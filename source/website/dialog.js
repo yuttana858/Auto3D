@@ -142,7 +142,7 @@ export class ProgressDialog extends Dialog
         let contentDiv = this.GetContentDiv ();
         contentDiv.classList.add ('ov_progress');
 
-        AddDiv (contentDiv, 'ov_progress_img', '<svg><use href="assets/images/auto3d-logo.svg#logo"></use></svg>');
+        AddDiv (contentDiv, 'ov_progress_img', '<svg><use href="assets/images/auto3d-logo.svg?v=sw-auto3d#logo"></use></svg>');
         this.textDiv = AddDiv (contentDiv, 'ov_progress_text');
         this.SetText (text);
     }
