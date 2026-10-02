@@ -14,11 +14,10 @@ import { Sidebar } from './sidebar.js';
 import { ThemeHandler } from './themehandler.js';
 import { ThreeModelLoaderUI } from './threemodelloaderui.js';
 import { Toolbar } from './toolbar.js';
-import { DownloadModel, ShowExportDialog } from './exportdialog.js';
+import { DownloadModel } from './exportdialog.js';
 import { ShowSnapshotDialog } from './snapshotdialog.js';
 import { AddSvgIconElement, GetFilesFromDataTransfer, InstallTooltip } from './utils.js';
 import { ShowOpenUrlDialog } from './openurldialog.js';
-import { ShowSharingDialog } from './sharingdialog.js';
 import { GetDefaultMaterials, ReplaceDefaultMaterialsColor } from '../engine/model/modelutils.js';
 import { Direction } from '../engine/geometry/geometry.js';
 import { CookieGetBoolVal, CookieSetBoolVal } from './cookiehandler.js';
@@ -33,6 +32,8 @@ import { LightingPanel } from './lightingpanel.js';
 import { MaterialPanel } from './materialpanel.js';
 import { AxisIndicator } from './axisindicator.js';
 import { GetBackgroundPreset, GetBackgroundGradientCSS } from '../engine/viewer/background.js';
+import { SessionEditor } from './sessioneditor.js';
+import { Preferences } from './preferences.js';
 
 const WebsiteUIState =
 {
@@ -235,6 +236,8 @@ export class Website
         this.lightingPanel = new LightingPanel (this);
         this.materialPanel = new MaterialPanel (this);
         this.axisIndicator = new AxisIndicator (this.viewer, document.getElementById ('world_axis'));
+        this.sessionEditor = new SessionEditor (this);
+        this.preferences = new Preferences (this);
         for (const [id, setting] of [['horizon_gradient', 'horizonGradient'], ['ground_grid', 'showGroundGrid']]) {
             const checkbox = document.getElementById (id);
             checkbox.addEventListener ('change', () => {
@@ -336,21 +339,22 @@ export class Website
         this.measureTool.SetActive (false);
     }
 
-    OnModelLoaded (importResult, threeObject)
+    OnModelLoaded (importResult, threeObject, fit = true)
     {
         this.model = importResult.model;
         this.sidebar.detailsPanel.modelFormat = GetFileExtension (importResult.mainFile).toUpperCase ();
-        this.parameters.fileNameDiv.innerHTML = importResult.mainFile;
+        this.parameters.fileNameDiv.textContent = importResult.mainFile;
         this.viewer.SetMainObject (threeObject);
         this.viewer.SetUpVector (Direction.Y, false);
         this.navigator.FillTree (importResult);
         if (this.materialPanel) { this.materialPanel.Update (); }
         this.sidebar.UpdateControlsVisibility ();
-        this.FitModelToWindow (true);
+        if (fit) { this.FitModelToWindow (true); }
     }
 
     OnModelClicked (button, mouseCoordinates)
     {
+        if (this.sessionEditor.controls.axis !== null || this.sessionEditor.controls.dragging) { return; }
         if (button !== 1) {
             return;
         }
@@ -455,6 +459,7 @@ export class Website
             HandleEvent ('model_load_started', 'hash');
             this.LoadModelFromUrlList (urls, importSettings);
         } else {
+            if (this.sessionEditor) { this.sessionEditor.document.objects.forEach ((object) => object.player?.Dispose ()); this.sessionEditor.document = new (this.sessionEditor.document.constructor) (); this.sessionEditor.history = new (this.sessionEditor.history.constructor) (); this.sessionEditor.selected = null; this.sessionEditor.controls.detach (); this.sessionEditor.RefreshUI (); }
             this.ClearModel ();
             this.SetUIState (WebsiteUIState.Intro);
         }
@@ -469,8 +474,9 @@ export class Website
     {
         let animation = !onLoad;
         let boundingSphere = this.viewer.GetBoundingSphere ((meshUserData) => {
-            return this.navigator.IsMeshVisible (meshUserData.originalMeshInstance.id);
+            return this.navigator.IsMeshVisible (meshUserData.originalMeshInstance.id) && this.sessionEditor.IsVisible (meshUserData.originalMeshInstance);
         });
+        if (boundingSphere === null || !Number.isFinite (boundingSphere.radius) || boundingSphere.radius <= 0) { return; }
         if (onLoad) {
             this.viewer.AdjustClippingPlanesToSphere (boundingSphere);
         }
@@ -500,12 +506,13 @@ export class Website
     UpdateMeshesVisibility ()
     {
         this.viewer.SetMeshesVisibility ((meshUserData) => {
-            return this.navigator.IsMeshVisible (meshUserData.originalMeshInstance.id);
+            return this.navigator.IsMeshVisible (meshUserData.originalMeshInstance.id) && this.sessionEditor.IsVisible (meshUserData.originalMeshInstance);
         });
     }
 
     UpdateMeshesSelection ()
     {
+        if (this.sessionEditor) { this.sessionEditor.SelectionChanged (); }
         let selectedMeshId = this.navigator.GetSelectedMeshId ();
         this.viewer.SetMeshesHighlight (this.highlightColor, (meshUserData) => {
             if (selectedMeshId !== null && meshUserData.originalMeshInstance.id.IsEqual (selectedMeshId)) {
@@ -525,6 +532,8 @@ export class Website
 
     LoadModelFromFileList (files)
     {
+        const session = Array.from (files).find ((file) => file.name.toLowerCase ().endsWith ('.auto3d'));
+        if (session) { this.sessionEditor.Run (() => this.sessionEditor.OpenArchiveFile (session)); return; }
         let importSettings = new ImportSettings ();
         importSettings.defaultLineColor = this.settings.defaultLineColor;
         importSettings.defaultColor = this.settings.defaultColor;
@@ -538,13 +547,13 @@ export class Website
         this.modelLoaderUI.LoadModel (files, settings, {
             onStart : () =>
             {
-                this.SetUIState (WebsiteUIState.Loading);
-                this.ClearModel ();
+                if (!this.sessionEditor.document.objects.length) { this.SetUIState (WebsiteUIState.Loading); }
+                this.sessionEditor.Status ('Loading model…');
             },
             onFinish : (importResult, threeObject) =>
             {
                 this.SetUIState (WebsiteUIState.Model);
-                this.OnModelLoaded (importResult, threeObject);
+                this.sessionEditor.Run (() => this.sessionEditor.Import (importResult, threeObject));
                 let importedExtension = GetFileExtension (importResult.mainFile);
                 HandleEvent ('model_loaded', importedExtension);
             },
@@ -554,7 +563,9 @@ export class Website
             },
             onError : (importError) =>
             {
-                this.SetUIState (WebsiteUIState.Intro);
+                this.SetUIState (this.sessionEditor.document.objects.length ? WebsiteUIState.Model : WebsiteUIState.Intro);
+                this.sessionEditor.replaceTarget = null;
+                this.sessionEditor.Status ('Model could not be loaded. Existing objects are retained.');
                 let extensionStr = null;
                 if (importError.mainFile !== null) {
                     extensionStr = GetFileExtension (importError.mainFile);
@@ -798,14 +809,10 @@ export class Website
             DownloadModel (importer);
         });
         AddButton (this.toolbar, 'export', Loc ('Export'), ['only_full_width', 'only_on_model'], () => {
-            ShowExportDialog (this.model, this.viewer, {
-                isMeshVisible : (meshInstanceId) => {
-                    return this.navigator.IsMeshVisible (meshInstanceId);
-                }
-            });
+            this.sessionEditor.Export ();
         });
         AddButton (this.toolbar, 'share', Loc ('Share'), ['only_full_width', 'only_on_model'], () => {
-            ShowSharingDialog (importer.GetFileList (), this.settings, this.viewer);
+            this.sessionEditor.library.Open ();
         });
         AddSeparator (this.toolbar, ['only_full_width', 'only_on_model']);
         AddButton (this.toolbar, 'snapshot', Loc ('Create snapshot'), ['only_full_width', 'only_on_model'], () => {
@@ -841,6 +848,7 @@ export class Website
             if (ev.target.files.length > 0) {
                 HandleEvent ('model_load_started', 'open_file');
                 this.LoadModelFromFileList (ev.target.files);
+                ev.target.value = '';
             }
         });
     }
@@ -1001,6 +1009,7 @@ export class Website
                 return GetMaterialsForMesh (this.viewer, this.model, meshInstanceId);
             },
             onMeshVisibilityChanged : () => {
+                this.sessionEditor.CaptureVisibility ();
                 this.UpdateMeshesVisibility ();
             },
             onMeshSelectionChanged : () => {

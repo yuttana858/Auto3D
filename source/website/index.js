@@ -22,6 +22,7 @@ import './css/sidebar.css';
 import './css/website.css';
 import './css/embed.css';
 import './css/workspace.css';
+import './css/session.css';
 
 export const UI = {
     ButtonDialog,

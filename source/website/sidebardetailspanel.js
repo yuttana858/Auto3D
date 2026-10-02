@@ -11,6 +11,7 @@ import { MaterialSource, MaterialType } from '../engine/model/material.js';
 import { RGBColorToHexString } from '../engine/model/color.js';
 import { Unit } from '../engine/model/unit.js';
 import { Loc } from '../engine/core/localization.js';
+import { DisplayLength } from './preferences.js';
 
 function UnitToString (unit)
 {
@@ -35,6 +36,7 @@ export class SidebarDetailsPanel extends SidebarPanel
     {
         super (parentDiv);
         this.modelFormat = null;
+        this.unitSystem = 'metric';
     }
 
     GetName ()
@@ -69,9 +71,9 @@ export class SidebarDetailsPanel extends SidebarPanel
         if (unit !== Unit.Unknown) {
             this.AddProperty (table, new Property (PropertyType.Text, Loc ('Unit'), UnitToString (unit)));
         }
-        this.AddProperty (table, new Property (PropertyType.Number, Loc ('Size X'), size.x));
-        this.AddProperty (table, new Property (PropertyType.Number, Loc ('Size Y'), size.y));
-        this.AddProperty (table, new Property (PropertyType.Number, Loc ('Size Z'), size.z));
+        this.AddProperty (table, new Property (PropertyType.Text, 'Width (X)', DisplayLength (size.x, unit, this.unitSystem)));
+        this.AddProperty (table, new Property (PropertyType.Text, 'Height (Y)', DisplayLength (size.y, unit, this.unitSystem)));
+        this.AddProperty (table, new Property (PropertyType.Text, 'Depth (Z)', DisplayLength (size.z, unit, this.unitSystem)));
         this.AddCalculatedProperty (table, Loc ('Volume'), () => {
             if (!IsTwoManifold (object3D)) {
                 return null;
@@ -147,14 +149,14 @@ export class SidebarDetailsPanel extends SidebarPanel
 
     AddPropertyGroup (table, propertyGroup)
     {
-        let row = AddDiv (table, 'ov_property_table_row group', propertyGroup.name);
+        let row = AddDiv (table, 'ov_property_table_row group'); row.textContent = propertyGroup.name;
         row.setAttribute ('title', propertyGroup.name);
     }
 
     AddProperty (table, property)
     {
         let row = AddDiv (table, 'ov_property_table_row');
-        let nameColumn = AddDiv (row, 'ov_property_table_cell ov_property_table_name', property.name + ':');
+        let nameColumn = AddDiv (row, 'ov_property_table_cell ov_property_table_name'); nameColumn.textContent = property.name + ':';
         let valueColumn = AddDiv (row, 'ov_property_table_cell ov_property_table_value');
         nameColumn.setAttribute ('title', property.name);
         this.DisplayPropertyValue (property, valueColumn);
@@ -196,8 +198,7 @@ export class SidebarDetailsPanel extends SidebarPanel
         let valueTitle = null;
         if (property.type === PropertyType.Text) {
             if (IsUrl (property.value)) {
-                valueHtml = '<a target="_blank" href="' + property.value + '">' + property.value + '</a>';
-                valueTitle = property.value;
+                const link = document.createElement ('a'); link.textContent = property.value; link.href = property.value; link.target = '_blank'; link.rel = 'noopener'; targetDiv.appendChild (link); targetDiv.title = property.value;
             } else {
                 valueHtml = PropertyToString (property);
             }
@@ -210,7 +211,7 @@ export class SidebarDetailsPanel extends SidebarPanel
             valueHtml = PropertyToString (property);
         }
         if (valueHtml !== null) {
-            targetDiv.innerHTML = valueHtml;
+            targetDiv.textContent = valueHtml;
             targetDiv.setAttribute ('title', valueTitle !== null ? valueTitle : valueHtml);
         }
     }

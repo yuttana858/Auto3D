@@ -1063,6 +1063,7 @@ export class ImporterGltf extends ImporterBase
         }
 
         let node = new Node ();
+        node.gltfNodeIndex = gltf.nodes.indexOf (gltfNode);
         if (gltfNode.name !== undefined) {
             node.SetName (gltfNode.name);
         }

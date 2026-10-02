@@ -123,6 +123,23 @@ export class LightingPanel
         document.getElementById ('lighting_status').textContent = text;
     }
 
+    Capture ()
+    {
+        return { mode : this.mode, environment : this.selected, background : this.lighting.showBackground, brightness : Number (document.getElementById ('hdri_brightness').value), rotation : Number (document.getElementById ('hdri_rotation').value), elevation : Number (document.getElementById ('hdri_elevation').value) };
+    }
+
+    async Restore (data)
+    {
+        const index = Environments.findIndex ((item) => item[0] === data.environment);
+        for (const [key, min, max] of [['brightness', 0, 3], ['rotation', -180, 180], ['elevation', -90, 90]]) {
+            if (Number.isFinite (data[key])) { const control = document.getElementById ('hdri_' + key); control.value = Math.max (min, Math.min (max, data[key])); control.dispatchEvent (new Event ('input')); }
+        }
+        document.getElementById ('hdri_background').checked = data.background === true; this.lighting.SetBackgroundVisible (data.background === true);
+        if (data.mode === 'hdri' && index >= 0) { this.SetMode ('hdri'); await this.Select (Environments[index][0], Environments[index][1], this.root.querySelector ('.hdri_gallery').children[index]); }
+        else { ++this.request; this.SetMode ('default'); this.lighting.SetDefault (); this.Status ('Default environment active.'); }
+        this.SyncBackgroundVisibility ();
+    }
+
     async Select (id, name, button)
     {
         const request = ++this.request;

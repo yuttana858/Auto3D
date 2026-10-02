@@ -250,6 +250,7 @@ export class Navigation
 		this.onMouseClick = null;
 		this.onMouseMove = null;
 		this.onContext = null;
+        this.enabled = true;
 
 		if (this.canvas.addEventListener) {
 			this.canvas.addEventListener ('mousedown', this.OnMouseDown.bind (this));
@@ -365,6 +366,7 @@ export class Navigation
 
 	OnMouseDown (ev)
 	{
+        if (!this.enabled) { return; }
 		ev.preventDefault ();
 
 		this.mouse.Down (this.canvas, ev);
@@ -373,6 +375,7 @@ export class Navigation
 
 	OnMouseMove (ev)
 	{
+        if (!this.enabled) { return; }
 		this.mouse.Move (this.canvas, ev);
 		this.clickDetector.Move (this.mouse.GetPosition ());
 		if (this.onMouseMove) {
@@ -417,13 +420,16 @@ export class Navigation
 
 	OnMouseUp (ev)
 	{
+        if (!this.enabled) { this.mouse.Up (this.canvas, ev); this.clickDetector.Cancel (); return; }
+        const wasDown = this.mouse.IsButtonDown ();
 		this.mouse.Up (this.canvas, ev);
 		this.clickDetector.End ();
 
-		if (this.clickDetector.IsClick ()) {
+        if (wasDown && this.clickDetector.IsClick ()) {
 			let mouseCoords = this.mouse.GetPosition ();
 			this.Click (ev.which, mouseCoords);
 		}
+        this.clickDetector.Cancel ();
 	}
 
 	OnMouseLeave (ev)
@@ -434,6 +440,7 @@ export class Navigation
 
 	OnTouchStart (ev)
 	{
+        if (!this.enabled) { return; }
 		ev.preventDefault ();
 
 		this.touch.Start (this.canvas, ev);
@@ -442,6 +449,7 @@ export class Navigation
 
 	OnTouchMove (ev)
 	{
+        if (!this.enabled) { return; }
 		ev.preventDefault ();
 
 		this.touch.Move (this.canvas, ev);
@@ -476,6 +484,7 @@ export class Navigation
 
 	OnTouchEnd (ev)
 	{
+        if (!this.enabled) { this.touch.End (this.canvas, ev); this.clickDetector.Cancel (); return; }
 		ev.preventDefault ();
 
 		this.touch.End (this.canvas, ev);
@@ -491,6 +500,7 @@ export class Navigation
 
 	OnMouseWheel (ev)
 	{
+        if (!this.enabled) { return; }
 		let params = ev || window.event;
 		params.preventDefault ();
 

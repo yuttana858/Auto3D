@@ -1,6 +1,6 @@
 {
 	"name": "online-3d-viewer",
-	"version": "0.19.0",
+	"version": "0.20.0",
 	"description": "Auto3D browser-based 3D model viewer",
 	"license": "MIT",
 	"type": "module",
@@ -37,7 +37,7 @@
 		"website/assets/envmaps/*"
 	],
 	"scripts": {
-		"start": "npm run build_website_dev && http-server",
+		"start": "node tools/dev_server.mjs",
 		"test": "mocha test",
 		"lint": "eslint source",
 		"lint_fix": "eslint source --fix",
