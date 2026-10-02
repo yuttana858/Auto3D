@@ -548,6 +548,7 @@ export class SidebarSettingsPanel extends SidebarPanel
         this.settings.environmentMapName = defaultSettings.environmentMapName;
         this.settings.backgroundIsEnvMap = defaultSettings.backgroundIsEnvMap;
         this.settings.horizonGradient = defaultSettings.horizonGradient;
+        this.settings.backgroundPreset = defaultSettings.backgroundPreset;
         this.settings.showGroundGrid = defaultSettings.showGroundGrid;
         this.settings.backgroundColor = defaultSettings.backgroundColor;
         this.settings.defaultLineColor = defaultSettings.defaultLineColor;

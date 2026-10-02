@@ -2,7 +2,7 @@ import { GetFileExtension, TransformFileHostUrls } from '../engine/io/fileutils.
 import { InputFilesFromFileObjects, InputFilesFromUrls } from '../engine/import/importerfiles.js';
 import { ImportErrorCode, ImportSettings } from '../engine/import/importer.js';
 import { NavigationMode, ProjectionMode } from '../engine/viewer/camera.js';
-import { RGBColor } from '../engine/model/color.js';
+import { RGBColor, HexStringToRGBAColor } from '../engine/model/color.js';
 import { Viewer } from '../engine/viewer/viewer.js';
 import { AddDomElement, ShowDomElement, SetDomElementOuterHeight, CreateDomElement, GetDomElementOuterWidth } from '../engine/viewer/domutils.js';
 import { CalculatePopupPositionToScreen, ShowListPopup } from './dialogs.js';
@@ -31,6 +31,8 @@ import { IntersectionMode } from '../engine/viewer/viewermodel.js';
 import { Loc } from '../engine/core/localization.js';
 import { LightingPanel } from './lightingpanel.js';
 import { MaterialPanel } from './materialpanel.js';
+import { AxisIndicator } from './axisindicator.js';
+import { GetBackgroundPreset, GetBackgroundGradientCSS } from '../engine/viewer/background.js';
 
 const WebsiteUIState =
 {
@@ -232,17 +234,18 @@ export class Website
     {
         this.lightingPanel = new LightingPanel (this);
         this.materialPanel = new MaterialPanel (this);
+        this.axisIndicator = new AxisIndicator (this.viewer, document.getElementById ('world_axis'));
         for (const [id, setting] of [['horizon_gradient', 'horizonGradient'], ['ground_grid', 'showGroundGrid']]) {
             const checkbox = document.getElementById (id);
             checkbox.addEventListener ('change', () => {
                 this.settings[setting] = checkbox.checked;
                 if (setting === 'horizonGradient' && checkbox.checked) {
                     this.settings.backgroundIsEnvMap = false;
-                    this.settings.backgroundColor = new Settings (this.settings.themeId).backgroundColor;
+                    if (this.settings.backgroundPreset === 'custom') { this.settings.backgroundPreset = 'standard'; }
                     this.UpdateEnvironmentMap ();
-                    this.sidebar.UpdateControlsStatus ();
                 }
                 this.UpdateViewport ();
+                this.sidebar.UpdateControlsStatus ();
                 this.settings.SaveToCookies ();
             });
         }
@@ -618,9 +621,8 @@ export class Website
             this.settings.backgroundColor = defaultSettings.backgroundColor;
             this.settings.defaultLineColor = defaultSettings.defaultLineColor;
             this.settings.defaultColor = defaultSettings.defaultColor;
-            this.sidebar.UpdateControlsStatus ();
-
             this.UpdateViewport ();
+            this.sidebar.UpdateControlsStatus ();
             let modelLoader = this.modelLoaderUI.GetModelLoader ();
             if (modelLoader.GetDefaultMaterials () !== null) {
                 ReplaceDefaultMaterialsColor (this.model, this.settings.defaultColor, this.settings.defaultLineColor);
@@ -649,13 +651,34 @@ export class Website
             return;
         }
         const dark = this.settings.themeId === Theme.Dark;
+        const background = GetBackgroundPreset (this.settings.backgroundPreset, dark);
+        if (this.settings.backgroundPreset !== 'custom') {
+            this.settings.backgroundColor = HexStringToRGBAColor (background.colors[0].slice (1) + 'ff');
+        }
+        const color = this.settings.backgroundColor;
+        const solidBackground = 'rgba(' + [color.r, color.g, color.b, color.a / 255].join (',') + ')';
+        this.parameters.viewerDiv.style.setProperty ('--sw_viewer_background', this.settings.horizonGradient ? GetBackgroundGradientCSS (background.colors) : solidBackground);
         this.parameters.viewerDiv.classList.toggle ('dark_viewport', dark);
         this.parameters.viewerDiv.classList.toggle ('horizon_viewport', this.settings.horizonGradient);
         this.viewer.SetBackgroundColor (this.settings.backgroundColor);
-        this.viewer.SetBackgroundGradient (this.settings.horizonGradient, dark);
-        this.viewer.SetGroundGrid (this.settings.showGroundGrid, dark);
-        document.getElementById ('horizon_gradient').checked = this.settings.horizonGradient;
-        document.getElementById ('ground_grid').checked = this.settings.showGroundGrid;
+        this.viewer.SetBackgroundGradient (this.settings.horizonGradient, dark, background.colors);
+        const darkGrid = this.settings.backgroundPreset === 'custom' ? (color.r + color.g + color.b) / 3 < 128 : background.dark;
+        this.parameters.viewerDiv.style.setProperty ('--sw_axis_text', darkGrid ? '#d5dce3' : '#394650');
+        this.viewer.SetGroundGrid (this.settings.showGroundGrid, darkGrid);
+        if (this.lightingPanel) { this.lightingPanel.SyncControls (); }
+    }
+
+    ApplyBackgroundPreset (preset)
+    {
+        this.settings.backgroundPreset = preset;
+        this.settings.horizonGradient = true;
+        if (this.settings.backgroundIsEnvMap) {
+            this.settings.backgroundIsEnvMap = false;
+            this.UpdateEnvironmentMap ();
+        }
+        this.UpdateViewport ();
+        this.sidebar.UpdateControlsStatus ();
+        this.settings.SaveToCookies ();
     }
 
     InitToolbar ()
@@ -870,6 +893,7 @@ export class Website
                 }
             },
             onBackgroundColorChanged : () => {
+                this.settings.backgroundPreset = 'custom';
                 this.settings.horizonGradient = false;
                 this.UpdateViewport ();
                 this.settings.SaveToCookies ();

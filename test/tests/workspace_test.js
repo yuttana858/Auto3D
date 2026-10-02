@@ -5,10 +5,41 @@ import { HDRILighting, ProjectHDRI } from '../../source/engine/viewer/hdrilighti
 import { ShadingModel } from '../../source/engine/viewer/shadingmodel.js';
 import { ShadingType } from '../../source/engine/threejs/threeutils.js';
 import { GetMaterialEntries, EnumerateUVTriangles } from '../../source/website/materialpanel.js';
+import { GetWorldAxisDirections } from '../../source/website/axisindicator.js';
+import { GetBackgroundPreset } from '../../source/engine/viewer/background.js';
 
 export default function suite ()
 {
     describe ('Workspace lighting and materials', () => {
+        it ('Follows the theme for Standard while preserving explicitly selected background colors', () => {
+            assert.deepEqual (GetBackgroundPreset ('standard', true).colors, GetBackgroundPreset ('dark', false).colors);
+            assert.deepEqual (GetBackgroundPreset ('standard', false).colors, GetBackgroundPreset ('light', true).colors);
+            for (const preset of ['dark', 'light', 'sunset', 'outdoor']) {
+                assert.deepEqual (GetBackgroundPreset (preset, true), GetBackgroundPreset (preset, false));
+            }
+        });
+
+        it ('Projects world axes through inverse camera orientation, including roll', () => {
+            const quaternion = new THREE.Quaternion ().setFromAxisAngle (new THREE.Vector3 (0, 0, 1), Math.PI / 2);
+            const axes = GetWorldAxisDirections (quaternion);
+            assert.ok (axes[0].vector.distanceTo (new THREE.Vector3 (0, -1, 0)) < 1e-10);
+            assert.ok (axes[1].vector.distanceTo (new THREE.Vector3 (1, 0, 0)) < 1e-10);
+            assert.ok (axes[2].vector.distanceTo (new THREE.Vector3 (0, 0, 1)) < 1e-10);
+        });
+
+        it ('Keeps the world indicator independent of camera translation and projection', () => {
+            const perspective = new THREE.PerspectiveCamera ();
+            perspective.position.set (3, 4, 5);
+            perspective.lookAt (0, 0, 0);
+            const orthographic = new THREE.OrthographicCamera ();
+            orthographic.position.set (30, 40, 50);
+            orthographic.lookAt (0, 0, 0);
+            const first = GetWorldAxisDirections (perspective.quaternion);
+            const second = GetWorldAxisDirections (orthographic.quaternion);
+            first.forEach ((axis, index) => assert.ok (axis.vector.distanceTo (second[index].vector) < 1e-10));
+            assert.ok (Math.abs (first[0].vector.dot (first[1].vector)) < 1e-10);
+        });
+
         function MakeViewer ()
         {
             const scene = new THREE.Scene ();

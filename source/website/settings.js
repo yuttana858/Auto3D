@@ -18,6 +18,7 @@ export class Settings
         this.environmentMapName = 'fishermans_bastion';
         this.backgroundIsEnvMap = false;
         this.horizonGradient = true;
+        this.backgroundPreset = 'standard';
         this.showGroundGrid = false;
         if (this.themeId === Theme.Light) {
             this.backgroundColor = new RGBAColor (255, 255, 255, 255);
@@ -37,6 +38,8 @@ export class Settings
         this.environmentMapName = CookieGetStringVal ('ov_environment_map', 'fishermans_bastion');
         this.backgroundIsEnvMap = CookieGetBoolVal ('ov_background_is_envmap', false);
         this.horizonGradient = CookieGetBoolVal ('sw_horizon_gradient', true);
+        const preset = CookieGetStringVal ('sw_background_preset', 'standard');
+        this.backgroundPreset = ['standard', 'dark', 'light', 'sunset', 'outdoor', 'custom'].includes (preset) ? preset : 'standard';
         this.showGroundGrid = CookieGetBoolVal ('sw_ground_grid', false);
         const defaultBackground = this.themeId === Theme.Dark ? new RGBAColor (0, 0, 0, 255) : new RGBAColor (255, 255, 255, 255);
         this.backgroundColor = this.horizonGradient ? defaultBackground : CookieGetRGBAColorVal ('ov_background_color', defaultBackground);
@@ -53,6 +56,7 @@ export class Settings
         CookieSetStringVal ('ov_environment_map', this.environmentMapName);
         CookieSetBoolVal ('ov_background_is_envmap', this.backgroundIsEnvMap);
         CookieSetBoolVal ('sw_horizon_gradient', this.horizonGradient);
+        CookieSetStringVal ('sw_background_preset', this.backgroundPreset);
         CookieSetBoolVal ('sw_ground_grid', this.showGroundGrid);
         CookieSetRGBAColorVal ('ov_background_color', this.backgroundColor);
         CookieSetRGBColorVal ('ov_default_line_color', this.defaultLineColor);

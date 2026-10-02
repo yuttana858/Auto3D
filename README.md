@@ -20,6 +20,8 @@ The left panel has collapsible Materials and Lighting sections. Select a model p
 
 Lighting offers the default environment and eight locally bundled 1K Poly Haven HDRIs, with brightness, rotation and elevation controls. Physical surfaces use prefiltered image-based lighting; Phong surfaces use a diffuse light probe integrated from the same HDR data. The horizon background and ground grid remain independent. Asset licenses and sources are in `website/assets/hdri/NOTICE.md` and `sources.json`; generate previews with `node tools/prepare_hdri_previews.mjs`.
 
+Default lighting includes Standard, Dark, Light, Sunset and Outdoor background presets. Standard follows the app theme; explicit presets retain their colors across theme changes. Background, horizon and grid preferences are saved in cookies. Horizon and ground-grid controls live in Lighting. The viewer's X/Y/Z world indicator follows the camera orientation, including orbit, roll and up-axis changes.
+
 ## Supported formats
 
 - **Import:** 3dm, 3ds, 3mf, amf, bim, brep, dae, fbx, fcstd, gltf/glb, ifc, iges, step, stl, obj, off, ply, wrl.

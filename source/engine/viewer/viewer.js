@@ -7,6 +7,7 @@ import { GetDomElementInnerDimensions } from './domutils.js';
 import { Navigation } from './navigation.js';
 import { ShadingModel } from './shadingmodel.js';
 import { ViewerModel, ViewerMainModel } from './viewermodel.js';
+import { BackgroundStops, GetBackgroundPreset } from './background.js';
 
 import * as THREE from 'three';
 
@@ -173,6 +174,7 @@ export class Viewer
         this.navigation = null;
         this.upVector = null;
         this.backgroundGradient = null;
+        this.onRender = null;
         this.groundGrid = null;
         this.groundGridSettings = { show : false, dark : false };
         this.settings = {
@@ -258,7 +260,7 @@ export class Viewer
         return this.canvas;
     }
 
-    SetBackgroundGradient (enabled, dark)
+    SetBackgroundGradient (enabled, dark, colors = null)
     {
         if (this.backgroundGradient !== null) {
             this.backgroundGradient.dispose ();
@@ -270,9 +272,9 @@ export class Viewer
             canvas.height = 512;
             const context = canvas.getContext ('2d');
             const gradient = context.createLinearGradient (0, 0, 0, 512);
-            const colors = dark ? ['#000000', '#07090c', '#1b2228', '#171b1f', '#000000'] : ['#ffffff', '#f8fafc', '#dbe2e8', '#e5e8eb', '#ffffff'];
-            for (const [index, stop] of [0, 0.45, 0.56, 0.59, 1].entries ()) {
-                gradient.addColorStop (stop, colors[index]);
+            const gradientColors = colors || GetBackgroundPreset ('standard', dark).colors;
+            for (const [index, stop] of BackgroundStops.entries ()) {
+                gradient.addColorStop (stop, gradientColors[index]);
             }
             context.fillStyle = gradient;
             context.fillRect (0, 0, 2, 512);
@@ -461,6 +463,11 @@ export class Viewer
         this.Render ();
     }
 
+    SetRenderHandler (onRender)
+    {
+        this.onRender = onRender;
+    }
+
     Render ()
     {
         let navigationCamera = this.navigation.GetCamera ();
@@ -491,6 +498,9 @@ export class Viewer
 
         this.shadingModel.UpdateByCamera (navigationCamera);
         this.renderer.render (this.scene, this.camera);
+        if (this.onRender !== null) {
+            this.onRender (this.camera);
+        }
     }
 
     SetMainObject (object)
@@ -675,6 +685,7 @@ export class Viewer
 
     Destroy ()
     {
+        this.onRender = null;
         this.groundGridSettings.show = false;
         this.Clear ();
         if (this.backgroundGradient !== null) {

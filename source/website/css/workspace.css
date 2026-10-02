@@ -22,6 +22,16 @@ div.workspace_panel.collapsed { flex-basis: 40px; width: 40px; }
 .mode_buttons button, .section_button { background: transparent; color: var(--ov_foreground_color); border: 1px solid var(--ov_border_color); border-radius: 4px; padding: 8px; font: inherit; font-size: 12px; cursor: pointer; }
 .mode_buttons button { flex: 1; }
 .mode_buttons button[aria-pressed="true"] { background: var(--ov_button_color); color: var(--ov_button_text_color); border-color: var(--ov_button_color); }
+.background_gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.background_card { display: flex; align-items: center; gap: 7px; padding: 7px; border: 1px solid var(--ov_border_color); border-radius: 4px; background: transparent; color: var(--ov_foreground_color); font: inherit; font-size: 11px; cursor: pointer; }
+.background_card:first-child { grid-column: span 2; }
+.background_card[aria-pressed="true"] { border-color: var(--ov_button_color); box-shadow: 0 0 0 1px var(--ov_button_color); }
+.background_swatch { width: 28px; height: 22px; flex: 0 0 28px; border-radius: 3px; border: 1px solid #8886; }
+.lighting_viewport_controls { display: flex; flex-direction: column; gap: 10px; margin: 16px 0 12px; padding-top: 12px; border-top: 1px solid var(--ov_border_color); font-size: 12px; }
+.lighting_viewport_controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.lighting_viewport_controls input { margin: 0; accent-color: var(--ov_button_color); }
+.world_axis { position: absolute; bottom: 12px; left: 12px; width: 88px; height: 92px; max-width: calc(100% - 24px); z-index: 2; pointer-events: none; overflow: visible; font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; }
+.axis_world_label { fill: var(--sw_axis_text, var(--ov_foreground_color)); font-size: 8px; letter-spacing: 1.5px; }
 .section_button { width: 100%; margin-top: 10px; }
 .section_button:hover, .material_card:hover { background: var(--ov_hover_color); }
 .section_button:disabled { opacity: 0.45; cursor: default; }
@@ -59,15 +69,8 @@ div.main_navigator, div.main_sidebar { width: 100% !important; margin: 0; }
 div.main .main_splitter { display: none !important; }
 div.main_viewer { flex: 1; min-width: 0; position: relative; overflow: hidden; }
 div.main_viewer canvas { margin: 0; border: 0; }
-.viewer_empty { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; pointer-events: none; background: var(--ov_background_color); }
+.viewer_empty { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; pointer-events: none; color: var(--sw_axis_text, var(--ov_foreground_color)); --ov_logo_text_color: var(--sw_axis_text, var(--ov_foreground_color)); background: var(--sw_viewer_background, var(--ov_background_color)); }
 .viewer_empty[hidden] { display: none; }
-.horizon_viewport .viewer_empty { background: linear-gradient(to bottom, #fff 0%, #f8fafc 45%, #dbe2e8 56%, #e5e8eb 59%, #fff 100%); }
-.dark_viewport .viewer_empty { background: #000; }
-.dark_viewport.horizon_viewport .viewer_empty { background: linear-gradient(to bottom, #000 0%, #07090c 45%, #1b2228 56%, #171b1f 59%, #000 100%); }
-.viewport_options { position: absolute; bottom: 14px; left: 14px; z-index: 2; display: flex; flex-wrap: wrap; gap: 10px; padding: 8px 10px; border: 1px solid var(--ov_border_color); border-radius: 5px; color: var(--ov_foreground_color); background: var(--ov_background_color); font-size: 12px; }
-.viewport_options label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
-.viewport_options input { accent-color: var(--ov_button_color); margin: 0; }
-.viewport_options { max-width: calc(100% - 28px); box-sizing: border-box; }
 .viewer_empty svg { width: 240px; max-width: 100%; height: 60px; }
 .viewer_empty h2 { margin: 22px 0 8px; font-size: 22px; font-weight: normal; }
 .viewer_empty p { max-width: 260px; color: var(--ov_light_icon_color); line-height: 1.6; font-size: 14px; }
