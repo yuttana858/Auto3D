@@ -10,6 +10,8 @@ Install the npm dependencies, then run `npm start`. The server at `http://localh
 
 The prototype is hosted at https://yuttana858.github.io/Auto3D/ from the `gh-pages` branch. Source code lives on `main`.
 
+Open or drag in `.zae` files directly to view bundled COLLADA models and textures. Auto3D extracts the archive and selects the DAE named by `manifest.xml`; archives without a manifest offer their DAE files for selection.
+
 To publish an update, run `npm run build_website` and `node tools/build_pages.mjs`. In `build/pages`, commit the updated files and push `gh-pages`. GitHub Pages publishes that branch automatically. Source pushes to `main` do not deploy the site.
 
 This is a prototype; the dependency-license, security, and privacy checks in `3d-viewer-review.md` remain outstanding.

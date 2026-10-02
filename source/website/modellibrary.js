@@ -1,5 +1,6 @@
 import { LibraryCategories } from './sessionarchive.js';
 import { CloudLibrary } from './cloudlibrary.js';
+import { EnablePopupFade } from './popuptransition.js';
 
 export class DeviceLibrary
 {
@@ -35,6 +36,7 @@ export class DeviceLibrary
 export function WorkspaceDialog (title)
 {
     const dialog = document.createElement ('dialog');
+    EnablePopupFade (dialog);
     dialog.className = 'workspace_dialog';
     dialog.setAttribute ('aria-label', title);
     const header = document.createElement ('div'); header.className = 'workspace_dialog_header';
@@ -65,9 +67,13 @@ export class ModelLibrary
         const hint = document.createElement ('p'); hint.className = 'section_hint'; hint.textContent = 'Use a publisher account from this project’s Supabase Authentication users. Everyone can browse the library; sign-in is required to publish.';
         const email = document.createElement ('input'); email.type = 'email'; email.required = true; email.autocomplete = 'username'; email.placeholder = 'Email'; email.setAttribute ('aria-label', 'Publisher email');
         const password = document.createElement ('input'); password.type = 'password'; password.required = true; password.autocomplete = 'current-password'; password.placeholder = 'Password'; password.setAttribute ('aria-label', 'Publisher password');
+        const revealLabel = document.createElement ('label'); revealLabel.className = 'password_visibility';
+        const reveal = document.createElement ('input'); reveal.type = 'checkbox';
+        reveal.addEventListener ('change', () => { password.type = reveal.checked ? 'text' : 'password'; });
+        revealLabel.append (reveal, document.createTextNode ('Show password'));
         const status = document.createElement ('p'); status.setAttribute ('role', 'status');
         const submit = document.createElement ('button'); submit.type = 'submit'; submit.className = 'workspace_primary'; submit.textContent = 'Sign in';
-        form.append (hint, email, password, status, submit);
+        form.append (hint, email, password, revealLabel, status, submit);
         form.addEventListener ('submit', async (event) => {
             event.preventDefault (); submit.disabled = true;
             try { await this.sharedStorage.SignIn (email.value.trim (), password.value); password.value = ''; dialog.close (); if (onSuccess) { onSuccess (); } }
@@ -79,7 +85,7 @@ export class ModelLibrary
     SaveDialog (download = false)
     {
         if (this.editor.readOnly) { return; }
-        const dialog = WorkspaceDialog (download ? 'Save session' : 'Save to library');
+        const dialog = WorkspaceDialog ('Save session');
         const form = document.createElement ('form'); form.className = 'workspace_save_form';
         const nameLabel = document.createElement ('label'); nameLabel.textContent = 'Name';
         const name = document.createElement ('input'); name.setAttribute ('aria-label', 'Save name'); name.required = true; name.maxLength = 100;
@@ -94,30 +100,44 @@ export class ModelLibrary
         if (!download && this.editor.selected) { kind.add (new Option ('Selected model', 'model')); }
         kindLabel.appendChild (kind);
         const destinationLabel = document.createElement ('label'); destinationLabel.textContent = 'Destination';
-        const destination = document.createElement ('select'); destination.setAttribute ('aria-label', 'Save destination'); destination.add (new Option ('Shared library', 'shared')); destination.add (new Option ('Device library', 'device')); destinationLabel.appendChild (destination);
-        destination.value = this.storage === this.sharedStorage ? 'shared' : 'device';
+        const destination = document.createElement ('select'); destination.setAttribute ('aria-label', 'Save destination'); destination.add (new Option ('Shared library', 'shared')); destination.add (new Option ('Device library (this browser)', 'device')); destination.add (new Option ('File on disk (.auto3d)', 'file')); destinationLabel.appendChild (destination);
+        destination.value = download ? 'file' : this.storage === this.sharedStorage ? 'shared' : 'device';
         const hint = document.createElement ('p'); hint.className = 'section_hint';
-        const updateHint = () => { hint.textContent = download ? 'A portable .auto3d file preserves objects, materials, textures and your view.' : destination.value === 'shared' ? 'Shared saves are visible to anyone visiting this prototype. Sign-in required to publish. Maximum 64 MB.' : 'Saved only in this browser on this device.'; };
-        destination.addEventListener ('change', updateHint); updateHint ();
+        const updateHint = () => {
+            hint.textContent = destination.value === 'file' ? (typeof window.showSaveFilePicker === 'function' ? 'Choose a folder and filename for a portable .auto3d session with materials, textures and your view.' : 'Download a portable .auto3d session. Your browser chooses the folder; enable “Ask where to save each file” in browser settings to choose a location.') : destination.value === 'shared' ? 'Shared saves are visible to anyone visiting this prototype. Sign-in required to publish. Maximum 64 MB.' : 'Stored in this browser on this device, not in a folder. Clearing site data removes these saves. Choose File on disk for a portable copy.';
+            submit.textContent = destination.value === 'file' ? 'Save session file' : 'Save to library';
+        };
         const status = document.createElement ('p'); status.className = 'section_hint'; status.setAttribute ('role', 'status');
-        const submit = document.createElement ('button'); submit.className = 'workspace_primary'; submit.type = 'submit'; submit.textContent = download ? 'Download session' : 'Save to library';
+        const submit = document.createElement ('button'); submit.className = 'workspace_primary'; submit.type = 'submit';
+        destination.addEventListener ('change', updateHint); updateHint ();
         submit.disabled = !this.editor.document.objects.length;
         const open = document.createElement ('button'); open.type = 'button'; open.textContent = 'Open session file';
         open.addEventListener ('click', () => { dialog.close (); this.editor.OpenSessionFile (); });
         form.append (nameLabel, categoryLabel, kindLabel);
-        if (!download) { form.appendChild (destinationLabel); }
+        form.appendChild (destinationLabel);
         form.append (hint, status, submit);
         if (download) { form.appendChild (open); }
         form.addEventListener ('submit', async (event) => {
             event.preventDefault (); if (!name.value.trim ()) { return; }
-            if (!download && destination.value === 'shared' && !this.sharedStorage.session) { this.SignInDialog (() => { status.textContent = 'Signed in. Press Save to library to publish.'; }); return; }
+            if (destination.value === 'shared' && !this.sharedStorage.session) { this.SignInDialog (() => { status.textContent = 'Signed in. Press Save to library to publish.'; }); return; }
             submit.disabled = true; status.textContent = 'Preparing session…';
             try {
+                let fileHandle = null;
+                if (destination.value === 'file' && typeof window.showSaveFilePicker === 'function') {
+                    fileHandle = await window.showSaveFilePicker ({ suggestedName : name.value.trim () + '.auto3d', types : [{ description : 'Auto3D session', accept : { 'application/octet-stream' : ['.auto3d'] } }] });
+                }
                 const objects = kind.value === 'model' ? [this.editor.selected] : this.editor.document.objects;
                 const saved = this.editor.Archive (objects, kind.value, name.value.trim ());
-                if (download) {
-                    this.editor.Download (saved, name.value.trim () + '.auto3d', 'application/octet-stream');
-                    this.editor.Status ('Session downloaded.');
+                if (destination.value === 'file') {
+                    if (fileHandle) {
+                        const writable = await fileHandle.createWritable ();
+                        try { await writable.write (saved); await writable.close (); }
+                        catch (error) { await writable.abort ().catch (() => {}); throw error; }
+                        this.editor.Status ('Session saved: ' + fileHandle.name);
+                    } else {
+                        this.editor.Download (saved, name.value.trim () + '.auto3d', 'application/octet-stream');
+                        this.editor.Status ('Session downloaded.');
+                    }
                 } else {
                     const thumbnail = this.editor.Thumbnail (objects);
                     const storage = destination.value === 'shared' ? this.sharedStorage : this.deviceStorage;
@@ -126,7 +146,7 @@ export class ModelLibrary
                 }
                 if (kind.value === 'session') { this.editor.document.name = name.value.trim (); this.editor.website.parameters.fileNameDiv.textContent = this.editor.document.name; }
                 dialog.close ();
-            } catch (error) { status.textContent = error.message; submit.disabled = false; }
+            } catch (error) { status.textContent = error.name === 'AbortError' ? 'Save canceled. Choose a destination to try again.' : error.message; submit.disabled = false; }
         });
         dialog.appendChild (form);
     }
@@ -149,6 +169,7 @@ export class ModelLibrary
         const body = document.createElement ('div'); body.className = 'library_body';
         const search = document.createElement ('input'); search.type = 'search'; search.placeholder = 'Search saved models and sessions'; search.setAttribute ('aria-label', 'Search library');
         const grid = document.createElement ('div'); grid.className = 'library_grid';
+        grid.tabIndex = 0; grid.setAttribute ('role', 'region'); grid.setAttribute ('aria-label', 'Saved models and sessions');
         const status = document.createElement ('p'); status.setAttribute ('role', 'status'); status.className = 'section_hint';
         body.append (search, status, grid); shell.append (categories, body); dialog.appendChild (shell);
         const save = document.createElement ('button'); save.className = 'workspace_primary'; save.textContent = 'Save current session'; save.disabled = !this.editor.document.objects.length;

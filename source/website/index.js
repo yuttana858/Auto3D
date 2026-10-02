@@ -6,6 +6,7 @@ import { SetEventHandler, HandleEvent } from './eventhandler.js';
 import { PluginType, RegisterPlugin } from './pluginregistry.js';
 import { ButtonDialog, ProgressDialog } from './dialog.js';
 import { ShowMessageDialog } from './dialogs.js';
+import { StartWelcomeSequence } from './welcome.js';
 
 import * as Engine from '../engine/main.js';
 export { Engine };
@@ -23,6 +24,7 @@ import './css/website.css';
 import './css/embed.css';
 import './css/workspace.css';
 import './css/session.css';
+import './css/welcome.css';
 
 export const UI = {
     ButtonDialog,
@@ -79,6 +81,7 @@ export function StartWebsite ()
             fileInput : document.getElementById ('open_file')
         });
         website.Load ();
+        StartWelcomeSequence ();
     });
 }
 

@@ -270,6 +270,16 @@ export class ImporterThreeBase extends ImporterBase
         material.diffuseMap = CreateTexture (threeMaterial.map, this.objectUrlToFileName);
         material.normalMap = CreateTexture (threeMaterial.normalMap, this.objectUrlToFileName);
         material.bumpMap = CreateTexture (threeMaterial.bumpMap, this.objectUrlToFileName);
+        material.specularMap = CreateTexture (threeMaterial.specularMap, this.objectUrlToFileName);
+        material.emissiveMap = CreateTexture (threeMaterial.emissiveMap, this.objectUrlToFileName);
+        material.aoMap = CreateTexture (threeMaterial.aoMap, this.objectUrlToFileName);
+        material.displacementMap = CreateTexture (threeMaterial.displacementMap, this.objectUrlToFileName);
+        if (threeMaterial.emissive) { material.emissive = this.ConvertThreeColor (threeMaterial.emissive); }
+        for (const key of ['bumpScale', 'displacementScale', 'displacementBias']) {
+            if (threeMaterial[key] !== undefined) { material[key] = threeMaterial[key]; }
+        }
+        if (threeMaterial.normalScale) { material.normalScale = threeMaterial.normalScale.x; }
+        if (threeMaterial.aoMapIntensity !== undefined) { material.aoIntensity = threeMaterial.aoMapIntensity; }
 
         return material;
     }

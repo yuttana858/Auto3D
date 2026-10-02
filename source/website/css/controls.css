@@ -1,7 +1,7 @@
 div.ov_svg_icon
 {
 	color: var(--ov_icon_color);
-	font-size: 18px;
+	font-size: 15.33px;
 	width: 18px;
 	height: 18px;
 }
@@ -147,7 +147,7 @@ div.ov_select_container
 div.ov_select_container:after
 {
 	font-family: "O3DVIcons";
-	font-size: 18px;
+	font-size: 15.33px;
     content: "\f101";
 	position: absolute;
     right: 6px;
@@ -159,7 +159,7 @@ select.ov_select
 {
 	color: var(--ov_dialog_foreground_color);
 	background: var(--ov_dialog_background_color);
-	font-size: 16px;
+	font-size: 13.33px;
 	margin: 0px;
 	padding: 5px;
 	border: 1px solid var(--ov_border_color);

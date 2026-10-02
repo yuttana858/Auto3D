@@ -1,5 +1,6 @@
 import { AddDiv, CreateDiv } from '../engine/viewer/domutils.js';
 import { AddSvgIconElement, CreateInlineColorCircle, IsHoverEnabled } from './utils.js';
+import { FadeOut } from './popuptransition.js';
 
 let currentDialog = null;
 
@@ -67,6 +68,8 @@ class Dialog
         }
 
         OnOpenDialog (this);
+        this.modalDiv.getAnimations ().forEach ((animation) => animation.cancel ());
+        this.modalDiv.inert = false;
 
         this.overlayDiv = AddDiv (document.body, 'ov_modal_overlay');
         document.body.appendChild (this.modalDiv);
@@ -104,8 +107,10 @@ class Dialog
             this.closeHandler ();
         }
 
-        this.modalDiv.remove ();
-        this.overlayDiv.remove ();
+        const overlay = this.overlayDiv;
+        this.modalDiv.inert = true;
+        FadeOut (this.modalDiv).then (() => { if (!this.isOpen) { this.modalDiv.remove (); } });
+        FadeOut (overlay).then (() => overlay.remove ());
 
         this.overlayDiv = null;
         this.resizeHandler = null;

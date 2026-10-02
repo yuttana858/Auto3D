@@ -11,6 +11,48 @@ const TextureSlots = [
     ['displacementMap', 'Displacement', 'displacementMap']
 ];
 
+export function GetAssignedTextureSlots (entry)
+{
+    return TextureSlots.filter ((slot) => entry.material[slot[0]] && entry.material[slot[0]].image).map ((slot) => ({
+        key : slot[0], title : slot[1], texture : entry.material[slot[0]],
+        name : entry.original[slot[2]]?.name || entry.material[slot[0]].name || slot[1]
+    }));
+}
+
+export function DrawTextureThumbnail (canvas, image)
+{
+    const width = image.naturalWidth || image.width;
+    const height = image.naturalHeight || image.height;
+    if (!width || !height) { return; }
+    const context = canvas.getContext ('2d');
+    const scale = Math.min (canvas.width / width, canvas.height / height);
+    let source = image;
+    if (image.data) {
+        source = document.createElement ('canvas');
+        source.width = width; source.height = height;
+        const pixels = new ImageData (width, height);
+        pixels.data.set (image.data);
+        source.getContext ('2d').putImageData (pixels, 0, 0);
+    }
+    context.drawImage (source, (canvas.width - width * scale) / 2, (canvas.height - height * scale) / 2, width * scale, height * scale);
+}
+
+export function PreserveTextureMapping (previous, texture, original)
+{
+    if (previous) {
+        for (const key of ['offset', 'repeat', 'center']) {
+            texture[key].copy (previous[key]);
+        }
+        for (const key of ['rotation', 'wrapS', 'wrapT', 'flipY', 'channel', 'matrixAutoUpdate']) {
+            texture[key] = previous[key];
+        }
+        texture.matrix.copy (previous.matrix);
+    }
+    original.offset.x = texture.offset.x; original.offset.y = texture.offset.y;
+    original.scale.x = texture.repeat.x; original.scale.y = texture.repeat.y;
+    original.rotation = texture.rotation;
+}
+
 export function GetMaterialEntries (viewer, model, selectedId)
 {
     const entries = new Map ();
@@ -130,7 +172,7 @@ export class MaterialPanel
             const swatch = document.createElement (image ? 'canvas' : 'span');
             swatch.className = 'material_swatch';
             swatch.style.backgroundColor = '#' + entry.material.color.getHexString ();
-            if (image) { swatch.width = 22; swatch.height = 22; swatch.getContext ('2d').drawImage (image, 0, 0, 22, 22); }
+            if (image) { swatch.width = 22; swatch.height = 22; DrawTextureThumbnail (swatch, image); }
             const text = document.createElement ('span');
             const maps = TextureSlots.filter ((slot) => entry.material[slot[0]]);
             text.textContent = (entry.original.name || 'Material ' + (entry.index + 1)) + ' · ' + (maps.length ? maps.map ((slot) => slot[1]).join (', ') : 'Solid color · no texture');
@@ -261,6 +303,7 @@ export class MaterialPanel
             });
             const note = this.Text (properties, 'Shared material · Load Bump, AO or Displacement maps in Textures to enable their controls.');
             note.classList.add ('editor_note');
+            this.ShowTextureThumbnails (content, entry);
             return;
         }
         const uvColumn = this.Column (content, 'UV layout');
@@ -327,12 +370,39 @@ export class MaterialPanel
         this.Text (uvDetails, 'Fills missing UVs only. Box projection is a starting point; seams can remain.');
     }
 
+    ShowTextureThumbnails (parent, entry)
+    {
+        const gallery = this.Column (parent, 'Assigned texture maps');
+        gallery.classList.add ('texture_gallery');
+        const maps = GetAssignedTextureSlots (entry);
+        if (!maps.length) { this.Text (gallery, 'This material has no texture images assigned.'); return; }
+        for (const map of maps) {
+            const card = document.createElement ('button');
+            card.type = 'button'; card.className = 'texture_map_card';
+            card.setAttribute ('aria-label', 'Edit ' + map.title + ' texture: ' + map.name);
+            card.title = map.title + ' · ' + map.name;
+            card.dataset.map = map.key;
+            card.setAttribute ('aria-pressed', String (this.page === 'textures' && this.mapSlot === map.key));
+            const thumbnail = document.createElement ('canvas');
+            thumbnail.width = 64; thumbnail.height = 64;
+            thumbnail.className = 'texture_map_thumbnail';
+            thumbnail.setAttribute ('aria-hidden', 'true');
+            DrawTextureThumbnail (thumbnail, map.texture.image);
+            const label = document.createElement ('span');
+            const title = document.createElement ('strong'); title.textContent = map.title;
+            const filename = document.createElement ('span'); filename.textContent = map.name;
+            label.append (title, filename); card.append (thumbnail, label);
+            card.addEventListener ('click', () => { this.mapSlot = map.key; this.page = 'textures'; this.FillDrawer (); });
+            gallery.appendChild (card);
+        }
+    }
+
     ShowTextures (content, entry)
     {
         const material = entry.material;
         const controls = this.Column (content, 'Texture maps');
         controls.classList.add ('texture_actions');
-        const maps = TextureSlots.filter ((slot) => material.isMeshStandardMaterial ? slot[0] !== 'specularMap' && slot[0] !== 'roughnessMap' : !['roughnessMap', 'metalnessMap'].includes (slot[0]));
+        const maps = TextureSlots.filter ((slot) => material[slot[0]] || (material.isMeshStandardMaterial ? slot[0] !== 'specularMap' && slot[0] !== 'roughnessMap' : !['roughnessMap', 'metalnessMap'].includes (slot[0])));
         const picker = document.createElement ('select');
         picker.setAttribute ('aria-label', 'Texture map');
         maps.forEach ((slot) => picker.add (new Option ((slot[0] === 'metalnessMap' ? 'Metalness / roughness' : slot[1]) + (material[slot[0]] ? ' · assigned' : ' · empty'), slot[0])));
@@ -353,6 +423,7 @@ export class MaterialPanel
         remove.addEventListener ('click', () => {
             ++this.textureRequest;
             material[slot[0]] = null; entry.original[slot[2]] = null;
+            if (slot[0] === 'specularMap' && material.isMeshPhysicalMaterial) { material.specularColorMap = null; }
             if (slot[0] === 'metalnessMap') { material.roughnessMap = null; }
             material.needsUpdate = true; this.website.viewer.Render (); this.ShowSummary (); this.FillDrawer ();
         });
@@ -375,13 +446,12 @@ export class MaterialPanel
             const preview = document.createElement ('canvas');
             preview.className = 'texture_preview'; preview.setAttribute ('aria-label', slot[1] + ' texture preview');
             if (texture.image) {
-                preview.width = texture.image.naturalWidth || texture.image.width;
-                preview.height = texture.image.naturalHeight || texture.image.height;
-                preview.getContext ('2d').drawImage (texture.image, 0, 0);
+                preview.width = 176; preview.height = 176;
+                DrawTextureThumbnail (preview, texture.image);
             }
             details.appendChild (preview);
             const fields = document.createElement ('div'); fields.className = 'texture_fields'; details.appendChild (fields);
-            this.Text (fields, (original ? original.name : slot[1]) + ' · ' + preview.width + ' × ' + preview.height + ' px · UV' + texture.channel);
+            this.Text (fields, (original ? original.name : slot[1]) + ' · ' + (texture.image?.naturalWidth || texture.image?.width || 0) + ' × ' + (texture.image?.naturalHeight || texture.image?.height || 0) + ' px · UV' + texture.channel);
             for (const [key, axis, title] of [['repeat', 'x', 'Tile U'], ['repeat', 'y', 'Tile V'], ['offset', 'x', 'Offset U'], ['offset', 'y', 'Offset V']]) {
                 this.Control (fields, title, 'number', texture[key][axis], { step : 0.05 }, (value) => {
                     texture[key][axis] = Number (value);
@@ -398,6 +468,7 @@ export class MaterialPanel
         if (entry.meshes.some ((item) => !item.mesh.geometry.getAttribute ('uv'))) {
             this.Text (details, 'This geometry has no UVs. Open UV → Generate box UVs to use your image.');
         }
+        this.ShowTextureThumbnails (content, entry);
     }
 
     async LoadTexture (entry, slot, file, status)
@@ -413,7 +484,9 @@ export class MaterialPanel
             this.editorTextures.add (texture);
             const original = new TextureMap ();
             original.name = file.name; original.mimeType = file.type || 'image/png'; original.buffer = buffer;
+            PreserveTextureMapping (entry.material[slot[0]], texture, original);
             entry.original[slot[2]] = original; entry.material[slot[0]] = texture;
+            if (slot[0] === 'specularMap' && entry.material.isMeshPhysicalMaterial) { entry.material.specularColorMap = texture; }
             if (slot[0] === 'metalnessMap') { entry.material.roughnessMap = texture; }
             if (slot[0] === 'map') { entry.original.multiplyDiffuseMap = true; }
             if (slot[0] === 'displacementMap' && entry.material.displacementScale === 0) {

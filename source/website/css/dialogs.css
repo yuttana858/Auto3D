@@ -24,7 +24,7 @@ div.ov_dialog
 
 div.ov_dialog div.ov_dialog_title
 {
-	font-size: 19px;
+	font-size: 16.33px;
 	font-weight: bold;
 }
 
@@ -71,7 +71,7 @@ div.ov_dialog div.ov_dialog_message
 
 div.ov_dialog div.ov_dialog_submessage
 {
-	font-size: 14px;
+	font-size: 11.33px;
 	font-style: italic;
 	margin-top: 10px;
 }
@@ -248,7 +248,7 @@ div.ov_progress div.ov_progress_img svg
 
 div.ov_progress div.ov_progress_text
 {
-	font-size: 19px;
+	font-size: 16.33px;
 	text-align: center;
 }
 

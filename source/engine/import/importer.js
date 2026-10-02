@@ -118,6 +118,11 @@ export class Importer
                 RunTaskAsync (() => {
                     this.DecompressArchives (this.fileList, () => {
                         this.ImportLoadedFiles (settings, callbacks);
+                    }, (archiveFile, message) => {
+                        let error = new ImportError (ImportErrorCode.ImportFailed);
+                        error.mainFile = archiveFile.name;
+                        error.message = message;
+                        callbacks.onImportError (error);
                     });
                 });
             },
@@ -247,12 +252,12 @@ export class Importer
         });
     }
 
-    DecompressArchives (fileList, onReady)
+    DecompressArchives (fileList, onReady, onError)
     {
         let files = fileList.GetFiles ();
         let archives = [];
         for (let file of files) {
-            if (file.extension === 'zip') {
+            if (file.extension === 'zip' || file.extension === 'zae') {
                 archives.push (file);
             }
         }
@@ -262,11 +267,39 @@ export class Importer
         }
         for (let i = 0; i < archives.length; i++) {
             const archiveFile = archives[i];
-            const archiveBuffer = new Uint8Array (archiveFile.content);
-            const decompressed = fflate.unzipSync (archiveBuffer);
+            let decompressed;
+            let mainPath = null;
+            try {
+                if (archiveFile.content === null) {
+                    throw new Error ('Could not read archive.');
+                }
+                decompressed = fflate.unzipSync (new Uint8Array (archiveFile.content));
+                if (archiveFile.extension === 'zae' && decompressed['manifest.xml']) {
+                    const manifest = fflate.strFromU8 (decompressed['manifest.xml']);
+                    const root = manifest.match (/<dae_root\b[^>]*>([\s\S]*?)<\/dae_root\s*>/i);
+                    if (!root) {
+                        throw new Error ('ZAE manifest does not specify a DAE model.');
+                    }
+                    mainPath = root[1].trim ().replace (/&(?:amp|lt|gt|quot|apos);/g, entity => ({
+                        '&amp;' : '&', '&lt;' : '<', '&gt;' : '>', '&quot;' : '"', '&apos;' : '\u0027'
+                    }[entity])).replace (/\\/g, '/').replace (/^\.\//, '');
+                    if (!decompressed[mainPath] || !mainPath.toLowerCase ().endsWith ('.dae')) {
+                        throw new Error ('The DAE model named in the ZAE manifest is missing.');
+                    }
+                }
+            } catch (err) {
+                if (onError) {
+                    onError (archiveFile, err.message);
+                    return;
+                }
+                throw err;
+            }
             for (const fileName in decompressed) {
                 if (Object.prototype.hasOwnProperty.call (decompressed, fileName)) {
                     let file = new ImporterFile (fileName, FileSource.Decompressed, null);
+                    if (archiveFile.extension === 'zae') {
+                        file.archiveResourceOnly = mainPath !== null ? fileName !== mainPath : file.extension !== 'dae';
+                    }
                     file.SetContent (decompressed[fileName].buffer);
                     fileList.AddFile (file);
                 }
@@ -303,6 +336,9 @@ export class Importer
         let files = fileList.GetFiles ();
         for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
             let file = files[fileIndex];
+            if (file.archiveResourceOnly) {
+                continue;
+            }
             let importer = FindImporter (file, this.importers);
             if (importer !== null) {
                 importableFiles.push ({

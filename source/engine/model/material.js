@@ -224,6 +224,7 @@ export class PhysicalMaterial extends FaceMaterial
         this.roughness = 1.0; // 0.0 .. 1.0
         this.metalnessMap = null;
         this.specularIntensity = 1.0;
+        this.specularMap = null;
     }
 
     IsEqual (rhs)
@@ -232,6 +233,9 @@ export class PhysicalMaterial extends FaceMaterial
             return false;
         }
         if (!IsEqual (this.metalness, rhs.metalness)) {
+            return false;
+        }
+        if (!TextureMapIsEqual (this.specularMap, rhs.specularMap)) {
             return false;
         }
         if (!IsEqual (this.roughness, rhs.roughness)) {

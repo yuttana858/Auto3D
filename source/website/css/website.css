@@ -37,7 +37,7 @@ div.title svg.logo_image
 div.title div.logo_text
 {
 	color: var(--ov_foreground_color);
-	font-size: 18px;
+	font-size: 15.33px;
 	font-weight: bold;
 	padding: 9px;
 	float: left;
@@ -97,12 +97,12 @@ div.intro svg.intro_logo
 
 div.intro div.intro_dragdrop_text
 {
-	font-size: 30px;
+	font-size: 27.33px;
 }
 
 div.intro div.intro_formats_title
 {
-	font-size: 25px;
+	font-size: 22.33px;
 	margin-bottom: 15px;
 }
 
@@ -115,7 +115,7 @@ div.intro div.intro_file_formats a
 {
 	color: var(--ov_outline_button_text_color);
 	text-decoration: none;
-	font-size: 17px;
+	font-size: 14.33px;
 	width: 50px;
 	border-radius: 5px;
 	padding: 4px 8px;

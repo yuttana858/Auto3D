@@ -182,6 +182,10 @@ export class ThreeMaterialHandler
 				threeMaterial.metalness = material.metalness;
 				threeMaterial.roughness = material.roughness;
                 threeMaterial.specularIntensity = material.specularIntensity;
+                this.LoadFaceTexture (threeMaterial, material.specularMap, (threeTexture) => {
+                    threeMaterial.specularMap = threeTexture;
+                    threeMaterial.specularColorMap = threeTexture;
+                });
 				this.LoadFaceTexture (threeMaterial, material.metalnessMap, (threeTexture) => {
 					threeMaterial.metalnessMap = threeTexture;
 					threeMaterial.roughnessMap = threeTexture;
