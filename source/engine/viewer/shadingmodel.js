@@ -50,6 +50,8 @@ export class ShadingModel
         this.environmentSettings = new EnvironmentSettings (null, false);
         this.environment = null;
         this.backgroundTexture = null;
+        this.hdriEnvironment = null;
+        this.hdriProbe = null;
 
         this.scene.add (this.ambientLight);
         this.scene.add (this.directionalLight);
@@ -69,6 +71,11 @@ export class ShadingModel
 
     UpdateShading ()
     {
+        this.ambientLight.intensity = this.hdriEnvironment !== null ? 0 : Math.PI;
+        this.directionalLight.intensity = this.hdriEnvironment !== null ? 0 : Math.PI;
+        if (this.hdriProbe !== null) {
+            this.hdriProbe.visible = this.type === ShadingType.Phong;
+        }
         if (this.type === ShadingType.Phong) {
             this.ambientLight.color.set (0x888888);
             this.directionalLight.color.set (0x888888);
@@ -77,6 +84,9 @@ export class ShadingModel
             this.ambientLight.color.set (0x000000);
             this.directionalLight.color.set (0x555555);
             this.scene.environment = this.environment;
+        }
+        if (this.hdriEnvironment !== null) {
+            this.scene.environment = this.hdriEnvironment;
         }
         if (this.environmentSettings.backgroundIsEnvMap && this.projectionMode === ProjectionMode.Perspective) {
             this.scene.background = this.environment;

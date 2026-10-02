@@ -1,0 +1,83 @@
+[
+  {
+    "id": "studio_small_09",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_09_1k.hdr",
+    "md5": "d5d7eb9d26d341d6aa4d11c1a54fd97c",
+    "source": "https://polyhaven.com/a/studio_small_09",
+    "license": "CC0-1.0",
+    "authors": [
+      "Sergej Majboroda"
+    ]
+  },
+  {
+    "id": "colorful_studio",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/colorful_studio_1k.hdr",
+    "md5": "cdcf68b2180b7029ba66f0acc1150914",
+    "source": "https://polyhaven.com/a/colorful_studio",
+    "license": "CC0-1.0",
+    "authors": [
+      "Sergej Majboroda"
+    ]
+  },
+  {
+    "id": "blue_photo_studio",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/blue_photo_studio_1k.hdr",
+    "md5": "bb72036ac6771905847d9c6f6b6a505f",
+    "source": "https://polyhaven.com/a/blue_photo_studio",
+    "license": "CC0-1.0",
+    "authors": [
+      "Sergej Majboroda"
+    ]
+  },
+  {
+    "id": "kiara_interior",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kiara_interior_1k.hdr",
+    "md5": "d6d8894caa34b2dc6086a372d94687e6",
+    "source": "https://polyhaven.com/a/kiara_interior",
+    "license": "CC0-1.0",
+    "authors": [
+      "Greg Zaal"
+    ]
+  },
+  {
+    "id": "autumn_forest_02",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/autumn_forest_02_1k.hdr",
+    "md5": "204941c66f299bcf4ef763479cec2f7f",
+    "source": "https://polyhaven.com/a/autumn_forest_02",
+    "license": "CC0-1.0",
+    "authors": [
+      "Andreas Mischok"
+    ]
+  },
+  {
+    "id": "shanghai_bund",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/shanghai_bund_1k.hdr",
+    "md5": "682071576d231d9ed36309cbe511309f",
+    "source": "https://polyhaven.com/a/shanghai_bund",
+    "license": "CC0-1.0",
+    "authors": [
+      "Greg Zaal"
+    ]
+  },
+  {
+    "id": "decor_shop",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/decor_shop_1k.hdr",
+    "md5": "73bc2e920d763bbfd6e5685c8965bed7",
+    "source": "https://polyhaven.com/a/decor_shop",
+    "license": "CC0-1.0",
+    "authors": [
+      "Sergej Majboroda"
+    ]
+  },
+  {
+    "id": "gear_store",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/gear_store_1k.hdr",
+    "md5": "099f7e6cce5a383e45aa37b66cceb9b3",
+    "source": "https://polyhaven.com/a/gear_store",
+    "license": "CC0-1.0",
+    "authors": [
+      "Dimitrios Savva",
+      "Jarod Guest"
+    ]
+  }
+]

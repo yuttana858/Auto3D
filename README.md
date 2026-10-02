@@ -14,6 +14,12 @@ To publish an update, run `npm run build_website` and `node tools/build_pages.mj
 
 This is a prototype; the dependency-license, security, and privacy checks in `3d-viewer-review.md` remain outstanding.
 
+## Lighting and materials
+
+The left panel has collapsible Materials and Lighting sections. Select a model part to inspect its assigned surface materials. The advanced editor opens below the viewer with color, opacity and physical/Phong surface controls, texture previews, tiling/offset/rotation controls and a UV0 layout. Edits affect all parts sharing that material and update the imported model in the current session. Reloading the model discards these edits; there is no project save system yet.
+
+Lighting offers the default environment and eight locally bundled 1K Poly Haven HDRIs, with brightness, rotation and elevation controls. Physical surfaces use prefiltered image-based lighting; Phong surfaces use a diffuse light probe integrated from the same HDR data. The horizon background and ground grid remain independent. Asset licenses and sources are in `website/assets/hdri/NOTICE.md` and `sources.json`; generate previews with `node tools/prepare_hdri_previews.mjs`.
+
 ## Supported formats
 
 - **Import:** 3dm, 3ds, 3mf, amf, bim, brep, dae, fbx, fcstd, gltf/glb, ifc, iges, step, stl, obj, off, ply, wrl.

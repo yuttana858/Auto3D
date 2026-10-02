@@ -29,6 +29,8 @@ import { EnumeratePlugins, PluginType } from './pluginregistry.js';
 import { EnvironmentSettings } from '../engine/viewer/shadingmodel.js';
 import { IntersectionMode } from '../engine/viewer/viewermodel.js';
 import { Loc } from '../engine/core/localization.js';
+import { LightingPanel } from './lightingpanel.js';
+import { MaterialPanel } from './materialpanel.js';
 
 const WebsiteUIState =
 {
@@ -142,7 +144,9 @@ class WebsiteLayouter
         }
 
         let contentWidth = windowWidth - leftWidth - rightWidth;
-        let contentHeight = windowHeight - headerHeight;
+        const drawer = document.getElementById ('material_drawer');
+        const drawerHeight = drawer && drawer.classList.contains ('open') ? drawer.offsetHeight : 0;
+        let contentHeight = Math.max (120, windowHeight - headerHeight - drawerHeight);
 
         const panelHeaderHeight = document.getElementById ('upload_panel_toggle').offsetHeight;
         this.parameters.mainDiv.style.height = contentHeight + 'px';
@@ -226,6 +230,8 @@ export class Website
 
     InitWorkspace ()
     {
+        this.lightingPanel = new LightingPanel (this);
+        this.materialPanel = new MaterialPanel (this);
         for (const [id, setting] of [['horizon_gradient', 'horizonGradient'], ['ground_grid', 'showGroundGrid']]) {
             const checkbox = document.getElementById (id);
             checkbox.addEventListener ('change', () => {
@@ -311,6 +317,7 @@ export class Website
 
     ClearModel ()
     {
+        if (this.materialPanel) { this.materialPanel.Clear (); }
         CloseAllDialogs ();
 
         this.model = null;
@@ -334,6 +341,7 @@ export class Website
         this.viewer.SetMainObject (threeObject);
         this.viewer.SetUpVector (Direction.Y, false);
         this.navigator.FillTree (importResult);
+        if (this.materialPanel) { this.materialPanel.Update (); }
         this.sidebar.UpdateControlsVisibility ();
         this.FitModelToWindow (true);
     }
@@ -502,6 +510,7 @@ export class Website
             }
             return false;
         });
+        if (this.materialPanel) { this.materialPanel.Update (); }
     }
 
     LoadModelFromUrlList (urls, settings)
