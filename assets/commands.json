@@ -1,0 +1,582 @@
+{
+  "apiVersion": 1,
+  "commands": [
+    {
+      "id": "scene.inspect",
+      "title": "Inspect scene",
+      "category": "Scene",
+      "description": "Return all objects, selected object ID and loading state.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "object.select",
+      "title": "Select object",
+      "category": "Objects",
+      "description": "Select an object by its stable ID.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "objectId"
+        ],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "object.transform",
+      "title": "Transform object",
+      "category": "Objects",
+      "description": "Set position in model units, rotation in degrees, and scale. Omitted vectors stay unchanged. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          },
+          "position": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number"
+            }
+          },
+          "rotation": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number"
+            }
+          },
+          "scale": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "position": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "object.duplicate",
+      "title": "Duplicate object",
+      "category": "Objects",
+      "description": "Duplicate and select an object. Returns the new ID. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "object.visibility",
+      "title": "Set visibility",
+      "category": "Objects",
+      "description": "Explicitly show or hide an object. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          },
+          "visible": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "visible"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "visible": true
+      }
+    },
+    {
+      "id": "object.delete",
+      "title": "Delete object",
+      "category": "Objects",
+      "description": "Remove an object from this session. Recover with history.undo.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "view.focus",
+      "title": "Focus object",
+      "category": "View",
+      "description": "Frame an object in the viewport.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "view.fit",
+      "title": "Fit scene",
+      "category": "View",
+      "description": "Frame all visible objects.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "history.undo",
+      "title": "Undo",
+      "category": "History",
+      "description": "Step through object edit history.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "history.redo",
+      "title": "Redo",
+      "category": "History",
+      "description": "Step through object edit history.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "view.background",
+      "title": "Set background",
+      "category": "View",
+      "description": "Choose a viewport background preset.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "preset": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "dark",
+              "light",
+              "sunset",
+              "outdoor"
+            ]
+          }
+        },
+        "required": [
+          "preset"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "preset": "dark"
+      }
+    },
+    {
+      "id": "view.guides",
+      "title": "Set viewport guides",
+      "category": "View",
+      "description": "Set horizon gradient and ground grid visibility.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "horizon": {
+            "type": "boolean"
+          },
+          "grid": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "horizon": true,
+        "grid": true
+      }
+    },
+    {
+      "id": "lighting.inspect",
+      "title": "Inspect lighting",
+      "category": "Lighting",
+      "description": "Return current environment and adjustments.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "lighting.restore",
+      "title": "Set lighting",
+      "category": "Lighting",
+      "description": "Apply a lighting configuration obtained from lighting.inspect.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "default",
+              "hdri"
+            ]
+          },
+          "environment": {
+            "type": "string"
+          },
+          "brightness": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "rotation": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "elevation": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "background": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "mode": "default"
+      }
+    },
+    {
+      "id": "material.list",
+      "title": "List materials",
+      "category": "Materials",
+      "description": "Return material indices, properties and assigned texture names.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "material.set",
+      "title": "Set material property",
+      "category": "Materials",
+      "description": "Set a numeric surface property for a material index; preserves UVs and textures.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "number",
+            "minimum": 0
+          },
+          "property": {
+            "type": "string",
+            "enum": [
+              "opacity",
+              "roughness",
+              "metalness",
+              "specularIntensity",
+              "bumpScale",
+              "normalScale",
+              "aoIntensity",
+              "displacementScale"
+            ]
+          },
+          "value": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "index",
+          "property",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "index": 0,
+        "property": "roughness",
+        "value": 0.4
+      }
+    },
+    {
+      "id": "material.color",
+      "title": "Set base color",
+      "category": "Materials",
+      "description": "Set a material base color using six-digit hex. Preserves assigned maps.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "number",
+            "minimum": 0
+          },
+          "color": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "color"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "index": 0,
+        "color": "#222222"
+      }
+    },
+    {
+      "id": "preferences.theme",
+      "title": "Set theme",
+      "category": "Preferences",
+      "description": "Apply and remember a light or dark theme.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "theme": {
+            "type": "string",
+            "enum": [
+              "light",
+              "dark"
+            ]
+          }
+        },
+        "required": [
+          "theme"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "theme": "dark"
+      }
+    },
+    {
+      "id": "preferences.units",
+      "title": "Set display units",
+      "category": "Preferences",
+      "description": "Apply metric or standard display units.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "units": {
+            "type": "string",
+            "enum": [
+              "metric",
+              "standard"
+            ]
+          }
+        },
+        "required": [
+          "units"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "units": "metric"
+      }
+    },
+    {
+      "id": "material.texture",
+      "title": "Replace texture image",
+      "category": "Materials",
+      "description": "Replace a material map from a PNG/JPEG/WebP base64 data URI. Retains UVs and map placement.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "number",
+            "minimum": 0
+          },
+          "slot": {
+            "type": "string",
+            "enum": [
+              "map",
+              "normalMap",
+              "bumpMap",
+              "emissiveMap",
+              "specularMap",
+              "aoMap",
+              "displacementMap",
+              "metalnessMap"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "dataUri": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "slot",
+          "name",
+          "dataUri"
+        ],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "macro.list",
+      "title": "List saved macros",
+      "category": "Macros",
+      "description": "Return macros stored in this browser.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "macro.save",
+      "title": "Save macro",
+      "category": "Macros",
+      "description": "Save a named version 1 macro locally. Definition is a JSON string; matching names are replaced.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "definition": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "definition"
+        ],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ui.materials",
+      "title": "Open material editor",
+      "category": "Panels",
+      "description": "Open the material editor for the selected object.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ui.library",
+      "title": "Open library",
+      "category": "Panels",
+      "description": "Open the saved-model library.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ui.save",
+      "title": "Open save dialog",
+      "category": "Panels",
+      "description": "Ask the user where to save. This command opens a dialog; it does not publish.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    }
+  ]
+}
