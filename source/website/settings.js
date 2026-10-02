@@ -17,12 +17,14 @@ export class Settings
         this.themeId = themeId;
         this.environmentMapName = 'fishermans_bastion';
         this.backgroundIsEnvMap = false;
+        this.horizonGradient = true;
+        this.showGroundGrid = false;
         if (this.themeId === Theme.Light) {
             this.backgroundColor = new RGBAColor (255, 255, 255, 255);
             this.defaultLineColor = new RGBColor (100, 100, 100);
             this.defaultColor = new RGBColor (200, 200, 200);
         } else if (this.themeId === Theme.Dark) {
-            this.backgroundColor = new RGBAColor (42, 43, 46, 255);
+            this.backgroundColor = new RGBAColor (0, 0, 0, 255);
             this.defaultLineColor = new RGBColor (100, 100, 100);
             this.defaultColor = new RGBColor (200, 200, 200);
         }
@@ -34,7 +36,10 @@ export class Settings
         this.themeId = CookieGetIntVal ('ov_theme_id', GetPreferredColorScheme ());
         this.environmentMapName = CookieGetStringVal ('ov_environment_map', 'fishermans_bastion');
         this.backgroundIsEnvMap = CookieGetBoolVal ('ov_background_is_envmap', false);
-        this.backgroundColor = CookieGetRGBAColorVal ('ov_background_color', new RGBAColor (255, 255, 255, 255));
+        this.horizonGradient = CookieGetBoolVal ('sw_horizon_gradient', true);
+        this.showGroundGrid = CookieGetBoolVal ('sw_ground_grid', false);
+        const defaultBackground = this.themeId === Theme.Dark ? new RGBAColor (0, 0, 0, 255) : new RGBAColor (255, 255, 255, 255);
+        this.backgroundColor = this.horizonGradient ? defaultBackground : CookieGetRGBAColorVal ('ov_background_color', defaultBackground);
         this.defaultLineColor = CookieGetRGBColorVal ('ov_default_line_color', new RGBColor (100, 100, 100));
         this.defaultColor = CookieGetRGBColorVal ('ov_default_color', new RGBColor (200, 200, 200));
         this.edgeSettings.showEdges = CookieGetBoolVal ('ov_show_edges', false);
@@ -47,6 +52,8 @@ export class Settings
         CookieSetIntVal ('ov_theme_id', this.themeId);
         CookieSetStringVal ('ov_environment_map', this.environmentMapName);
         CookieSetBoolVal ('ov_background_is_envmap', this.backgroundIsEnvMap);
+        CookieSetBoolVal ('sw_horizon_gradient', this.horizonGradient);
+        CookieSetBoolVal ('sw_ground_grid', this.showGroundGrid);
         CookieSetRGBAColorVal ('ov_background_color', this.backgroundColor);
         CookieSetRGBColorVal ('ov_default_line_color', this.defaultLineColor);
         CookieSetRGBColorVal ('ov_default_color', this.defaultColor);

@@ -172,6 +172,9 @@ export class Viewer
         this.shadingModel = null;
         this.navigation = null;
         this.upVector = null;
+        this.backgroundGradient = null;
+        this.groundGrid = null;
+        this.groundGridSettings = { show : false, dark : false };
         this.settings = {
             animationSteps : 40
         };
@@ -253,6 +256,75 @@ export class Viewer
     GetCanvas ()
     {
         return this.canvas;
+    }
+
+    SetBackgroundGradient (enabled, dark)
+    {
+        if (this.backgroundGradient !== null) {
+            this.backgroundGradient.dispose ();
+            this.backgroundGradient = null;
+        }
+        if (enabled) {
+            const canvas = document.createElement ('canvas');
+            canvas.width = 2;
+            canvas.height = 512;
+            const context = canvas.getContext ('2d');
+            const gradient = context.createLinearGradient (0, 0, 0, 512);
+            const colors = dark ? ['#000000', '#07090c', '#1b2228', '#171b1f', '#000000'] : ['#ffffff', '#f8fafc', '#dbe2e8', '#e5e8eb', '#ffffff'];
+            for (const [index, stop] of [0, 0.45, 0.56, 0.59, 1].entries ()) {
+                gradient.addColorStop (stop, colors[index]);
+            }
+            context.fillStyle = gradient;
+            context.fillRect (0, 0, 2, 512);
+            this.backgroundGradient = new THREE.CanvasTexture (canvas);
+            this.backgroundGradient.colorSpace = THREE.LinearSRGBColorSpace;
+        }
+        this.shadingModel.backgroundTexture = this.backgroundGradient;
+        this.shadingModel.UpdateShading ();
+        this.Render ();
+    }
+
+    SetGroundGrid (show, dark)
+    {
+        this.groundGridSettings = { show, dark };
+        this.UpdateGroundGrid ();
+        this.Render ();
+    }
+
+    UpdateGroundGrid ()
+    {
+        if (this.groundGrid !== null) {
+            this.scene.remove (this.groundGrid);
+            this.groundGrid.dispose ();
+            this.groundGrid = null;
+        }
+        if (!this.groundGridSettings.show) {
+            return;
+        }
+        const bounds = this.GetBoundingBox (() => true);
+        if (bounds === null) {
+            return;
+        }
+        const extent = Math.max (bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y, bounds.max.z - bounds.min.z);
+        if (extent <= 0 || !Number.isFinite (extent)) {
+            return;
+        }
+        const dark = this.groundGridSettings.dark;
+        const grid = new THREE.GridHelper (extent * 4, 40, dark ? 0x607080 : 0x879099, dark ? 0x30363c : 0xc3c7cb);
+        grid.material.transparent = true;
+        grid.material.opacity = 0.65;
+        grid.material.depthWrite = false;
+        grid.position.set ((bounds.min.x + bounds.max.x) / 2, (bounds.min.y + bounds.max.y) / 2, (bounds.min.z + bounds.max.z) / 2);
+        const axis = this.upVector.direction === Direction.X ? 'x' : this.upVector.direction === Direction.Z ? 'z' : 'y';
+        const offset = extent * 0.0001;
+        grid.position[axis] = this.upVector.isFlipped ? bounds.max[axis] + offset : bounds.min[axis] - offset;
+        if (axis === 'x') {
+            grid.rotation.z = -Math.PI / 2;
+        } else if (axis === 'z') {
+            grid.rotation.x = Math.PI / 2;
+        }
+        this.groundGrid = grid;
+        this.scene.add (grid);
     }
 
     GetCamera ()
@@ -362,6 +434,7 @@ export class Viewer
     {
         let oldCamera = this.navigation.GetCamera ();
         let newCamera = this.upVector.SetFixed (navigationMode === NavigationMode.FixedUpVector, oldCamera);
+        this.UpdateGroundGrid ();
         this.navigation.SetNavigationMode (navigationMode);
         if (newCamera !== null) {
             this.navigation.MoveCamera (newCamera, this.settings.animationSteps);
@@ -373,6 +446,7 @@ export class Viewer
     {
         let oldCamera = this.navigation.GetCamera ();
         let newCamera = this.upVector.SetDirection (upDirection, oldCamera);
+        this.UpdateGroundGrid ();
         let animationSteps = animate ? this.settings.animationSteps : 0;
         this.navigation.MoveCamera (newCamera, animationSteps);
         this.Render ();
@@ -382,6 +456,7 @@ export class Viewer
     {
         let oldCamera = this.navigation.GetCamera ();
         let newCamera = this.upVector.Flip (oldCamera);
+        this.UpdateGroundGrid ();
         this.navigation.MoveCamera (newCamera, 0);
         this.Render ();
     }
@@ -423,6 +498,7 @@ export class Viewer
         const shadingType = GetShadingTypeOfObject (object);
         this.mainModel.SetMainObject (object);
         this.shadingModel.SetShadingType (shadingType);
+        this.UpdateGroundGrid ();
 
         this.Render ();
     }
@@ -437,6 +513,7 @@ export class Viewer
     {
         this.mainModel.Clear ();
         this.extraModel.Clear ();
+        this.UpdateGroundGrid ();
         this.Render ();
     }
 
@@ -582,20 +659,27 @@ export class Viewer
             renderHeight /= window.devicePixelRatio;
         }
         let clearAlpha = this.renderer.getClearAlpha ();
+        const originalBackground = this.scene.background;
         if (isTransparent) {
             this.renderer.setClearAlpha (0.0);
+            this.scene.background = null;
         }
         this.ResizeRenderer (renderWidth, renderHeight);
         this.Render ();
         let url = this.renderer.domElement.toDataURL ();
-        this.ResizeRenderer (originalSize.width, originalSize.height);
+        this.scene.background = originalBackground;
         this.renderer.setClearAlpha (clearAlpha);
+        this.ResizeRenderer (originalSize.width, originalSize.height);
         return url;
     }
 
     Destroy ()
     {
+        this.groundGridSettings.show = false;
         this.Clear ();
+        if (this.backgroundGradient !== null) {
+            this.backgroundGradient.dispose ();
+        }
         this.renderer.dispose ();
     }
 }

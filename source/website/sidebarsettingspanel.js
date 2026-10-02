@@ -198,6 +198,7 @@ class SettingsModelDisplaySection extends SettingsSection
         super (parentDiv, Loc ('Model Display'), settings);
 
         this.backgroundColorPicker = null;
+        this.syncingBackgroundColor = false;
 
         this.environmentMapPhongDiv = null;
         this.environmentMapPhongInput = null;
@@ -224,6 +225,9 @@ class SettingsModelDisplaySection extends SettingsSection
         let predefinedBackgroundColors = ['#ffffffff', '#e3e3e3ff', '#c9c9c9ff', '#898989ff', '#5f5f5fff', '#494949ff', '#383838ff', '#0f0f0fff'];
         let defaultBackgroundColor = '#' + RGBAColorToHexString (this.settings.backgroundColor);
         this.backgroundColorPicker = AddColorPicker (backgroundColorInput, true, defaultBackgroundColor, predefinedBackgroundColors, (r, g, b, a) => {
+            if (this.syncingBackgroundColor) {
+                return;
+            }
             this.settings.backgroundColor = new RGBAColor (r, g, b, a);
             this.callbacks.onBackgroundColorChanged ();
         });
@@ -326,7 +330,9 @@ class SettingsModelDisplaySection extends SettingsSection
     Update ()
     {
         if (this.backgroundColorPicker !== null) {
+            this.syncingBackgroundColor = true;
             this.backgroundColorPicker.setColor ('#' + RGBAColorToHexString (this.settings.backgroundColor));
+            this.syncingBackgroundColor = false;
         }
 
         if (this.environmentMapPbrInput !== null || this.environmentMapPhongDiv !== null) {
@@ -541,6 +547,8 @@ export class SidebarSettingsPanel extends SidebarPanel
 
         this.settings.environmentMapName = defaultSettings.environmentMapName;
         this.settings.backgroundIsEnvMap = defaultSettings.backgroundIsEnvMap;
+        this.settings.horizonGradient = defaultSettings.horizonGradient;
+        this.settings.showGroundGrid = defaultSettings.showGroundGrid;
         this.settings.backgroundColor = defaultSettings.backgroundColor;
         this.settings.defaultLineColor = defaultSettings.defaultLineColor;
         this.settings.defaultColor = defaultSettings.defaultColor;

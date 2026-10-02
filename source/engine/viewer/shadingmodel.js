@@ -49,6 +49,7 @@ export class ShadingModel
         this.directionalLight = new THREE.DirectionalLight (0x888888, 1.0 * Math.PI);
         this.environmentSettings = new EnvironmentSettings (null, false);
         this.environment = null;
+        this.backgroundTexture = null;
 
         this.scene.add (this.ambientLight);
         this.scene.add (this.directionalLight);
@@ -80,7 +81,7 @@ export class ShadingModel
         if (this.environmentSettings.backgroundIsEnvMap && this.projectionMode === ProjectionMode.Perspective) {
             this.scene.background = this.environment;
         } else {
-            this.scene.background = null;
+            this.scene.background = this.backgroundTexture;
         }
     }
 

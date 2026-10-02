@@ -226,6 +226,21 @@ export class Website
 
     InitWorkspace ()
     {
+        for (const [id, setting] of [['horizon_gradient', 'horizonGradient'], ['ground_grid', 'showGroundGrid']]) {
+            const checkbox = document.getElementById (id);
+            checkbox.addEventListener ('change', () => {
+                this.settings[setting] = checkbox.checked;
+                if (setting === 'horizonGradient' && checkbox.checked) {
+                    this.settings.backgroundIsEnvMap = false;
+                    this.settings.backgroundColor = new Settings (this.settings.themeId).backgroundColor;
+                    this.UpdateEnvironmentMap ();
+                    this.sidebar.UpdateControlsStatus ();
+                }
+                this.UpdateViewport ();
+                this.settings.SaveToCookies ();
+            });
+        }
+        this.UpdateViewport ();
         document.getElementById ('workspace_upload').addEventListener ('click', () => this.OpenFileBrowserDialog ());
         document.getElementById ('workspace_open_url').addEventListener ('click', () => {
             ShowOpenUrlDialog ((urls) => {
@@ -596,7 +611,7 @@ export class Website
             this.settings.defaultColor = defaultSettings.defaultColor;
             this.sidebar.UpdateControlsStatus ();
 
-            this.viewer.SetBackgroundColor (this.settings.backgroundColor);
+            this.UpdateViewport ();
             let modelLoader = this.modelLoaderUI.GetModelLoader ();
             if (modelLoader.GetDefaultMaterials () !== null) {
                 ReplaceDefaultMaterialsColor (this.model, this.settings.defaultColor, this.settings.defaultLineColor);
@@ -616,6 +631,22 @@ export class Website
         this.viewer.SetNavigationMode (this.cameraSettings.navigationMode);
         this.viewer.SetProjectionMode (this.cameraSettings.projectionMode);
         this.UpdateEnvironmentMap ();
+        this.UpdateViewport ();
+    }
+
+    UpdateViewport ()
+    {
+        if (this.viewer.renderer === null) {
+            return;
+        }
+        const dark = this.settings.themeId === Theme.Dark;
+        this.parameters.viewerDiv.classList.toggle ('dark_viewport', dark);
+        this.parameters.viewerDiv.classList.toggle ('horizon_viewport', this.settings.horizonGradient);
+        this.viewer.SetBackgroundColor (this.settings.backgroundColor);
+        this.viewer.SetBackgroundGradient (this.settings.horizonGradient, dark);
+        this.viewer.SetGroundGrid (this.settings.showGroundGrid, dark);
+        document.getElementById ('horizon_gradient').checked = this.settings.horizonGradient;
+        document.getElementById ('ground_grid').checked = this.settings.showGroundGrid;
     }
 
     InitToolbar ()
@@ -819,15 +850,20 @@ export class Website
                 return GetDefaultMaterials (this.model);
             },
             onEnvironmentMapChanged : () => {
+                if (this.settings.backgroundIsEnvMap) {
+                    this.settings.horizonGradient = false;
+                }
                 this.settings.SaveToCookies ();
                 this.UpdateEnvironmentMap ();
+                this.UpdateViewport ();
                 if (this.measureTool.IsActive ()) {
                     this.measureTool.UpdatePanel ();
                 }
             },
             onBackgroundColorChanged : () => {
+                this.settings.horizonGradient = false;
+                this.UpdateViewport ();
                 this.settings.SaveToCookies ();
-                this.viewer.SetBackgroundColor (this.settings.backgroundColor);
                 if (this.measureTool.IsActive ()) {
                     this.measureTool.UpdatePanel ();
                 }
