@@ -51,6 +51,7 @@ export class ShadingModel
         this.environment = null;
         this.backgroundTexture = null;
         this.hdriEnvironment = null;
+        this.hdriBackground = null;
         this.hdriProbe = null;
 
         this.scene.add (this.ambientLight);
@@ -88,7 +89,9 @@ export class ShadingModel
         if (this.hdriEnvironment !== null) {
             this.scene.environment = this.hdriEnvironment;
         }
-        if (this.environmentSettings.backgroundIsEnvMap && this.projectionMode === ProjectionMode.Perspective) {
+        if (this.hdriBackground !== null) {
+            this.scene.background = this.hdriBackground;
+        } else if (this.environmentSettings.backgroundIsEnvMap && this.projectionMode === ProjectionMode.Perspective) {
             this.scene.background = this.environment;
         } else {
             this.scene.background = this.backgroundTexture;

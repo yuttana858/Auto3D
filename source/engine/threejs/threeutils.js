@@ -219,7 +219,7 @@ export function CreateHighlightMaterial (originalMaterial, highlightColor, withP
             color : ConvertColorToThreeColor (highlightColor),
             side : THREE.DoubleSide
         });
-    } else if (originalMaterial.type === 'MeshStandardMaterial') {
+    } else if (originalMaterial.isMeshStandardMaterial) {
         material = new THREE.MeshStandardMaterial ({
             color : ConvertColorToThreeColor (highlightColor),
             side : THREE.DoubleSide

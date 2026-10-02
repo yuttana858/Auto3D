@@ -7,10 +7,60 @@ import { ShadingType } from '../../source/engine/threejs/threeutils.js';
 import { GetMaterialEntries, EnumerateUVTriangles } from '../../source/website/materialpanel.js';
 import { GetWorldAxisDirections } from '../../source/website/axisindicator.js';
 import { GetBackgroundPreset } from '../../source/engine/viewer/background.js';
+import { GetBoxUVTriangle, GenerateMissingBoxUVs } from '../../source/website/materialuv.js';
+import { Mesh } from '../../source/engine/model/mesh.js';
+import { Triangle } from '../../source/engine/model/triangle.js';
+import { Coord3D } from '../../source/engine/geometry/coord3d.js';
 
 export default function suite ()
 {
     describe ('Workspace lighting and materials', () => {
+        it ('Hides HDRI imagery without changing radiance, intensity or rotation and restores the gradient', () => {
+            const viewer = MakeViewer ();
+            const lighting = new HDRILighting (viewer);
+            lighting.texture = new THREE.DataTexture (new Float32Array (8 * 8 * 4).fill (1), 8, 8, THREE.RGBAFormat, THREE.FloatType);
+            lighting.target = { texture : new THREE.Texture () };
+            lighting.enabled = true;
+            const gradient = new THREE.Texture ();
+            viewer.shadingModel.backgroundTexture = gradient;
+            lighting.Adjust (0.7, 40, -20);
+            lighting.SetBackgroundVisible (true);
+            assert.equal (viewer.scene.background, lighting.texture);
+            assert.equal (viewer.scene.backgroundIntensity, 0.7);
+            assert.equal (viewer.scene.backgroundRotation.y, viewer.scene.environmentRotation.y);
+            const coefficients = lighting.probe.sh.clone ();
+            lighting.SetBackgroundVisible (false);
+            assert.equal (viewer.scene.background, gradient);
+            assert.equal (viewer.scene.backgroundIntensity, 1);
+            assert.equal (viewer.scene.environment, lighting.target.texture);
+            assert.equal (viewer.scene.environmentIntensity, 0.7);
+            assert.equal (lighting.probe.intensity, 0.7);
+            assert.ok (lighting.probe.sh.equals (coefficients));
+            lighting.SetBackgroundVisible (true);
+            lighting.SetDefault ();
+            assert.equal (viewer.scene.background, gradient);
+        });
+
+        it ('Generates box UVs consistently for export and display while preserving authored UVs', () => {
+            const original = new Mesh ();
+            [[0, 0, 0], [2, 0, 0], [0, 0, 4]].forEach ((point) => original.AddVertex (new Coord3D (...point)));
+            original.AddTriangle (new Triangle (0, 1, 2));
+            const geometry = new THREE.BufferGeometry ();
+            geometry.setAttribute ('position', new THREE.Float32BufferAttribute ([0, 0, 0, 2, 0, 0, 0, 0, 4], 3));
+            const mesh = { geometry, userData : { originalMeshInstance : { GetMesh : () => original } } };
+            const viewer = { mainModel : { EnumerateMeshes : (callback) => callback (mesh) } };
+            const entry = { meshes : [{ mesh }] };
+            GenerateMissingBoxUVs (viewer, entry);
+            assert.equal (original.TextureUVCount (), 3);
+            const expected = [[0, 0], [1, 0], [0, 1]];
+            assert.deepEqual (GetBoxUVTriangle ([[0, 0, 0], [2, 0, 0], [0, 0, 4]], { min : [0, 0, 0], max : [2, 0, 4] }), expected);
+            for (let i = 0; i < 3; i++) {
+                assert.deepEqual ([original.GetTextureUV (i).x, original.GetTextureUV (i).y], expected[i]);
+                assert.deepEqual ([geometry.getAttribute ('uv').getX (i), geometry.getAttribute ('uv').getY (i)], expected[i]);
+            }
+            GenerateMissingBoxUVs (viewer, entry);
+            assert.equal (original.TextureUVCount (), 3);
+        });
         it ('Follows the theme for Standard while preserving explicitly selected background colors', () => {
             assert.deepEqual (GetBackgroundPreset ('standard', true).colors, GetBackgroundPreset ('dark', false).colors);
             assert.deepEqual (GetBackgroundPreset ('standard', false).colors, GetBackgroundPreset ('light', true).colors);

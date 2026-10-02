@@ -41,6 +41,7 @@ export class HDRILighting
         this.enabled = false;
         this.request = 0;
         this.brightness = 1;
+        this.showBackground = false;
         this.rotation = new THREE.Euler ();
         this.probe = new THREE.LightProbe ();
         this.probe.intensity = 0;
@@ -89,17 +90,26 @@ export class HDRILighting
         this.Update ();
     }
 
+    SetBackgroundVisible (visible)
+    {
+        this.showBackground = visible;
+        this.Update ();
+    }
+
     Update ()
     {
         const shading = this.viewer.shadingModel;
         const active = this.enabled && this.texture !== null;
         shading.hdriEnvironment = active ? this.target.texture : null;
+        shading.hdriBackground = active && this.showBackground ? this.texture : null;
         this.probe.intensity = active ? this.brightness : 0;
         if (active) {
             this.probe.sh.copy (ProjectHDRI (this.texture.image, this.rotation));
         }
         this.viewer.scene.environmentIntensity = active ? this.brightness : 1;
         this.viewer.scene.environmentRotation.copy (active ? this.rotation : new THREE.Euler ());
+        this.viewer.scene.backgroundRotation.copy (active ? this.rotation : new THREE.Euler ());
+        this.viewer.scene.backgroundIntensity = active && this.showBackground ? this.brightness : 1;
         shading.UpdateShading ();
         this.viewer.Render ();
     }

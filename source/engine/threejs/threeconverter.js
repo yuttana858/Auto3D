@@ -150,7 +150,12 @@ export class ThreeMaterialHandler
 			opacity : material.opacity,
 			transparent : material.transparent,
 			alphaTest : material.alphaTest,
-			side : THREE.DoubleSide
+            side : material.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
+            bumpScale : material.bumpScale,
+            normalScale : new THREE.Vector2 (material.normalScale, material.normalScale),
+            aoMapIntensity : material.aoIntensity,
+            displacementScale : material.displacementScale,
+            displacementBias : material.displacementBias
 		};
 
 		if (this.conversionParams.forceMediumpForMaterials) {
@@ -172,13 +177,12 @@ export class ThreeMaterialHandler
 				});
 			}
 		} else if (this.shadingType === ShadingType.Physical) {
-			threeMaterial = new THREE.MeshStandardMaterial (materialParams);
+            threeMaterial = new THREE.MeshPhysicalMaterial (materialParams);
 			if (material.type === MaterialType.Physical) {
 				threeMaterial.metalness = material.metalness;
 				threeMaterial.roughness = material.roughness;
+                threeMaterial.specularIntensity = material.specularIntensity;
 				this.LoadFaceTexture (threeMaterial, material.metalnessMap, (threeTexture) => {
-					threeMaterial.metalness = 1.0;
-					threeMaterial.roughness = 1.0;
 					threeMaterial.metalnessMap = threeTexture;
 					threeMaterial.roughnessMap = threeTexture;
 				});
@@ -203,6 +207,8 @@ export class ThreeMaterialHandler
 		this.LoadFaceTexture (threeMaterial, material.emissiveMap, (threeTexture) => {
 			threeMaterial.emissiveMap = threeTexture;
 		});
+        this.LoadFaceTexture (threeMaterial, material.aoMap, (threeTexture) => { threeMaterial.aoMap = threeTexture; });
+        this.LoadFaceTexture (threeMaterial, material.displacementMap, (threeTexture) => { threeMaterial.displacementMap = threeTexture; });
 
 		if (material.source !== MaterialSource.Model) {
 			threeMaterial.userData.source = material.source;

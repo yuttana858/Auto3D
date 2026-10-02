@@ -527,7 +527,7 @@ export class ExporterGltf extends ExporterBase
                     baseColorFactor : ColorToRGBA (material.color, material.opacity)
                 },
                 emissiveFactor : ColorToRGB (material.emissive),
-                doubleSided : true,
+                doubleSided : material.doubleSided,
                 alphaMode : 'OPAQUE'
             };
 
@@ -544,21 +544,37 @@ export class ExporterGltf extends ExporterBase
                 jsonMaterial.pbrMetallicRoughness.baseColorTexture = baseColorTexture;
             }
             if (material.type === MaterialType.Physical) {
+                jsonMaterial.pbrMetallicRoughness.metallicFactor = material.metalness;
+                jsonMaterial.pbrMetallicRoughness.roughnessFactor = material.roughness;
                 let metallicTexture = GetTextureParams (mainJson, material.metalnessMap, addTexture);
                 if (metallicTexture !== null) {
                     jsonMaterial.pbrMetallicRoughness.metallicRoughnessTexture = metallicTexture;
-                } else {
-                    jsonMaterial.pbrMetallicRoughness.metallicFactor = material.metalness;
-                    jsonMaterial.pbrMetallicRoughness.roughnessFactor = material.roughness;
+                }
+                if (material.specularIntensity !== 1.0) {
+                    mainJson.extensionsUsed = mainJson.extensionsUsed || [];
+                    if (!mainJson.extensionsUsed.includes ('KHR_materials_specular')) { mainJson.extensionsUsed.push ('KHR_materials_specular'); }
+                    jsonMaterial.extensions = { KHR_materials_specular : { specularFactor : material.specularIntensity } };
                 }
             }
             let normalTexture = GetTextureParams (mainJson, material.normalMap, addTexture);
             if (normalTexture !== null) {
                 jsonMaterial.normalTexture = normalTexture;
+                jsonMaterial.normalTexture.scale = material.normalScale;
             }
             let emissiveTexture = GetTextureParams (mainJson, material.emissiveMap, addTexture);
             if (emissiveTexture !== null) {
                 jsonMaterial.emissiveTexture = emissiveTexture;
+            }
+            const aoTexture = GetTextureParams (mainJson, material.aoMap, addTexture);
+            if (aoTexture !== null) { jsonMaterial.occlusionTexture = { ...aoTexture, strength : Math.min (1, material.aoIntensity) }; }
+            if (material.bumpMap || material.displacementMap) {
+                jsonMaterial.extras = { swAuto3D : {
+                    bumpScale : material.bumpScale,
+                    displacementScale : material.displacementScale,
+                    displacementBias : material.displacementBias,
+                    bumpTexture : GetTextureParams (mainJson, material.bumpMap, addTexture),
+                    displacementTexture : GetTextureParams (mainJson, material.displacementMap, addTexture)
+                } };
             }
 
             mainJson.materials.push (jsonMaterial);

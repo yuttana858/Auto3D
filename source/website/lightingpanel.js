@@ -27,6 +27,7 @@ export class LightingPanel
             <div class="mode_buttons"><button id="lighting_default" aria-pressed="true">Default environment</button><button id="lighting_hdri" aria-pressed="false">HDRI</button></div>
             <div id="default_background_options"><p class="section_hint">Background</p><div class="background_gallery"></div><p class="section_hint">Standard follows the app theme.</p></div>
             <div id="hdri_options" hidden><p class="section_hint">Choose a surrounding light environment.</p><div class="hdri_gallery"></div>
+            <div class="lighting_viewport_controls"><label><input type="checkbox" id="hdri_background"> Show HDRI background</label></div>
             <label class="slider_label" for="hdri_brightness">Brightness <output id="hdri_brightness_value">1.00×</output></label><input id="hdri_brightness" type="range" min="0" max="3" step="0.05" value="1">
             <label class="slider_label" for="hdri_rotation">Rotation <output id="hdri_rotation_value">0°</output></label><input id="hdri_rotation" type="range" min="-180" max="180" step="1" value="0">
             <label class="slider_label" for="hdri_elevation">Elevation <output id="hdri_elevation_value">0°</output></label><input id="hdri_elevation" type="range" min="-90" max="90" step="1" value="0">
@@ -57,6 +58,7 @@ export class LightingPanel
             ++this.request;
             this.SetMode ('default');
             this.lighting.SetDefault ();
+            this.SyncBackgroundVisibility ();
             this.Status ('Default environment active.');
         });
         document.getElementById ('lighting_hdri').addEventListener ('click', () => {
@@ -74,6 +76,10 @@ export class LightingPanel
             document.getElementById ('hdri_elevation_value').textContent = elevation + '°';
             this.lighting.Adjust (brightness, rotation, elevation);
         };
+        document.getElementById ('hdri_background').addEventListener ('change', (event) => {
+            this.lighting.SetBackgroundVisible (event.target.checked);
+            this.SyncBackgroundVisibility ();
+        });
         for (const id of ['hdri_brightness', 'hdri_rotation', 'hdri_elevation']) {
             document.getElementById (id).addEventListener ('input', adjust);
         }
@@ -98,6 +104,11 @@ export class LightingPanel
         document.getElementById ('ground_grid').checked = settings.showGroundGrid;
     }
 
+    SyncBackgroundVisibility ()
+    {
+        this.website.parameters.viewerDiv.classList.toggle ('hdri_background_visible', this.lighting.enabled && this.lighting.showBackground && this.lighting.texture !== null);
+    }
+
     SetMode (mode)
     {
         this.mode = mode;
@@ -119,6 +130,7 @@ export class LightingPanel
         try {
             if (!await this.lighting.Load ('assets/hdri/' + id + '.hdr') || request !== this.request) { return; }
             this.selected = id;
+            this.SyncBackgroundVisibility ();
             for (const card of this.root.querySelectorAll ('.hdri_card')) {
                 card.setAttribute ('aria-pressed', String (card === button));
             }

@@ -1,8 +1,14 @@
+import * as THREE from 'three';
+import { TextureMap } from '../engine/model/material.js';
+import { HexStringToRGBColor } from '../engine/model/color.js';
+import { GenerateMissingBoxUVs } from './materialuv.js';
+
 const TextureSlots = [
     ['map', 'Base color', 'diffuseMap'], ['normalMap', 'Normal', 'normalMap'],
     ['bumpMap', 'Bump', 'bumpMap'], ['roughnessMap', 'Roughness', 'metalnessMap'],
     ['metalnessMap', 'Metalness', 'metalnessMap'], ['emissiveMap', 'Emission', 'emissiveMap'],
-    ['specularMap', 'Specular', 'specularMap']
+    ['specularMap', 'Specular', 'specularMap'], ['aoMap', 'Ambient occlusion', 'aoMap'],
+    ['displacementMap', 'Displacement', 'displacementMap']
 ];
 
 export function GetMaterialEntries (viewer, model, selectedId)
@@ -51,7 +57,31 @@ export class MaterialPanel
         this.entries = [];
         this.active = 0;
         this.open = false;
+        this.page = 'surface';
+        this.mapSlot = 'map';
+        this.textureRequest = 0;
+        this.editorTextures = new Set ();
         this.drawer = document.getElementById ('material_drawer');
+        const tabs = document.createElement ('div');
+        tabs.className = 'editor_tabs';
+        tabs.setAttribute ('role', 'tablist');
+        tabs.setAttribute ('aria-label', 'Material editor views');
+        for (const [id, title] of [['surface', 'Surface'], ['textures', 'Textures'], ['uv', 'UV']]) {
+            const button = document.createElement ('button');
+            button.textContent = title;
+            button.id = 'editor_tab_' + id;
+            button.setAttribute ('role', 'tab');
+            button.setAttribute ('aria-controls', 'material_drawer_content');
+            button.addEventListener ('click', () => { this.page = id; this.FillDrawer (); });
+            button.addEventListener ('keydown', (event) => {
+                if (!['ArrowLeft', 'ArrowRight'].includes (event.key)) { return; }
+                const buttons = Array.from (tabs.children);
+                const next = buttons[(buttons.indexOf (button) + (event.key === 'ArrowRight' ? 1 : 2)) % 3];
+                next.click (); next.focus (); event.preventDefault ();
+            });
+            tabs.appendChild (button);
+        }
+        this.drawer.querySelector ('.drawer_header').insertBefore (tabs, document.getElementById ('material_drawer_close'));
         this.section = document.getElementById ('materials_section');
         this.section.innerHTML = '<summary>Materials</summary><div class="section_content"><p id="material_context" class="section_hint"></p><div id="material_list"></div><button class="section_button" id="material_advance" disabled>Advance material editor</button></div>';
         document.getElementById ('material_advance').addEventListener ('click', () => this.Open ());
@@ -64,6 +94,9 @@ export class MaterialPanel
 
     Clear ()
     {
+        ++this.textureRequest;
+        for (const texture of this.editorTextures) { texture.dispose (); }
+        this.editorTextures.clear ();
         this.open = false;
         this.drawer.classList.remove ('open');
         this.drawer.inert = true;
@@ -94,10 +127,10 @@ export class MaterialPanel
             const button = document.createElement ('button');
             button.className = 'material_card';
             const image = entry.material.map && entry.material.map.image;
-            const swatch = document.createElement (image && image.src ? 'img' : 'span');
+            const swatch = document.createElement (image ? 'canvas' : 'span');
             swatch.className = 'material_swatch';
             swatch.style.backgroundColor = '#' + entry.material.color.getHexString ();
-            if (image && image.src) { swatch.src = image.src; swatch.alt = ''; }
+            if (image) { swatch.width = 22; swatch.height = 22; swatch.getContext ('2d').drawImage (image, 0, 0, 22, 22); }
             const text = document.createElement ('span');
             const maps = TextureSlots.filter ((slot) => entry.material[slot[0]]);
             text.textContent = (entry.original.name || 'Material ' + (entry.index + 1)) + ' · ' + (maps.length ? maps.map ((slot) => slot[1]).join (', ') : 'Solid color · no texture');
@@ -143,83 +176,95 @@ export class MaterialPanel
         }
         const entry = this.entries[this.active];
         const material = entry.material;
-        document.getElementById ('material_drawer_context').textContent = entry.original.name || 'Material ' + (entry.index + 1);
-        const properties = this.Column (content, 'Surface');
+        const contextLabel = document.getElementById ('material_drawer_context');
+        contextLabel.replaceChildren ();
         const select = document.createElement ('select');
         select.setAttribute ('aria-label', 'Material');
-        this.entries.forEach ((item, index) => {
-            const option = new Option (item.original.name || 'Material ' + (item.index + 1), index);
-            select.add (option);
-        });
+        this.entries.forEach ((item, index) => select.add (new Option (item.original.name || 'Material ' + (item.index + 1), index)));
         select.value = this.active;
         select.addEventListener ('change', () => { this.active = Number (select.value); this.FillDrawer (); });
-        properties.appendChild (select);
-        this.Text (properties, material.isMeshStandardMaterial ? 'Physical material' : 'Phong material');
-        this.Control (properties, 'Base color', 'color', '#' + material.color.getHexString (), {}, (value) => {
-            material.color.set (value);
-            const color = entry.original.color;
-            color.r = Math.round (material.color.r * 255);
-            color.g = Math.round (material.color.g * 255);
-            color.b = Math.round (material.color.b * 255);
-            entry.original.multiplyDiffuseMap = true;
-            this.ShowSummary ();
-        });
-        this.Control (properties, 'Opacity', 'range', material.opacity, { min : 0, max : 1, step : 0.01 }, (value) => {
-            material.opacity = Number (value);
-            material.transparent = material.opacity < 1;
-            entry.original.opacity = material.opacity;
-            entry.original.transparent = material.transparent;
-        });
-        for (const [key, title, max, factor] of material.isMeshStandardMaterial ? [['roughness', 'Roughness', 1, 1], ['metalness', 'Metalness', 1, 1]] : [['shininess', 'Shininess', 100, 100]]) {
-            this.Control (properties, title, 'range', material[key], { min : 0, max, step : max / 100 }, (value) => {
-                material[key] = Number (value);
-                entry.original[key] = Number (value) / factor;
-            });
+        contextLabel.appendChild (select);
+        for (const button of this.drawer.querySelectorAll ('[role="tab"]')) {
+            const selected = button.id === 'editor_tab_' + this.page;
+            button.setAttribute ('aria-selected', String (selected));
+            button.tabIndex = selected ? 0 : -1;
         }
-        this.Text (properties, 'Changes apply to every part sharing this material.');
-        const textures = this.Column (content, 'Textures & mapping');
-        const maps = TextureSlots.filter ((slot) => material[slot[0]]);
-        if (!maps.length) {
-            this.Text (textures, 'No texture maps assigned. This surface uses a solid color.');
-        } else {
-            const picker = document.createElement ('select');
-            picker.setAttribute ('aria-label', 'Texture map');
-            maps.forEach ((slot, index) => picker.add (new Option (slot[1], index)));
-            const details = document.createElement ('div');
-            textures.append (picker, details);
-            const show = () => {
-                details.replaceChildren ();
-                const slot = maps[Number (picker.value)];
-                const texture = material[slot[0]];
-                const original = entry.original[slot[2]];
-                const image = texture.image;
-                if (image && image.src) {
-                    const preview = document.createElement ('img');
-                    preview.className = 'texture_preview';
-                    preview.src = image.src;
-                    preview.alt = slot[1] + ' texture';
-                    details.appendChild (preview);
+        content.setAttribute ('role', 'tabpanel');
+        content.setAttribute ('aria-labelledby', 'editor_tab_' + this.page);
+        if (this.page === 'textures') { this.ShowTextures (content, entry); return; }
+        if (this.page === 'surface') {
+            const properties = this.Column (content, 'Surface');
+            properties.classList.add ('surface_controls');
+            this.Control (properties, 'Base color', 'color', '#' + material.color.getHexString (), {}, (value) => {
+                material.color.set (value);
+                entry.original.color = HexStringToRGBColor (value.substring (1));
+                entry.original.multiplyDiffuseMap = true;
+                this.ShowSummary ();
+            });
+            this.Control (properties, 'Opacity', 'range', material.opacity, { min : 0, max : 1, step : 0.01 }, (value) => {
+                material.opacity = Number (value);
+                material.transparent = material.opacity < 1;
+                entry.original.opacity = material.opacity;
+                entry.original.transparent = material.transparent;
+            });
+            const physical = material.isMeshStandardMaterial;
+            this.Control (properties, 'Glossy', 'range', physical ? 1 - material.roughness : material.shininess / 100, { min : 0, max : 1, step : 0.01 }, (value) => {
+                if (physical) {
+                    material.roughness = 1 - Number (value);
+                    entry.original.roughness = material.roughness;
+                    this.SyncValue ('Roughness', material.roughness);
+                } else {
+                    material.shininess = Number (value) * 100;
+                    entry.original.shininess = Number (value);
                 }
-                this.Text (details, original && original.name ? original.name : slot[1] + ' map');
-                this.Text (details, image ? (image.naturalWidth || image.width) + ' × ' + (image.naturalHeight || image.height) + ' px · UV channel ' + texture.channel : 'Texture image unavailable');
-                this.Text (details, 'Wrap U / V: ' + this.WrapName (texture.wrapS) + ' / ' + this.WrapName (texture.wrapT));
-                for (const [key, axis, title] of [['repeat', 'x', 'Tile U'], ['repeat', 'y', 'Tile V'], ['offset', 'x', 'Offset U'], ['offset', 'y', 'Offset V']]) {
-                    this.Control (details, title, 'number', texture[key][axis], { step : 0.05 }, (value) => {
-                        texture[key][axis] = Number (value);
-                        if (original) { original[key === 'repeat' ? 'scale' : key][axis] = Number (value); }
-                        texture.updateMatrix ();
-                    });
-                }
-                this.Control (details, 'Texture rotation (°)', 'number', texture.rotation * 180 / Math.PI, { step : 1 }, (value) => {
-                    texture.rotation = Number (value) * Math.PI / 180;
-                    if (original) { original.rotation = texture.rotation; }
-                    texture.updateMatrix ();
+            });
+            if (physical) {
+                this.Control (properties, 'Roughness', 'range', material.roughness, { min : 0, max : 1, step : 0.01 }, (value) => {
+                    material.roughness = Number (value); entry.original.roughness = material.roughness;
+                    this.SyncValue ('Glossy', 1 - material.roughness);
                 });
-            };
-            picker.addEventListener ('change', show);
-            show ();
+                this.Control (properties, 'Metalness', 'range', material.metalness, { min : 0, max : 1, step : 0.01 }, (value) => {
+                    material.metalness = Number (value); entry.original.metalness = material.metalness;
+                });
+            }
+            this.Control (properties, 'Reflective', 'range', physical ? material.specularIntensity : Math.max (material.specular.r, material.specular.g, material.specular.b), { min : 0, max : 1, step : 0.01 }, (value) => {
+                if (physical) { material.specularIntensity = Number (value); entry.original.specularIntensity = Number (value); }
+                else {
+                    material.specular.setRGB (Number (value), Number (value), Number (value));
+                    entry.original.specular = HexStringToRGBColor (material.specular.getHexString ());
+                }
+            });
+            for (const [key, originalKey, title, map, max] of [
+                ['bumpScale', 'bumpScale', 'Bump', 'bumpMap', 2],
+                ['normalScale', 'normalScale', 'Normal strength', 'normalMap', 2],
+                ['aoMapIntensity', 'aoIntensity', 'AO intensity', 'aoMap', 1]
+            ]) {
+                const value = key === 'normalScale' ? material.normalScale.x : material[key];
+                this.Control (properties, title, 'range', value, { min : 0, max, step : 0.01, disabled : !material[map] || (map === 'bumpMap' && !!material.normalMap) }, (value) => {
+                    if (key === 'normalScale') { material.normalScale.setScalar (Number (value)); }
+                    else { material[key] = Number (value); }
+                    entry.original[originalKey] = Number (value);
+                });
+            }
+            let extent = 1;
+            for (const { mesh } of entry.meshes) {
+                mesh.geometry.computeBoundingBox ();
+                const size = mesh.geometry.boundingBox.getSize (new THREE.Vector3 ());
+                extent = Math.max (size.x, size.y, size.z, 1e-6);
+            }
+            const maxDisplacement = Math.max (extent * 0.05, Math.abs (material.displacementScale));
+            this.Control (properties, 'Displacement', 'range', material.displacementScale, { min : -maxDisplacement, max : maxDisplacement, step : maxDisplacement / 100, disabled : !material.displacementMap }, (value) => {
+                material.displacementScale = Number (value); entry.original.displacementScale = Number (value);
+            });
+            this.Control (properties, 'Double sided', 'checkbox', material.side === THREE.DoubleSide, {}, (value) => {
+                material.side = value ? THREE.DoubleSide : THREE.FrontSide; entry.original.doubleSided = value;
+            });
+            const note = this.Text (properties, 'Shared material · Load Bump, AO or Displacement maps in Textures to enable their controls.');
+            note.classList.add ('editor_note');
+            return;
         }
         const uvColumn = this.Column (content, 'UV layout');
+        uvColumn.classList.add ('uv_column');
         const canvas = document.createElement ('canvas');
         canvas.width = 300;
         canvas.height = 300;
@@ -270,8 +315,131 @@ export class MaterialPanel
             context.closePath ();
             context.stroke ();
         }
-        this.Text (uvColumn, triangles ? 'UV0 · ' + triangles.toLocaleString () + ' triangles · U ' + bounds.minU.toFixed (2) + ' to ' + bounds.maxU.toFixed (2) + ' · V ' + bounds.minV.toFixed (2) + ' to ' + bounds.maxV.toFixed (2) + '. Grey outline marks the 0–1 tile. Layout shows geometry UVs; texture adjustments change how the image is placed.' + (triangles > 10000 ? ' Preview limited to 10,000 triangles.' : '') : 'No UV coordinates in this geometry. Texture mapping requires UVs.');
-        if (this.open) { this.website.layouter.Resize (); }
+        const uvDetails = document.createElement ('div');
+        uvColumn.appendChild (uvDetails);
+        this.Text (uvDetails, triangles ? 'UV0 · ' + triangles.toLocaleString () + ' triangles · U ' + bounds.minU.toFixed (2) + '–' + bounds.maxU.toFixed (2) + ' · V ' + bounds.minV.toFixed (2) + '–' + bounds.maxV.toFixed (2) + '. Grey outline: 0–1 tile.' + (triangles > 10000 ? ' Preview: first 10,000 triangles.' : '') : 'No UV coordinates in this geometry. Texture mapping requires UVs.');
+        const generate = document.createElement ('button');
+        generate.className = 'section_button';
+        generate.textContent = 'Generate box UVs';
+        generate.disabled = !entry.meshes.some ((item) => item.mesh.userData.originalMeshInstance.TextureUVCount () === 0);
+        generate.addEventListener ('click', () => { GenerateMissingBoxUVs (this.website.viewer, entry); this.website.viewer.Render (); this.FillDrawer (); });
+        uvDetails.appendChild (generate);
+        this.Text (uvDetails, 'Fills missing UVs only. Box projection is a starting point; seams can remain.');
+    }
+
+    ShowTextures (content, entry)
+    {
+        const material = entry.material;
+        const controls = this.Column (content, 'Texture maps');
+        controls.classList.add ('texture_actions');
+        const maps = TextureSlots.filter ((slot) => material.isMeshStandardMaterial ? slot[0] !== 'specularMap' && slot[0] !== 'roughnessMap' : !['roughnessMap', 'metalnessMap'].includes (slot[0]));
+        const picker = document.createElement ('select');
+        picker.setAttribute ('aria-label', 'Texture map');
+        maps.forEach ((slot) => picker.add (new Option ((slot[0] === 'metalnessMap' ? 'Metalness / roughness' : slot[1]) + (material[slot[0]] ? ' · assigned' : ' · empty'), slot[0])));
+        picker.value = maps.some ((slot) => slot[0] === this.mapSlot) ? this.mapSlot : 'map';
+        this.mapSlot = picker.value;
+        picker.addEventListener ('change', () => { this.mapSlot = picker.value; this.FillDrawer (); });
+        controls.appendChild (picker);
+        const slot = maps.find ((slot) => slot[0] === this.mapSlot);
+        const fileInput = document.createElement ('input');
+        fileInput.type = 'file'; fileInput.accept = 'image/png,image/jpeg,image/webp';
+        fileInput.hidden = true;
+        fileInput.setAttribute ('aria-label', 'Load texture image');
+        const load = document.createElement ('button');
+        load.className = 'section_button'; load.textContent = material[slot[0]] ? 'Replace image' : 'Load image';
+        load.addEventListener ('click', () => fileInput.click ());
+        const remove = document.createElement ('button');
+        remove.className = 'section_button'; remove.textContent = 'Remove map'; remove.disabled = !material[slot[0]];
+        remove.addEventListener ('click', () => {
+            ++this.textureRequest;
+            material[slot[0]] = null; entry.original[slot[2]] = null;
+            if (slot[0] === 'metalnessMap') { material.roughnessMap = null; }
+            material.needsUpdate = true; this.website.viewer.Render (); this.ShowSummary (); this.FillDrawer ();
+        });
+        const status = this.Text (controls, 'PNG, JPEG or WebP · stays in your browser');
+        status.setAttribute ('role', 'status');
+        fileInput.addEventListener ('change', async () => {
+            if (!fileInput.files.length) { return; }
+            load.disabled = true; status.textContent = 'Loading image…';
+            await this.LoadTexture (entry, slot, fileInput.files[0], status);
+            load.disabled = false;
+        });
+        controls.append (load, remove, fileInput);
+        const details = this.Column (content, 'Mapping');
+        details.classList.add ('texture_details');
+        const texture = material[slot[0]];
+        const original = entry.original[slot[2]];
+        if (!texture) {
+            this.Text (details, 'Load a texture image for this map. Metalness / roughness images use green for roughness and blue for metalness.');
+        } else {
+            const preview = document.createElement ('canvas');
+            preview.className = 'texture_preview'; preview.setAttribute ('aria-label', slot[1] + ' texture preview');
+            if (texture.image) {
+                preview.width = texture.image.naturalWidth || texture.image.width;
+                preview.height = texture.image.naturalHeight || texture.image.height;
+                preview.getContext ('2d').drawImage (texture.image, 0, 0);
+            }
+            details.appendChild (preview);
+            const fields = document.createElement ('div'); fields.className = 'texture_fields'; details.appendChild (fields);
+            this.Text (fields, (original ? original.name : slot[1]) + ' · ' + preview.width + ' × ' + preview.height + ' px · UV' + texture.channel);
+            for (const [key, axis, title] of [['repeat', 'x', 'Tile U'], ['repeat', 'y', 'Tile V'], ['offset', 'x', 'Offset U'], ['offset', 'y', 'Offset V']]) {
+                this.Control (fields, title, 'number', texture[key][axis], { step : 0.05 }, (value) => {
+                    texture[key][axis] = Number (value);
+                    if (original) { original[key === 'repeat' ? 'scale' : key][axis] = Number (value); }
+                    texture.updateMatrix ();
+                });
+            }
+            this.Control (fields, 'Texture rotation (°)', 'number', texture.rotation * 180 / Math.PI, { step : 1 }, (value) => {
+                texture.rotation = Number (value) * Math.PI / 180;
+                if (original) { original.rotation = texture.rotation; }
+                texture.updateMatrix ();
+            });
+        }
+        if (entry.meshes.some ((item) => !item.mesh.geometry.getAttribute ('uv'))) {
+            this.Text (details, 'This geometry has no UVs. Open UV → Generate box UVs to use your image.');
+        }
+    }
+
+    async LoadTexture (entry, slot, file, status)
+    {
+        const request = ++this.textureRequest;
+        const model = this.website.model;
+        const url = URL.createObjectURL (file);
+        try {
+            const buffer = await file.arrayBuffer ();
+            const texture = await new THREE.TextureLoader ().loadAsync (url);
+            if (request !== this.textureRequest || model !== this.website.model) { texture.dispose (); return; }
+            texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping;
+            this.editorTextures.add (texture);
+            const original = new TextureMap ();
+            original.name = file.name; original.mimeType = file.type || 'image/png'; original.buffer = buffer;
+            entry.original[slot[2]] = original; entry.material[slot[0]] = texture;
+            if (slot[0] === 'metalnessMap') { entry.material.roughnessMap = texture; }
+            if (slot[0] === 'map') { entry.original.multiplyDiffuseMap = true; }
+            if (slot[0] === 'displacementMap' && entry.material.displacementScale === 0) {
+                entry.meshes[0].mesh.geometry.computeBoundingBox ();
+                const size = entry.meshes[0].mesh.geometry.boundingBox.getSize (new THREE.Vector3 ());
+                entry.original.displacementScale = Math.max (size.x, size.y, size.z) * 0.005;
+                entry.material.displacementScale = entry.original.displacementScale;
+            }
+            entry.material.needsUpdate = true;
+            this.website.viewer.Render (); this.ShowSummary ();
+            if (this.open && this.entries[this.active] && this.entries[this.active].material === entry.material) { this.FillDrawer (); }
+        } catch (error) {
+            if (request === this.textureRequest) { status.textContent = 'Image could not be loaded. Choose a PNG, JPEG or WebP.'; }
+        } finally { URL.revokeObjectURL (url); }
+    }
+
+    FormatValue (value)
+    {
+        const number = Number (value);
+        return number !== 0 && Math.abs (number) < 0.01 ? number.toPrecision (2) : number.toFixed (2);
+    }
+
+    SyncValue (title, value)
+    {
+        const input = this.drawer.querySelector ('input[aria-label="' + title + '"]');
+        if (input) { input.value = value; input.nextElementSibling.textContent = this.FormatValue (value); }
     }
 
     WrapName (value)
@@ -296,26 +464,28 @@ export class MaterialPanel
         paragraph.className = 'section_hint';
         paragraph.textContent = text;
         parent.appendChild (paragraph);
+        return paragraph;
     }
 
     Control (parent, title, type, value, attributes, onChange)
     {
         const label = document.createElement ('label');
         label.className = 'editor_control';
+        if (attributes.disabled) { label.title = 'Load the corresponding texture map in Textures. Normal maps take priority over bump maps.'; }
         const caption = document.createElement ('span');
         caption.textContent = title;
         const input = document.createElement ('input');
         input.type = type;
         input.setAttribute ('aria-label', title);
-        input.value = value;
         Object.assign (input, attributes);
+        if (type === 'checkbox') { input.checked = value; } else { input.value = value; }
         const output = document.createElement ('output');
-        output.textContent = type === 'range' ? Number (value).toFixed (2) : '';
+        output.textContent = type === 'range' ? this.FormatValue (value) : '';
         label.append (caption, input, output);
         input.addEventListener ('input', () => {
             if (type === 'number' && (!input.value || !Number.isFinite (Number (input.value)))) { return; }
-            onChange (input.value);
-            output.textContent = type === 'range' ? Number (input.value).toFixed (2) : '';
+            onChange (type === 'checkbox' ? input.checked : input.value);
+            output.textContent = type === 'range' ? this.FormatValue (input.value) : '';
             this.entries[this.active].material.needsUpdate = true;
             this.website.viewer.Render ();
         });

@@ -740,6 +740,25 @@ export class ImporterGltf extends ImporterBase
         if (newMaterial !== null) {
             material = newMaterial;
         }
+        material.doubleSided = gltfMaterial.doubleSided === true;
+        material.aoMap = this.ImportTexture (gltf, gltfMaterial.occlusionTexture);
+        if (gltfMaterial.occlusionTexture && gltfMaterial.occlusionTexture.strength !== undefined) {
+            material.aoIntensity = gltfMaterial.occlusionTexture.strength;
+        }
+        if (gltfMaterial.normalTexture && gltfMaterial.normalTexture.scale !== undefined) {
+            material.normalScale = gltfMaterial.normalTexture.scale;
+        }
+        const specular = gltfMaterial.extensions && gltfMaterial.extensions.KHR_materials_specular;
+        if (specular && Number.isFinite (specular.specularFactor)) { material.specularIntensity = specular.specularFactor; }
+        // Keep nonstandard height maps in our extras; ordinary glTF viewers ignore them.
+        const surface = gltfMaterial.extras && gltfMaterial.extras.swAuto3D;
+        if (surface) {
+            for (const key of ['bumpScale', 'displacementScale', 'displacementBias']) {
+                if (Number.isFinite (surface[key])) { material[key] = surface[key]; }
+            }
+            material.bumpMap = this.ImportTexture (gltf, surface.bumpTexture);
+            material.displacementMap = this.ImportTexture (gltf, surface.displacementTexture);
+        }
         this.model.AddMaterial (material);
     }
 

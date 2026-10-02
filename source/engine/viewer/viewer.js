@@ -60,7 +60,7 @@ export function GetShadingTypeOfObject (mainObject)
             for (const material of obj.material) {
                 if (material.type === 'MeshPhongMaterial') {
                     shadingType = ShadingType.Phong;
-                } else if (material.type === 'MeshStandardMaterial') {
+                } else if (material.isMeshStandardMaterial) {
                     shadingType = ShadingType.Physical;
                 }
                 return false;

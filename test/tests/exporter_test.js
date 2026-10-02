@@ -75,6 +75,44 @@ function Export (model, settings, format, extension, onReady)
 }
 
 describe ('Exporter', function () {
+    for (const [format, extension] of [[OV.FileFormat.Text, 'gltf'], [OV.FileFormat.Binary, 'glb']]) {
+        it ('Preserves edited physical surfaces and height maps in ' + extension, function (done) {
+            const model = CreateTestModel ();
+            const material = new OV.PhysicalMaterial ();
+            material.name = 'Edited surface'; material.color = new OV.RGBColor (203, 180, 140);
+            material.doubleSided = false; material.roughness = 0.25; material.metalness = 0.4;
+            material.specularIntensity = 0.35; material.normalScale = 0.6; material.aoIntensity = 0.7;
+            material.bumpScale = 0.2; material.displacementScale = 0.015; material.displacementBias = -0.002;
+            for (const key of ['metalnessMap', 'normalMap', 'aoMap', 'bumpMap', 'displacementMap']) {
+                const map = new OV.TextureMap ();
+                map.name = key + '.png'; map.mimeType = 'image/png'; map.buffer = new Uint8Array ([1, 2, 3, 4]).buffer;
+                material[key] = map;
+            }
+            model.materials[0] = material;
+            Export (model, new OV.ExporterSettings (), format, extension, (files) => {
+                const importer = new OV.ImporterGltf ();
+                importer.Import (files[0].GetName (), extension, files[0].GetBufferContent (), {
+                    getDefaultLineMaterialColor : () => new OV.RGBColor (0, 0, 0),
+                    getDefaultMaterialColor : () => new OV.RGBColor (0, 0, 0),
+                    getFileBuffer : (path) => { const file = files.find ((item) => item.GetName () === path); return file ? file.GetBufferContent () : null; },
+                    onError : () => done (new Error ('Export could not be imported')),
+                    onSuccess : () => {
+                        try {
+                            const restored = importer.GetModel ().GetMaterial (0);
+                            for (const key of ['doubleSided', 'roughness', 'metalness', 'specularIntensity', 'normalScale', 'aoIntensity', 'bumpScale', 'displacementScale', 'displacementBias']) {
+                                assert.equal (restored[key], material[key], key);
+                            }
+                            for (const key of ['metalnessMap', 'normalMap', 'aoMap', 'bumpMap', 'displacementMap']) {
+                                assert.ok (restored[key].IsValid (), key);
+                                assert.equal (restored[key].buffer.byteLength, 4, key);
+                            }
+                            done ();
+                        } catch (error) { done (error); }
+                    }
+                });
+            });
+        });
+    }
     it ('Exporter Error', function (done) {
         let model = CreateTestModel ();
         let exporter = new OV.Exporter ();
@@ -339,7 +377,7 @@ describe ('Exporter', function () {
         let model = CreateTestModel ();
         let settings = new OV.ExporterSettings ();
         Export (model, settings, OV.FileFormat.Text, 'gltf', function (result) {
-            assert.strictEqual (result.length, 3);
+            assert.strictEqual (result.length, 4);
 
             let gltfFile = result[0];
             let binFile = result[1];
@@ -349,6 +387,8 @@ describe ('Exporter', function () {
 
             assert.strictEqual (textureFile.GetName (), 'texture1.png');
             assert.strictEqual (textureFile.GetBufferContent ().byteLength, 1);
+            assert.strictEqual (result[3].GetName (), 'texture3.png');
+            assert.strictEqual (result[3].GetBufferContent ().byteLength, 3);
 
             let contentBuffer = gltfFile.GetBufferContent ();
             let importer = new OV.ImporterGltf ();
