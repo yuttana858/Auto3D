@@ -16,7 +16,7 @@ import { ThreeModelLoaderUI } from './threemodelloaderui.js';
 import { Toolbar } from './toolbar.js';
 import { DownloadModel, ShowExportDialog } from './exportdialog.js';
 import { ShowSnapshotDialog } from './snapshotdialog.js';
-import { AddSvgIconElement, GetFilesFromDataTransfer, InstallTooltip, IsSmallWidth } from './utils.js';
+import { AddSvgIconElement, GetFilesFromDataTransfer, InstallTooltip } from './utils.js';
 import { ShowOpenUrlDialog } from './openurldialog.js';
 import { ShowSharingDialog } from './sharingdialog.js';
 import { GetDefaultMaterials, ReplaceDefaultMaterialsColor } from '../engine/model/modelutils.js';
@@ -135,7 +135,7 @@ class WebsiteLayouter
         let leftWidth = 0;
         let rightWidth = 0;
         let safetyMargin = 0;
-        if (!IsSmallWidth ()) {
+        if (this.parameters.mainDiv.style.display !== 'none') {
             leftWidth = GetDomElementOuterWidth (this.parameters.leftContainerDiv);
             rightWidth = GetDomElementOuterWidth (this.parameters.rightContainerDiv);
             safetyMargin = 1;
@@ -144,36 +144,17 @@ class WebsiteLayouter
         let contentWidth = windowWidth - leftWidth - rightWidth;
         let contentHeight = windowHeight - headerHeight;
 
-        if (contentWidth < this.limits.minCanvasWidth) {
-            let neededIncrease = this.limits.minCanvasWidth - contentWidth;
-
-            let isNavigatorVisible = this.navigator.IsPanelsVisible ();
-            let isSidebarVisible = this.sidebar.IsPanelsVisible ();
-
-            if (neededIncrease > 0 && isNavigatorVisible) {
-                let navigatorDecrease = Math.min (neededIncrease, leftWidth - this.limits.minPanelWidth);
-                this.navigator.SetWidth (this.navigator.GetWidth () - navigatorDecrease);
-                neededIncrease = neededIncrease - navigatorDecrease;
-            }
-
-            if (neededIncrease > 0 && isSidebarVisible) {
-                let sidebarDecrease = Math.min (neededIncrease, rightWidth - this.limits.minPanelWidth);
-                this.sidebar.SetWidth (this.sidebar.GetWidth () - sidebarDecrease);
-            }
-
-            leftWidth = GetDomElementOuterWidth (this.parameters.leftContainerDiv);
-            rightWidth = GetDomElementOuterWidth (this.parameters.rightContainerDiv);
-            contentWidth = windowWidth - leftWidth - rightWidth;
-        }
-
-        this.navigator.Resize (contentHeight);
+        const panelHeaderHeight = document.getElementById ('upload_panel_toggle').offsetHeight;
+        this.parameters.mainDiv.style.height = contentHeight + 'px';
+        const uploadHeight = document.getElementById ('upload_slot').offsetHeight;
+        this.navigator.Resize (Math.max (100, contentHeight - panelHeaderHeight - uploadHeight));
         SetDomElementOuterHeight (this.parameters.navigatorSplitterDiv, contentHeight);
 
-        this.sidebar.Resize (contentHeight);
+        this.sidebar.Resize (Math.max (100, contentHeight - panelHeaderHeight));
         SetDomElementOuterHeight (this.parameters.sidebarSplitterDiv, contentHeight);
 
-        SetDomElementOuterHeight (this.parameters.introDiv, contentHeight);
-        this.viewer.Resize (contentWidth - safetyMargin, contentHeight);
+        this.parameters.viewerDiv.style.width = Math.max (1, contentWidth - safetyMargin) + 'px';
+        this.viewer.Resize (Math.max (1, contentWidth - safetyMargin), contentHeight);
 
         this.measureTool.Resize ();
     }
@@ -221,6 +202,7 @@ export class Website
         this.InitDragAndDrop ();
         this.InitSidebar ();
         this.InitNavigator ();
+        this.InitWorkspace ();
 
         this.viewer.SetMouseClickHandler (this.OnModelClicked.bind (this));
         this.viewer.SetMouseMoveHandler (this.OnModelMouseMoved.bind (this));
@@ -242,6 +224,41 @@ export class Website
         return this.model !== null;
     }
 
+    InitWorkspace ()
+    {
+        document.getElementById ('workspace_upload').addEventListener ('click', () => this.OpenFileBrowserDialog ());
+        document.getElementById ('workspace_open_url').addEventListener ('click', () => {
+            ShowOpenUrlDialog ((urls) => {
+                if (urls.length > 0) {
+                    this.hashHandler.SetModelFilesToHash (urls);
+                }
+            });
+        });
+        for (const [side, toggleId] of [['left', 'upload_panel_toggle'], ['right', 'data_panel_toggle']]) {
+            const container = side === 'left' ? this.parameters.leftContainerDiv : this.parameters.rightContainerDiv;
+            const toggle = document.getElementById (toggleId);
+            const apply = (collapsed) => {
+                container.classList.toggle ('collapsed', collapsed);
+                toggle.setAttribute ('aria-expanded', String (!collapsed));
+                toggle.setAttribute ('aria-label', (collapsed ? 'Expand ' : 'Collapse ') + (side === 'left' ? 'model upload panel' : 'model data panel'));
+                toggle.querySelector ('.panel_chevron').textContent = (side === 'left') === collapsed ? '›' : '‹';
+            };
+            apply (window.innerWidth < 800);
+            toggle.addEventListener ('click', () => {
+                const collapsed = !container.classList.contains ('collapsed');
+                if (!collapsed && window.innerWidth < 800) {
+                    const other = side === 'left' ? this.parameters.rightContainerDiv : this.parameters.leftContainerDiv;
+                    if (!other.classList.contains ('collapsed')) {
+                        document.getElementById (side === 'left' ? 'data_panel_toggle' : 'upload_panel_toggle').click ();
+                    }
+                }
+                apply (collapsed);
+                this.layouter.Resize ();
+            });
+        }
+        this.sidebar.detailsPanel.contentDiv.textContent = 'Load a model to view geometry, dimensions, materials and properties.';
+    }
+
     SetUIState (uiState)
     {
         function ShowOnlyOnModelElements (show)
@@ -258,21 +275,22 @@ export class Website
         if (this.uiState === WebsiteUIState.Intro) {
             ShowDomElement (this.parameters.introDiv, true);
             ShowDomElement (this.parameters.headerDiv, true);
-            ShowDomElement (this.parameters.mainDiv, false);
+            ShowDomElement (this.parameters.mainDiv, true);
             ShowOnlyOnModelElements (false);
         } else if (this.uiState === WebsiteUIState.Model) {
-            ShowDomElement (this.parameters.introDiv, false);
+            ShowDomElement (this.parameters.introDiv, true);
             ShowDomElement (this.parameters.headerDiv, true);
             ShowDomElement (this.parameters.mainDiv, true);
             ShowOnlyOnModelElements (true);
-            this.UpdatePanelsVisibility ();
         } else if (this.uiState === WebsiteUIState.Loading) {
-            ShowDomElement (this.parameters.introDiv, false);
+            ShowDomElement (this.parameters.introDiv, true);
             ShowDomElement (this.parameters.headerDiv, true);
-            ShowDomElement (this.parameters.mainDiv, false);
+            ShowDomElement (this.parameters.mainDiv, true);
             ShowOnlyOnModelElements (false);
         }
 
+        document.getElementById ('viewer_empty').hidden = uiState === WebsiteUIState.Model;
+        ShowDomElement (this.parameters.navigatorDiv, uiState === WebsiteUIState.Model);
         this.layouter.Resize ();
     }
 
@@ -287,6 +305,7 @@ export class Website
 
         this.navigator.Clear ();
         this.sidebar.Clear ();
+        this.sidebar.detailsPanel.contentDiv.textContent = 'Load a model to view geometry, dimensions, materials and properties.';
 
         this.measureTool.SetActive (false);
     }

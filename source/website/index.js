@@ -21,6 +21,7 @@ import './css/navigator.css';
 import './css/sidebar.css';
 import './css/website.css';
 import './css/embed.css';
+import './css/workspace.css';
 
 export const UI = {
     ButtonDialog,
@@ -57,8 +58,9 @@ export function StartWebsite ()
             return;
         }
 
-        document.getElementById ('intro_dragdrop_text').innerHTML = Loc ('Drag and drop 3D models here.');
-        document.getElementById ('intro_formats_title').innerHTML = Loc ('Check an example file:');
+        document.getElementById ('intro_dragdrop_text').innerHTML = Loc ('Drop model files here');
+        document.getElementById ('intro_formats_title').innerHTML = Loc ('Try a sample model');
+        document.getElementById ('upload_slot').appendChild (document.getElementById ('intro'));
 
         let website = new Website ({
             headerDiv : document.getElementById ('header'),
