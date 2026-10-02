@@ -12,8 +12,8 @@
     <!-- meta end -->
 
     <!-- website start -->
-<link rel="stylesheet" href="o3dv/o3dv.website.min.css">
-<script src="o3dv/o3dv.website.min.js"></script>
+<link rel="stylesheet" href="o3dv/o3dv.website.min.css?v=5364535430ff">
+<script src="o3dv/o3dv.website.min.js?v=5364535430ff"></script>
 <!-- website end -->
     <!-- plugins start -->
     <!-- plugins end -->
@@ -51,21 +51,31 @@
         <div class="toolbar" id="toolbar"></div>
     </div>
     <div class="main" id="main">
-        <div class="main_left_container only_full_width" id="main_left_container">
+        <div class="main_left_container workspace_panel" id="main_left_container">
+            <button class="workspace_panel_toggle" id="upload_panel_toggle" aria-expanded="true" aria-controls="upload_panel_content"><span>Model upload</span><span class="panel_chevron">‹</span></button>
+            <div class="workspace_panel_body" id="upload_panel_content">
+            <div id="upload_slot"></div>
             <div class="main_navigator ov_panel_set_container" id="main_navigator"></div>
+            </div>
             <div class="main_splitter" id="main_navigator_splitter"></div>
         </div>
-        <div class="main_viewer" id="main_viewer"></div>
-        <div class="main_right_container only_full_width" id="main_right_container">
+        <div class="main_viewer" id="main_viewer">
+            <div class="viewer_empty" id="viewer_empty"><svg viewBox="0 0 286 60"><use href="assets/images/auto3d-logo.svg?v=sw-auto3d#logo"></use></svg><h2>Model viewer</h2><p>Upload a model or choose a sample from the left panel.</p></div>
+        </div>
+        <div class="main_right_container workspace_panel" id="main_right_container">
+            <button class="workspace_panel_toggle" id="data_panel_toggle" aria-expanded="true" aria-controls="data_panel_content"><span>Model data</span><span class="panel_chevron">›</span></button>
+            <div class="workspace_panel_body" id="data_panel_content">
             <div class="main_splitter" id="main_sidebar_splitter"></div>
             <div class="main_sidebar ov_panel_set_right_container" id="main_sidebar"></div>
+            </div>
         </div>
     </div>
     <div class="intro ov_thin_scrollbar" id="intro">
         <div class="intro_content" id="intro_content">
             <div class="intro_logo">
-                <svg class="intro_logo" viewBox="0 0 286 60"><use href="assets/images/auto3d-logo.svg?v=sw-auto3d#logo"></use></svg>
                 <div class="intro_dragdrop_text" id="intro_dragdrop_text"></div>
+                <button class="workspace_upload_button" id="workspace_upload">Upload model</button>
+                <button class="workspace_url_button" id="workspace_open_url">Open model URL</button>
             </div>
             <div class="intro_formats">
                 <div class="intro_formats_title" id="intro_formats_title"></div>
