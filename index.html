@@ -12,8 +12,8 @@
     <!-- meta end -->
 
     <!-- website start -->
-<link rel="stylesheet" href="o3dv/o3dv.website.min.css?v=d333c2c96588">
-<script src="o3dv/o3dv.website.min.js?v=d333c2c96588"></script>
+<link rel="stylesheet" href="o3dv/o3dv.website.min.css?v=18e44169b6df">
+<script src="o3dv/o3dv.website.min.js?v=18e44169b6df"></script>
 <!-- website end -->
     <!-- plugins start -->
     <!-- plugins end -->
@@ -55,6 +55,8 @@
             <button class="workspace_panel_toggle" id="upload_panel_toggle" aria-expanded="true" aria-controls="upload_panel_content"><span>Model upload</span><span class="panel_chevron">‹</span></button>
             <div class="workspace_panel_body" id="upload_panel_content">
             <div id="upload_slot"></div>
+            <details class="workspace_section" id="materials_section" open></details>
+            <details class="workspace_section" id="lighting_section" open></details>
             <div class="main_navigator ov_panel_set_container" id="main_navigator"></div>
             </div>
             <div class="main_splitter" id="main_navigator_splitter"></div>
@@ -71,6 +73,10 @@
             </div>
         </div>
     </div>
+    <section id="material_drawer" class="material_drawer" role="region" aria-label="Advanced material editor" inert>
+        <div class="drawer_header"><div><strong>Advanced material editor</strong><span id="material_drawer_context"></span></div><button id="material_drawer_close" aria-label="Close material editor">×</button></div>
+        <div id="material_drawer_content" class="drawer_content"></div>
+    </section>
     <div class="intro ov_thin_scrollbar" id="intro">
         <div class="intro_content" id="intro_content">
             <div class="intro_logo">
