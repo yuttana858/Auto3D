@@ -4,6 +4,6 @@
       <path d="M13 18 26 10l13 8v16L26 42 13 34z"/>
       <path d="m13 18 13 8 13-8M26 26v16M13 34l13-8 13 8"/>
     </g>
-    <text x="51" y="39" fill="var(--ov_logo_text_color, #15334a)" font-family="Arial, Helvetica, sans-serif" font-size="31" font-weight="700" letter-spacing="-1">Auto3D</text>
+    <text x="51" y="39" fill="var(--ov_logo_text_color, #15334a)" font-family="Arial, Helvetica, sans-serif" font-size="31" font-weight="700" letter-spacing="-1">SW Auto3D</text>
   </g>
 </svg>
