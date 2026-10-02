@@ -1,0 +1,11 @@
+.workspace_dialog.command_dialog { width: 950px; }
+.command_shell { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 20px; }
+.command_catalog, .command_detail, .macro_editor { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.command_list { display: flex; flex-direction: column; gap: 4px; max-height: 350px; overflow-y: auto; }
+.command_list button { text-align: left; }
+.command_schema, .command_output { padding: 12px; margin: 0; overflow: auto; max-height: 180px; background: var(--ov_hover_color); border-radius: 4px; font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.command_dialog textarea { width: 100%; box-sizing: border-box; resize: vertical; font-family: monospace; font-size: 12px; padding: 10px; background: var(--ov_background_color); color: var(--ov_foreground_color); border: 1px solid var(--ov_border_color); border-radius: 4px; }
+.command_dialog p { font-size: 12px; line-height: 1.6; margin: 0; }
+.command_dialog h3 { font-size: 15px; margin: 0; }
+.macro_editor { border-top: 1px solid var(--ov_border_color); margin-top: 24px; padding-top: 20px; }
+@media (max-width: 650px) { .command_shell { grid-template-columns: 1fr; } .command_list { max-height: 160px; } }

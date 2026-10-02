@@ -7,6 +7,7 @@ import { PluginType, RegisterPlugin } from './pluginregistry.js';
 import { ButtonDialog, ProgressDialog } from './dialog.js';
 import { ShowMessageDialog } from './dialogs.js';
 import { StartWelcomeSequence } from './welcome.js';
+import { CreateAgentCommands } from './agentcommands.js';
 
 import * as Engine from '../engine/main.js';
 export { Engine };
@@ -25,6 +26,7 @@ import './css/embed.css';
 import './css/workspace.css';
 import './css/session.css';
 import './css/welcome.css';
+import './css/commands.css';
 
 export const UI = {
     ButtonDialog,
@@ -81,6 +83,8 @@ export function StartWebsite ()
             fileInput : document.getElementById ('open_file')
         });
         website.Load ();
+        website.commands = CreateAgentCommands (website);
+        window.Auto3D = Object.freeze ({ apiVersion : 1, catalog : (query) => website.commands.Catalog (query), execute : (id, args) => website.commands.Execute (id, args), runMacro : (macro) => website.commands.RunMacro (macro), cancelMacro : () => website.commands.Cancel () });
         StartWelcomeSequence ();
     });
 }

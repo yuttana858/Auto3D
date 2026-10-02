@@ -1,8 +1,9 @@
 import { Theme } from './settings.js';
 import { WorkspaceDialog } from './modellibrary.js';
 import { Unit } from '../engine/model/unit.js';
+import { OpenCommandPanel } from './commandpanel.js';
 
-export const AppVersion = '0.20.1';
+export const AppVersion = '0.20.2';
 
 export function DisplayLength (value, sourceUnit, system)
 {
@@ -36,12 +37,18 @@ export class Preferences
         const unitLabel = document.createElement ('label'); unitLabel.textContent = 'Units';
         const units = document.createElement ('select'); units.setAttribute ('aria-label', 'Units'); units.add (new Option ('Metric (mm)', 'metric')); units.add (new Option ('Standard (in)', 'standard')); units.value = this.units;
         units.addEventListener ('change', () => {
-            this.units = units.value; this.website.sidebar.detailsPanel.unitSystem = this.units;
-            try { localStorage.setItem ('sw-auto3d-units', this.units); } catch { /* Keep this session preference. */ }
-            if (this.website.model) { this.website.sidebar.AddObject3DProperties (this.website.model, this.website.model); this.website.sessionEditor.UpdateDetails (); }
+            this.SetUnits (units.value);
         }); unitLabel.appendChild (units);
         const about = document.createElement ('p'); about.className = 'preferences_about';
         about.textContent = 'SW Auto3D v' + AppVersion + ' — A browser workspace for inspecting, arranging and reviewing 3D models, materials, lighting and reusable layouts. Dimensions use the units declared by the source model; unspecified units remain model units.';
-        const heading = document.createElement ('strong'); heading.textContent = 'About'; form.append (appearance, unitLabel, heading, about); dialog.appendChild (form);
+        const commands = document.createElement ('button'); commands.textContent = 'Commands and macros'; commands.className = 'workspace_primary'; commands.addEventListener ('click', () => { dialog.close (); OpenCommandPanel (this.website); });
+        const heading = document.createElement ('strong'); heading.textContent = 'About'; form.append (appearance, unitLabel, commands, heading, about); dialog.appendChild (form);
+    }
+
+    SetUnits (units)
+    {
+        this.units = units; this.website.sidebar.detailsPanel.unitSystem = units;
+        try { localStorage.setItem ('sw-auto3d-units', units); } catch { /* Keep this session preference. */ }
+        if (this.website.model) { this.website.sidebar.AddObject3DProperties (this.website.model, this.website.model); this.website.sessionEditor.UpdateDetails (); }
     }
 }
