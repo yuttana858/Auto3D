@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta http-equiv="content-type" content="text/html;charset=utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no">
+	<link rel="icon" type="image/svg+xml" href="assets/images/auto3d-mark.svg">
+
+	<title>Auto3D</title>
+
+	<!-- meta start -->
+	<!-- meta end -->
+
+	<!-- website start -->
+	<link rel="stylesheet" type="text/css" href="../build/website_dev/o3dv.website.min.css">
+	<script type="text/javascript" src="../build/website_dev/o3dv.website.min.js"></script>
+	<!-- website end -->
+
+	<!-- embed analytics start -->
+    <script type="text/javascript">
+        OV.SetWebsiteEventHandler ((eventName, eventLabel, eventParams) => {
+            console.log ({
+                eventName : eventName,
+                eventLabel : eventLabel,
+                eventParams : eventParams
+            });
+        });
+    </script>
+	<!-- embed analytics end -->
+
+    <script type="text/javascript">
+        OV.StartEmbed ();
+    </script>
+
+	<style>
+		html, body
+		{
+			background: transparent;
+		}
+	</style>
+</head>
+
+<body>
+	<div class="embed_viewer" id="embed_viewer">
+		<a id="website_link" href="./" target="_blank" title="Open in Auto3D">
+			<img class="embed_logo" src="assets/images/auto3d-mark.svg"/>
+		</a>
+	</div>
+</body>
+
+</html>
