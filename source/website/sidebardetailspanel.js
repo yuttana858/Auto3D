@@ -34,6 +34,7 @@ export class SidebarDetailsPanel extends SidebarPanel
     constructor (parentDiv)
     {
         super (parentDiv);
+        this.modelFormat = null;
     }
 
     GetName ()
@@ -50,6 +51,9 @@ export class SidebarDetailsPanel extends SidebarPanel
     {
         this.Clear ();
         let table = AddDiv (this.contentDiv, 'ov_property_table');
+        if (this.modelFormat !== null) {
+            this.AddProperty (table, new Property (PropertyType.Text, Loc ('Format'), this.modelFormat));
+        }
         let boundingBox = GetBoundingBox (object3D);
         let size = SubCoord3D (boundingBox.max, boundingBox.min);
         let unit = model.GetUnit ();

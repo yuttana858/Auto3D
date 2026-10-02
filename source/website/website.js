@@ -305,6 +305,7 @@ export class Website
 
         this.navigator.Clear ();
         this.sidebar.Clear ();
+        this.sidebar.detailsPanel.modelFormat = null;
         this.sidebar.detailsPanel.contentDiv.textContent = 'Load a model to view geometry, dimensions, materials and properties.';
 
         this.measureTool.SetActive (false);
@@ -313,6 +314,7 @@ export class Website
     OnModelLoaded (importResult, threeObject)
     {
         this.model = importResult.model;
+        this.sidebar.detailsPanel.modelFormat = GetFileExtension (importResult.mainFile).toUpperCase ();
         this.parameters.fileNameDiv.innerHTML = importResult.mainFile;
         this.viewer.SetMainObject (threeObject);
         this.viewer.SetUpVector (Direction.Y, false);

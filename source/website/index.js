@@ -59,7 +59,6 @@ export function StartWebsite ()
         }
 
         document.getElementById ('intro_dragdrop_text').innerHTML = Loc ('Drop model files here');
-        document.getElementById ('intro_formats_title').innerHTML = Loc ('Try a sample model');
         document.getElementById ('upload_slot').appendChild (document.getElementById ('intro'));
 
         let website = new Website ({
