@@ -1,6 +1,11 @@
 .version_badge { font-size: 11px; color: var(--ov_light_icon_color); border: 1px solid var(--ov_border_color); border-radius: 4px; padding: 3px 5px; margin-left: 10px; vertical-align: middle; white-space: nowrap; }
 .title_left { display: flex; align-items: center; }
 .preferences_button { padding: 4px; border: 0; background: transparent; color: var(--ov_foreground_color); cursor: pointer; }
+.header_library_button { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; padding: 5px 8px; background: transparent; color: var(--ov_foreground_color); border: 1px solid var(--ov_border_color); border-radius: 4px; font-size: 12px; cursor: pointer; }
+.header_library_button:hover { background: var(--ov_hover_color); }
+.library_source_tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.library_source_tabs button[aria-pressed="true"] { border-color: var(--ov_button_color); background: var(--ov_hover_color); }
+.shared_view #toolbar, .shared_view .header_library_button, .shared_view #upload_slot, .shared_view #intro, .shared_view #materials_section, .shared_view #material_drawer, .shared_view #session_objects > .section_content > .mode_buttons, .shared_view .session_object_row button:not(.object_name), .shared_view .scene_tool:not([aria-label="Select (V)"]):not([aria-label="Focus object (F)"]) { display: none !important; }
 .scene_tools { position: absolute; top: 12px; right: 10px; bottom: 12px; z-index: 5; display: flex; flex-direction: column; gap: 3px; width: 36px; padding: 5px; box-sizing: border-box; overflow: auto; max-height: fit-content; background: var(--ov_background_color); border: 1px solid var(--ov_border_color); border-radius: 7px; box-shadow: 0 3px 14px #0002; }
 .scene_tool { flex: 0 0 29px; width: 25px; height: 29px; border: 0; background: transparent; color: var(--ov_foreground_color); padding: 3px; cursor: pointer; border-radius: 4px; }
 .scene_tool svg { width: 100%; height: 100%; }

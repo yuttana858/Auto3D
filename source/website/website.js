@@ -219,7 +219,7 @@ export class Website
         this.SetUIState (WebsiteUIState.Intro);
 
         this.hashHandler.SetEventListener (this.OnHashChange.bind (this));
-        this.OnHashChange ();
+        if (this.sessionEditor.readOnly) { this.sessionEditor.LoadShared (); } else { this.OnHashChange (); }
 
         window.addEventListener ('resize', () => {
 			this.layouter.Resize ();
@@ -443,6 +443,7 @@ export class Website
 
     OnHashChange ()
     {
+        if (this.sessionEditor.readOnly) { return; }
         if (this.hashHandler.HasHash ()) {
             let urls = this.hashHandler.GetModelFilesFromHash ();
             if (urls === null) {
@@ -532,6 +533,7 @@ export class Website
 
     LoadModelFromFileList (files)
     {
+        if (this.sessionEditor.readOnly) { return; }
         const session = Array.from (files).find ((file) => file.name.toLowerCase ().endsWith ('.auto3d'));
         if (session) { this.sessionEditor.Run (() => this.sessionEditor.OpenArchiveFile (session)); return; }
         let importSettings = new ImportSettings ();

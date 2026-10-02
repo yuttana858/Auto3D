@@ -4,7 +4,7 @@ Auto3D is a branded, self-hostable browser 3D viewer based on [Online3DViewer](h
 
 ## Run locally
 
-Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.20.0**.
+Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.20.1**.
 
 ## Prototype hosting
 
@@ -24,7 +24,11 @@ Uploads append objects. **Update** replaces the selected object's source geometr
 
 GLB/glTF models with embedded clips have independent Play/Pause, clip selection, timeline, Reset and speed controls. Skeletal and morph animations are retained in portable sessions and GLB/glTF exports. Include referenced binary/texture files when uploading a glTF. Animation extensions requiring additional decoders may show an unavailable-animation message while retaining a static preview. Mesh-format exports use the engine's static geometry.
 
-The device library uses IndexedDB, with categories Primary products, Retail shelf, Pallets and Accessories. Cards include thumbnails: **Open** replaces the workspace with a saved session; **Add** appends its objects. Shared Supabase storage and view-only Share links require access to the existing project; the interface currently reports this pending connection. No user models are published with the static site.
+The top-right **Library** button opens shared models and device saves, with categories Primary products, Retail shelf, Pallets and Accessories. Cards include thumbnails: **Open** replaces the workspace; **Add** appends its objects; **Share** creates a persistent viewer link for a shared save. Shared views hide editing controls and retain orbit navigation, model selection and animation playback. Device saves remain in IndexedDB and are never uploaded automatically.
+
+The shared library connects to Supabase project `iesepcoxqochycckbwoh`. Browsing is public. Publishing requires a signed-in Supabase Authentication user; create a publisher account in the project dashboard, then use **Publisher sign-in** in the library. The password is submitted directly to Supabase and is never stored by this application. Session tokens last for this browser tab. Shared saves have a 64 MB upload limit. Rows and files are immutable to visitors and publishers; editing a model and saving creates a new entry. Storage is a private bucket with RLS allowing reads only for published entries. The browser configuration contains only a publishable key. The migration is recorded under `supabase/migrations`.
+
+No user models are included in the static site. Saving to **Shared library** explicitly publishes the chosen session or model to all prototype visitors. A view-only link hides editing controls; recipients still receive the model data required to render it.
 
 Preferences offers Light/Dark appearance, Metric (mm) or Standard (in) dimensions, and About. Models with no declared length unit display model units. GLB/glTF coordinates use meters. Unit preferences change dimension labels, not geometry.
 

@@ -2,7 +2,7 @@ import { Theme } from './settings.js';
 import { WorkspaceDialog } from './modellibrary.js';
 import { Unit } from '../engine/model/unit.js';
 
-export const AppVersion = '0.20.0';
+export const AppVersion = '0.20.1';
 
 export function DisplayLength (value, sourceUnit, system)
 {

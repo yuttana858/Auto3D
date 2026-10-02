@@ -49,7 +49,25 @@ export class SessionEditor
             object.scale = object.scale.map ((value) => Math.abs (value) < 1e-6 ? 1e-6 : value); this.document.ApplyTransform (object); this.SyncInputs ();
         });
         this.CreateUI ();
+        const headerLibrary = Element ('button', 'header_library_button', undefined, document.getElementById ('header_buttons'));
+        headerLibrary.title = 'Saved models and sessions'; headerLibrary.setAttribute ('aria-label', 'Library');
+        headerLibrary.innerHTML = '<svg viewBox="0 0 26 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6">' + Icons.library + '</svg><span>Library</span>';
+        headerLibrary.addEventListener ('click', () => this.library.Open ());
+        this.shareId = new URLSearchParams (window.location.search).get ('share');
+        this.readOnly = this.shareId !== null;
+        if (this.readOnly) { document.body.classList.add ('shared_view'); this.RefreshButtons (); }
         window.addEventListener ('keydown', (event) => this.KeyDown (event));
+    }
+
+    async LoadShared ()
+    {
+        if (!this.readOnly) { return; }
+        this.Status ('Loading shared view…');
+        try {
+            const item = await this.library.sharedStorage.Get (this.shareId);
+            await this.OpenArchive (await this.library.sharedStorage.Archive (item), false);
+            this.Status ('Shared view · ' + item.name);
+        } catch (error) { this.Status (error.message); }
     }
 
     CreateUI ()
@@ -88,9 +106,9 @@ export class SessionEditor
 
     async Run (action) { if (this.busy) { return; } try { await action (); } catch (error) { this.Status (error.message); } }
     Status (text) { this.status.textContent = text; }
-    AddModel () { this.replaceTarget = null; this.website.OpenFileBrowserDialog (); }
-    UpdateModel (object = this.selected) { if (object) { this.replaceTarget = object; this.website.OpenFileBrowserDialog (); } }
-    OpenSessionFile () { this.sessionInput.click (); }
+    AddModel () { if (this.readOnly) { return; } this.replaceTarget = null; this.website.OpenFileBrowserDialog (); }
+    UpdateModel (object = this.selected) { if (!this.readOnly && object) { this.replaceTarget = object; this.website.OpenFileBrowserDialog (); } }
+    OpenSessionFile () { if (!this.readOnly) { this.sessionInput.click (); } }
     async OpenArchiveFile (file) { return this.OpenArchive (await file.arrayBuffer (), false); }
 
     async Import (result, disposableObject)
@@ -153,7 +171,7 @@ export class SessionEditor
         this.history.Push ({ undo : () => apply (before), redo : () => apply (after) }); this.RefreshButtons ();
     }
 
-    SetMode (mode) { this.mode = mode; this.Select (this.selected); }
+    SetMode (mode) { if (this.readOnly && mode !== 'select') { return; } this.mode = mode; this.Select (this.selected); }
     Select (object, fromNavigator = false)
     {
         this.selected = object && this.document.objects.includes (object) ? object : null;
@@ -177,7 +195,7 @@ export class SessionEditor
     RefreshButtons ()
     {
         for (const [key, button] of this.buttons) {
-            button.disabled = this.busy || (['move', 'rotate', 'scale', 'duplicate', 'visible', 'remove', 'focus', 'update'].includes (key) && !this.selected) || (key === 'export' && !this.document.objects.length) || (key === 'undo' && !this.history.undo.length) || (key === 'redo' && !this.history.redo.length);
+            button.disabled = this.busy || (this.readOnly && !['select', 'focus'].includes (key)) || (['move', 'rotate', 'scale', 'duplicate', 'visible', 'remove', 'focus', 'update'].includes (key) && !this.selected) || (key === 'export' && !this.document.objects.length) || (key === 'undo' && !this.history.undo.length) || (key === 'redo' && !this.history.redo.length);
             if (['select', 'move', 'rotate', 'scale'].includes (key)) { button.setAttribute ('aria-pressed', String ((key === 'move' ? 'translate' : key) === this.mode)); }
         }
     }
@@ -304,6 +322,7 @@ export class SessionEditor
     }
     KeyDown (event)
     {
+        if (this.readOnly) { return; }
         if (event.target.closest ('input, textarea, select, dialog, [contenteditable="true"]') || this.busy) { return; }
         const modified = event.ctrlKey || event.metaKey; const key = event.key.toLowerCase (); let action = null;
         if (modified && key === 's') { action = () => this.library.SaveDialog (true); } else if (modified && key === 'd') { action = () => this.Duplicate (); } else if (modified && key === 'z') { action = () => event.shiftKey ? this.Redo () : this.Undo (); }

@@ -31,6 +31,7 @@ import parameterlist_test from './tests/parameterlist_test.js';
 import viewport_test from './tests/viewport_test.js';
 import workspace_test from './tests/workspace_test.js';
 import session_test from './tests/session_test.js';
+import cloudlibrary_test from './tests/cloudlibrary_test.js';
 
 process.chdir (path.resolve ());
 SetGlobals ();
@@ -64,3 +65,4 @@ parameterlist_test ();
 viewport_test ();
 workspace_test ();
 session_test ();
+cloudlibrary_test ();
