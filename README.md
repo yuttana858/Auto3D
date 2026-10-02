@@ -6,6 +6,14 @@ Auto3D is a branded, self-hostable browser 3D viewer based on [Online3DViewer](h
 
 Install the npm dependencies, then run `npm start`. This builds the development viewer and starts a local static server.
 
+## Prototype hosting
+
+The prototype is hosted at https://yuttana858.github.io/Auto3D/ from the `gh-pages` branch. Source code lives on `main`.
+
+To publish an update, run `npm run build_website` and `node tools/build_pages.mjs`. In `build/pages`, commit the updated files and push `gh-pages`. GitHub Pages publishes that branch automatically. Source pushes to `main` do not deploy the site.
+
+This is a prototype; the dependency-license, security, and privacy checks in `3d-viewer-review.md` remain outstanding.
+
 ## Supported formats
 
 - **Import:** 3dm, 3ds, 3mf, amf, bim, brep, dae, fbx, fcstd, gltf/glb, ifc, iges, step, stl, obj, off, ply, wrl.
