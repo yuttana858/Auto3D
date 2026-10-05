@@ -179,7 +179,18 @@ export class LightingPanel
             if (!response.ok) { return; }
             const remote = await response.json ();
             const byId = new Map (remote.map ((item) => [item.id, item]));
-            this.environments = DefaultEnvironments.map ((fallback) => ({ ...fallback, ...(byId.get (fallback.id) || {}) }));
+            this.environments = DefaultEnvironments.map ((fallback) => {
+                const remoteItem = byId.get (fallback.id);
+                if (!remoteItem) { return { ...fallback }; }
+                return {
+                    ...fallback,
+                    name : remoteItem.name || fallback.name,
+                    sourceUrl : remoteItem.sourceUrl || fallback.sourceUrl,
+                    license : remoteItem.license || fallback.license,
+                    cdnPreviewUrl : remoteItem.previewUrl || null,
+                    renderUrl : remoteItem.renderUrl || null
+                };
+            });
             this.RenderEnvironmentGallery ();
         } catch { /* Bundled HDRIs remain the offline fallback. */ }
     }
@@ -279,9 +290,11 @@ export class LightingPanel
         const request = ++this.request;
         this.Status ('Loading ' + environment.name + ' preview…');
         try {
-            const fallback = 'assets/hdri/' + environment.id + '.hdr';
             this.website.sceneEffects.SuspendDynamicReflection ();
-            if (!await this.lighting.Load (environment.previewUrl, environment.renderUrl, fallback) || request !== this.request) { return; }
+            // Always load the packaged preview first. It ships with the app and
+            // cannot disappear because of an API/CDN outage. The remote catalog
+            // is used only for the future high-resolution render upgrade.
+            if (!await this.lighting.Load (environment.previewUrl, environment.renderUrl, null) || request !== this.request) { return; }
             this.selected = environment.id;
             this.SyncBackgroundVisibility ();
             for (const card of this.root.querySelectorAll ('.hdri_card')) {
@@ -289,7 +302,7 @@ export class LightingPanel
             }
             document.getElementById ('hdri_credit').href = environment.sourceUrl || ('https://polyhaven.com/a/' + environment.id);
             this.website.sceneEffects.Refresh ();
-            this.Status (environment.name + ' preview active' + (environment.renderUrl ? ' · high-resolution render tier loading.' : ' · high-resolution tier coming soon.'));
+            this.Status (environment.name + ' preview active · packaged 1K source' + (environment.renderUrl ? ' · high-resolution render tier loading.' : ' · high-resolution tier coming soon.'));
             if (recordHistory) { this.RecordHistory (before); }
         } catch (error) {
             if (request === this.request) {
