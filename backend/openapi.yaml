@@ -6,6 +6,11 @@ info:
 servers:
   - url: /api
 paths:
+  /health:
+    get:
+      summary: Service health
+      responses:
+        '200': { description: Healthy }
   /library/items:
     get:
       summary: List visible library items
@@ -28,13 +33,11 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required: [id, name, category, kind, objectCount, archive, thumbnail]
+              required: [metadata, archive, thumbnail]
               properties:
-                id: { type: string, format: uuid }
-                name: { type: string, minLength: 1, maxLength: 100 }
-                category: { type: string }
-                kind: { type: string, enum: [model, session] }
-                objectCount: { type: integer, minimum: 1, maximum: 1000 }
+                metadata:
+                  type: string
+                  description: JSON-encoded metadata containing id, name, category, kind, objectCount, optional version and supersedesId.
                 archive:
                   type: string
                   format: binary
@@ -68,7 +71,7 @@ paths:
       responses:
         '204': { description: Removed }
         '401': { description: Authentication required }
-        '403': { description: Admin or publisher role required }
+        '403': { description: Admin role required }
   /library/items/{id}/archive:
     parameters:
       - in: path
