@@ -4,17 +4,15 @@ Auto3D is a branded, self-hostable browser 3D viewer based on [Online3DViewer](h
 
 ## Run locally
 
-Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.20.4**.
+Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.21.0**.
 
-## Prototype hosting
+## Hosting
 
-The prototype is hosted at https://yuttana858.github.io/Auto3D/ from the `gh-pages` branch. Source code lives on `main`.
+The pre-transition build is hosted on Cloudflare Pages at `https://auto3d-5av.pages.dev`. Source code is private on `main`.
 
-Open or drag in `.zae` files directly to view bundled COLLADA models and textures. Auto3D extracts the archive and selects the DAE named by `manifest.xml`; archives without a manifest offer their DAE files for selection.
+Production deployment is automated by `.github/workflows/cloudflare-pages.yml`. It builds the static site into `build/pages` and uploads it with Wrangler. Same-origin `/api/*` routes are served by Cloudflare Pages Functions. No purchased domain is required for this temporary hosting path.
 
-To publish an update, run `npm run build_website` and `node tools/build_pages.mjs`. In `build/pages`, commit the updated files and push `gh-pages`. GitHub Pages publishes that branch automatically. Source pushes to `main` do not deploy the site.
-
-This is a prototype; the dependency-license, security, and privacy checks in `3d-viewer-review.md` remain outstanding.
+The v0.21.0 engineering hardening baseline is documented in `docs/pretransition-readiness.md`, with privacy/network behavior in `docs/privacy-network-boundary.md`.
 
 ## Lighting and materials
 
@@ -28,9 +26,9 @@ GLB/glTF models with embedded clips have independent Play/Pause, clip selection,
 
 The top-right **Library** button opens shared models and device saves, with categories Primary products, Retail shelf, Pallets and Accessories. Cards include thumbnails: **Open** replaces the workspace; **Add** appends its objects; **Share** creates a persistent viewer link for a shared save. Shared views hide editing controls and retain orbit navigation, model selection and animation playback. Device saves remain in IndexedDB and are never uploaded automatically.
 
-The shared library currently reads published prototype content from Supabase project `iesepcoxqochycckbwoh`. Browser-side publisher authentication and direct publishing have been removed as part of the corporate identity migration. Shared browsing and view-only links remain available; Device library and portable `.auto3d` files remain fully supported.
+The browser now accesses shared content only through same-origin `/api/library/*` routes. The temporary Cloudflare Pages Function reads the existing Supabase library server-side; Supabase configuration and direct database/storage requests have been removed from the browser bundle. Shared browsing and view-only links remain available; Device library, crash-recovery checkpoints and portable `.auto3d` files remain fully supported.
 
-The provider-neutral Auto3D Library API is implemented under `backend/`. Public shared-library reads can be routed through it by configuring `AUTO3D_LIBRARY_API_URL`. Publishing and administrative deletion are protected by Microsoft Entra ID application roles; browser publishing remains disabled until the corporate Entra application registration and API deployment are configured. The browser will depend on the Auto3D Library API rather than Supabase-specific authentication or database operations so the service can migrate to Azure Database for PostgreSQL and Azure Blob Storage without rewriting the editor. The target architecture and migration goal are documented in `docs/backend-architecture.md` and `GOAL.md`. Database migrations are recorded under `supabase/migrations`.
+The provider-neutral Auto3D Library API is implemented under `backend/`. Its privileged publishing and administrative deletion endpoints are protected by Microsoft Entra ID application roles; browser publishing remains disabled until GIS supplies the corporate Entra application registration and Azure runtime. The browser will depend on the Auto3D Library API rather than Supabase-specific authentication or database operations so the service can migrate to Azure Database for PostgreSQL and Azure Blob Storage without rewriting the editor. The target architecture and migration goal are documented in `docs/backend-architecture.md` and `GOAL.md`. Database migrations are recorded under `supabase/migrations`.
 
 No user models are included in the static site. Shared-library publishing is temporarily disabled during the corporate identity migration. A view-only link hides editing controls; recipients still receive the model data required to render it.
 
@@ -49,4 +47,4 @@ Some formats are provided by separate libraries. Dependencies are listed in `pac
 
 ## Upstream and licensing
 
-The upstream [Online3DViewer source](https://github.com/kovacsv/Online3DViewer) and [developer documentation](https://kovacsv.github.io/Online3DViewer) are useful references. The upstream project by Viktor Kovacs is distributed under the MIT License. Auto3D retains the upstream [LICENSE.md](LICENSE.md) and required copyright notice. Review third-party dependency licenses before redistribution.
+The upstream [Online3DViewer source](https://github.com/kovacsv/Online3DViewer) and [developer documentation](https://kovacsv.github.io/Online3DViewer) are useful references. The upstream project by Viktor Kovacs is distributed under the MIT License. Auto3D retains the upstream [LICENSE.md](LICENSE.md) and required copyright notice. The production dependency license inventory is recorded in `THIRD_PARTY_NOTICES.md` and enforced by CI; corporate legal/policy approval remains separate from the engineering check.
