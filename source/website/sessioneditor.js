@@ -80,6 +80,9 @@ export class SessionEditor
         headerExport.innerHTML = '<svg viewBox="0 0 26 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6">' + Icons.export + '</svg><span>Export</span>';
         headerExport.addEventListener ('click', () => this.Export ());
         this.headerExport = headerExport;
+        this.website.parameters.fileNameDiv.classList.add ('editable_name');
+        this.website.parameters.fileNameDiv.title = 'Click to rename current session';
+        this.website.parameters.fileNameDiv.addEventListener ('click', () => { if (this.document.objects.length) { this.RenameSession (); } });
         const query = new URLSearchParams (window.location.search);
         this.shareId = query.get ('share');
         this.shareToken = query.get ('view');
@@ -224,6 +227,47 @@ export class SessionEditor
     async Run (action) { if (this.busy) { return; } try { await action (); } catch (error) { this.Status (error.message); } }
     Status (text) { this.status.textContent = text; }
 
+    PushHistory (undo, redo)
+    {
+        this.history.Push ({ undo, redo });
+        this.RefreshButtons ();
+    }
+
+    RenameObject (object)
+    {
+        if (this.readOnly || !object) { return; }
+        const previous = object.name;
+        const value = window.prompt ('Rename session model', previous);
+        if (value === null) { return; }
+        const next = value.trim ().slice (0, 100);
+        if (!next || next === previous) { return; }
+        const apply = (name) => {
+            object.name = name;
+            object.threeObject && (object.threeObject.name = name);
+            this.document.ApplyTransform (object);
+            this.RefreshUI (); this.UpdateDetails (); this.MarkDirty ();
+        };
+        apply (next);
+        this.PushHistory (() => apply (previous), () => apply (next));
+    }
+
+    RenameSession ()
+    {
+        if (this.readOnly) { return; }
+        const previous = this.document.name;
+        const value = window.prompt ('Rename session', previous);
+        if (value === null) { return; }
+        const next = value.trim ().slice (0, 100);
+        if (!next || next === previous) { return; }
+        const apply = (name) => {
+            this.document.name = name;
+            this.website.parameters.fileNameDiv.textContent = name;
+            this.MarkDirty ();
+        };
+        apply (next);
+        this.PushHistory (() => apply (previous), () => apply (next));
+    }
+
     MarkDirty ()
     {
         if (this.readOnly) { return; }
@@ -283,7 +327,7 @@ export class SessionEditor
         const object = this.document.AddImported (result.model, result.mainFile, result.upVector);
         if (extension === 'glb' || extension === 'gltf') { object.animationAsset = { main : result.mainFile, files }; }
         if (target && this.document.objects.includes (target)) {
-            Object.assign (object, TransformState (target), { id : target.id, name : target.name, visible : target.visible }); this.document.ApplyTransform (object);
+            Object.assign (object, TransformState (target), { id : target.id, name : target.name, visible : target.visible, userData : { ...(target.userData || {}) }, castShadow : target.castShadow !== false, receiveShadow : target.receiveShadow !== false }); this.document.ApplyTransform (object);
             const index = this.document.objects.indexOf (target); this.document.Remove (target);
             this.history.Push ({ undo : async () => { this.document.Remove (object); this.document.Restore (target, index); this.selected = target; await this.Render (); }, redo : async () => { this.document.Remove (target); this.document.Restore (object, index); this.selected = object; await this.Render (); } });
         } else {
@@ -317,7 +361,8 @@ export class SessionEditor
             if (this.objectUrls) { this.objectUrls.forEach (URL.revokeObjectURL); } this.objectUrls = output.objectUrls;
             this.website.sidebar.detailsPanel.modelFormat = 'SESSION';
             this.document.objects.forEach ((object) => { object.threeObject.visible = object.visible; }); this.website.UpdateMeshesVisibility ();
-            this.RefreshUI (); this.Select (this.selected); this.website.viewer.Render ();
+            this.website.sceneEffects?.ApplyObjectSettings (this.document.objects);
+            this.RefreshUI (); this.Select (this.selected); this.website.sceneEffects?.Refresh (); this.website.viewer.Render ();
         } finally { this.busy = false; this.RefreshButtons (); }
     }
 
@@ -325,7 +370,7 @@ export class SessionEditor
     {
         this.document.ApplyTransform (object);
         if (object.threeObject) { object.threeObject.position.fromArray (object.position); object.threeObject.rotation.set (...object.rotation.map (THREE.MathUtils.degToRad)); object.threeObject.scale.fromArray (object.scale); object.threeObject.updateMatrixWorld (true); }
-        this.website.viewer.UpdateGroundGrid (); this.UpdateSelectionBox (); this.website.viewer.Render (); this.SyncInputs ();
+        this.website.viewer.UpdateGroundGrid (); this.UpdateSelectionBox (); this.website.sceneEffects?.Refresh (); this.website.viewer.Render (); this.SyncInputs ();
     }
     RecordTransform (object, before)
     {
@@ -411,7 +456,12 @@ export class SessionEditor
         if (!this.document.objects.length) { Element ('p', 'section_hint', 'Add multiple models and select an object to edit its placement.', this.objectList); }
         for (const object of this.document.objects) {
             const row = Element ('div', 'session_object_row', undefined, this.objectList); row.classList.toggle ('selected', object === this.selected);
-            const select = Element ('button', 'object_name', object.name, row); select.title = object.source; select.setAttribute ('aria-label', 'Select ' + object.name); select.addEventListener ('click', () => this.Select (object));
+            const select = Element ('button', 'object_name editable_name', object.name, row);
+            select.title = object === this.selected ? 'Click again to rename · ' + object.source : 'Select ' + object.name + ' · ' + object.source;
+            select.setAttribute ('aria-label', (object === this.selected ? 'Rename ' : 'Select ') + object.name);
+            select.addEventListener ('mouseenter', () => object.threeObject?.traverse ((item) => { if (item.isMesh) { item.userData.auto3dNameHover = true; } }));
+            select.addEventListener ('mouseleave', () => object.threeObject?.traverse ((item) => { if (item.isMesh) { delete item.userData.auto3dNameHover; } }));
+            select.addEventListener ('click', () => { if (object === this.selected) { this.RenameObject (object); } else { this.Select (object); } });
             const visible = Element ('button', null, object.visible ? '◉' : '○', row); visible.title = object.visible ? 'Hide object' : 'Show object'; visible.setAttribute ('aria-label', visible.title + ' ' + object.name); visible.addEventListener ('click', () => { this.Select (object); this.ToggleVisibility (); });
             const update = Element ('button', null, '↻', row); update.title = 'Replace model, keep placement'; update.setAttribute ('aria-label', 'Update ' + object.name); update.addEventListener ('click', () => this.UpdateModel (object));
         }
@@ -462,6 +512,21 @@ export class SessionEditor
                 this.SetObjectDisplayDimension (object, axis, input.valueAsNumber);
             });
         }
+
+        Element ('strong', null, 'Shadows', details);
+        const shadowOptions = Element ('div', 'scene_shadow_options', undefined, details);
+        for (const [key, title] of [['castShadow', 'Cast shadows'], ['receiveShadow', 'Receive shadows']]) {
+            const label = Element ('label', null, undefined, shadowOptions);
+            const input = Element ('input', null, undefined, label); input.type = 'checkbox'; input.checked = object[key] !== false; input.disabled = this.readOnly;
+            label.appendChild (document.createTextNode (' ' + title));
+            input.addEventListener ('change', () => {
+                const before = object[key] !== false; const after = input.checked;
+                const apply = (value) => { object[key] = value; this.website.sceneEffects?.ApplyObjectSettings (this.document.objects); this.website.viewer.Render (); this.MarkDirty (); };
+                apply (after);
+                this.PushHistory (() => apply (before), () => apply (after));
+            });
+        }
+        Element ('p', 'section_hint', 'Cast + Receive enables self-shadowing. Cast affects other receiving models; Receive accepts shadows from other casters.', details);
 
         Element ('strong', null, 'User data', details);
         const userDataList = Element ('div', 'scene_user_data', undefined, details);
@@ -619,7 +684,7 @@ export class SessionEditor
 
     Archive (objects, kind, name)
     {
-        const data = PackSession (this.document, { camera : this.website.viewer.GetCamera (), backgroundPreset : this.website.settings.backgroundPreset, horizonGradient : this.website.settings.horizonGradient, showGroundGrid : this.website.settings.showGroundGrid, lighting : this.website.lightingPanel.Capture () }, objects, kind); data.name = name; return CreateSessionArchive (data);
+        const data = PackSession (this.document, { camera : this.website.viewer.GetCamera (), backgroundPreset : this.website.settings.backgroundPreset, horizonGradient : this.website.settings.horizonGradient, showGroundGrid : this.website.settings.showGroundGrid, lighting : this.website.lightingPanel.Capture (), sceneEffects : this.website.sceneEffects?.Capture () }, objects, kind); data.name = name; return CreateSessionArchive (data);
     }
     async OpenArchive (buffer, append, recovered = false)
     {
@@ -628,7 +693,7 @@ export class SessionEditor
             const added = [];
             for (const source of saved.document.objects) {
                 const model = saved.document.CompactModel ([source], true); model.root = model.root.GetChildNode (0);
-                const object = this.document.AddImported (model, source.name, Direction.Y, false); Object.assign (object, TransformState (source), { source : source.source, visible : source.visible, hiddenParts : [...source.hiddenParts], unit : source.unit, userData : { ...(source.userData || {}) }, animationAsset : source.animationAsset, playback : source.playback }); this.document.ApplyTransform (object); added.push (object);
+                const object = this.document.AddImported (model, source.name, Direction.Y, false); Object.assign (object, TransformState (source), { source : source.source, visible : source.visible, hiddenParts : [...source.hiddenParts], unit : source.unit, userData : { ...(source.userData || {}) }, castShadow : source.castShadow !== false, receiveShadow : source.receiveShadow !== false, animationAsset : source.animationAsset, playback : source.playback }); this.document.ApplyTransform (object); added.push (object);
             }
             const firstIndex = this.document.objects.length - added.length; this.history.Push ({ undo : async () => { added.forEach ((object) => this.document.Remove (object)); this.selected = null; await this.Render (); }, redo : async () => { added.forEach ((object, index) => this.document.Restore (object, firstIndex + index)); this.selected = added[0]; await this.Render (); } }); this.selected = added[0];
         } else { this.document = saved.document; this.history = new SceneHistory (() => this.MarkDirty ()); this.selected = this.document.objects[0] || null; if (this.website.hashHandler.HasHash ()) { this.website.hashHandler.SkipNextEventHandler (); this.website.hashHandler.ClearHash (); } }
@@ -638,6 +703,7 @@ export class SessionEditor
             for (const key of ['horizonGradient', 'showGroundGrid']) { if (typeof saved.view[key] === 'boolean') { this.website.settings[key] = saved.view[key]; } }
             this.website.UpdateViewport ();
             if (saved.view.lighting) { await this.website.lightingPanel.Restore (saved.view.lighting); }
+            if (saved.view.sceneEffects) { this.website.sceneEffects?.Restore (saved.view.sceneEffects); this.website.lightingPanel?.SyncEffects (); }
         }
         if (!append && saved.view.camera) {
             const camera = this.website.viewer.GetCamera (); const data = saved.view.camera;
@@ -703,8 +769,12 @@ export class SessionEditor
     KeyDown (event)
     {
         if (this.readOnly) { return; }
-        if (event.target.closest ('input, textarea, select, dialog, [contenteditable="true"]') || this.busy) { return; }
-        const modified = event.ctrlKey || event.metaKey; const key = event.key.toLowerCase (); let action = null;
+        const modified = event.ctrlKey || event.metaKey; const key = event.key.toLowerCase ();
+        const target = event.target;
+        const textEditing = target.closest ('textarea, [contenteditable="true"]') || (target.matches?.('input') && ['text', 'search', 'email', 'url', 'password', 'number'].includes (target.type));
+        if (this.busy || (textEditing && !(modified && key === 'z' && !target.matches?.(':focus')))) { return; }
+        if (target.closest ('dialog') && !(modified && key === 'z')) { return; }
+        let action = null;
         if (modified && key === 's') { action = () => this.library.SaveDialog (true); } else if (modified && key === 'd') { action = () => this.Duplicate (); } else if (modified && key === 'z') { action = () => event.shiftKey ? this.Redo () : this.Undo (); }
         else if (!modified && !event.altKey) { action = ({ v : () => this.SetMode ('select'), w : () => this.SetMode ('translate'), e : () => this.SetMode ('rotate'), r : () => this.SetMode ('scale'), f : () => this.Focus (), h : () => this.ToggleVisibility (), delete : () => this.Delete () })[key]; }
         if (action) { event.preventDefault (); this.Run (action); }
