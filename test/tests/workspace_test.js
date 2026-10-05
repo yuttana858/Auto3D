@@ -13,10 +13,47 @@ import { Triangle } from '../../source/engine/model/triangle.js';
 import { Coord3D } from '../../source/engine/geometry/coord3d.js';
 import { Viewer } from '../../source/engine/viewer/viewer.js';
 import { Direction } from '../../source/engine/geometry/geometry.js';
+import { Navigation } from '../../source/engine/viewer/navigation.js';
 
 export default function suite ()
 {
     describe ('Workspace lighting and materials', () => {
+        it ('Dispatches a browser contextmenu event without depending on stale click state', () => {
+            let called = null; let canceled = false; let prevented = false;
+            Navigation.prototype.OnContextMenu.call ({
+                enabled : true,
+                Context : (x, y) => { called = [x, y]; },
+                clickDetector : { Cancel : () => { canceled = true; }, IsClick : () => false }
+            }, {
+                clientX : 125,
+                clientY : 240,
+                preventDefault : () => { prevented = true; }
+            });
+            assert.deepEqual (called, [125, 240]);
+            assert.equal (prevented, true);
+            assert.equal (canceled, true);
+        });
+
+        it ('Applies HDRI directly to Phong materials and restores their previous environment', () => {
+            const viewer = MakeViewer ();
+            const material = new THREE.MeshPhongMaterial ();
+            const originalMap = new THREE.Texture ();
+            material.envMap = originalMap;
+            material.envMapIntensity = 0.35;
+            const mesh = new THREE.Mesh (new THREE.BoxGeometry (1, 1, 1), material);
+            viewer.scene.add (mesh);
+            const lighting = new HDRILighting (viewer);
+            lighting.texture = new THREE.DataTexture (new Float32Array (8 * 8 * 4).fill (1), 8, 8, THREE.RGBAFormat, THREE.FloatType);
+            lighting.target = { texture : new THREE.Texture (), dispose : () => {} };
+            lighting.enabled = true;
+            lighting.Adjust (0.8, 30, 10);
+            assert.equal (material.envMap, lighting.texture);
+            assert.equal (material.envMapIntensity, 0.8);
+            lighting.SetDefault ();
+            assert.equal (material.envMap, originalMap);
+            assert.equal (material.envMapIntensity, 0.35);
+        });
+
         it ('Hides HDRI imagery without changing radiance, intensity or rotation and restores the gradient', () => {
             const viewer = MakeViewer ();
             const lighting = new HDRILighting (viewer);
