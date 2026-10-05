@@ -314,24 +314,23 @@ export class Viewer
                 upAxis : { value : new THREE.Vector3 (...up) }
             },
             vertexShader : `
-                varying vec3 vDirection;
+                uniform vec3 upAxis;
+                varying float vHeight;
                 void main () {
-                    vDirection = position;
-                    vec4 clip = projectionMatrix * mat4(mat3(viewMatrix)) * vec4(position, 1.0);
-                    gl_Position = clip.xyww;
+                    vec3 worldDirection = normalize((modelMatrix * vec4(position, 0.0)).xyz);
+                    vHeight = dot(worldDirection, normalize(upAxis));
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
                 }
             `,
             fragmentShader : `
                 uniform vec3 skyTop;
                 uniform vec3 horizon;
                 uniform vec3 ground;
-                uniform vec3 upAxis;
-                varying vec3 vDirection;
+                varying float vHeight;
                 void main () {
-                    float height = dot(normalize(vDirection), normalize(upAxis));
-                    float skyMix = pow(clamp(height, 0.0, 1.0), 0.55);
-                    float groundMix = pow(clamp(-height, 0.0, 1.0), 0.65);
-                    vec3 color = height >= 0.0 ? mix(horizon, skyTop, skyMix) : mix(horizon, ground, groundMix);
+                    float skyMix = pow(clamp(vHeight, 0.0, 1.0), 0.55);
+                    float groundMix = pow(clamp(-vHeight, 0.0, 1.0), 0.65);
+                    vec3 color = vHeight >= 0.0 ? mix(horizon, skyTop, skyMix) : mix(horizon, ground, groundMix);
                     gl_FragColor = vec4(color, 1.0);
                 }
             `
@@ -342,6 +341,7 @@ export class Viewer
         dome.name = 'Auto3DDefaultDome';
         this.defaultDome = dome;
         this.scene.add (dome);
+        this.UpdateDefaultDomeCamera ();
         this.Render ();
     }
 
@@ -351,6 +351,16 @@ export class Viewer
         const up = this.upVector.direction === Direction.X ? [1, 0, 0] : this.upVector.direction === Direction.Z ? [0, 0, 1] : [0, 1, 0];
         if (this.upVector.isFlipped) { up[0] *= -1; up[1] *= -1; up[2] *= -1; }
         this.defaultDome.material.uniforms.upAxis.value.set (...up);
+    }
+
+    UpdateDefaultDomeCamera ()
+    {
+        if (this.defaultDome === null || this.camera === null) { return; }
+        this.defaultDome.position.copy (this.camera.position);
+        const radius = Math.max (10, Number.isFinite (this.camera.far) ? this.camera.far * 0.8 : 1000);
+        this.defaultDome.scale.setScalar (radius);
+        this.defaultDome.quaternion.identity ();
+        this.defaultDome.updateMatrixWorld (true);
     }
 
     SetGroundGrid (show, dark)
@@ -565,6 +575,7 @@ export class Viewer
         }
 
         this.shadingModel.UpdateByCamera (navigationCamera);
+        this.UpdateDefaultDomeCamera ();
         this.renderer.render (this.scene, this.camera);
         if (this.onRender !== null) {
             this.onRender (this.camera);
