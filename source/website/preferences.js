@@ -3,13 +3,39 @@ import { WorkspaceDialog } from './modellibrary.js';
 import { Unit } from '../engine/model/unit.js';
 import { OpenCommandPanel } from './commandpanel.js';
 
-export const AppVersion = '0.20.2';
+export const AppVersion = '0.23.0';
+
+export function UnitFactor (sourceUnit, system)
+{
+    const meters = { [Unit.Millimeter] : 0.001, [Unit.Centimeter] : 0.01, [Unit.Meter] : 1, [Unit.Inch] : 0.0254, [Unit.Foot] : 0.3048 }[sourceUnit];
+    if (!meters) { return null; }
+    return meters / (system === 'standard' ? 0.0254 : 0.001);
+}
+
+export function DisplayUnitLabel (system)
+{
+    return system === 'standard' ? 'in' : 'mm';
+}
 
 export function DisplayLength (value, sourceUnit, system)
 {
-    const meters = { [Unit.Millimeter] : 0.001, [Unit.Centimeter] : 0.01, [Unit.Meter] : 1, [Unit.Inch] : 0.0254, [Unit.Foot] : 0.3048 }[sourceUnit];
-    if (!meters) { return value.toLocaleString (undefined, { maximumFractionDigits : 4 }) + ' model units'; }
-    return (value * meters / (system === 'standard' ? 0.0254 : 0.001)).toLocaleString (undefined, { maximumFractionDigits : 2 }) + (system === 'standard' ? ' in' : ' mm');
+    const factor = UnitFactor (sourceUnit, system);
+    if (factor === null) { return value.toLocaleString (undefined, { maximumFractionDigits : 4 }) + ' model units'; }
+    return (value * factor).toLocaleString (undefined, { maximumFractionDigits : 2 }) + ' ' + DisplayUnitLabel (system);
+}
+
+export function DisplaySizeFromScale (baseSize, scale, sourceUnit, system)
+{
+    const factor = UnitFactor (sourceUnit, system);
+    return factor === null ? scale : baseSize * Math.abs (scale) * factor;
+}
+
+export function ScaleFromDisplaySize (baseSize, displayedSize, sourceUnit, system)
+{
+    const factor = UnitFactor (sourceUnit, system);
+    if (factor === null) { return displayedSize; }
+    if (baseSize <= 1e-12 || displayedSize <= 0) { return null; }
+    return displayedSize / (baseSize * factor);
 }
 
 export class Preferences
@@ -18,7 +44,10 @@ export class Preferences
     {
         this.website = website;
         this.units = 'metric';
-        try { this.units = localStorage.getItem ('sw-auto3d-units') === 'standard' ? 'standard' : 'metric'; } catch { /* Storage can be disabled. */ }
+        try {
+            const profile = JSON.parse (localStorage.getItem ('auto3d-user-preferences-v1') || '{}');
+            this.units = profile.units === 'standard' || localStorage.getItem ('sw-auto3d-units') === 'standard' ? 'standard' : 'metric';
+        } catch { /* Storage can be disabled. */ }
         website.sidebar.detailsPanel.unitSystem = this.units;
         const badge = document.createElement ('span'); badge.className = 'version_badge'; badge.textContent = 'v' + AppVersion;
         document.querySelector ('.title_left').appendChild (badge);
@@ -48,7 +77,15 @@ export class Preferences
     SetUnits (units)
     {
         this.units = units; this.website.sidebar.detailsPanel.unitSystem = units;
-        try { localStorage.setItem ('sw-auto3d-units', units); } catch { /* Keep this session preference. */ }
-        if (this.website.model) { this.website.sidebar.AddObject3DProperties (this.website.model, this.website.model); this.website.sessionEditor.UpdateDetails (); }
+        try {
+            const profile = JSON.parse (localStorage.getItem ('auto3d-user-preferences-v1') || '{}');
+            profile.units = units;
+            localStorage.setItem ('auto3d-user-preferences-v1', JSON.stringify (profile));
+            localStorage.setItem ('sw-auto3d-units', units);
+        } catch { /* Keep this session preference. */ }
+        if (this.website.model) {
+            this.website.sidebar.AddObject3DProperties (this.website.model, this.website.model);
+            this.website.sessionEditor.UnitsChanged ();
+        }
     }
 }

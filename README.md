@@ -4,7 +4,7 @@ Auto3D is a branded, self-hostable browser 3D viewer based on [Online3DViewer](h
 
 ## Run locally
 
-Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.22.0**.
+Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.23.0**.
 
 ## Hosting
 
@@ -20,11 +20,11 @@ The left panel has collapsible Session objects, Materials and Lighting sections.
 
 ## Object editing and library
 
-Uploads append objects. Selecting multiple standalone model files in one upload imports each model as a separate session object while still making selected sidecar files available to the importers. **Update** replaces the selected object's source geometry while retaining its placement. The viewer tool strip supports Select (V), Move (W), Rotate (E), Scale (R), Duplicate (Ctrl+D), visibility (H), Focus (F), Delete, and Undo/Redo for object edits. Transform tools provide a gizmo and numeric fields. Undo applies to object and placement edits; material controls are saved in the session but do not use that history.
+Uploads and files dropped directly onto the main viewer append objects to the current session. Selecting multiple standalone model files in one upload imports each model as a separate session object while still making selected sidecar files available to the importers. **Update** replaces the selected object's source geometry while retaining its placement. The viewer tool strip supports Select (V), Move (W), Rotate (E), Scale (R), Duplicate (Ctrl+D), visibility (H), Focus (F), Delete, and Undo/Redo for object edits. Transform tools provide a gizmo and numeric fields. Undo applies to object and placement edits; material controls are saved in the session but do not use that history.
 
 GLB/glTF models with embedded clips have independent Play/Pause, clip selection, timeline, Reset and speed controls. Skeletal and morph animations are retained in portable sessions and GLB/glTF exports. Include referenced binary/texture files when uploading a glTF. Animation extensions requiring additional decoders may show an unavailable-animation message while retaining a static preview. Mesh-format exports use the engine's static geometry.
 
-The top-right menu now includes **Full screen** and **Library**. Library opens shared models and device saves, with categories Primary products, Retail shelf, Pallets and Accessories. Cards include thumbnails: **Open** replaces the workspace; **Add** appends its objects; **Share** creates a persistent viewer link for a shared save. Library **Share** creates a dedicated read-only mini Auto3D viewer link for internal or external recipients. Links can optionally expose a `.auto3d` download control and can require a 4-digit access code. The mini viewer adapts to desktop/tablet/mobile layouts and reuses Auto3D touch navigation (drag to orbit, pinch to zoom and two-finger drag to pan). Legacy shared views remain supported. Device saves remain in IndexedDB and are never uploaded automatically.
+The top-right menu now includes **Library**, **Export**, **Preferences** and **Full screen**, with Full screen kept last. Library opens shared models and device saves, with categories Primary products, Retail shelf, Pallets and Accessories. Cards include thumbnails: **Open** replaces the workspace; **Add** appends its objects; **Share** creates a persistent viewer link for a shared save. Library **Share** creates a dedicated read-only mini Auto3D viewer link for internal or external recipients. Links can optionally expose a `.auto3d` download control and can require a 4-digit access code. The mini viewer adapts to desktop/tablet/mobile layouts and reuses Auto3D touch navigation (drag to orbit, pinch to zoom and two-finger drag to pan). Legacy shared views remain supported. Device saves remain in IndexedDB and are never uploaded automatically.
 
 The browser now accesses shared content only through same-origin `/api/library/*` routes. The temporary Cloudflare Pages Function reads the existing Supabase library server-side; Supabase configuration and direct database/storage requests have been removed from the browser bundle. Shared browsing and view-only links remain available; Device library, crash-recovery checkpoints and portable `.auto3d` files remain fully supported.
 
@@ -48,3 +48,10 @@ Some formats are provided by separate libraries. Dependencies are listed in `pac
 ## Upstream and licensing
 
 The upstream [Online3DViewer source](https://github.com/kovacsv/Online3DViewer) and [developer documentation](https://kovacsv.github.io/Online3DViewer) are useful references. The upstream project by Viktor Kovacs is distributed under the MIT License. Auto3D retains the upstream [LICENSE.md](LICENSE.md) and required copyright notice. The production dependency license inventory is recorded in `THIRD_PARTY_NOTICES.md` and enforced by CI; corporate legal/policy approval remains separate from the engineering check.
+
+
+### v0.23 viewer and units
+
+Selected objects retain their textured/material appearance and are indicated with a fine bounding box. The transform Scale mode exposes physical **Size** fields in the global unit preference when the source model declares units; unknown-unit models continue to use scale multipliers. Metric/standard units persist in the local user-profile preference and update dimensions and size fields immediately. Cross-device account synchronization is intentionally deferred until corporate identity is connected.
+
+The main toolbar places **Save session file** directly beside **Open**, while **Export** is also available in the right-side header.

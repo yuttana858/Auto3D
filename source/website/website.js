@@ -517,13 +517,7 @@ export class Website
     UpdateMeshesSelection ()
     {
         if (this.sessionEditor) { this.sessionEditor.SelectionChanged (); }
-        let selectedMeshId = this.navigator.GetSelectedMeshId ();
-        this.viewer.SetMeshesHighlight (this.highlightColor, (meshUserData) => {
-            if (selectedMeshId !== null && meshUserData.originalMeshInstance.id.IsEqual (selectedMeshId)) {
-                return true;
-            }
-            return false;
-        });
+        this.viewer.SetMeshesHighlight (this.highlightColor, () => false);
         if (this.materialPanel) { this.materialPanel.Update (); }
     }
 
@@ -739,7 +733,7 @@ export class Website
         button.addEventListener ('click', () => this.ToggleFullscreen ());
         document.addEventListener ('fullscreenchange', update);
         document.addEventListener ('webkitfullscreenchange', update);
-        this.parameters.headerButtonsDiv.prepend (button);
+        this.parameters.headerButtonsDiv.appendChild (button);
         update ();
     }
 
@@ -833,6 +827,9 @@ export class Website
 
         AddButton (this.toolbar, 'open', Loc ('Open from your device'), [], () => {
             this.OpenFileBrowserDialog ();
+        });
+        AddButton (this.toolbar, 'file_download', 'Save session file', ['only_on_model'], () => {
+            this.sessionEditor.library.SaveDialog (true);
         });
         AddButton (this.toolbar, 'open_url', Loc ('Open from url'), [], () => {
             ShowOpenUrlDialog ((urls) => {
@@ -935,22 +932,39 @@ export class Website
 
     InitDragAndDrop ()
     {
+        let viewerDragDepth = 0;
+        const viewer = this.parameters.viewerDiv;
         window.addEventListener ('dragstart', (ev) => {
             ev.preventDefault ();
         }, false);
 
+        viewer.addEventListener ('dragenter', (ev) => {
+            if (this.sessionEditor?.readOnly) { return; }
+            ev.preventDefault (); viewerDragDepth++; viewer.classList.add ('session_drop_target');
+        });
+        viewer.addEventListener ('dragleave', () => {
+            viewerDragDepth = Math.max (0, viewerDragDepth - 1);
+            if (viewerDragDepth === 0) { viewer.classList.remove ('session_drop_target'); }
+        });
+
         window.addEventListener ('dragover', (ev) => {
             ev.stopPropagation ();
             ev.preventDefault ();
-            ev.dataTransfer.dropEffect = 'copy';
+            ev.dataTransfer.dropEffect = this.sessionEditor?.readOnly ? 'none' : 'copy';
         }, false);
 
         window.addEventListener ('drop', (ev) => {
             ev.stopPropagation ();
             ev.preventDefault ();
+            viewerDragDepth = 0; viewer.classList.remove ('session_drop_target');
+            if (this.sessionEditor?.readOnly) { return; }
             GetFilesFromDataTransfer (ev.dataTransfer, (files) => {
                 if (files.length > 0) {
                     HandleEvent ('model_load_started', 'drop');
+                    const intoViewer = viewer.contains (ev.target);
+                    if (intoViewer && this.sessionEditor?.document.objects.length) {
+                        this.sessionEditor.Status ('Adding dropped model(s) to current session…');
+                    }
                     this.LoadModelFromFileList (files);
                 }
             });
