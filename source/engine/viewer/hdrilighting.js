@@ -38,7 +38,6 @@ export class HDRILighting
         this.viewer = viewer;
         this.texture = null;
         this.target = null;
-        if (!this.enabled) { this.ApplyMaterialEnvironment (false); }
         this.enabled = false;
         this.request = 0;
         this.brightness = 1;
