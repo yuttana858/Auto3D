@@ -9,7 +9,7 @@ import { ConvertModelToThreeObject, ModelToThreeConversionParams, ModelToThreeCo
 import { Direction } from '../engine/geometry/geometry.js';
 import { Unit } from '../engine/model/unit.js';
 import { Property, PropertyType } from '../engine/model/property.js';
-import { DisplayLength, DisplayUnitLabel, UnitFactor } from './preferences.js';
+import { DisplayLength, DisplayUnitLabel, UnitFactor, DisplaySizeFromScale, ScaleFromDisplaySize } from './preferences.js';
 import { LoadAnimationScene } from './sessionanimation.js';
 import { ShowExportDialog } from './exportdialog.js';
 
@@ -176,7 +176,9 @@ export class SessionEditor
                         const base = this.GetObjectBaseSize (this.selected);
                         if (factor !== null && base[axis] > 1e-12) {
                             if (input.valueAsNumber <= 0) { return; }
-                            this.selected.scale[axis] = input.valueAsNumber / (base[axis] * factor);
+                            const nextScale = ScaleFromDisplaySize (base[axis], input.valueAsNumber, this.selected.unit, this.website.preferences.units);
+                            if (nextScale === null) { return; }
+                            this.selected.scale[axis] = nextScale;
                         } else {
                             if (Math.abs (input.valueAsNumber) < 1e-6) { return; }
                             this.selected.scale[axis] = input.valueAsNumber;
@@ -368,7 +370,7 @@ export class SessionEditor
         }
         for (const { input, key, axis } of this.inputs) {
             if (!this.selected) { input.value = ''; continue; }
-            const value = key === 'scale' && factor !== null ? base[axis] * Math.abs (this.selected.scale[axis]) * factor : this.selected[key][axis];
+            const value = key === 'scale' ? DisplaySizeFromScale (base[axis], this.selected.scale[axis], this.selected.unit, units) : this.selected[key][axis];
             input.value = Number (value.toFixed (5));
         }
     }
