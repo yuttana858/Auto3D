@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { MaterialReflectionStrength } from './materialreflection.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 
 // Integrate the radiance over the sphere. Rotating the sample directions moves
@@ -158,7 +159,7 @@ export class HDRILighting
                 if (active) {
                     const changed = material.envMap !== this.texture;
                     material.envMap = this.texture;
-                    material.envMapIntensity = this.brightness * (this.viewer.scene.userData.auto3dEnvironmentIntensity ?? 1);
+                    material.envMapIntensity = this.brightness * (this.viewer.scene.userData.auto3dEnvironmentIntensity ?? 1) * MaterialReflectionStrength (material);
                     if (material.envMapRotation?.copy) { material.envMapRotation.copy (this.rotation); }
                     if (changed) { material.needsUpdate = true; }
                 } else {
