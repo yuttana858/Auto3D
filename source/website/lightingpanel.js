@@ -75,7 +75,9 @@ export class LightingPanel
             const before = this.Capture ();
             ++this.request;
             this.SetMode ('default');
+            this.website.sceneEffects.SuspendDynamicReflection ();
             this.lighting.SetDefault ();
+            this.website.sceneEffects.Refresh ();
             this.website.UpdateViewport ();
             this.SyncBackgroundVisibility ();
             this.Status ('Default dome environment active.');
@@ -95,7 +97,9 @@ export class LightingPanel
             document.getElementById ('hdri_brightness_value').textContent = brightness.toFixed (2) + '×';
             document.getElementById ('hdri_rotation_value').textContent = rotation + '°';
             document.getElementById ('hdri_elevation_value').textContent = elevation + '°';
+            this.website.sceneEffects.SuspendDynamicReflection ();
             this.lighting.Adjust (brightness, rotation, elevation);
+            this.website.sceneEffects.Refresh ();
         };
         document.getElementById ('hdri_background').addEventListener ('change', (event) => {
             const before = this.Capture ();
@@ -276,6 +280,7 @@ export class LightingPanel
         this.Status ('Loading ' + environment.name + ' preview…');
         try {
             const fallback = 'assets/hdri/' + environment.id + '.hdr';
+            this.website.sceneEffects.SuspendDynamicReflection ();
             if (!await this.lighting.Load (environment.previewUrl, environment.renderUrl, fallback) || request !== this.request) { return; }
             this.selected = environment.id;
             this.SyncBackgroundVisibility ();
