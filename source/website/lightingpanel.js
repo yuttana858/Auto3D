@@ -237,6 +237,13 @@ export class LightingPanel
         document.getElementById ('lighting_status').textContent = text;
     }
 
+    RefreshMaterialProperties ()
+    {
+        this.lighting.Update ();
+        this.website.sceneEffects?.SyncMaterialProperties ();
+        this.website.viewer.Render ();
+    }
+
     RecordHistory (before)
     {
         if (this.restoring || !before || !this.website.sessionEditor) { return; }
