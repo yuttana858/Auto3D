@@ -24,6 +24,9 @@ const Icons = {
     rotate : '<path d="M20 8a9 9 0 1 0 1 8M20 3v6h-6"/>', scale : '<path d="M4 13v7h7M13 4h7v7M4 20l16-16"/>', duplicate : '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M15 8V4H4v11h4"/>',
     visible : '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>', remove : '<path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/>',
     focus : '<path d="M3 9V3h6m6 0h6v6M3 15v6h6m6 0h6v-6"/><circle cx="12" cy="12" r="3"/>', undo : '<path d="M3 9h12a6 6 0 0 1 0 12M3 9l5-5M3 9l5 5"/>', redo : '<path d="M21 9H9a6 6 0 0 0 0 12m12-12-5-5m5 5-5 5"/>',
+    fit : '<path d="M3 9V3h6m6 0h6v6M3 15v6h6m6 0h6v-6"/>',
+    array : '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>',
+    floor : '<path d="M3 20h18M12 3v12m-4-4 4 4 4-4"/>',
     add : '<path d="M12 3v18M3 12h18"/>', save : '<path d="M4 3h13l4 4v14H3V3h1Zm3 0v7h10V3M7 21v-7h10v7"/>', export : '<path d="M12 16V2m-4 4 4-4 4 4M4 12v9h16v-9"/>', library : '<path d="M3 4h5v17H3Zm7 0h5v17h-5Zm7 1 4-1 3 16-4 1Z"/>', update : '<path d="M20 7a9 9 0 1 0 1 9M20 2v6h-6"/>'
 };
 
@@ -156,7 +159,7 @@ export class SessionEditor
     CreateUI ()
     {
         this.strip = Element ('div', 'scene_tools', undefined, this.website.parameters.viewerDiv); this.strip.setAttribute ('role', 'toolbar'); this.strip.setAttribute ('aria-label', 'Object tools');
-        const tools = [['select', 'Select (V)', () => this.SetMode ('select')], ['move', 'Move (W)', () => this.SetMode ('translate')], ['rotate', 'Rotate (E)', () => this.SetMode ('rotate')], ['scale', 'Scale (R)', () => this.SetMode ('scale')], ['duplicate', 'Duplicate object (Ctrl+D)', () => this.Duplicate ()], ['visible', 'Hide or show object (H)', () => this.ToggleVisibility ()], ['remove', 'Delete object', () => this.Delete ()], ['focus', 'Focus object (F)', () => this.Focus ()], ['update', 'Update selected model', () => this.UpdateModel ()], ['undo', 'Undo object edit (Ctrl+Z)', () => this.Undo ()], ['redo', 'Redo object edit (Ctrl+Shift+Z)', () => this.Redo ()], ['add', 'Add model', () => this.AddModel ()], ['save', 'Save or open session (Ctrl+S)', () => this.library.SaveDialog (true)], ['export', 'Export', () => this.Export ()], ['library', 'Model library', () => this.library.Open ()]];
+        const tools = [['select', 'Select (V)', () => this.SetMode ('select')], ['move', 'Move (W)', () => this.SetMode ('translate')], ['rotate', 'Rotate (E)', () => this.SetMode ('rotate')], ['scale', 'Scale (R)', () => this.SetMode ('scale')], ['duplicate', 'Duplicate object (Ctrl+D)', () => this.Duplicate ()], ['array', 'Array selected object', () => this.ArrayDialog ()], ['floor', 'Drop selected object to floor', () => this.DropToFloor ()], ['visible', 'Hide or show object (H)', () => this.ToggleVisibility ()], ['remove', 'Delete object', () => this.Delete ()], ['focus', 'Focus object (F)', () => this.Focus ()], ['fit', 'Fit all objects to screen', () => this.FitScene ()], ['update', 'Update selected model', () => this.UpdateModel ()], ['undo', 'Undo object edit (Ctrl+Z)', () => this.Undo ()], ['redo', 'Redo object edit (Ctrl+Shift+Z)', () => this.Redo ()], ['add', 'Add model', () => this.AddModel ()], ['save', 'Save or open session (Ctrl+S)', () => this.library.SaveDialog (true)], ['export', 'Export', () => this.Export ()], ['library', 'Model library', () => this.library.Open ()]];
         for (const [key, label, action] of tools) {
             const button = Element ('button', 'scene_tool', undefined, this.strip); button.title = label; button.setAttribute ('aria-label', label); button.innerHTML = '<svg viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">' + Icons[key] + '</svg>';
             button.addEventListener ('click', () => this.Run (action)); this.buttons.set (key, button);
@@ -383,7 +386,7 @@ export class SessionEditor
     RefreshButtons ()
     {
         for (const [key, button] of this.buttons) {
-            button.disabled = this.busy || (this.readOnly && !['select', 'focus'].includes (key)) || (['move', 'rotate', 'scale', 'duplicate', 'visible', 'remove', 'focus', 'update'].includes (key) && !this.selected) || (key === 'export' && !this.document.objects.length) || (key === 'undo' && !this.history.undo.length) || (key === 'redo' && !this.history.redo.length);
+            button.disabled = this.busy || (this.readOnly && !['select', 'focus', 'fit'].includes (key)) || (['move', 'rotate', 'scale', 'duplicate', 'array', 'floor', 'visible', 'remove', 'focus', 'update'].includes (key) && !this.selected) || (key === 'export' && !this.document.objects.length) || (key === 'undo' && !this.history.undo.length) || (key === 'redo' && !this.history.redo.length);
             if (['select', 'move', 'rotate', 'scale'].includes (key)) { button.setAttribute ('aria-pressed', String ((key === 'move' ? 'translate' : key) === this.mode)); }
         }
         if (this.headerExport) { this.headerExport.disabled = this.busy || this.readOnly || !this.document.objects.length; }
@@ -404,12 +407,98 @@ export class SessionEditor
     {
         const object = this.selected;
         if (!object?.threeObject || !this.website.model) { return; }
-        const box = new THREE.Box3 ().setFromObject (object.threeObject, true); if (box.isEmpty ()) { return; } const size = box.getSize (new THREE.Vector3 ());
-        const panel = this.website.sidebar.detailsPanel; const table = panel.contentDiv.querySelector ('.ov_property_table'); if (!table) { return; }
+        const panel = this.website.sidebar.detailsPanel;
+        const table = panel.contentDiv.querySelector ('.ov_property_table');
+        if (!table) { return; }
+
         table.querySelectorAll ('.scene_dimension').forEach ((row) => row.remove ());
-        table.querySelectorAll ('.ov_property_table_row').forEach ((row) => { if (['Width (X):', 'Height (Y):', 'Depth (Z):', 'Unit:'].includes (row.querySelector ('.ov_property_table_name')?.textContent)) { row.remove (); } });
-        for (const [title, value] of [['Object', object.name], ['Width (X)', DisplayLength (size.x, object.unit, panel.unitSystem)], ['Height (Y)', DisplayLength (size.y, object.unit, panel.unitSystem)], ['Depth (Z)', DisplayLength (size.z, object.unit, panel.unitSystem)]]) { panel.AddProperty (table, new Property (PropertyType.Text, title, value)).classList.add ('scene_dimension'); }
+        table.querySelectorAll ('.ov_property_table_row').forEach ((row) => {
+            if (['Width (X):', 'Height (Y):', 'Depth (Z):', 'Unit:', 'Object:'].includes (row.querySelector ('.ov_property_table_name')?.textContent)) { row.remove (); }
+        });
+        const base = this.GetObjectBaseSize (object);
+        const units = this.website.preferences.units;
+        const unitLabel = UnitFactor (object.unit, units) === null ? 'model units' : DisplayUnitLabel (units);
+        const sizes = [
+            DisplaySizeFromScale (base[0], object.scale[0], object.unit, units),
+            DisplaySizeFromScale (base[2], object.scale[2], object.unit, units),
+            DisplaySizeFromScale (base[1], object.scale[1], object.unit, units)
+        ];
+        for (const [title, value] of [
+            ['Object', object.name],
+            ['Width (W / X)', DisplayLength (base[0] * Math.abs (object.scale[0]), object.unit, units)],
+            ['Length (L / Z)', DisplayLength (base[2] * Math.abs (object.scale[2]), object.unit, units)],
+            ['Height (H / Y)', DisplayLength (base[1] * Math.abs (object.scale[1]), object.unit, units)]
+        ]) {
+            panel.AddProperty (table, new Property (PropertyType.Text, title, value)).classList.add ('scene_dimension');
+        }
+
+        panel.contentDiv.querySelectorAll ('.scene_object_details').forEach ((item) => item.remove ());
+        const details = Element ('div', 'scene_object_details', undefined, panel.contentDiv);
+        Element ('strong', null, 'Model size', details);
+        Element ('p', 'section_hint', 'W = X · L = Z · H = Y · ' + unitLabel, details);
+        const dimensionGrid = Element ('div', 'scene_dimension_editor', undefined, details);
+        for (const [label, axis, value] of [['W', 0, sizes[0]], ['L', 2, sizes[1]], ['H', 1, sizes[2]]]) {
+            const field = Element ('label', null, label, dimensionGrid);
+            const input = Element ('input', null, undefined, field);
+            input.type = 'number'; input.step = 'any'; input.min = '0.000001'; input.value = Number (value.toFixed (5));
+            input.disabled = this.readOnly;
+            input.setAttribute ('aria-label', label + ' dimension in ' + unitLabel);
+            input.addEventListener ('change', () => {
+                if (!Number.isFinite (input.valueAsNumber) || input.valueAsNumber <= 0) { this.UpdateDetails (); return; }
+                this.SetObjectDisplayDimension (object, axis, input.valueAsNumber);
+            });
+        }
+
+        Element ('strong', null, 'User data', details);
+        const userDataList = Element ('div', 'scene_user_data', undefined, details);
+        const renderUserData = () => {
+            userDataList.replaceChildren ();
+            const entries = Object.entries (object.userData || {});
+            if (!entries.length) { Element ('p', 'section_hint', 'No user data entered.', userDataList); }
+            entries.forEach (([key, value]) => {
+                const row = Element ('div', 'scene_user_data_row', undefined, userDataList);
+                const keyInput = Element ('input', null, undefined, row); keyInput.value = key; keyInput.maxLength = 100; keyInput.disabled = this.readOnly; keyInput.setAttribute ('aria-label', 'User data name');
+                const valueInput = Element ('input', null, undefined, row); valueInput.value = value; valueInput.maxLength = 2000; valueInput.disabled = this.readOnly; valueInput.setAttribute ('aria-label', 'User data value');
+                const remove = Element ('button', null, '×', row); remove.title = 'Remove user data field'; remove.disabled = this.readOnly;
+                const save = () => {
+                    const nextKey = keyInput.value.trim ().slice (0, 100);
+                    const nextValue = valueInput.value.slice (0, 2000);
+                    if (!nextKey) { return; }
+                    if (nextKey !== key) { delete object.userData[key]; }
+                    object.userData[nextKey] = nextValue;
+                    this.MarkDirty ();
+                    key = nextKey;
+                };
+                keyInput.addEventListener ('change', save); valueInput.addEventListener ('change', save);
+                remove.addEventListener ('click', () => { delete object.userData[key]; this.MarkDirty (); renderUserData (); });
+            });
+        };
+        renderUserData ();
+        if (!this.readOnly) {
+            const add = Element ('button', null, '+ Add user data field', details);
+            add.addEventListener ('click', () => {
+                object.userData ||= {};
+                let index = 1; let key = 'Field ' + index;
+                while (Object.hasOwn (object.userData, key)) { key = 'Field ' + (++index); }
+                object.userData[key] = '';
+                this.MarkDirty (); this.UpdateDetails ();
+            });
+        }
+        panel.Resize ();
     }
+
+    SetObjectDisplayDimension (object, axis, value)
+    {
+        const base = this.GetObjectBaseSize (object);
+        const next = ScaleFromDisplaySize (base[axis], value, object.unit, this.website.preferences.units);
+        if (next === null || !Number.isFinite (next) || Math.abs (next) < 1e-6) { return; }
+        const before = TransformState (object);
+        object.scale[axis] = next;
+        this.ApplyTransform (object);
+        this.RecordTransform (object, before);
+        this.UpdateDetails ();
+    }
+
     AnimationUI ()
     {
         this.animationPanel.replaceChildren (); const player = this.selected?.player;
@@ -421,6 +510,94 @@ export class SessionEditor
         const reset = Element ('button', null, 'Reset', actions); reset.addEventListener ('click', () => { player.Seek (0); scrub.value = '0'; this.UpdateDetails (); });
         const speed = Element ('select', null, undefined, this.animationPanel); speed.setAttribute ('aria-label', 'Animation speed'); [0.25, 0.5, 1, 1.5, 2].forEach ((value) => speed.add (new Option (value + '×', value))); speed.value = String (player.state.speed); speed.addEventListener ('change', () => { player.state.speed = Number (speed.value); });
         const scrub = Element ('input', null, undefined, this.animationPanel); scrub.type = 'range'; scrub.min = '0'; scrub.max = String (player.clips[player.state.clip].duration); scrub.step = '0.01'; scrub.value = String (player.state.time); scrub.setAttribute ('aria-label', 'Animation timeline'); scrub.addEventListener ('input', () => { player.Seek (Number (scrub.value)); this.UpdateDetails (); }); player.onTime = (time) => { if (document.activeElement !== scrub) { scrub.value = String (time); } };
+    }
+
+    FitScene ()
+    {
+        this.website.FitModelToWindow (false);
+    }
+
+    DropToFloor ()
+    {
+        const object = this.selected;
+        if (!object?.threeObject) { return; }
+        const box = new THREE.Box3 ().setFromObject (object.threeObject, true);
+        if (box.isEmpty ()) { return; }
+        const up = this.website.viewer.upVector;
+        const axis = up.direction === Direction.X ? 0 : up.direction === Direction.Z ? 2 : 1;
+        const boundary = up.isFlipped ? box.max.getComponent (axis) : box.min.getComponent (axis);
+        if (Math.abs (boundary) < 1e-10) { this.Status (object.name + ' is already on the floor.'); return; }
+        const before = TransformState (object);
+        object.position[axis] -= boundary;
+        this.ApplyTransform (object);
+        this.RecordTransform (object, before);
+        this.UpdateDetails ();
+        this.Status ('Dropped ' + object.name + ' to floor');
+    }
+
+    ArrayDialog ()
+    {
+        if (!this.selected) { return; }
+        const dialog = WorkspaceDialog ('Array selected model');
+        const form = Element ('form', 'workspace_save_form', undefined, dialog);
+        Element ('p', 'section_hint', 'Create touching copies using the selected model bounding box. W = X · L = Z · H = Y.', form);
+        const fields = {};
+        for (const [key, title] of [['w', 'Width count (W)'], ['l', 'Length count (L)'], ['h', 'Height count (H)']]) {
+            const label = Element ('label', null, title, form);
+            const input = Element ('input', null, undefined, label); input.type = 'number'; input.min = '1'; input.max = '20'; input.step = '1'; input.value = '1'; input.required = true;
+            fields[key] = input;
+        }
+        const status = Element ('p', 'section_hint', 'The selected model is position 1,1,1.', form);
+        const create = Element ('button', 'workspace_primary', 'Create array', form); create.type = 'submit';
+        form.addEventListener ('submit', async (event) => {
+            event.preventDefault ();
+            const counts = ['w', 'l', 'h'].map ((key) => Number (fields[key].value));
+            if (counts.some ((value) => !Number.isInteger (value) || value < 1 || value > 20)) { status.textContent = 'Each count must be an integer from 1 to 20.'; return; }
+            const total = counts[0] * counts[1] * counts[2];
+            if (this.document.objects.length + total - 1 > 1000) { status.textContent = 'This array would exceed the 1,000-object session limit.'; return; }
+            create.disabled = true;
+            try { await this.CreateArray (...counts); dialog.close (); } catch (error) { status.textContent = error.message; create.disabled = false; }
+        });
+    }
+
+    async CreateArray (widthCount, lengthCount, heightCount)
+    {
+        const source = this.selected;
+        if (!source?.threeObject) { throw new Error ('Select a model first.'); }
+        const counts = [widthCount, lengthCount, heightCount];
+        if (counts.some ((value) => !Number.isInteger (value) || value < 1 || value > 20)) { throw new Error ('Array counts must be integers from 1 to 20.'); }
+        const total = widthCount * lengthCount * heightCount;
+        if (this.document.objects.length + total - 1 > 1000) { throw new Error ('Array exceeds the 1,000-object session limit.'); }
+        if (total === 1) { this.Status ('Array is 1 × 1 × 1; no copies created.'); return []; }
+
+        const box = new THREE.Box3 ().setFromObject (source.threeObject, true);
+        const size = box.getSize (new THREE.Vector3 ());
+        const added = [];
+        const firstIndex = this.document.objects.length;
+        for (let h = 0; h < heightCount; h++) {
+            for (let l = 0; l < lengthCount; l++) {
+                for (let w = 0; w < widthCount; w++) {
+                    if (w === 0 && l === 0 && h === 0) { continue; }
+                    const copy = this.document.Duplicate (source);
+                    copy.name = source.name + ' [' + (w + 1) + ',' + (l + 1) + ',' + (h + 1) + ']';
+                    copy.position = [
+                        source.position[0] + w * size.x,
+                        source.position[1] + h * size.y,
+                        source.position[2] + l * size.z
+                    ];
+                    this.document.ApplyTransform (copy);
+                    added.push (copy);
+                }
+            }
+        }
+        this.history.Push ({
+            undo : async () => { added.forEach ((object) => this.document.Remove (object)); this.selected = source; await this.Render (); },
+            redo : async () => { added.forEach ((object, index) => this.document.Restore (object, firstIndex + index)); this.selected = source; await this.Render (); }
+        });
+        this.selected = source;
+        await this.Render ();
+        this.Status ('Created ' + widthCount + ' × ' + lengthCount + ' × ' + heightCount + ' array · ' + total + ' objects');
+        return added;
     }
 
     async Duplicate () { if (!this.selected) { return; } const object = this.document.Duplicate (this.selected); const index = this.document.objects.indexOf (object); this.history.Push ({ undo : async () => { this.document.Remove (object); this.selected = null; await this.Render (); }, redo : async () => { this.document.Restore (object, index); this.selected = object; await this.Render (); } }); this.selected = object; await this.Render (); this.Status ('Duplicated ' + object.name); }
@@ -441,7 +618,7 @@ export class SessionEditor
             const added = [];
             for (const source of saved.document.objects) {
                 const model = saved.document.CompactModel ([source], true); model.root = model.root.GetChildNode (0);
-                const object = this.document.AddImported (model, source.name, Direction.Y, false); Object.assign (object, TransformState (source), { source : source.source, visible : source.visible, hiddenParts : [...source.hiddenParts], unit : source.unit, animationAsset : source.animationAsset, playback : source.playback }); this.document.ApplyTransform (object); added.push (object);
+                const object = this.document.AddImported (model, source.name, Direction.Y, false); Object.assign (object, TransformState (source), { source : source.source, visible : source.visible, hiddenParts : [...source.hiddenParts], unit : source.unit, userData : { ...(source.userData || {}) }, animationAsset : source.animationAsset, playback : source.playback }); this.document.ApplyTransform (object); added.push (object);
             }
             const firstIndex = this.document.objects.length - added.length; this.history.Push ({ undo : async () => { added.forEach ((object) => this.document.Remove (object)); this.selected = null; await this.Render (); }, redo : async () => { added.forEach ((object, index) => this.document.Restore (object, firstIndex + index)); this.selected = added[0]; await this.Render (); } }); this.selected = added[0];
         } else { this.document = saved.document; this.history = new SceneHistory (() => this.MarkDirty ()); this.selected = this.document.objects[0] || null; if (this.website.hashHandler.HasHash ()) { this.website.hashHandler.SkipNextEventHandler (); this.website.hashHandler.ClearHash (); } }
