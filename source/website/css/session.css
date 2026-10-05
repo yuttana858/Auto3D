@@ -262,3 +262,62 @@ div.main_viewer
 {
     background: var(--ov_hover_color);
 }
+
+
+.editable_name
+{
+    cursor: text;
+    border-radius: 3px;
+    transition: background-color .12s ease, outline-color .12s ease;
+}
+
+.editable_name:hover,
+.editable_name:focus
+{
+    background: var(--ov_hover_color);
+    outline: 1px solid var(--ov_border_color);
+    outline-offset: 1px;
+}
+
+.material_card_text
+{
+    min-width: 0;
+}
+
+.material_name
+{
+    font-weight: 600;
+}
+
+.material_map_summary
+{
+    opacity: .72;
+}
+
+.scene_shadow_options
+{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 6px 0;
+}
+
+.scene_shadow_options label
+{
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.scene_effects
+{
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--ov_border_color);
+}
+
+.scene_effects > strong
+{
+    display: block;
+    margin-bottom: 7px;
+}

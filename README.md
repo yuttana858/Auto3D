@@ -64,3 +64,18 @@ Selecting a session object adds an editable **Model size** section to Model Data
 The object tool strip now includes **Array**, **Drop to floor**, and **Fit to screen**. Array creates a W/L/H grid from the selected object's current world bounding box so adjacent bounding envelopes touch without overlapping. Drop to floor honors the current X/Y/Z up vector and flipped-up state.
 
 Right-clicking a model selects its session object and exposes object actions including Focus, Array, Drop to floor, Duplicate, visibility and Delete. Right-clicking empty viewer space exposes Fit to screen. Mesh isolation remains available where applicable.
+
+
+### v0.25 interaction, HDRI, reflections and shadows
+
+Desktop viewer navigation is now **left-click select, middle-drag pan, right-drag orbit**. A short right-click still opens the object/empty-space context menu; a right-drag suppresses that menu on release.
+
+HDRI presets are cataloged through the same-origin `/api/environments` endpoint. Current 1K HDR files are the low-resolution **preview** tier in the public `auto3d-hdri` Supabase Storage bucket with CDN caching. Each environment also has a reserved high-resolution **render** path for future assets. The application falls back to the packaged preview HDR if the CDN copy is unavailable.
+
+Lighting now includes global environment-reflection intensity, optional realtime model reflections, optional planar floor reflection and intensity, and global shadows/floor-shadow intensity. Realtime model reflections use a cube capture and floor reflection uses Three.js `Reflector`, so both remain opt-in render passes.
+
+Each session model has independent **Cast shadows** and **Receive shadows** controls. Cast + Receive enables normal self-shadowing; a casting model can shadow any receiving model. These flags persist in `.auto3d` schema v4.
+
+Material-list hover identifies the material on the model and selecting a material flashes the surface white briefly. Material, current session, session-model, and Device Library names can be renamed from the UI. Shared Library names remain read-only until authenticated publishing identity is available.
+
+Ctrl/Cmd+Z uses the session-wide history stack for object operations plus the new material, naming, shadow, HDRI and reflection edits. Focused text fields retain native text undo.

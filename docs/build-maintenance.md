@@ -22,3 +22,10 @@ Runtime renderer baseline for Auto3D v0.21.1:
 - Three.js 0.186.1
 
 This renderer version passed the full Auto3D hardening gate (workspace, materials, animation, import/export, session, backend, engine/module and website builds).
+
+
+## CI usage policy — v0.25
+
+To reduce GitHub Actions usage and notification noise, the full validation suite runs on pull requests (and manual dispatch) only. Superseded PR runs are cancelled automatically.
+
+A merge to `main` runs only the Cloudflare production build/deploy workflow. This avoids repeating the full lint/test/engine/module/website validation immediately after a PR has already passed it.

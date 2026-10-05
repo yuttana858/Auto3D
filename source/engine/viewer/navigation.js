@@ -251,6 +251,7 @@ export class Navigation
 		this.onMouseMove = null;
 		this.onContext = null;
         this.enabled = true;
+        this.suppressContextMenu = false;
 
 		if (this.canvas.addEventListener) {
 			this.canvas.addEventListener ('mousedown', this.OnMouseDown.bind (this));
@@ -371,6 +372,7 @@ export class Navigation
 
 		this.mouse.Down (this.canvas, ev);
 		this.clickDetector.Start (this.mouse.GetPosition ());
+        if (ev.which === 3) { this.suppressContextMenu = false; }
 	}
 
 	OnMouseMove (ev)
@@ -391,17 +393,14 @@ export class Navigation
 		let mouseButton = this.mouse.GetButton ();
 
 		let navigationType = NavigationType.None;
-		if (mouseButton === 1) {
-			if (ev.ctrlKey) {
-				navigationType = NavigationType.Zoom;
-			} else if (ev.shiftKey) {
-				navigationType = NavigationType.Pan;
-			} else {
-				navigationType = NavigationType.Orbit;
-			}
-		} else if (mouseButton === 2 || mouseButton === 3) {
-			navigationType = NavigationType.Pan;
-		}
+        // Auto3D desktop navigation:
+        // left = selection click only, middle-drag = pan, right-drag = orbit.
+        if (mouseButton === 2) {
+            navigationType = NavigationType.Pan;
+        } else if (mouseButton === 3) {
+            navigationType = NavigationType.Orbit;
+            if (!this.clickDetector.IsClick ()) { this.suppressContextMenu = true; }
+        }
 
 		if (navigationType === NavigationType.Orbit) {
 			let orbitRatio = 0.5;
@@ -519,9 +518,13 @@ export class Navigation
 		ev.preventDefault ();
         if (!this.enabled) { return; }
 
-        // Browsers dispatch contextmenu after the right-button mouseup. Mouseup
-        // clears ClickDetector, so gating this event on IsClick makes the menu
-        // unreachable even for a normal right-click.
+        // A short right click opens the context menu. A right-button drag is
+        // camera orbit, so suppress the contextmenu event generated on release.
+        if (this.suppressContextMenu) {
+            this.suppressContextMenu = false;
+            this.clickDetector.Cancel ();
+            return;
+        }
         this.Context (ev.clientX, ev.clientY);
         this.clickDetector.Cancel ();
 	}

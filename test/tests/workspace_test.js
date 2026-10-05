@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import * as THREE from 'three';
-import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import fs from 'node:fs';
 import { HDRILighting, ProjectHDRI } from '../../source/engine/viewer/hdrilighting.js';
 import { ShadingModel } from '../../source/engine/viewer/shadingmodel.js';
 import { ShadingType } from '../../source/engine/threejs/threeutils.js';
@@ -14,24 +14,35 @@ import { Coord3D } from '../../source/engine/geometry/coord3d.js';
 import { Viewer } from '../../source/engine/viewer/viewer.js';
 import { Direction } from '../../source/engine/geometry/geometry.js';
 import { Navigation } from '../../source/engine/viewer/navigation.js';
+import { SceneEffects } from '../../source/engine/viewer/sceneeffects.js';
 
 export default function suite ()
 {
     describe ('Workspace lighting and materials', () => {
-        it ('Dispatches a browser contextmenu event without depending on stale click state', () => {
-            let called = null; let canceled = false; let prevented = false;
-            Navigation.prototype.OnContextMenu.call ({
+        it ('Opens the context menu on a short right click and suppresses it after a right-drag orbit', () => {
+            const event = { clientX : 125, clientY : 240, preventDefault : () => {} };
+            let called = null; let canceled = 0;
+            const shortClick = {
                 enabled : true,
+                suppressContextMenu : false,
                 Context : (x, y) => { called = [x, y]; },
-                clickDetector : { Cancel : () => { canceled = true; }, IsClick : () => false }
-            }, {
-                clientX : 125,
-                clientY : 240,
-                preventDefault : () => { prevented = true; }
-            });
+                clickDetector : { Cancel : () => { canceled++; } }
+            };
+            Navigation.prototype.OnContextMenu.call (shortClick, event);
             assert.deepEqual (called, [125, 240]);
-            assert.equal (prevented, true);
-            assert.equal (canceled, true);
+            assert.equal (canceled, 1);
+
+            called = null;
+            const orbitRelease = {
+                enabled : true,
+                suppressContextMenu : true,
+                Context : (x, y) => { called = [x, y]; },
+                clickDetector : { Cancel : () => { canceled++; } }
+            };
+            Navigation.prototype.OnContextMenu.call (orbitRelease, event);
+            assert.equal (called, null);
+            assert.equal (orbitRelease.suppressContextMenu, false);
+            assert.equal (canceled, 2);
         });
 
         it ('Applies HDRI directly to Phong materials and restores their previous environment', () => {
@@ -52,6 +63,20 @@ export default function suite ()
             lighting.SetDefault ();
             assert.equal (material.envMap, originalMap);
             assert.equal (material.envMapIntensity, 0.35);
+        });
+
+        it ('Decodes an actual bundled HDR preview through the cached in-memory loader path', async () => {
+            const bytes = fs.readFileSync (new URL ('../../website/assets/hdri/studio_small_09.hdr', import.meta.url));
+            const originalFetch = global.fetch;
+            try {
+                global.fetch = async () => new Response (bytes, { status : 200, headers : { 'Content-Type' : 'application/octet-stream' } });
+                const lighting = new HDRILighting (MakeViewer ());
+                const texture = await lighting.Decode ('https://auto3d.example/studio_small_09.hdr');
+                assert.ok (texture.isDataTexture);
+                assert.ok (texture.image.width > 0);
+                assert.ok (texture.image.height > 0);
+                texture.dispose ();
+            } finally { global.fetch = originalFetch; }
         });
 
         it ('Hides HDRI imagery without changing radiance, intensity or rotation and restores the gradient', () => {
@@ -200,27 +225,68 @@ export default function suite ()
         });
 
         it ('Discards stale HDR downloads after another choice or a return to default', async () => {
-            const original = RGBELoader.prototype.loadAsync;
+            const lighting = new HDRILighting (MakeViewer ());
             const pending = [];
-            RGBELoader.prototype.loadAsync = () => new Promise ((resolve) => pending.push (resolve));
-            try {
-                const lighting = new HDRILighting (MakeViewer ());
-                const first = lighting.Load ('first.hdr');
-                const second = lighting.Load ('second.hdr');
-                const old = new THREE.Texture ();
-                let disposed = false;
-                old.addEventListener ('dispose', () => { disposed = true; });
-                pending[0] (old);
-                assert.equal (await first, false);
-                assert.ok (disposed);
-                lighting.SetDefault ();
-                pending[1] (new THREE.Texture ());
-                assert.equal (await second, false);
-                assert.equal (lighting.texture, null);
-                assert.equal (lighting.enabled, false);
-            } finally {
-                RGBELoader.prototype.loadAsync = original;
-            }
+            lighting.Prepare = () => new Promise ((resolve) => pending.push (resolve));
+            const prepared = () => {
+                const texture = new THREE.Texture (); let textureDisposed = false;
+                texture.addEventListener ('dispose', () => { textureDisposed = true; });
+                let targetDisposed = false;
+                return {
+                    texture,
+                    target : { texture : new THREE.Texture (), dispose : () => { targetDisposed = true; } },
+                    disposed : () => textureDisposed && targetDisposed
+                };
+            };
+
+            const first = lighting.Load ('first.hdr');
+            const second = lighting.Load ('second.hdr');
+            const old = prepared (); pending[0] (old);
+            assert.equal (await first, false);
+            assert.ok (old.disposed ());
+
+            lighting.SetDefault ();
+            const newer = prepared (); pending[1] (newer);
+            assert.equal (await second, false);
+            assert.ok (newer.disposed ());
+            assert.equal (lighting.texture, null);
+            assert.equal (lighting.enabled, false);
+        });
+
+        it ('Keeps per-model shadow flags stable while the global shadow renderer toggles', () => {
+            const scene = new THREE.Scene ();
+            const light = new THREE.DirectionalLight ();
+            scene.add (light);
+            const root = new THREE.Group ();
+            const mesh = new THREE.Mesh (new THREE.BoxGeometry (1, 1, 1), new THREE.MeshStandardMaterial ());
+            root.add (mesh); scene.add (root);
+            const viewer = {
+                scene,
+                renderer : { shadowMap : { enabled : false, type : null } },
+                shadingModel : {
+                    directionalLight : light,
+                    hdriEnvironment : null,
+                    UpdateShading : () => { light.intensity = Math.PI; }
+                },
+                mainModel : { mainModel : { GetRootObject : () => root } },
+                upVector : { direction : Direction.Y, isFlipped : false },
+                canvas : { width : 800, height : 600 },
+                Render : () => {}
+            };
+            const effects = new SceneEffects (viewer);
+            const object = { castShadow : true, receiveShadow : false, threeObject : root };
+            effects.ApplyObjectSettings ([object]);
+            assert.equal (mesh.castShadow, true);
+            assert.equal (mesh.receiveShadow, false);
+            effects.Set ('shadows', true);
+            assert.equal (viewer.renderer.shadowMap.enabled, true);
+            assert.equal (light.castShadow, true);
+            effects.Set ('environmentIntensity', 0.65);
+            assert.equal (scene.userData.auto3dEnvironmentIntensity, 0.65);
+            effects.Set ('shadows', false);
+            assert.equal (mesh.castShadow, true);
+            assert.equal (mesh.receiveShadow, false);
+            effects.Dispose ();
         });
 
         it ('Reads original materials through selection highlighting and limits them to the selected part', () => {

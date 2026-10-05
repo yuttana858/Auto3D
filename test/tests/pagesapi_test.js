@@ -1,6 +1,7 @@
 import * as assert from 'node:assert';
 import { onRequest } from '../../functions/api/library/[[path]].js';
 import { onRequest as onShareRequest } from '../../functions/api/share/[[path]].js';
+import { onRequest as onEnvironmentRequest } from '../../functions/api/environments.js';
 
 export default function suite ()
 {
@@ -134,6 +135,38 @@ export default function suite ()
                 });
                 assert.equal (response.status, 403);
                 assert.equal (calls, 1);
+            } finally { global.fetch = originalFetch; }
+        });
+    });
+
+    describe ('Cloudflare environment catalog API', () => {
+        it ('returns preview and future render tiers as public CDN URLs', async () => {
+            const originalFetch = global.fetch;
+            try {
+                global.fetch = async (url, options) => {
+                    assert.ok (String (url).includes ('auto3d_environments'));
+                    assert.ok (options.headers.apikey.startsWith ('sb_publishable_'));
+                    return new Response (JSON.stringify ([{
+                        id : 'studio_small_09',
+                        name : 'Studio Small',
+                        preview_path : 'preview/studio_small_09.hdr',
+                        render_path : 'render/studio_small_09_4k.hdr',
+                        thumbnail_path : 'thumb/studio_small_09.png',
+                        source_url : 'https://polyhaven.com/a/studio_small_09',
+                        license : 'CC0-1.0',
+                        sort_order : 10
+                    }]), { status : 200, headers : { 'Content-Type' : 'application/json' } });
+                };
+                const response = await onEnvironmentRequest ({
+                    request : new Request ('https://auto3d.example/api/environments'),
+                    env : {}
+                });
+                assert.equal (response.status, 200);
+                const body = await response.json ();
+                assert.equal (body.length, 1);
+                assert.match (body[0].previewUrl, /\/storage\/v1\/object\/public\/auto3d-hdri\/preview\/studio_small_09\.hdr$/);
+                assert.match (body[0].renderUrl, /\/storage\/v1\/object\/public\/auto3d-hdri\/render\/studio_small_09_4k\.hdr$/);
+                assert.match (body[0].thumbnailUrl, /\/storage\/v1\/object\/public\/auto3d-hdri\/thumb\/studio_small_09\.png$/);
             } finally { global.fetch = originalFetch; }
         });
     });
