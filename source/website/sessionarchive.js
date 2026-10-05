@@ -16,6 +16,7 @@ import { SceneDocument } from './scenedocument.js';
 
 const TriangleKeys = ['v0', 'v1', 'v2', 'c0', 'c1', 'c2', 'n0', 'n1', 'n2', 'u0', 'u1', 'u2', 'mat', 'curve'];
 const MaxArchiveBytes = 256 * 1024 * 1024;
+export const SessionVersion = 2;
 export const LibraryCategories = ['Primary products', 'Retail shelf', 'Pallets', 'Accessories'];
 
 export function EncodeBuffer (buffer)
@@ -118,11 +119,25 @@ function ReadNode (data, parent, meshCount, depth = 0)
     return node;
 }
 
+export function MigrateSessionData (data)
+{
+    if (!data || data.format !== 'SW Auto3D' || !Number.isInteger (data.version)) { throw new Error ('This is not a supported Auto3D session.'); }
+    if (data.version > SessionVersion) { throw new Error ('This Auto3D session was created by a newer application version.'); }
+    if (data.version < 1) { throw new Error ('This is not a supported Auto3D session.'); }
+
+    let current = data;
+    if (current.version === 1) {
+        current = { ...current, version : 2, metadata : { savedAt : null, migratedFrom : 1 } };
+    }
+    if (current.version !== SessionVersion) { throw new Error ('This Auto3D session version cannot be migrated.'); }
+    return current;
+}
+
 export function PackSession (document, view = {}, objects = document.objects, kind = 'session')
 {
     const model = document.CompactModel (objects);
     return {
-        format : 'SW Auto3D', version : 1, kind, name : document.name, view,
+        format : 'SW Auto3D', version : SessionVersion, metadata : { savedAt : new Date ().toISOString () }, kind, name : document.name, view,
         objects : objects.map ((object) => ({ id : object.id, name : object.name, source : object.source, unit : object.unit, visible : object.visible, hiddenParts : object.hiddenParts || [], position : object.position, rotation : object.rotation, scale : object.scale, playback : object.playback, animationAsset : object.animationAsset ? { main : object.animationAsset.main, files : object.animationAsset.files.map ((file) => ({ name : file.name, buffer : EncodeBuffer (file.buffer) })) } : null })),
         model : { unit : model.unit, properties : model.propertyGroups, materials : model.materials.map (PackMaterial), meshes : model.meshes.map (PackMesh), nodes : model.root.childNodes.map (PackNode) }
     };
@@ -130,7 +145,8 @@ export function PackSession (document, view = {}, objects = document.objects, ki
 
 export function ReadSession (data)
 {
-    if (!data || data.format !== 'SW Auto3D' || data.version !== 1) { throw new Error ('This is not a supported Auto3D session.'); }
+    data = MigrateSessionData (data);
+    if (!data.model || !Array.isArray (data.model.nodes) || !Array.isArray (data.model.materials) || !Array.isArray (data.model.meshes)) { throw new Error ('Invalid model data.'); }
     if (!Array.isArray (data.objects) || data.objects.length > 1000 || data.objects.length !== data.model.nodes.length) { throw new Error ('Invalid object list.'); }
     const document = new SceneDocument ();
     const model = new Model ();
