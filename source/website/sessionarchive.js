@@ -195,7 +195,7 @@ export function ReadSession (data)
             for (const [key, value] of Object.entries (data.userData).slice (0, 100)) {
                 const name = String (key).trim ().slice (0, 100);
                 const text = String (value).slice (0, 2000);
-                if (name) { object.userData[name] = text; }
+                if (name && !['__proto__', 'prototype', 'constructor'].includes (name)) { object.userData[name] = text; }
             }
         }
         if (data.animationAsset) {
