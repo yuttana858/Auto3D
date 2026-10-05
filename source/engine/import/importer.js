@@ -23,6 +23,7 @@ export class ImportSettings
     {
         this.defaultLineColor = new RGBColor (100, 100, 100);
         this.defaultColor = new RGBColor (200, 200, 200);
+        this.mainFileName = null;
     }
 }
 
@@ -172,7 +173,16 @@ export class Importer
             return;
         }
 
-        if (importableFiles.length === 1 || !callbacks.onSelectMainFile) {
+        if (settings.mainFileName !== null) {
+            const mainFile = importableFiles.find ((candidate) => candidate.file.name.toLowerCase () === settings.mainFileName.toLowerCase ());
+            if (!mainFile) {
+                let error = new ImportError (ImportErrorCode.NoImportableFile);
+                error.mainFile = settings.mainFileName;
+                callbacks.onImportError (error);
+                return;
+            }
+            this.ImportLoadedMainFile (mainFile, settings, callbacks);
+        } else if (importableFiles.length === 1 || !callbacks.onSelectMainFile) {
             let mainFile = importableFiles[0];
             this.ImportLoadedMainFile (mainFile, settings, callbacks);
         } else {
