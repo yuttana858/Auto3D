@@ -66,11 +66,12 @@ export default function suite ()
                 assert.match (result.url, /^https:\/\/auto3d\.example\/\?view=/);
                 assert.equal (result.allowDownload, true);
                 assert.equal (result.codeRequired, true);
+                assert.ok (calls[1].url.includes ('/rest/v1/rpc/auto3d_create_share'));
                 const inserted = JSON.parse (calls[1].options.body);
-                assert.equal (inserted.item_id, itemId);
-                assert.equal (inserted.code_required, true);
-                assert.match (inserted.code_hash, /^[0-9a-f]{64}$/);
-                assert.notEqual (inserted.code_hash, '1234');
+                assert.equal (inserted.p_item_id, itemId);
+                assert.equal (inserted.p_code_required, true);
+                assert.match (inserted.p_code_hash, /^[0-9a-f]{64}$/);
+                assert.notEqual (inserted.p_code_hash, '1234');
             } finally { global.fetch = originalFetch; }
         });
 
