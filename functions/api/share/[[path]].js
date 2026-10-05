@@ -66,15 +66,15 @@ async function createShare (context)
 
     const token = crypto.randomUUID ();
     const hash = await codeHash (token, code);
-    await request (context.env, '/rest/v1/' + LinkTable, {
+    await request (context.env, '/rest/v1/rpc/auto3d_create_share', {
         method : 'POST',
-        headers : { 'Content-Type' : 'application/json', Prefer : 'return=minimal' },
+        headers : { 'Content-Type' : 'application/json' },
         body : JSON.stringify ({
-            token,
-            item_id : itemId,
-            allow_download : allowDownload,
-            code_hash : hash,
-            code_required : Boolean (code)
+            p_token : token,
+            p_item_id : itemId,
+            p_allow_download : allowDownload,
+            p_code_hash : hash,
+            p_code_required : Boolean (code)
         })
     });
 
