@@ -34,6 +34,7 @@ import { AxisIndicator } from './axisindicator.js';
 import { GetBackgroundPreset, GetBackgroundGradientCSS } from '../engine/viewer/background.js';
 import { SessionEditor } from './sessioneditor.js';
 import { Preferences } from './preferences.js';
+import { SceneEffects } from '../engine/viewer/sceneeffects.js';
 
 const MultiModelExtensions = new Set (['3dm', '3ds', '3mf', 'amf', 'bim', 'brep', 'dae', 'fbx', 'fcstd', 'gltf', 'glb', 'ifc', 'iges', 'igs', 'step', 'stp', 'stl', 'obj', 'off', 'ply', 'wrl', 'zae']);
 
@@ -236,6 +237,7 @@ export class Website
 
     InitWorkspace ()
     {
+        this.sceneEffects = new SceneEffects (this.viewer);
         this.lightingPanel = new LightingPanel (this);
         this.materialPanel = new MaterialPanel (this);
         this.axisIndicator = new AxisIndicator (this.viewer, document.getElementById ('world_axis'));
@@ -349,6 +351,7 @@ export class Website
         this.parameters.fileNameDiv.textContent = importResult.mainFile;
         this.viewer.SetMainObject (threeObject);
         this.viewer.SetUpVector (Direction.Y, false);
+        this.sceneEffects?.Refresh ();
         this.navigator.FillTree (importResult);
         if (this.materialPanel) { this.materialPanel.Update (); }
         this.sidebar.UpdateControlsVisibility ();
