@@ -32,6 +32,7 @@ import viewport_test from './tests/viewport_test.js';
 import workspace_test from './tests/workspace_test.js';
 import session_test from './tests/session_test.js';
 import cloudlibrary_test from './tests/cloudlibrary_test.js';
+import pagesapi_test from './tests/pagesapi_test.js';
 
 process.chdir (path.resolve ());
 SetGlobals ();
@@ -66,3 +67,4 @@ viewport_test ();
 workspace_test ();
 session_test ();
 cloudlibrary_test ();
+pagesapi_test ();

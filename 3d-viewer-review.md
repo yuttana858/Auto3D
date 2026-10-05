@@ -49,3 +49,17 @@ The hosted viewer manual says local files are processed in the browser and are n
 - [MIT license file](https://github.com/kovacsv/Online3DViewer/blob/master/LICENSE.md)
 - [Online viewer user manual: formats, loading, privacy, embedding](https://3dviewer.net/info/)
 - [Engine developer documentation](https://kovacsv.github.io/Online3DViewer/)
+
+
+## Auto3D v0.21.0 engineering closure
+
+The prototype-selection risks above have now been converted into release controls for the Auto3D fork:
+
+- production JavaScript dependency licenses are inventoried and CI-enforced;
+- production npm vulnerabilities at high/critical severity fail CI;
+- browser shared-library traffic is isolated behind same-origin Auto3D API routes;
+- source is private and replacement hosting is automated on Cloudflare Pages;
+- the portable session format has an explicit compatibility/migration policy and recovery protection;
+- representative importer/exporter/session/workspace regression tests remain in the release gate.
+
+Remaining approval work is organizational or environment-specific rather than an unresolved browser architecture issue: GIS must provide Entra/Azure resources, corporate representative CAD/BIM files should be run through UAT for required fidelity, and corporate security/legal teams retain final approval authority.

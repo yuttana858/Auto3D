@@ -1,6 +1,6 @@
 {
 	"name": "online-3d-viewer",
-	"version": "0.20.4",
+	"version": "0.21.0",
 	"description": "Auto3D browser-based 3D model viewer",
 	"license": "MIT",
 	"type": "module",
@@ -39,10 +39,12 @@
 	"scripts": {
 		"start": "node tools/dev_server.mjs",
 		"test": "mocha test",
+		"check_licenses": "node tools/check_licenses.mjs",
+		"audit_prod": "npm audit --omit=dev --audit-level=high",
 		"lint": "eslint source",
 		"lint_fix": "eslint source --fix",
 		"generate_icon_font": "run-python3 tools/generate_icon_font.py",
-		"create_dist": "npm run create_package && npm run lint && npm run test",
+		"create_dist": "npm run create_package && npm run lint && npm run test && npm run check_licenses",
 		"create_dist_test": "npm run create_package_test && npm run lint && npm run test",
 		"create_package": "npm run generate_docs && npm run build_engine && npm run build_engine_module && npm run build_website && run-python3 tools/create_package.py",
 		"create_package_test": "npm run generate_docs && npm run build_engine && npm run build_engine_module && npm run build_website && run-python3 tools/create_package.py test",

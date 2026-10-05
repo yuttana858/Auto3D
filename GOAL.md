@@ -70,3 +70,19 @@ Use AWS only for a workload with a specific technical or organizational advantag
 ## Exit criteria
 
 The migration is complete when Auto3D can run with Supabase disabled in the browser, corporate users can authenticate through Entra ID, authorized publishers can manage shared content through the backend API, automated tests/build/deployment pass, and the repository can be made private without disrupting the production application.
+
+
+## Pre-transition build status — v0.21.0
+
+Engineering work that does not require GIS is complete in the v0.21.0 hardening baseline:
+
+- Browser-side Supabase publisher authentication and direct Supabase access removed.
+- Same-origin Library API active for shared reads on Cloudflare Pages.
+- Shared writes fail closed pending corporate identity.
+- Provider-neutral privileged Library API implemented and Entra-ready.
+- Repository private and replacement Cloudflare hosting operational.
+- CI/release gates, dependency license inventory, production vulnerability audit and full builds enabled.
+- Versioned `.auto3d` v2 contract with v1 migration, validation and recovery protection established.
+- Privacy/network boundary and pre-transition readiness documented.
+
+Remaining goal items are intentionally GIS-dependent: Entra tenant/app registration and role assignments, Azure runtime/database/blob/key-vault/monitoring resources, final corporate retention/classification values, and corporate security/legal approval. These should be completed without changing the browser API contract.

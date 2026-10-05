@@ -1,8 +1,1 @@
-// Browser-safe publishable key. Server secrets must never be added here.
-export const LibraryConfig = {
-    'apiUrl': null,
-    'url': 'https://iesepcoxqochycckbwoh.supabase.co',
-    'key': 'sb_publishable_CmRJpuYE32OBF9rIV1jwqQ_diMF7OXh',
-    'bucket': 'auto3d-library'
-};
-
+// The production browser uses same-origin /api routes. Override only for local/backend development.\nexport const LibraryConfig = { apiUrl : '' };\n

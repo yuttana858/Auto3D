@@ -15,8 +15,17 @@ export default function suite ()
         });
         it ('Disables browser publishing during the corporate identity migration', async () => {
             const library = new CloudLibrary (); let requests = 0; library.Request = async () => { requests++; };
-            await assert.rejects (() => library.Save ({}), /corporate identity migration/);
+            await assert.rejects (() => library.Save ({}), /corporate identity/);
             assert.equal (requests, 0);
+        });
+        it ('Uses same-origin API routes by default', async () => {
+            const originalFetch = global.fetch;
+            try {
+                let requested = null;
+                global.fetch = async (url) => { requested = String (url); return new Response ('[]', { status : 200, headers : { 'Content-Type' : 'application/json' } }); };
+                const library = new CloudLibrary (); await library.List ();
+                assert.equal (requested, '/api/library/items');
+            } finally { global.fetch = originalFetch; }
         });
         it ('Uses the backend API for shared reads when configured', async () => {
             const originalFetch = global.fetch;

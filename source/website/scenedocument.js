@@ -165,9 +165,10 @@ export class SceneDocument
 
 export class SceneHistory
 {
-    constructor () { this.undo = []; this.redo = []; }
-    Push (command) { this.undo.push (command); if (this.undo.length > 50) { this.undo.shift (); } this.redo = []; }
-    async Undo () { const command = this.undo.pop (); if (command) { await command.undo (); this.redo.push (command); } }
-    async Redo () { const command = this.redo.pop (); if (command) { await command.redo (); this.undo.push (command); } }
+    constructor (onChange = null) { this.undo = []; this.redo = []; this.onChange = onChange; }
+    Changed () { if (this.onChange) { this.onChange (); } }
+    Push (command) { this.undo.push (command); if (this.undo.length > 50) { this.undo.shift (); } this.redo = []; this.Changed (); }
+    async Undo () { const command = this.undo.pop (); if (command) { await command.undo (); this.redo.push (command); this.Changed (); } }
+    async Redo () { const command = this.redo.pop (); if (command) { await command.redo (); this.undo.push (command); this.Changed (); } }
 }
 

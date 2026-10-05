@@ -365,7 +365,7 @@ export class MaterialPanel
         generate.className = 'section_button';
         generate.textContent = 'Generate box UVs';
         generate.disabled = !entry.meshes.some ((item) => item.mesh.userData.originalMeshInstance.TextureUVCount () === 0);
-        generate.addEventListener ('click', () => { GenerateMissingBoxUVs (this.website.viewer, entry); this.website.viewer.Render (); this.FillDrawer (); });
+        generate.addEventListener ('click', () => { GenerateMissingBoxUVs (this.website.viewer, entry); this.website.sessionEditor?.MarkDirty (); this.website.viewer.Render (); this.FillDrawer (); });
         uvDetails.appendChild (generate);
         this.Text (uvDetails, 'Fills missing UVs only. Box projection is a starting point; seams can remain.');
     }
@@ -425,7 +425,7 @@ export class MaterialPanel
             material[slot[0]] = null; entry.original[slot[2]] = null;
             if (slot[0] === 'specularMap' && material.isMeshPhysicalMaterial) { material.specularColorMap = null; }
             if (slot[0] === 'metalnessMap') { material.roughnessMap = null; }
-            material.needsUpdate = true; this.website.viewer.Render (); this.ShowSummary (); this.FillDrawer ();
+            material.needsUpdate = true; this.website.sessionEditor?.MarkDirty (); this.website.viewer.Render (); this.ShowSummary (); this.FillDrawer ();
         });
         const status = this.Text (controls, 'PNG, JPEG or WebP · stays in your browser');
         status.setAttribute ('role', 'status');
@@ -496,6 +496,7 @@ export class MaterialPanel
                 entry.material.displacementScale = entry.original.displacementScale;
             }
             entry.material.needsUpdate = true;
+            this.website.sessionEditor?.MarkDirty ();
             this.website.viewer.Render (); this.ShowSummary ();
             if (this.open && this.entries[this.active] && this.entries[this.active].material === entry.material) { this.FillDrawer (); }
         } catch (error) {
@@ -558,6 +559,7 @@ export class MaterialPanel
         input.addEventListener ('input', () => {
             if (type === 'number' && (!input.value || !Number.isFinite (Number (input.value)))) { return; }
             onChange (type === 'checkbox' ? input.checked : input.value);
+            this.website.sessionEditor?.MarkDirty ();
             output.textContent = type === 'range' ? this.FormatValue (input.value) : '';
             this.entries[this.active].material.needsUpdate = true;
             this.website.viewer.Render ();
