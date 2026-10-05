@@ -20,6 +20,23 @@ const DefaultEnvironments = [
     license : 'CC0-1.0'
 }));
 
+export function MergeEnvironmentCatalog (defaults, remote)
+{
+    const byId = new Map ((remote || []).map ((item) => [item.id, item]));
+    return defaults.map ((fallback) => {
+        const remoteItem = byId.get (fallback.id);
+        if (!remoteItem) { return { ...fallback }; }
+        return {
+            ...fallback,
+            name : remoteItem.name || fallback.name,
+            sourceUrl : remoteItem.sourceUrl || fallback.sourceUrl,
+            license : remoteItem.license || fallback.license,
+            cdnPreviewUrl : remoteItem.previewUrl || null,
+            renderUrl : remoteItem.renderUrl || null
+        };
+    });
+}
+
 export class LightingPanel
 {
     constructor (website)
@@ -178,19 +195,7 @@ export class LightingPanel
             const response = await fetch ('/api/environments', { cache : 'force-cache' });
             if (!response.ok) { return; }
             const remote = await response.json ();
-            const byId = new Map (remote.map ((item) => [item.id, item]));
-            this.environments = DefaultEnvironments.map ((fallback) => {
-                const remoteItem = byId.get (fallback.id);
-                if (!remoteItem) { return { ...fallback }; }
-                return {
-                    ...fallback,
-                    name : remoteItem.name || fallback.name,
-                    sourceUrl : remoteItem.sourceUrl || fallback.sourceUrl,
-                    license : remoteItem.license || fallback.license,
-                    cdnPreviewUrl : remoteItem.previewUrl || null,
-                    renderUrl : remoteItem.renderUrl || null
-                };
-            });
+            this.environments = MergeEnvironmentCatalog (DefaultEnvironments, remote);
             this.RenderEnvironmentGallery ();
         } catch { /* Bundled HDRIs remain the offline fallback. */ }
     }
