@@ -112,6 +112,28 @@ describe ('Importer Test', function () {
         });
     });
 
+    it ('Selects a requested main file when multiple standalone models are supplied', function (done) {
+        let files = [
+            new FileObject ('', 'obj/single_triangle.obj'),
+            new FileObject ('', 'stl/single_triangle.stl')
+        ];
+        let importer = new OV.Importer ();
+        let settings = new OV.ImportSettings ();
+        settings.mainFileName = 'single_triangle.stl';
+        importer.ImportFiles (OV.InputFilesFromFileObjects (files), settings, {
+            onLoadStart : () => {},
+            onFileListProgress : () => {},
+            onFileLoadProgress : () => {},
+            onImportStart : () => {},
+            onImportSuccess : (result) => {
+                assert.strictEqual (result.mainFile, 'single_triangle.stl');
+                assert.ok (!OV.IsModelEmpty (result.model));
+                done ();
+            },
+            onImportError : () => assert.fail ()
+        });
+    });
+
     it ('Multiple files', function (done) {
         let files = [
             new FileObject ('', 'obj/cube_with_materials.obj'),
