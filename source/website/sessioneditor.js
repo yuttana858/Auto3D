@@ -684,7 +684,7 @@ export class SessionEditor
 
     Archive (objects, kind, name)
     {
-        const data = PackSession (this.document, { camera : this.website.viewer.GetCamera (), backgroundPreset : this.website.settings.backgroundPreset, horizonGradient : this.website.settings.horizonGradient, showGroundGrid : this.website.settings.showGroundGrid, lighting : this.website.lightingPanel.Capture (), sceneEffects : this.website.sceneEffects?.Capture () }, objects, kind); data.name = name; return CreateSessionArchive (data);
+        const data = PackSession (this.document, { camera : this.website.viewer.GetCamera (), backgroundPreset : this.website.settings.backgroundPreset, horizonGradient : this.website.settings.horizonGradient, showGroundGrid : this.website.settings.showGroundGrid, lighting : this.website.lightingPanel.Capture () }, objects, kind); data.name = name; return CreateSessionArchive (data);
     }
     async OpenArchive (buffer, append, recovered = false)
     {
@@ -703,7 +703,6 @@ export class SessionEditor
             for (const key of ['horizonGradient', 'showGroundGrid']) { if (typeof saved.view[key] === 'boolean') { this.website.settings[key] = saved.view[key]; } }
             this.website.UpdateViewport ();
             if (saved.view.lighting) { await this.website.lightingPanel.Restore (saved.view.lighting); }
-            if (saved.view.sceneEffects) { this.website.sceneEffects?.Restore (saved.view.sceneEffects); this.website.lightingPanel?.SyncEffects (); }
         }
         if (!append && saved.view.camera) {
             const camera = this.website.viewer.GetCamera (); const data = saved.view.camera;
