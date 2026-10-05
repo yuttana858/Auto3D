@@ -79,3 +79,12 @@ Each session model has independent **Cast shadows** and **Receive shadows** cont
 Material-list hover identifies the material on the model and selecting a material flashes the surface white briefly. Material, current session, session-model, and Device Library names can be renamed from the UI. Shared Library names remain read-only until authenticated publishing identity is available.
 
 Ctrl/Cmd+Z uses the session-wide history stack for object operations plus the new material, naming, shadow, HDRI and reflection edits. Focused text fields retain native text undo.
+
+
+### v0.25.1 recovery and material-response hotfix
+
+- Recovery checkpoints are normalized from Blob, ArrayBuffer or typed-array browser storage forms and validated before Restore is enabled.
+- Invalid recovery records remain discardable instead of failing silently.
+- Global HDRI/model reflection now multiplies each material's Auto3D Reflective property instead of replacing it.
+- Roughness, metalness, specular, normal/bump, AO and assigned texture maps remain material-specific and continue to drive Three.js shading.
+- Texture-map card, texture-map selector and texture preview selection trigger the short white material-identification flash.
