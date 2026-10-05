@@ -1,7 +1,7 @@
 import * as assert from 'node:assert';
 import * as THREE from 'three';
 import { SceneDocument, SceneHistory } from '../../source/website/scenedocument.js';
-import { PackSession, ReadSession, CreateSessionArchive, OpenSessionArchive } from '../../source/website/sessionarchive.js';
+import { PackSession, ReadSession, CreateSessionArchive, OpenSessionArchive, MigrateSessionData, SessionVersion } from '../../source/website/sessionarchive.js';
 import { Model } from '../../source/engine/model/model.js';
 import { Node } from '../../source/engine/model/node.js';
 import { Mesh } from '../../source/engine/model/mesh.js';
@@ -46,6 +46,14 @@ export default function suite ()
             assert.deepEqual (reopened.document.objects[0].position, [2, 3, 4]); assert.equal (reopened.document.objects[0].visible, false); assert.equal (reopened.document.objects[0].playback.playing, false); assert.equal (reopened.document.objects[0].playback.time, 0.5);
             assert.deepEqual (new Uint8Array (reopened.document.objects[0].animationAsset.files[0].buffer), new Uint8Array ([1, 2, 255])); assert.deepEqual (new Uint8Array (reopened.document.model.materials[0].diffuseMap.buffer), new Uint8Array ([0, 128, 255])); assert.equal (reopened.document.model.materials[0].gltfMaterialIndex, 3); assert.equal (reopened.document.model.materials[0].bumpScale, 0.7);
             let importedIndex; reopened.document.model.root.Enumerate ((node) => { if (node.gltfNodeIndex !== undefined) { importedIndex = node.gltfNodeIndex; } }); assert.equal (importedIndex, 7);
+        });
+        it ('Writes the current schema and migrates v1 sessions forward', () => {
+            const scene = new SceneDocument (); scene.AddImported (Asset (), 'one');
+            const current = PackSession (scene); assert.equal (current.version, SessionVersion); assert.ok (current.metadata.savedAt);
+            const legacy = { ...current, version : 1 }; delete legacy.metadata;
+            const migrated = MigrateSessionData (legacy); assert.equal (migrated.version, SessionVersion); assert.equal (migrated.metadata.migratedFrom, 1);
+            assert.equal (ReadSession (legacy).document.objects.length, 1);
+            assert.throws (() => ReadSession ({ ...current, version : SessionVersion + 1 }), /newer application version/);
         });
         it ('Rejects corrupted references, repeated IDs and nonfinite transforms', () => {
             const scene = new SceneDocument (); scene.AddImported (Asset (), 'one'); scene.AddImported (Asset (), 'two'); const data = PackSession (scene);
