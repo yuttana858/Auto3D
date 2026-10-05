@@ -4,12 +4,21 @@ The `.auto3d` file is Auto3D's portable document contract. It is a ZIP archive c
 
 ## Compatibility policy
 
-- Current writer version: **3**.
+- Current writer version: **4**.
 - Readers must accept the current version and explicitly supported older versions.
-- Version 1 and version 2 sessions migrate in memory to version 3 before validation.
+- Version 1, version 2 and version 3 sessions migrate in memory to version 4 before validation.
 - A file created by a newer unsupported Auto3D version fails with a clear compatibility error; Auto3D does not guess at unknown schemas.
 - Migrations are sequential and must be covered by regression tests before the writer version changes.
 - Opening an older file does not rewrite it automatically. A user must explicitly save to create a new-version file.
+
+## Version 4
+
+Version 4 adds per-object shadow participation flags:
+
+- `castShadow`: whether the model can cast shadows.
+- `receiveShadow`: whether the model can receive shadows.
+
+Existing sessions default both values to `true` during migration.
 
 ## Version 3
 
