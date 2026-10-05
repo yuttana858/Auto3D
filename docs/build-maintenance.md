@@ -15,3 +15,10 @@ As of the October 2026 build refresh, the validated build/test toolchain is:
 - SVGO 3.3.5
 
 Runtime/rendering dependencies are reviewed separately from build tooling. Three.js upgrades must pass the full workspace, material, animation, import/export and session regression suite before merge.
+
+
+Runtime renderer baseline for Auto3D v0.21.1:
+
+- Three.js 0.186.1
+
+This renderer version passed the full Auto3D hardening gate (workspace, materials, animation, import/export, session, backend, engine/module and website builds).
