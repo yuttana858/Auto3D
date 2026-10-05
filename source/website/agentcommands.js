@@ -31,6 +31,7 @@ export function CreateAgentCommands (website)
     add ('object.delete', 'Delete object', 'Objects', 'Remove an object from this session. Recover with history.undo.', { objectId : text }, [], true, async (args) => { const item = object (args.objectId); editor.Select (item); await editor.Delete (); return { deletedId : item.id }; });
     add ('view.focus', 'Focus object', 'View', 'Frame an object in the viewport.', { objectId : text }, [], false, (args) => { editor.Select (object (args.objectId)); editor.Focus (); return { focusedId : editor.selected.id }; });
     add ('view.fit', 'Fit scene', 'View', 'Frame all visible objects.', {}, [], false, () => { website.FitModelToWindow (false); return { fitted : true }; });
+    add ('view.fullscreen', 'Set full screen', 'View', 'Enter or exit browser full-screen mode.', { enabled : boolean }, ['enabled'], false, async ({ enabled }) => ({ fullscreen : await website.SetFullscreen (enabled) }), { enabled : true });
     for (const [id, method] of [['history.undo', 'Undo'], ['history.redo', 'Redo']]) {
         add (id, method, 'History', 'Step through object edit history.', {}, [], true, async () => { await editor[method] (); return { undo : editor.history.undo.length, redo : editor.history.redo.length }; });
     }
