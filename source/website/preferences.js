@@ -24,6 +24,20 @@ export function DisplayLength (value, sourceUnit, system)
     return (value * factor).toLocaleString (undefined, { maximumFractionDigits : 2 }) + ' ' + DisplayUnitLabel (system);
 }
 
+export function DisplaySizeFromScale (baseSize, scale, sourceUnit, system)
+{
+    const factor = UnitFactor (sourceUnit, system);
+    return factor === null ? scale : baseSize * Math.abs (scale) * factor;
+}
+
+export function ScaleFromDisplaySize (baseSize, displayedSize, sourceUnit, system)
+{
+    const factor = UnitFactor (sourceUnit, system);
+    if (factor === null) { return displayedSize; }
+    if (baseSize <= 1e-12 || displayedSize <= 0) { return null; }
+    return displayedSize / (baseSize * factor);
+}
+
 export class Preferences
 {
     constructor (website)
