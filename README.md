@@ -79,3 +79,15 @@ Each session model has independent **Cast shadows** and **Receive shadows** cont
 Material-list hover identifies the material on the model and selecting a material flashes the surface white briefly. Material, current session, session-model, and Device Library names can be renamed from the UI. Shared Library names remain read-only until authenticated publishing identity is available.
 
 Ctrl/Cmd+Z uses the session-wide history stack for object operations plus the new material, naming, shadow, HDRI and reflection edits. Focused text fields retain native text undo.
+
+
+### v0.25.2 regression recovery and Library folders
+
+- Default environment uses a camera-centered, world-oriented dome so the horizon remains locked to the selected ground/up plane while orbiting.
+- Packaged 1K HDRI previews and thumbnails are authoritative. Supabase environment metadata can provide future high-resolution render assets, but an API/CDN outage cannot remove the built-in HDRI choices.
+- Recovery checkpoints are validated across Blob, ArrayBuffer and typed-array storage forms. Restore/Discard closes the recovery prompt on the first click, and a successfully restored checkpoint is consumed so it does not loop on the next reload.
+- Global reflection multiplies each material's Reflective setting. Roughness, metalness, specular, normal/bump, AO and texture maps remain material-specific.
+- Selecting an assigned texture card, texture-map selector entry, or texture preview flashes the affected material white briefly for visual identification.
+- Device Library now supports nested category/project folders, manual add/rename/delete folder operations, moving saved items between folders, individual delete, and multi-select bulk delete.
+- Deleting a folder preserves saved models by moving them to its parent folder or Uncategorized. Existing flat categories migrate automatically into the folder tree.
+- Save Session now offers existing nested folders plus a New category/project option.
