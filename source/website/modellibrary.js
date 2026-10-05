@@ -28,9 +28,13 @@ export class DeviceLibrary
         });
     }
 
-    async List () { const items = await this.Request ('readonly', (store) => store.getAll ()); return items.sort ((a, b) => b.updatedAt.localeCompare (a.updatedAt)); }
+    async List () { const items = await this.Request ('readonly', (store) => store.getAll ()); return items.filter ((item) => item.id !== '__auto3d_recovery__').sort ((a, b) => b.updatedAt.localeCompare (a.updatedAt)); }
     async Save (item) { return this.Request ('readwrite', (store) => store.put (item)); }
     async Get (id) { return this.Request ('readonly', (store) => store.get (id)); }
+    async Remove (id) { return this.Request ('readwrite', (store) => store.delete (id)); }
+    async SaveRecovery (archive, name) { return this.Save ({ id : '__auto3d_recovery__', name, updatedAt : new Date ().toISOString (), archive : new Blob ([archive], { type : 'application/octet-stream' }) }); }
+    async GetRecovery () { return this.Get ('__auto3d_recovery__'); }
+    async ClearRecovery () { return this.Remove ('__auto3d_recovery__'); }
 }
 
 export function WorkspaceDialog (title)
@@ -119,7 +123,10 @@ export class ModelLibrary
                     await this.deviceStorage.Save ({ id : crypto.randomUUID (), name : name.value.trim (), category : category.value, kind : kind.value, updatedAt : new Date ().toISOString (), thumbnail, objects : objects.length, archive : new Blob ([saved], { type : 'application/octet-stream' }) });
                     this.editor.Status ('Saved to device library: ' + name.value.trim ());
                 }
-                if (kind.value === 'session') { this.editor.document.name = name.value.trim (); this.editor.website.parameters.fileNameDiv.textContent = this.editor.document.name; }
+                if (kind.value === 'session') {
+                    this.editor.document.name = name.value.trim (); this.editor.website.parameters.fileNameDiv.textContent = this.editor.document.name;
+                    await this.editor.MarkClean ();
+                }
                 dialog.close ();
             } catch (error) {
                 status.textContent = error.name === 'AbortError' ? 'Save canceled. Choose a destination to try again.' : error.message;
