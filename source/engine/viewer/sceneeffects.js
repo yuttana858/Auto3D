@@ -85,6 +85,7 @@ export class SceneEffects
     Update ()
     {
         const scene = this.viewer.scene;
+        scene.userData.auto3dEnvironmentIntensity = this.settings.environmentIntensity;
         scene.environmentIntensity = this.settings.environmentIntensity;
         this.viewer.shadingModel.directionalLight.castShadow = this.settings.shadows;
         this.viewer.renderer.shadowMap.enabled = this.settings.shadows;
@@ -135,6 +136,10 @@ export class SceneEffects
         }
         const bounds = this.SceneBounds ();
         if (!bounds) { return; }
+        // Restore the latest HDRI/baseline environment before capturing the
+        // scene so changing HDRI while model reflections are enabled does not
+        // leave stale reflection state behind.
+        this.RestoreMaterialReflections ();
         this.EnsureCubeCamera ();
         this.cubeCamera.visible = false;
         this.floorReflector && (this.floorReflector.visible = false);
@@ -180,8 +185,9 @@ export class SceneEffects
     {
         if (!this.floorReflector) { return; }
         this.viewer.scene.remove (this.floorReflector);
-        this.floorReflector.dispose ();
+        this.floorReflector.getRenderTarget?.().dispose ();
         this.floorReflector.geometry.dispose ();
+        this.floorReflector.material?.dispose?. ();
         this.floorReflector = null;
     }
 
