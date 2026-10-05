@@ -38,11 +38,13 @@ export class HDRILighting
         this.viewer = viewer;
         this.texture = null;
         this.target = null;
+        if (!this.enabled) { this.ApplyMaterialEnvironment (false); }
         this.enabled = false;
         this.request = 0;
         this.brightness = 1;
         this.showBackground = false;
         this.rotation = new THREE.Euler ();
+        this.materialState = new Map ();
         this.probe = new THREE.LightProbe ();
         this.probe.intensity = 0;
         viewer.scene.add (this.probe);
@@ -96,6 +98,39 @@ export class HDRILighting
         this.Update ();
     }
 
+    ApplyMaterialEnvironment (active)
+    {
+        this.viewer.scene.traverse ((object) => {
+            if (!object.isMesh || !object.material) { return; }
+            const materials = Array.isArray (object.material) ? object.material : [object.material];
+            for (const material of materials) {
+                if (!material?.isMeshPhongMaterial) { continue; }
+                if (!this.materialState.has (material)) {
+                    this.materialState.set (material, {
+                        envMap : material.envMap || null,
+                        envMapIntensity : material.envMapIntensity,
+                        envMapRotation : material.envMapRotation?.clone ? material.envMapRotation.clone () : null
+                    });
+                }
+                const previous = this.materialState.get (material);
+                if (active) {
+                    const changed = material.envMap !== this.texture;
+                    material.envMap = this.texture;
+                    material.envMapIntensity = this.brightness;
+                    if (material.envMapRotation?.copy) { material.envMapRotation.copy (this.rotation); }
+                    if (changed) { material.needsUpdate = true; }
+                } else {
+                    const changed = material.envMap !== previous.envMap;
+                    material.envMap = previous.envMap;
+                    if (Number.isFinite (previous.envMapIntensity)) { material.envMapIntensity = previous.envMapIntensity; }
+                    if (previous.envMapRotation && material.envMapRotation?.copy) { material.envMapRotation.copy (previous.envMapRotation); }
+                    if (changed) { material.needsUpdate = true; }
+                    this.materialState.delete (material);
+                }
+            }
+        });
+    }
+
     Update ()
     {
         const shading = this.viewer.shadingModel;
@@ -103,6 +138,7 @@ export class HDRILighting
         shading.hdriEnvironment = active ? this.target.texture : null;
         shading.hdriBackground = active && this.showBackground ? this.texture : null;
         this.probe.intensity = active ? this.brightness : 0;
+        this.ApplyMaterialEnvironment (active);
         if (active) {
             this.probe.sh.copy (ProjectHDRI (this.texture.image, this.rotation));
         }
