@@ -2,6 +2,18 @@ import { LibraryCategories } from './sessionarchive.js';
 import { CloudLibrary } from './cloudlibrary.js';
 import { EnablePopupFade } from './popuptransition.js';
 
+export async function RecoveryArchiveBuffer (archive)
+{
+    if (archive instanceof ArrayBuffer) { return archive.slice (0); }
+    if (ArrayBuffer.isView (archive)) {
+        return archive.buffer.slice (archive.byteOffset, archive.byteOffset + archive.byteLength);
+    }
+    if (archive instanceof Blob || typeof archive?.arrayBuffer === 'function') {
+        return await archive.arrayBuffer ();
+    }
+    throw new Error ('Recovery checkpoint data is unavailable.');
+}
+
 export class DeviceLibrary
 {
     async Database ()
@@ -33,7 +45,13 @@ export class DeviceLibrary
     async Get (id) { return this.Request ('readonly', (store) => store.get (id)); }
     async Remove (id) { return this.Request ('readwrite', (store) => store.delete (id)); }
     async SaveRecovery (archive, name) { return this.Save ({ id : '__auto3d_recovery__', name, updatedAt : new Date ().toISOString (), archive : new Blob ([archive], { type : 'application/octet-stream' }) }); }
-    async GetRecovery () { return this.Get ('__auto3d_recovery__'); }
+    async GetRecovery ()
+    {
+        const recovery = await this.Get ('__auto3d_recovery__');
+        if (!recovery) { return null; }
+        const buffer = await RecoveryArchiveBuffer (recovery.archive);
+        return { ...recovery, archive : new Blob ([buffer], { type : 'application/octet-stream' }) };
+    }
     async ClearRecovery () { return this.Remove ('__auto3d_recovery__'); }
 }
 
