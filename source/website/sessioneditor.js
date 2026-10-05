@@ -58,6 +58,11 @@ export class SessionEditor
         headerLibrary.title = 'Saved models and sessions'; headerLibrary.setAttribute ('aria-label', 'Library');
         headerLibrary.innerHTML = '<svg viewBox="0 0 26 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6">' + Icons.library + '</svg><span>Library</span>';
         headerLibrary.addEventListener ('click', () => this.library.Open ());
+        const headerExport = Element ('button', 'header_library_button header_export_button', undefined, document.getElementById ('header_buttons'));
+        headerExport.title = 'Export current session'; headerExport.setAttribute ('aria-label', 'Export');
+        headerExport.innerHTML = '<svg viewBox="0 0 26 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6">' + Icons.export + '</svg><span>Export</span>';
+        headerExport.addEventListener ('click', () => this.Export ());
+        this.headerExport = headerExport;
         const query = new URLSearchParams (window.location.search);
         this.shareId = query.get ('share');
         this.shareToken = query.get ('view');
@@ -379,6 +384,7 @@ export class SessionEditor
             button.disabled = this.busy || (this.readOnly && !['select', 'focus'].includes (key)) || (['move', 'rotate', 'scale', 'duplicate', 'visible', 'remove', 'focus', 'update'].includes (key) && !this.selected) || (key === 'export' && !this.document.objects.length) || (key === 'undo' && !this.history.undo.length) || (key === 'redo' && !this.history.redo.length);
             if (['select', 'move', 'rotate', 'scale'].includes (key)) { button.setAttribute ('aria-pressed', String ((key === 'move' ? 'translate' : key) === this.mode)); }
         }
+        if (this.headerExport) { this.headerExport.disabled = this.busy || this.readOnly || !this.document.objects.length; }
     }
     RefreshUI ()
     {
