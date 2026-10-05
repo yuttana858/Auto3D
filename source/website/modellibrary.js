@@ -549,7 +549,6 @@ export class ModelLibrary
         });
         renameFolder.addEventListener ('click', async () => {
             if (this.category === 'All sessions' || this.category === 'Uncategorized') { return; }
-            const parent = LibraryPathParent (this.category);
             const value = window.prompt ('Rename category/project', this.category);
             if (value === null) { return; }
             try { this.category = await this.deviceStorage.RenameFolder (this.category, value); folders = await this.deviceStorage.Folders (); renderCategories (); render (); }
