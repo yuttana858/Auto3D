@@ -167,38 +167,65 @@ export class MaterialPanel
     CaptureMaterialState (entry)
     {
         const material = entry.material;
+        const original = entry.original;
         return {
-            color : material.color?.getHexString?.() || null,
-            emissive : material.emissive?.getHexString?.() || null,
-            emissiveIntensity : material.emissiveIntensity,
-            opacity : material.opacity,
-            transparent : material.transparent,
-            roughness : material.roughness,
-            metalness : material.metalness,
-            specularIntensity : material.specularIntensity,
-            specular : material.specular?.getHexString?.() || null,
-            shininess : material.shininess,
-            bumpScale : material.bumpScale,
-            normalScale : material.normalScale?.x,
-            aoMapIntensity : material.aoMapIntensity,
-            displacementScale : material.displacementScale,
-            side : material.side
+            material : {
+                color : material.color?.getHexString?.() || null,
+                emissive : material.emissive?.getHexString?.() || null,
+                emissiveIntensity : material.emissiveIntensity,
+                opacity : material.opacity,
+                transparent : material.transparent,
+                roughness : material.roughness,
+                metalness : material.metalness,
+                specularIntensity : material.specularIntensity,
+                specular : material.specular?.getHexString?.() || null,
+                shininess : material.shininess,
+                bumpScale : material.bumpScale,
+                normalScale : material.normalScale?.x,
+                aoMapIntensity : material.aoMapIntensity,
+                displacementScale : material.displacementScale,
+                side : material.side
+            },
+            original : {
+                color : original.color ? { r : original.color.r, g : original.color.g, b : original.color.b } : null,
+                opacity : original.opacity,
+                transparent : original.transparent,
+                roughness : original.roughness,
+                metalness : original.metalness,
+                specularIntensity : original.specularIntensity,
+                specular : original.specular ? { r : original.specular.r, g : original.specular.g, b : original.specular.b } : null,
+                shininess : original.shininess,
+                bumpScale : original.bumpScale,
+                normalScale : original.normalScale,
+                aoIntensity : original.aoIntensity,
+                displacementScale : original.displacementScale,
+                doubleSided : original.doubleSided,
+                multiplyDiffuseMap : original.multiplyDiffuseMap
+            }
         };
     }
 
     RestoreMaterialState (entry, state)
     {
         const material = entry.material;
-        if (state.color !== null && material.color) { material.color.set ('#' + state.color); entry.original.color = HexStringToRGBColor (state.color); }
-        if (state.emissive !== null && material.emissive) { material.emissive.set ('#' + state.emissive); }
+        const m = state.material;
+        if (m.color !== null && material.color) { material.color.set ('#' + m.color); }
+        if (m.emissive !== null && material.emissive) { material.emissive.set ('#' + m.emissive); }
         for (const key of ['emissiveIntensity', 'opacity', 'roughness', 'metalness', 'specularIntensity', 'shininess', 'bumpScale', 'aoMapIntensity', 'displacementScale', 'side']) {
-            if (state[key] !== undefined) { material[key] = state[key]; }
+            if (m[key] !== undefined) { material[key] = m[key]; }
         }
-        if (state.specular !== null && material.specular) { material.specular.set ('#' + state.specular); }
-        if (state.normalScale !== undefined && material.normalScale) { material.normalScale.setScalar (state.normalScale); }
-        material.transparent = state.transparent;
+        if (m.specular !== null && material.specular) { material.specular.set ('#' + m.specular); }
+        if (m.normalScale !== undefined && material.normalScale) { material.normalScale.setScalar (m.normalScale); }
+        material.transparent = m.transparent;
+        const original = state.original;
+        if (original.color && entry.original.color) { Object.assign (entry.original.color, original.color); }
+        for (const key of ['opacity', 'transparent', 'roughness', 'metalness', 'specularIntensity', 'shininess', 'bumpScale', 'normalScale', 'aoIntensity', 'displacementScale', 'doubleSided', 'multiplyDiffuseMap']) {
+            if (original[key] !== undefined) { entry.original[key] = original[key]; }
+        }
+        if (original.specular && entry.original.specular) { Object.assign (entry.original.specular, original.specular); }
         material.needsUpdate = true;
         this.ShowSummary (); if (this.open) { this.FillDrawer (); } this.website.viewer.Render ();
+        this.website.sessionEditor?.MarkDirty ();
     }
 
     Emphasize (entry, strength = 0.35)
