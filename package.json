@@ -1,11 +1,11 @@
 {
 	"name": "online-3d-viewer",
-	"version": "0.20.2",
+	"version": "0.20.3",
 	"description": "Auto3D browser-based 3D model viewer",
 	"license": "MIT",
 	"type": "module",
 	"main": "./build/engine/o3dv.module.js",
-	"repository": "github:kovacsv/Online3DViewer",
+	"repository": "github:yuttana858/Auto3D",
 	"keywords": [
 		"3d",
 		"viewer",

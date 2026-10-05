@@ -4,7 +4,7 @@ Auto3D is a branded, self-hostable browser 3D viewer based on [Online3DViewer](h
 
 ## Run locally
 
-Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.20.1**.
+Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.20.3**.
 
 ## Prototype hosting
 
@@ -28,9 +28,11 @@ GLB/glTF models with embedded clips have independent Play/Pause, clip selection,
 
 The top-right **Library** button opens shared models and device saves, with categories Primary products, Retail shelf, Pallets and Accessories. Cards include thumbnails: **Open** replaces the workspace; **Add** appends its objects; **Share** creates a persistent viewer link for a shared save. Shared views hide editing controls and retain orbit navigation, model selection and animation playback. Device saves remain in IndexedDB and are never uploaded automatically.
 
-The shared library connects to Supabase project `iesepcoxqochycckbwoh`. Browsing is public. Publishing requires a signed-in Supabase Authentication user; create a publisher account in the project dashboard, then use **Publisher sign-in** in the library. The password is submitted directly to Supabase and is never stored by this application. Session tokens last for this browser tab. Shared saves have a 64 MB upload limit. Rows and files are immutable to visitors and publishers; editing a model and saving creates a new entry. Storage is a private bucket with RLS allowing reads only for published entries. The browser configuration contains only a publishable key. The migration is recorded under `supabase/migrations`.
+The shared library currently reads published prototype content from Supabase project `iesepcoxqochycckbwoh`. Browser-side publisher authentication and direct publishing have been removed as part of the corporate identity migration. Shared browsing and view-only links remain available; Device library and portable `.auto3d` files remain fully supported.
 
-No user models are included in the static site. Saving to **Shared library** explicitly publishes the chosen session or model to all prototype visitors. A view-only link hides editing controls; recipients still receive the model data required to render it.
+Corporate publishing will be reintroduced through a backend API protected by Microsoft Entra ID. The browser will depend on the Auto3D Library API rather than Supabase-specific authentication or database operations so the service can migrate to Azure Database for PostgreSQL and Azure Blob Storage without rewriting the editor. The target architecture and migration goal are documented in `docs/backend-architecture.md` and `GOAL.md`. Database migrations are recorded under `supabase/migrations`.
+
+No user models are included in the static site. Shared-library publishing is temporarily disabled during the corporate identity migration. A view-only link hides editing controls; recipients still receive the model data required to render it.
 
 Preferences offers Light/Dark appearance, Metric (mm) or Standard (in) dimensions, and About. Models with no declared length unit display model units. GLB/glTF coordinates use meters. Unit preferences change dimension labels, not geometry.
 

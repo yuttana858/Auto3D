@@ -1,0 +1,122 @@
+openapi: 3.0.3
+info:
+  title: Auto3D Library API
+  version: 1.0.0
+  description: Provider-neutral backend contract for Auto3D shared library operations.
+servers:
+  - url: /api
+paths:
+  /library/items:
+    get:
+      summary: List visible library items
+      responses:
+        '200':
+          description: Library items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LibraryItem'
+    post:
+      summary: Publish a new immutable library item
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [id, name, category, kind, objectCount, archive, thumbnail]
+              properties:
+                id: { type: string, format: uuid }
+                name: { type: string, minLength: 1, maxLength: 100 }
+                category: { type: string }
+                kind: { type: string, enum: [model, session] }
+                objectCount: { type: integer, minimum: 1, maximum: 1000 }
+                archive:
+                  type: string
+                  format: binary
+                thumbnail:
+                  type: string
+                  format: binary
+      responses:
+        '201': { description: Published }
+        '401': { description: Authentication required }
+        '403': { description: Publisher role required }
+  /library/items/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Get library item metadata
+      responses:
+        '200':
+          description: Library item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryItem'
+        '404': { description: Not found }
+    delete:
+      summary: Archive or delete a library item according to retention policy
+      security:
+        - bearerAuth: []
+      responses:
+        '204': { description: Removed }
+        '401': { description: Authentication required }
+        '403': { description: Admin or publisher role required }
+  /library/items/{id}/archive:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Download an Auto3D archive
+      responses:
+        '200':
+          description: Portable Auto3D archive
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '404': { description: Not found }
+  /library/items/{id}/thumbnail:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Download the item thumbnail
+      responses:
+        '200':
+          description: PNG thumbnail
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+        '404': { description: Not found }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    LibraryItem:
+      type: object
+      required: [id, name, category, kind, objectCount, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        category: { type: string }
+        kind: { type: string, enum: [model, session] }
+        objectCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+        createdBy: { type: string, nullable: true }
+        version: { type: integer, minimum: 1, default: 1 }
+        supersedesId: { type: string, format: uuid, nullable: true }
+        status: { type: string, enum: [published, archived], default: published }

@@ -60,28 +60,6 @@ export class ModelLibrary
         this.category = 'All sessions';
     }
 
-    SignInDialog (onSuccess)
-    {
-        const dialog = WorkspaceDialog ('Publisher sign-in');
-        const form = document.createElement ('form'); form.className = 'workspace_save_form';
-        const hint = document.createElement ('p'); hint.className = 'section_hint'; hint.textContent = 'Use a publisher account from this project’s Supabase Authentication users. Everyone can browse the library; sign-in is required to publish.';
-        const email = document.createElement ('input'); email.type = 'email'; email.required = true; email.autocomplete = 'username'; email.placeholder = 'Email'; email.setAttribute ('aria-label', 'Publisher email');
-        const password = document.createElement ('input'); password.type = 'password'; password.required = true; password.autocomplete = 'current-password'; password.placeholder = 'Password'; password.setAttribute ('aria-label', 'Publisher password');
-        const revealLabel = document.createElement ('label'); revealLabel.className = 'password_visibility';
-        const reveal = document.createElement ('input'); reveal.type = 'checkbox';
-        reveal.addEventListener ('change', () => { password.type = reveal.checked ? 'text' : 'password'; });
-        revealLabel.append (reveal, document.createTextNode ('Show password'));
-        const status = document.createElement ('p'); status.setAttribute ('role', 'status');
-        const submit = document.createElement ('button'); submit.type = 'submit'; submit.className = 'workspace_primary'; submit.textContent = 'Sign in';
-        form.append (hint, email, password, revealLabel, status, submit);
-        form.addEventListener ('submit', async (event) => {
-            event.preventDefault (); submit.disabled = true;
-            try { await this.sharedStorage.SignIn (email.value.trim (), password.value); password.value = ''; dialog.close (); if (onSuccess) { onSuccess (); } }
-            catch (error) { status.textContent = error.message; password.value = ''; submit.disabled = false; }
-        });
-        dialog.appendChild (form);
-    }
-
     SaveDialog (download = false)
     {
         if (this.editor.readOnly) { return; }
@@ -100,17 +78,16 @@ export class ModelLibrary
         if (!download && this.editor.selected) { kind.add (new Option ('Selected model', 'model')); }
         kindLabel.appendChild (kind);
         const destinationLabel = document.createElement ('label'); destinationLabel.textContent = 'Destination';
-        const destination = document.createElement ('select'); destination.setAttribute ('aria-label', 'Save destination'); destination.add (new Option ('Shared library', 'shared')); destination.add (new Option ('Device library (this browser)', 'device')); destination.add (new Option ('File on disk (.auto3d)', 'file')); destinationLabel.appendChild (destination);
-        destination.value = download ? 'file' : this.storage === this.sharedStorage ? 'shared' : 'device';
+        const destination = document.createElement ('select'); destination.setAttribute ('aria-label', 'Save destination'); destination.add (new Option ('Shared library (publishing disabled)', 'shared')); destination.add (new Option ('Device library (this browser)', 'device')); destination.add (new Option ('File on disk (.auto3d)', 'file')); destinationLabel.appendChild (destination);
+        destination.value = download ? 'file' : 'device';
         const hint = document.createElement ('p'); hint.className = 'section_hint';
         const updateHint = () => {
-            hint.textContent = destination.value === 'file' ? (typeof window.showSaveFilePicker === 'function' ? 'Choose a folder and filename for a portable .auto3d session with materials, textures and your view.' : 'Download a portable .auto3d session. Your browser chooses the folder; enable “Ask where to save each file” in browser settings to choose a location.') : destination.value === 'shared' ? 'Shared saves are visible to anyone visiting this prototype. Sign-in required to publish. Maximum 64 MB.' : 'Stored in this browser on this device, not in a folder. Clearing site data removes these saves. Choose File on disk for a portable copy.';
-            submit.textContent = destination.value === 'file' ? 'Save session file' : 'Save to library';
+            hint.textContent = destination.value === 'file' ? (typeof window.showSaveFilePicker === 'function' ? 'Choose a folder and filename for a portable .auto3d session with materials, textures and your view.' : 'Download a portable .auto3d session. Your browser chooses the folder; enable “Ask where to save each file” in browser settings to choose a location.') : destination.value === 'shared' ? 'Corporate publishing is temporarily disabled while Auto3D moves to backend-managed identity. Use Device library or File on disk.' : 'Stored in this browser on this device, not in a folder. Clearing site data removes these saves. Choose File on disk for a portable copy.';
+            submit.textContent = destination.value === 'file' ? 'Save session file' : destination.value === 'shared' ? 'Publishing unavailable' : 'Save to library'; submit.disabled = !this.editor.document.objects.length || destination.value === 'shared';
         };
         const status = document.createElement ('p'); status.className = 'section_hint'; status.setAttribute ('role', 'status');
         const submit = document.createElement ('button'); submit.className = 'workspace_primary'; submit.type = 'submit';
         destination.addEventListener ('change', updateHint); updateHint ();
-        submit.disabled = !this.editor.document.objects.length;
         const open = document.createElement ('button'); open.type = 'button'; open.textContent = 'Open session file';
         open.addEventListener ('click', () => { dialog.close (); this.editor.OpenSessionFile (); });
         form.append (nameLabel, categoryLabel, kindLabel);
@@ -118,8 +95,7 @@ export class ModelLibrary
         form.append (hint, status, submit);
         if (download) { form.appendChild (open); }
         form.addEventListener ('submit', async (event) => {
-            event.preventDefault (); if (!name.value.trim ()) { return; }
-            if (destination.value === 'shared' && !this.sharedStorage.session) { this.SignInDialog (() => { status.textContent = 'Signed in. Press Save to library to publish.'; }); return; }
+            event.preventDefault (); if (!name.value.trim () || destination.value === 'shared') { return; }
             submit.disabled = true; status.textContent = 'Preparing session…';
             try {
                 let fileHandle = null;
@@ -140,13 +116,15 @@ export class ModelLibrary
                     }
                 } else {
                     const thumbnail = this.editor.Thumbnail (objects);
-                    const storage = destination.value === 'shared' ? this.sharedStorage : this.deviceStorage;
-                    await storage.Save ({ id : crypto.randomUUID (), name : name.value.trim (), category : category.value, kind : kind.value, updatedAt : new Date ().toISOString (), thumbnail, objects : objects.length, archive : new Blob ([saved], { type : 'application/octet-stream' }) });
-                    this.editor.Status ('Saved to ' + destination.value + ' library: ' + name.value.trim ());
+                    await this.deviceStorage.Save ({ id : crypto.randomUUID (), name : name.value.trim (), category : category.value, kind : kind.value, updatedAt : new Date ().toISOString (), thumbnail, objects : objects.length, archive : new Blob ([saved], { type : 'application/octet-stream' }) });
+                    this.editor.Status ('Saved to device library: ' + name.value.trim ());
                 }
                 if (kind.value === 'session') { this.editor.document.name = name.value.trim (); this.editor.website.parameters.fileNameDiv.textContent = this.editor.document.name; }
                 dialog.close ();
-            } catch (error) { status.textContent = error.name === 'AbortError' ? 'Save canceled. Choose a destination to try again.' : error.message; submit.disabled = false; }
+            } catch (error) {
+                status.textContent = error.name === 'AbortError' ? 'Save canceled. Choose a destination to try again.' : error.message;
+                submit.disabled = false;
+            }
         });
         dialog.appendChild (form);
     }
@@ -158,12 +136,6 @@ export class ModelLibrary
         const hint = document.createElement ('p'); hint.className = 'library_connection';
         dialog.appendChild (hint);
         const tabs = document.createElement ('div'); tabs.className = 'library_source_tabs'; dialog.appendChild (tabs);
-        const signIn = document.createElement ('button'); signIn.textContent = this.sharedStorage.session ? 'Sign out' : 'Publisher sign-in';
-        signIn.addEventListener ('click', async () => {
-            if (this.sharedStorage.session) {
-                try { await this.sharedStorage.SignOut (); signIn.textContent = 'Publisher sign-in'; } catch (error) { status.textContent = error.message; }
-            } else { this.SignInDialog (() => { signIn.textContent = 'Sign out'; }); }
-        });
         const shell = document.createElement ('div'); shell.className = 'library_shell';
         const categories = document.createElement ('nav'); categories.className = 'library_categories'; categories.setAttribute ('aria-label', 'Library categories');
         const body = document.createElement ('div'); body.className = 'library_body';
@@ -227,15 +199,14 @@ export class ModelLibrary
         let loadGeneration = 0;
         const load = async () => {
             const request = ++loadGeneration; generation++; clearUrls (); grid.replaceChildren (); status.textContent = 'Loading saved models…';
-            hint.textContent = this.storage === this.sharedStorage ? 'Shared library · Public viewing · Publisher sign-in to save' : 'Device library · Saved only in this browser';
+            hint.textContent = this.storage === this.sharedStorage ? 'Shared library · Read-only during corporate identity migration' : 'Device library · Saved only in this browser';
             try { const saved = await this.storage.List (); if (request === loadGeneration && dialog.isConnected) { items = saved; render (); } }
             catch (error) { if (request === loadGeneration) { status.textContent = error.message; } }
         };
         for (const [label, storage] of [['Shared library', this.sharedStorage], ['Device library', this.deviceStorage]]) {
             const button = document.createElement ('button'); button.textContent = label; button.setAttribute ('aria-pressed', String (this.storage === storage));
-            button.addEventListener ('click', () => { this.storage = storage; Array.from (tabs.children).filter ((other) => other !== signIn).forEach ((other) => { other.setAttribute ('aria-pressed', String (other === button)); }); load (); }); tabs.appendChild (button);
+            button.addEventListener ('click', () => { this.storage = storage; Array.from (tabs.children).forEach ((other) => { other.setAttribute ('aria-pressed', String (other === button)); }); load (); }); tabs.appendChild (button);
         }
-        tabs.appendChild (signIn);
         await load ();
     }
 }
