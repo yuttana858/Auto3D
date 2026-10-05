@@ -16,7 +16,7 @@ export async function RecoveryArchiveBuffer (archive)
 
 export function NormalizeLibraryPath (value)
 {
-    const segments = String (value || '').split ('/').map ((segment) => segment.trim ().replace (/[<>:"\\|?*]+/g, ' ').replace (/\s+/g, ' ').slice (0, 60)).filter (Boolean);
+    const segments = String (value || '').split ('/').map ((segment) => segment.trim ().replace (/[<>:"\\|?*]+/g, ' ').replace (/\s+/g, ' ').trim ().slice (0, 60)).filter (Boolean);
     return segments.slice (0, 8).join ('/');
 }
 
@@ -42,6 +42,20 @@ export function RenameLibraryPath (path, previous, next)
     if (value === oldPath) { return newPath; }
     if (value.startsWith (oldPath + '/')) { return newPath + value.slice (oldPath.length); }
     return value;
+}
+
+export function ExpandLibraryPaths (paths)
+{
+    const expanded = new Set ();
+    for (const value of paths || []) {
+        let current = NormalizeLibraryPath (value);
+        while (current) {
+            expanded.add (current);
+            current = LibraryPathParent (current);
+        }
+    }
+    expanded.add ('Uncategorized');
+    return Array.from (expanded).sort ((a, b) => a.localeCompare (b, undefined, { numeric : true, sensitivity : 'base' }));
 }
 
 export class DeviceLibrary
@@ -111,9 +125,8 @@ export class DeviceLibrary
 
     async SaveFolders (paths)
     {
-        const normalized = new Set ((paths || []).map (NormalizeLibraryPath).filter (Boolean));
-        normalized.add ('Uncategorized');
-        await this.Save ({ id : '__auto3d_folders__', paths : Array.from (normalized).sort (), updatedAt : new Date ().toISOString () });
+        const normalized = ExpandLibraryPaths (paths);
+        await this.Save ({ id : '__auto3d_folders__', paths : normalized, updatedAt : new Date ().toISOString () });
         return this.Folders ();
     }
 
@@ -144,7 +157,7 @@ export class DeviceLibrary
             item.category = RenameLibraryPath (item.category, oldPath, newPath);
             item.updatedAt = new Date ().toISOString ();
         }
-        await this.WriteBatch ([...changed, { id : '__auto3d_folders__', paths : Array.from (new Set (renamedFolders)).sort (), updatedAt : new Date ().toISOString () }]);
+        await this.WriteBatch ([...changed, { id : '__auto3d_folders__', paths : ExpandLibraryPaths (renamedFolders), updatedAt : new Date ().toISOString () }]);
         return newPath;
     }
 
@@ -164,7 +177,7 @@ export class DeviceLibrary
             item.category = destination;
             item.updatedAt = new Date ().toISOString ();
         }
-        await this.WriteBatch ([...changed, { id : '__auto3d_folders__', paths : Array.from (new Set (remaining)).sort (), updatedAt : new Date ().toISOString () }]);
+        await this.WriteBatch ([...changed, { id : '__auto3d_folders__', paths : ExpandLibraryPaths (remaining), updatedAt : new Date ().toISOString () }]);
         return destination;
     }
 
