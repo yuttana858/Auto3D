@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { HDRILighting, ProjectHDRI } from '../../source/engine/viewer/hdrilighting.js';
 import { ShadingModel } from '../../source/engine/viewer/shadingmodel.js';
 import { ShadingType } from '../../source/engine/threejs/threeutils.js';
-import { GetMaterialEntries, EnumerateUVTriangles } from '../../source/website/materialpanel.js';
+import { MaterialPanel, GetMaterialEntries, EnumerateUVTriangles } from '../../source/website/materialpanel.js';
 import { GetWorldAxisDirections } from '../../source/website/axisindicator.js';
 import { GetBackgroundPreset } from '../../source/engine/viewer/background.js';
 import { GetBoxUVTriangle, GenerateMissingBoxUVs } from '../../source/website/materialuv.js';
@@ -15,6 +15,7 @@ import { Viewer } from '../../source/engine/viewer/viewer.js';
 import { Direction } from '../../source/engine/geometry/geometry.js';
 import { Navigation } from '../../source/engine/viewer/navigation.js';
 import { SceneEffects } from '../../source/engine/viewer/sceneeffects.js';
+import { MaterialReflectionStrength, SetMaterialReflectionStrength } from '../../source/engine/viewer/materialreflection.js';
 
 export default function suite ()
 {
@@ -251,6 +252,71 @@ export default function suite ()
             assert.ok (newer.disposed ());
             assert.equal (lighting.texture, null);
             assert.equal (lighting.enabled, false);
+        });
+
+        it ('Multiplies realtime reflection by the material Reflective property without replacing texture maps', () => {
+            const scene = new THREE.Scene ();
+            const root = new THREE.Group ();
+            const material = new THREE.MeshPhysicalMaterial ({ roughness : 0.35, metalness : 0.7 });
+            const roughnessMap = new THREE.Texture (); const metalnessMap = new THREE.Texture (); const normalMap = new THREE.Texture ();
+            material.roughnessMap = roughnessMap; material.metalnessMap = metalnessMap; material.normalMap = normalMap;
+            SetMaterialReflectionStrength (material, 0.4);
+            const mesh = new THREE.Mesh (new THREE.BoxGeometry (1, 1, 1), material); root.add (mesh); scene.add (root);
+            const light = new THREE.DirectionalLight (); scene.add (light);
+            const viewer = {
+                scene,
+                renderer : { shadowMap : { enabled : false, type : null }, render : () => {} },
+                shadingModel : { directionalLight : light, hdriEnvironment : null, UpdateShading : () => {} },
+                mainModel : { mainModel : { GetRootObject : () => root } },
+                upVector : { direction : Direction.Y, isFlipped : false },
+                canvas : { width : 800, height : 600 },
+                Render : () => {}
+            };
+            const effects = new SceneEffects (viewer);
+            effects.settings.modelReflections = true;
+            effects.settings.modelReflectionIntensity = 0.5;
+            effects.cubeTarget = { texture : new THREE.Texture (), dispose : () => {} };
+            effects.cubeCamera = { visible : true, position : new THREE.Vector3 (), update : () => {} };
+            effects.UpdateDynamicReflection ();
+            assert.equal (material.envMapIntensity, 0.2);
+            assert.equal (material.roughnessMap, roughnessMap);
+            assert.equal (material.metalnessMap, metalnessMap);
+            assert.equal (material.normalMap, normalMap);
+            SetMaterialReflectionStrength (material, 0.8);
+            effects.SyncMaterialProperties ();
+            assert.equal (material.envMapIntensity, 0.4);
+            effects.RestoreMaterialReflections ();
+            effects.Dispose ();
+        });
+
+        it ('Applies the material Reflective multiplier to Phong HDRI environment response', () => {
+            const viewer = MakeViewer ();
+            const material = new THREE.MeshPhongMaterial ({ specular : 0xffffff });
+            SetMaterialReflectionStrength (material, 0.25);
+            const mesh = new THREE.Mesh (new THREE.BoxGeometry (1, 1, 1), material); viewer.scene.add (mesh);
+            const lighting = new HDRILighting (viewer);
+            lighting.texture = new THREE.DataTexture (new Float32Array (8 * 8 * 4).fill (1), 8, 8, THREE.RGBAFormat, THREE.FloatType);
+            lighting.target = { texture : new THREE.Texture (), dispose : () => {} };
+            lighting.enabled = true;
+            lighting.Adjust (0.8, 0, 0);
+            assert.equal (MaterialReflectionStrength (material), 0.25);
+            assert.equal (material.envMapIntensity, 0.2);
+            lighting.SetDefault ();
+        });
+
+        it ('Flashes a selected material or texture white and restores its emissive state', async () => {
+            const material = new THREE.MeshPhysicalMaterial ();
+            material.emissive.set (0x112233); material.emissiveIntensity = 0.18;
+            const panel = Object.create (MaterialPanel.prototype);
+            panel.emphasisState = new Map (); panel.flashTimers = new Map ();
+            panel.website = { viewer : { Render : () => {} } };
+            const entry = { material };
+            panel.Flash (entry);
+            assert.equal (material.emissive.getHex (), 0xffffff);
+            assert.equal (material.emissiveIntensity, 1);
+            await new Promise ((resolve) => setTimeout (resolve, 220));
+            assert.equal (material.emissive.getHex (), 0x112233);
+            assert.equal (material.emissiveIntensity, 0.18);
         });
 
         it ('Keeps per-model shadow flags stable while the global shadow renderer toggles', () => {
