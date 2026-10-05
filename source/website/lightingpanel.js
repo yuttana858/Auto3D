@@ -25,7 +25,7 @@ export class LightingPanel
         this.root = document.getElementById ('lighting_section');
         this.root.innerHTML = `<summary>Lighting</summary><div class="section_content">
             <div class="mode_buttons"><button id="lighting_default" aria-pressed="true">Default environment</button><button id="lighting_hdri" aria-pressed="false">HDRI</button></div>
-            <div id="default_background_options"><p class="section_hint">Background</p><div class="background_gallery"></div><p class="section_hint">Standard follows the app theme.</p></div>
+            <div id="default_background_options"><p class="section_hint">World-locked dome background</p><div class="background_gallery"></div><p class="section_hint">Standard follows the app theme.</p></div>
             <div id="hdri_options" hidden><p class="section_hint">Choose a surrounding light environment.</p><div class="hdri_gallery"></div>
             <div class="lighting_viewport_controls"><label><input type="checkbox" id="hdri_background"> Show HDRI background</label></div>
             <label class="slider_label" for="hdri_brightness">Brightness <output id="hdri_brightness_value">1.00×</output></label><input id="hdri_brightness" type="range" min="0" max="3" step="0.05" value="1">
@@ -33,7 +33,7 @@ export class LightingPanel
             <label class="slider_label" for="hdri_elevation">Elevation <output id="hdri_elevation_value">0°</output></label><input id="hdri_elevation" type="range" min="-90" max="90" step="1" value="0">
             <button class="section_button" id="hdri_reset">Reset adjustments</button><p class="section_hint">Rotate or tilt to reposition the light.</p>
             <a id="hdri_credit" href="https://polyhaven.com/hdris" target="_blank" rel="noopener">Poly Haven · CC0</a></div>
-            <div class="lighting_viewport_controls"><label><input type="checkbox" id="horizon_gradient"> Horizon gradient</label><label><input type="checkbox" id="ground_grid"> Ground grid</label></div>
+            <div class="lighting_viewport_controls"><label><input type="checkbox" id="horizon_gradient"> Dome horizon</label><label><input type="checkbox" id="ground_grid"> Ground grid</label></div>
             <p id="lighting_status" role="status">Default environment active.</p></div>`;
         const backgrounds = this.root.querySelector ('.background_gallery');
         for (const [id, name] of [['standard', 'Standard'], ['dark', 'Dark'], ['light', 'Light'], ['sunset', 'Sunset'], ['outdoor', 'Outdoor']]) {
@@ -58,11 +58,13 @@ export class LightingPanel
             ++this.request;
             this.SetMode ('default');
             this.lighting.SetDefault ();
+            this.website.UpdateViewport ();
             this.SyncBackgroundVisibility ();
-            this.Status ('Default environment active.');
+            this.Status ('Default dome environment active.');
         });
         document.getElementById ('lighting_hdri').addEventListener ('click', () => {
             this.SetMode ('hdri');
+            this.website.UpdateViewport ();
             const index = this.selected === null ? 0 : Environments.findIndex ((item) => item[0] === this.selected);
             const [id, name] = Environments[index];
             this.Select (id, name, gallery.children[index]);
@@ -116,6 +118,7 @@ export class LightingPanel
         document.getElementById ('default_background_options').hidden = mode !== 'default';
         document.getElementById ('lighting_default').setAttribute ('aria-pressed', String (mode === 'default'));
         document.getElementById ('lighting_hdri').setAttribute ('aria-pressed', String (mode === 'hdri'));
+        if (this.website.viewer.renderer !== null) { this.website.UpdateViewport (); }
     }
 
     Status (text)
@@ -136,7 +139,7 @@ export class LightingPanel
         }
         document.getElementById ('hdri_background').checked = data.background === true; this.lighting.SetBackgroundVisible (data.background === true);
         if (data.mode === 'hdri' && index >= 0) { this.SetMode ('hdri'); await this.Select (Environments[index][0], Environments[index][1], this.root.querySelector ('.hdri_gallery').children[index]); }
-        else { ++this.request; this.SetMode ('default'); this.lighting.SetDefault (); this.Status ('Default environment active.'); }
+        else { ++this.request; this.SetMode ('default'); this.lighting.SetDefault (); this.website.UpdateViewport (); this.Status ('Default dome environment active.'); }
         this.SyncBackgroundVisibility ();
     }
 
