@@ -48,13 +48,19 @@ export default function suite ()
             assert.deepEqual (new Uint8Array (reopened.document.objects[0].animationAsset.files[0].buffer), new Uint8Array ([1, 2, 255])); assert.deepEqual (new Uint8Array (reopened.document.model.materials[0].diffuseMap.buffer), new Uint8Array ([0, 128, 255])); assert.equal (reopened.document.model.materials[0].gltfMaterialIndex, 3); assert.equal (reopened.document.model.materials[0].bumpScale, 0.7);
             let importedIndex; reopened.document.model.root.Enumerate ((node) => { if (node.gltfNodeIndex !== undefined) { importedIndex = node.gltfNodeIndex; } }); assert.equal (importedIndex, 7);
         });
-        it ('Round-trips object user data in session schema v3', () => {
+        it ('Round-trips object user data and per-model shadow flags in session schema v4', () => {
             const scene = new SceneDocument (); const object = scene.AddImported (Asset (), 'one');
             object.userData = { SKU : 'PKG-001', Notes : 'Primary bottle' };
+            object.castShadow = false; object.receiveShadow = true;
             const reopened = OpenSessionArchive (CreateSessionArchive (PackSession (scene)));
             assert.deepEqual (reopened.document.objects[0].userData, object.userData);
-            const legacy = PackSession (scene); legacy.version = 2; delete legacy.objects[0].userData;
-            assert.deepEqual (ReadSession (legacy).document.objects[0].userData, {});
+            assert.equal (reopened.document.objects[0].castShadow, false);
+            assert.equal (reopened.document.objects[0].receiveShadow, true);
+            const legacy = PackSession (scene); legacy.version = 2; delete legacy.objects[0].userData; delete legacy.objects[0].castShadow; delete legacy.objects[0].receiveShadow;
+            const migrated = ReadSession (legacy).document.objects[0];
+            assert.deepEqual (migrated.userData, {});
+            assert.equal (migrated.castShadow, true);
+            assert.equal (migrated.receiveShadow, true);
         });
 
         it ('Computes touching W/L/H array offsets and floor deltas', () => {
