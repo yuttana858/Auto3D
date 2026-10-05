@@ -3,7 +3,7 @@ import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { SceneDocument, SceneHistory } from './scenedocument.js';
 import { PackSession, CreateSessionArchive, OpenSessionArchive } from './sessionarchive.js';
-import { ModelLibrary, WorkspaceDialog } from './modellibrary.js';
+import { ModelLibrary, WorkspaceDialog, RecoveryArchiveBuffer } from './modellibrary.js';
 import { Selection, SelectionType } from './navigator.js';
 import { ConvertModelToThreeObject, ModelToThreeConversionParams, ModelToThreeConversionOutput } from '../engine/threejs/threeconverter.js';
 import { Direction } from '../engine/geometry/geometry.js';
@@ -298,19 +298,51 @@ export class SessionEditor
     async OfferRecovery ()
     {
         let recovery = null;
-        try { recovery = await this.library.deviceStorage.GetRecovery (); } catch { return; }
+        try { recovery = await this.library.deviceStorage.GetRecovery (); } catch (error) { console.warn ('Auto3D recovery lookup failed.', error); return; }
         if (!recovery?.archive || this.document.objects.length) { return; }
+
+        let buffer = null;
+        let validationError = null;
+        try {
+            buffer = await RecoveryArchiveBuffer (recovery.archive);
+            OpenSessionArchive (buffer);
+        } catch (error) {
+            validationError = error;
+        }
+
         const dialog = WorkspaceDialog ('Recover unsaved session');
         const body = document.createElement ('div'); body.className = 'workspace_save_form';
-        const message = document.createElement ('p'); message.textContent = 'Auto3D found an unsaved recovery checkpoint from ' + new Date (recovery.updatedAt).toLocaleString () + '.';
-        const restore = document.createElement ('button'); restore.className = 'workspace_primary'; restore.textContent = 'Restore recovery';
-        const discard = document.createElement ('button'); discard.textContent = 'Discard recovery';
+        const timestamp = recovery.updatedAt ? new Date (recovery.updatedAt) : null;
+        const message = document.createElement ('p');
+        message.textContent = validationError
+            ? 'The saved recovery checkpoint cannot be opened: ' + validationError.message
+            : 'Auto3D found an unsaved recovery checkpoint' + (timestamp && !Number.isNaN (timestamp.getTime ()) ? ' from ' + timestamp.toLocaleString () : '') + '.';
+        const restore = document.createElement ('button'); restore.type = 'button'; restore.className = 'workspace_primary'; restore.textContent = 'Restore recovery'; restore.disabled = Boolean (validationError);
+        const discard = document.createElement ('button'); discard.type = 'button'; discard.textContent = validationError ? 'Discard invalid recovery' : 'Discard recovery';
+
         restore.addEventListener ('click', async () => {
-            restore.disabled = true; discard.disabled = true;
-            try { await this.OpenArchive (await recovery.archive.arrayBuffer (), false, true); dialog.close (); this.Status ('Recovered unsaved session · Save to keep it.'); }
-            catch (error) { restore.disabled = false; discard.disabled = false; message.textContent = error.message; }
+            if (!buffer) { return; }
+            restore.disabled = true; discard.disabled = true; message.textContent = 'Restoring recovery…';
+            try {
+                await this.OpenArchive (buffer.slice (0), false, true);
+                dialog.close ();
+                this.Status ('Recovered unsaved session · Save to keep it.');
+            } catch (error) {
+                restore.disabled = false; discard.disabled = false;
+                message.textContent = 'Recovery could not be restored: ' + error.message;
+            }
         });
-        discard.addEventListener ('click', async () => { await this.library.deviceStorage.ClearRecovery ().catch (() => {}); dialog.close (); });
+        discard.addEventListener ('click', async () => {
+            restore.disabled = true; discard.disabled = true;
+            try {
+                await this.library.deviceStorage.ClearRecovery ();
+                dialog.close ();
+                this.Status ('Recovery checkpoint discarded.');
+            } catch (error) {
+                restore.disabled = Boolean (validationError); discard.disabled = false;
+                message.textContent = 'Recovery could not be discarded: ' + error.message;
+            }
+        });
         body.append (message, restore, discard); dialog.appendChild (body);
     }
     AddModel () { if (this.readOnly) { return; } this.replaceTarget = null; this.website.OpenFileBrowserDialog (); }
