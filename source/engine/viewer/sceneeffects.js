@@ -75,8 +75,8 @@ export class SceneEffects
             if (!object.threeObject) { continue; }
             object.threeObject.traverse ((item) => {
                 if (!item.isMesh) { return; }
-                item.castShadow = this.settings.shadows && object.castShadow !== false;
-                item.receiveShadow = this.settings.shadows && object.receiveShadow !== false;
+                item.castShadow = object.castShadow !== false;
+                item.receiveShadow = object.receiveShadow !== false;
             });
         }
         this.UpdateShadowFloor ();
@@ -85,9 +85,17 @@ export class SceneEffects
     Update ()
     {
         const scene = this.viewer.scene;
+        const shading = this.viewer.shadingModel;
         scene.userData.auto3dEnvironmentIntensity = this.settings.environmentIntensity;
         scene.environmentIntensity = this.settings.environmentIntensity;
-        this.viewer.shadingModel.directionalLight.castShadow = this.settings.shadows;
+        shading.UpdateShading ();
+        shading.directionalLight.castShadow = this.settings.shadows;
+        // HDRI normally disables direct lights. A subtle directional component
+        // is retained only while shadows are enabled so cast shadows have a
+        // physical light source without overpowering the environment.
+        if (this.settings.shadows && shading.hdriEnvironment !== null) {
+            shading.directionalLight.intensity = 0.22 * Math.PI;
+        }
         this.viewer.renderer.shadowMap.enabled = this.settings.shadows;
         this.UpdateDynamicReflection ();
         this.UpdateFloorReflection ();
