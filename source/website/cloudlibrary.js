@@ -10,6 +10,17 @@ export class CloudLibrary
     constructor ()
     {
         this.config = LibraryConfig;
+        this.apiUrl = this.config.apiUrl || (typeof window !== 'undefined' ? window.AUTO3D_LIBRARY_API_URL || null : null);
+    }
+
+    async ApiRequest (path)
+    {
+        const response = await fetch (this.apiUrl.replace (/\/$/, '') + path);
+        if (!response.ok) {
+            let detail = null; try { detail = await response.json (); } catch { /* Non-JSON backend error. */ }
+            throw new Error (detail?.error || 'Shared library API request failed (' + response.status + ').');
+        }
+        return response;
     }
 
     async Request (path, options = {})
@@ -25,11 +36,25 @@ export class CloudLibrary
 
     Item (row)
     {
-        return { id : row.id, name : row.name, category : row.category, kind : row.kind, objects : row.object_count, updatedAt : row.created_at, archivePath : row.archive_path, thumbnailPath : row.thumbnail_path, shared : true };
+        return {
+            id : row.id,
+            name : row.name,
+            category : row.category,
+            kind : row.kind,
+            objects : row.objectCount ?? row.object_count,
+            updatedAt : row.createdAt ?? row.created_at,
+            archivePath : row.archive_path || null,
+            thumbnailPath : row.thumbnail_path || null,
+            shared : true
+        };
     }
 
     async List ()
     {
+        if (this.apiUrl) {
+            const response = await this.ApiRequest ('/api/library/items');
+            return (await response.json ()).map ((row) => this.Item (row));
+        }
         const rows = [];
         for (let offset = 0; ; offset += 1000) {
             const page = await this.Request ('/rest/v1/auto3d_library?select=*&order=created_at.desc,id.asc&limit=1000&offset=' + offset);
@@ -42,6 +67,10 @@ export class CloudLibrary
     async Get (id)
     {
         if (!IsLibraryId (id)) { throw new Error ('This shared model link is invalid.'); }
+        if (this.apiUrl) {
+            const response = await this.ApiRequest ('/api/library/items/' + encodeURIComponent (id));
+            return this.Item (await response.json ());
+        }
         const rows = await this.Request ('/rest/v1/auto3d_library?select=*&id=eq.' + encodeURIComponent (id));
         if (!rows.length) { throw new Error ('This shared model is unavailable.'); }
         return this.Item (rows[0]);
@@ -52,7 +81,17 @@ export class CloudLibrary
         return this.Request ('/storage/v1/object/authenticated/' + this.config.bucket + '/' + path.split ('/').map (encodeURIComponent).join ('/'));
     }
 
-    async Archive (item) { return (await this.File (item.archivePath)).arrayBuffer (); }
+    async Archive (item)
+    {
+        if (this.apiUrl) { return (await this.ApiRequest ('/api/library/items/' + encodeURIComponent (item.id) + '/archive')).arrayBuffer (); }
+        return (await this.File (item.archivePath)).arrayBuffer ();
+    }
+
+    async Thumbnail (item)
+    {
+        if (this.apiUrl) { return (await this.ApiRequest ('/api/library/items/' + encodeURIComponent (item.id) + '/thumbnail')).blob (); }
+        return this.File (item.thumbnailPath);
+    }
 
     async Save ()
     {

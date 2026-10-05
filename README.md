@@ -4,7 +4,7 @@ Auto3D is a branded, self-hostable browser 3D viewer based on [Online3DViewer](h
 
 ## Run locally
 
-Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.20.3**.
+Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.20.4**.
 
 ## Prototype hosting
 
@@ -30,7 +30,7 @@ The top-right **Library** button opens shared models and device saves, with cate
 
 The shared library currently reads published prototype content from Supabase project `iesepcoxqochycckbwoh`. Browser-side publisher authentication and direct publishing have been removed as part of the corporate identity migration. Shared browsing and view-only links remain available; Device library and portable `.auto3d` files remain fully supported.
 
-Corporate publishing will be reintroduced through a backend API protected by Microsoft Entra ID. The browser will depend on the Auto3D Library API rather than Supabase-specific authentication or database operations so the service can migrate to Azure Database for PostgreSQL and Azure Blob Storage without rewriting the editor. The target architecture and migration goal are documented in `docs/backend-architecture.md` and `GOAL.md`. Database migrations are recorded under `supabase/migrations`.
+The provider-neutral Auto3D Library API is implemented under `backend/`. Public shared-library reads can be routed through it by configuring `AUTO3D_LIBRARY_API_URL`. Publishing and administrative deletion are protected by Microsoft Entra ID application roles; browser publishing remains disabled until the corporate Entra application registration and API deployment are configured. The browser will depend on the Auto3D Library API rather than Supabase-specific authentication or database operations so the service can migrate to Azure Database for PostgreSQL and Azure Blob Storage without rewriting the editor. The target architecture and migration goal are documented in `docs/backend-architecture.md` and `GOAL.md`. Database migrations are recorded under `supabase/migrations`.
 
 No user models are included in the static site. Shared-library publishing is temporarily disabled during the corporate identity migration. A view-only link hides editing controls; recipients still receive the model data required to render it.
 

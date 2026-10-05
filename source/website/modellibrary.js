@@ -159,7 +159,7 @@ export class ModelLibrary
                 const card = document.createElement ('article'); card.className = 'library_card';
                 const image = document.createElement ('img'); image.alt = item.name + ' preview';
                 if (item.shared) {
-                    this.sharedStorage.File (item.thumbnailPath).then ((blob) => { if (current === generation && dialog.isConnected) { const url = URL.createObjectURL (blob); urls.push (url); image.src = url; } }).catch (() => { image.alt = item.name + ' · Preview unavailable'; });
+                    this.sharedStorage.Thumbnail (item).then ((blob) => { if (current === generation && dialog.isConnected) { const url = URL.createObjectURL (blob); urls.push (url); image.src = url; } }).catch (() => { image.alt = item.name + ' · Preview unavailable'; });
                 } else { image.src = item.thumbnail; }
                 const name = document.createElement ('h3'); name.textContent = item.name;
                 const info = document.createElement ('p'); info.textContent = item.category + ' · ' + item.objects + ' object(s) · ' + new Date (item.updatedAt).toLocaleDateString ();
