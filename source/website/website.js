@@ -35,7 +35,7 @@ import { GetBackgroundPreset, GetBackgroundGradientCSS } from '../engine/viewer/
 import { SessionEditor } from './sessioneditor.js';
 import { Preferences } from './preferences.js';
 
-const MultiModelExtensions = new Set (['3dm', '3ds', '3mf', 'amf', 'bim', 'brep', 'dae', 'fbx', 'fcstd', 'gltf', 'glb', 'ifc', 'iges', 'igs', 'step', 'stp', 'stl', 'obj', 'off', 'ply', 'wrl']);
+const MultiModelExtensions = new Set (['3dm', '3ds', '3mf', 'amf', 'bim', 'brep', 'dae', 'fbx', 'fcstd', 'gltf', 'glb', 'ifc', 'iges', 'igs', 'step', 'stp', 'stl', 'obj', 'off', 'ply', 'wrl', 'zae']);
 
 const WebsiteUIState =
 {
