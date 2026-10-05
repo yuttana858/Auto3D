@@ -10,7 +10,7 @@ The production JavaScript dependency inventory is pinned by `package-lock.json` 
 | core-js | 3.32.2 | MIT |
 | fflate | 0.8.2 | MIT |
 | nanopop | 2.3.0 | MIT |
-| three | 0.176.0 | MIT |
+| three | 0.186.1 | MIT |
 
 The automated check intentionally fails closed when a production dependency reports a license outside the reviewed allowlist. Legal/corporate policy approval remains an organizational responsibility; this file is the engineering inventory, not legal advice.
 
