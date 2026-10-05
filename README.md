@@ -4,7 +4,7 @@ Auto3D is a branded, self-hostable browser 3D viewer based on [Online3DViewer](h
 
 ## Run locally
 
-Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.23.0**.
+Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.24.0**.
 
 ## Hosting
 
@@ -55,3 +55,12 @@ The upstream [Online3DViewer source](https://github.com/kovacsv/Online3DViewer) 
 Selected objects retain their textured/material appearance and are indicated with a fine bounding box. The transform Scale mode exposes physical **Size** fields in the global unit preference when the source model declares units; unknown-unit models continue to use scale multipliers. Metric/standard units persist in the local user-profile preference and update dimensions and size fields immediately. Cross-device account synchronization is intentionally deferred until corporate identity is connected.
 
 The main toolbar places **Save session file** directly beside **Open**, while **Export** is also available in the right-side header.
+
+
+### v0.24 model data and placement tools
+
+Selecting a session object adds an editable **Model size** section to Model Data. Dimensions use the global preference and map **W = X, L = Z, H = Y**. Editing a dimension changes the corresponding object scale. A **User data** section accepts custom name/value metadata and stores it with the portable Auto3D session.
+
+The object tool strip now includes **Array**, **Drop to floor**, and **Fit to screen**. Array creates a W/L/H grid from the selected object's current world bounding box so adjacent bounding envelopes touch without overlapping. Drop to floor honors the current X/Y/Z up vector and flipped-up state.
+
+Right-clicking a model selects its session object and exposes object actions including Focus, Array, Drop to floor, Duplicate, visibility and Delete. Right-clicking empty viewer space exposes Fit to screen. Mesh isolation remains available where applicable.

@@ -74,7 +74,7 @@ export class SceneDocument
         else if (upVector === Direction.Z) { orientation.makeRotationX (-Math.PI / 2); }
         orientation.multiply (new THREE.Matrix4 ().fromArray (asset.GetTransformation ().GetMatrix ().Get ()));
         asset.SetTransformation (new Transformation (new Matrix (orientation.toArray ())));
-        const object = { id : typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID () : 'object-' + Date.now () + '-' + Math.random (), name, source : name, visible : true, node, position : [0, 0, 0], rotation : [0, 0, 0], scale : [1, 1, 1] };
+        const object = { id : typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID () : 'object-' + Date.now () + '-' + Math.random (), name, source : name, visible : true, node, position : [0, 0, 0], rotation : [0, 0, 0], scale : [1, 1, 1], userData : {} };
         object.unit = source.GetUnit ();
         this.objects.push (object);
         this.ApplyTransform (object);
@@ -152,7 +152,7 @@ export class SceneDocument
         // Drop the session wrapper so the copy has one editable object origin.
         asset.root = asset.root.GetChildNode (0);
         const copy = this.AddImported (asset, object.name + ' copy', Direction.Y, false);
-        copy.unit = object.unit; copy.hiddenParts = [...(object.hiddenParts || [])];
+        copy.unit = object.unit; copy.hiddenParts = [...(object.hiddenParts || [])]; copy.userData = { ...(object.userData || {}) };
         if (object.animationAsset) { copy.animationAsset = object.animationAsset; copy.playback = { ...object.playback, playing : false }; }
         copy.position = [...object.position]; copy.rotation = [...object.rotation]; copy.scale = [...object.scale];
         let minX = Infinity; let maxX = -Infinity;

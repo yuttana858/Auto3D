@@ -13,6 +13,7 @@ import { Direction } from '../../source/engine/geometry/geometry.js';
 import { Unit } from '../../source/engine/model/unit.js';
 import { DisplayLength, DisplaySizeFromScale, ScaleFromDisplaySize, UnitFactor } from '../../source/website/preferences.js';
 import { AnimationPlayer } from '../../source/website/sessionanimation.js';
+import { ArrayOffset, DropToFloorDelta } from '../../source/website/sessioneditor.js';
 
 function Asset (material = new PhysicalMaterial ())
 {
@@ -47,6 +48,24 @@ export default function suite ()
             assert.deepEqual (new Uint8Array (reopened.document.objects[0].animationAsset.files[0].buffer), new Uint8Array ([1, 2, 255])); assert.deepEqual (new Uint8Array (reopened.document.model.materials[0].diffuseMap.buffer), new Uint8Array ([0, 128, 255])); assert.equal (reopened.document.model.materials[0].gltfMaterialIndex, 3); assert.equal (reopened.document.model.materials[0].bumpScale, 0.7);
             let importedIndex; reopened.document.model.root.Enumerate ((node) => { if (node.gltfNodeIndex !== undefined) { importedIndex = node.gltfNodeIndex; } }); assert.equal (importedIndex, 7);
         });
+        it ('Round-trips object user data in session schema v3', () => {
+            const scene = new SceneDocument (); const object = scene.AddImported (Asset (), 'one');
+            object.userData = { SKU : 'PKG-001', Notes : 'Primary bottle' };
+            const reopened = OpenSessionArchive (CreateSessionArchive (PackSession (scene)));
+            assert.deepEqual (reopened.document.objects[0].userData, object.userData);
+            const legacy = PackSession (scene); legacy.version = 2; delete legacy.objects[0].userData;
+            assert.deepEqual (ReadSession (legacy).document.objects[0].userData, {});
+        });
+
+        it ('Computes touching W/L/H array offsets and floor deltas', () => {
+            const size = new THREE.Vector3 (2, 3, 4);
+            assert.deepEqual (ArrayOffset (size, 2, 1, 3), [4, 9, 4]);
+            const box = new THREE.Box3 (new THREE.Vector3 (-2, -5, -7), new THREE.Vector3 (6, 8, 9));
+            assert.deepEqual (DropToFloorDelta (box, { direction : Direction.Y, isFlipped : false }), [0, 5, 0]);
+            assert.deepEqual (DropToFloorDelta (box, { direction : Direction.Z, isFlipped : true }), [0, 0, -9]);
+            assert.deepEqual (DropToFloorDelta (box, { direction : Direction.X, isFlipped : false }), [2, 0, 0]);
+        });
+
         it ('Writes the current schema and migrates v1 sessions forward', () => {
             const scene = new SceneDocument (); scene.AddImported (Asset (), 'one');
             const current = PackSession (scene); assert.equal (current.version, SessionVersion); assert.ok (current.metadata.savedAt);

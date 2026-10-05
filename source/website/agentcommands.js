@@ -16,7 +16,7 @@ export function CreateAgentCommands (website)
         const selected = id ? editor.document.objects.find ((item) => item.id === id) : editor.selected;
         if (!selected) { throw new Error ('Select an object or supply a valid objectId.'); } return selected;
     };
-    const describe = (item) => ({ id : item.id, name : item.name, visible : item.visible, position : [...item.position], rotation : [...item.rotation], scale : [...item.scale] });
+    const describe = (item) => ({ id : item.id, name : item.name, visible : item.visible, position : [...item.position], rotation : [...item.rotation], scale : [...item.scale], userData : { ...(item.userData || {}) } });
     const add = (id, title, category, description, properties, required, mutates, handler, example = {}) => registry.Register ({ id, title, category, description, mutates, inputSchema : { type : 'object', properties, required, additionalProperties : false }, example }, handler);
     add ('scene.inspect', 'Inspect scene', 'Scene', 'Return all objects, selected object ID and loading state.', {}, [], false, () => ({ name : editor.document.name, objects : editor.document.objects.map (describe), selectedObjectId : editor.selected?.id || null }));
     add ('object.select', 'Select object', 'Objects', 'Select an object by its stable ID.', { objectId : text }, ['objectId'], false, ({ objectId }) => { const item = object (objectId); editor.Select (item); return describe (item); });
@@ -27,6 +27,16 @@ export function CreateAgentCommands (website)
         editor.Select (item); editor.ApplyTransform (item); editor.RecordTransform (item, before); editor.UpdateDetails (); return describe (item);
     }, { position : [0, 0, 0] });
     add ('object.duplicate', 'Duplicate object', 'Objects', 'Duplicate and select an object. Returns the new ID. Undo supported.', { objectId : text }, [], true, async (args) => { editor.Select (object (args.objectId)); await editor.Duplicate (); return describe (editor.selected); });
+    add ('object.array', 'Array object', 'Objects', 'Create a touching W/L/H array of the selected object. W=X, L=Z, H=Y. Undo supported.', { objectId : text, width : { ...number, minimum : 1, maximum : 20 }, length : { ...number, minimum : 1, maximum : 20 }, height : { ...number, minimum : 1, maximum : 20 } }, ['width', 'length', 'height'], true, async (args) => {
+        editor.Select (object (args.objectId)); const added = await editor.CreateArray (args.width, args.length, args.height); return { created : added.length, total : args.width * args.length * args.height, selectedObjectId : editor.selected.id };
+    }, { width : 2, length : 2, height : 1 });
+    add ('object.drop_to_floor', 'Drop object to floor', 'Objects', 'Move the object to the active ground plane using the current up vector. Undo supported.', { objectId : text }, [], true, (args) => { editor.Select (object (args.objectId)); editor.DropToFloor (); return describe (editor.selected); });
+    add ('object.dimension', 'Set object dimension', 'Objects', 'Set one W/L/H object dimension in the current global display unit. W=X, L=Z, H=Y. Undo supported.', { objectId : text, dimension : enumOf ('width', 'length', 'height'), value : { ...number, minimum : 0.000001 } }, ['dimension', 'value'], true, ({ objectId, dimension, value }) => {
+        const item = object (objectId); editor.Select (item); const axis = dimension === 'width' ? 0 : dimension === 'length' ? 2 : 1; editor.SetObjectDisplayDimension (item, axis, value); return describe (item);
+    }, { dimension : 'width', value : 100 });
+    add ('object.user_data', 'Set object user data', 'Objects', 'Set a user-defined metadata field on an object. The field is stored in the Auto3D session.', { objectId : text, name : text, value : text }, ['name', 'value'], true, ({ objectId, name, value }) => {
+        const item = object (objectId); const key = name.trim ().slice (0, 100); if (!key || ['__proto__', 'prototype', 'constructor'].includes (key)) { throw new Error ('Use a valid user data name.'); } item.userData ||= {}; item.userData[key] = value.slice (0, 2000); editor.MarkDirty (); editor.Select (item); return { objectId : item.id, userData : { ...item.userData } };
+    }, { name : 'SKU', value : 'ABC-123' });
     add ('object.visibility', 'Set visibility', 'Objects', 'Explicitly show or hide an object. Undo supported.', { objectId : text, visible : boolean }, ['visible'], true, (args) => { const item = object (args.objectId); editor.Select (item); if (item.visible !== args.visible) { editor.ToggleVisibility (); } return describe (item); }, { visible : true });
     add ('object.delete', 'Delete object', 'Objects', 'Remove an object from this session. Recover with history.undo.', { objectId : text }, [], true, async (args) => { const item = object (args.objectId); editor.Select (item); await editor.Delete (); return { deletedId : item.id }; });
     add ('view.focus', 'Focus object', 'View', 'Frame an object in the viewport.', { objectId : text }, [], false, (args) => { editor.Select (object (args.objectId)); editor.Focus (); return { focusedId : editor.selected.id }; });

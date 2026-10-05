@@ -102,6 +102,131 @@
       "example": {}
     },
     {
+      "id": "object.array",
+      "title": "Array object",
+      "category": "Objects",
+      "description": "Create a touching W/L/H array of the selected object. W=X, L=Z, H=Y. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          },
+          "width": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "length": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "height": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 20
+          }
+        },
+        "required": [
+          "width",
+          "length",
+          "height"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "width": 2,
+        "length": 2,
+        "height": 1
+      }
+    },
+    {
+      "id": "object.drop_to_floor",
+      "title": "Drop object to floor",
+      "category": "Objects",
+      "description": "Move the object to the active ground plane using the current up vector. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "object.dimension",
+      "title": "Set object dimension",
+      "category": "Objects",
+      "description": "Set one W/L/H object dimension in the current global display unit. W=X, L=Z, H=Y. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          },
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "width",
+              "length",
+              "height"
+            ]
+          },
+          "value": {
+            "type": "number",
+            "minimum": 0.000001
+          }
+        },
+        "required": [
+          "dimension",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "dimension": "width",
+        "value": 100
+      }
+    },
+    {
+      "id": "object.user_data",
+      "title": "Set object user data",
+      "category": "Objects",
+      "description": "Set a user-defined metadata field on an object. The field is stored in the Auto3D session.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "name": "SKU",
+        "value": "ABC-123"
+      }
+    },
+    {
       "id": "object.visibility",
       "title": "Set visibility",
       "category": "Objects",

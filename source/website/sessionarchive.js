@@ -16,7 +16,7 @@ import { SceneDocument } from './scenedocument.js';
 
 const TriangleKeys = ['v0', 'v1', 'v2', 'c0', 'c1', 'c2', 'n0', 'n1', 'n2', 'u0', 'u1', 'u2', 'mat', 'curve'];
 const MaxArchiveBytes = 256 * 1024 * 1024;
-export const SessionVersion = 2;
+export const SessionVersion = 3;
 export const LibraryCategories = ['Primary products', 'Retail shelf', 'Pallets', 'Accessories'];
 
 export function EncodeBuffer (buffer)
@@ -129,6 +129,14 @@ export function MigrateSessionData (data)
     if (current.version === 1) {
         current = { ...current, version : 2, metadata : { savedAt : null, migratedFrom : 1 } };
     }
+    if (current.version === 2) {
+        current = {
+            ...current,
+            version : 3,
+            objects : current.objects.map ((object) => ({ ...object, userData : object.userData && typeof object.userData === 'object' ? object.userData : {} })),
+            metadata : { ...(current.metadata || {}), migratedFrom : current.metadata?.migratedFrom || 2 }
+        };
+    }
     if (current.version !== SessionVersion) { throw new Error ('This Auto3D session version cannot be migrated.'); }
     return current;
 }
@@ -138,7 +146,7 @@ export function PackSession (document, view = {}, objects = document.objects, ki
     const model = document.CompactModel (objects);
     return {
         format : 'SW Auto3D', version : SessionVersion, metadata : { savedAt : new Date ().toISOString () }, kind, name : document.name, view,
-        objects : objects.map ((object) => ({ id : object.id, name : object.name, source : object.source, unit : object.unit, visible : object.visible, hiddenParts : object.hiddenParts || [], position : object.position, rotation : object.rotation, scale : object.scale, playback : object.playback, animationAsset : object.animationAsset ? { main : object.animationAsset.main, files : object.animationAsset.files.map ((file) => ({ name : file.name, buffer : EncodeBuffer (file.buffer) })) } : null })),
+        objects : objects.map ((object) => ({ id : object.id, name : object.name, source : object.source, unit : object.unit, visible : object.visible, hiddenParts : object.hiddenParts || [], position : object.position, rotation : object.rotation, scale : object.scale, userData : object.userData || {}, playback : object.playback, animationAsset : object.animationAsset ? { main : object.animationAsset.main, files : object.animationAsset.files.map ((file) => ({ name : file.name, buffer : EncodeBuffer (file.buffer) })) } : null })),
         model : { unit : model.unit, properties : model.propertyGroups, materials : model.materials.map (PackMaterial), meshes : model.meshes.map (PackMesh), nodes : model.root.childNodes.map (PackNode) }
     };
 }
@@ -182,6 +190,14 @@ export function ReadSession (data)
         const object = { id, name : String (data.name), source : String (data.source), visible : data.visible !== false, node : nodes[index], position : ReadVector (data.position, 3), rotation : ReadVector (data.rotation, 3), scale : ReadVector (data.scale, 3) };
         object.unit = Number.isInteger (data.unit) ? data.unit : model.unit;
         object.hiddenParts = Array.isArray (data.hiddenParts) ? data.hiddenParts.filter ((index) => Number.isInteger (index) && index >= 0) : [];
+        object.userData = {};
+        if (data.userData && typeof data.userData === 'object' && !Array.isArray (data.userData)) {
+            for (const [key, value] of Object.entries (data.userData).slice (0, 100)) {
+                const name = String (key).trim ().slice (0, 100);
+                const text = String (value).slice (0, 2000);
+                if (name && !['__proto__', 'prototype', 'constructor'].includes (name)) { object.userData[name] = text; }
+            }
+        }
         if (data.animationAsset) {
             object.animationAsset = { main : String (data.animationAsset.main), files : data.animationAsset.files.map ((file) => ({ name : String (file.name), buffer : DecodeBuffer (file.buffer) })) };
             object.playback = { clip : Number.isInteger (data.playback?.clip) ? data.playback.clip : 0, time : Number.isFinite (data.playback?.time) ? Math.max (0, data.playback.time) : 0, speed : Number.isFinite (data.playback?.speed) ? Math.max (0.1, Math.min (4, data.playback.speed)) : 1, playing : false };

@@ -185,3 +185,80 @@ div.main_viewer
     opacity: .4;
     cursor: default;
 }
+
+
+.scene_object_details
+{
+    margin: 12px 0 4px;
+    padding: 10px;
+    border-top: 1px solid var(--ov_border_color);
+    font-size: 9.33px;
+}
+
+.scene_object_details > strong
+{
+    display: block;
+    margin: 8px 0 6px;
+}
+
+.scene_dimension_editor
+{
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    margin-bottom: 14px;
+}
+
+.scene_dimension_editor label
+{
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 7.33px;
+}
+
+.scene_dimension_editor input,
+.scene_user_data_row input
+{
+    width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+    padding: 5px;
+    border: 1px solid var(--ov_border_color);
+    border-radius: 4px;
+    background: var(--ov_background_color);
+    color: var(--ov_foreground_color);
+    font: inherit;
+}
+
+.scene_user_data
+{
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 7px;
+}
+
+.scene_user_data_row
+{
+    display: grid;
+    grid-template-columns: minmax(75px, .8fr) minmax(90px, 1.2fr) 26px;
+    gap: 4px;
+}
+
+.scene_user_data_row button,
+.scene_object_details > button
+{
+    border: 1px solid var(--ov_border_color);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--ov_foreground_color);
+    cursor: pointer;
+    font: inherit;
+}
+
+.scene_user_data_row button:hover,
+.scene_object_details > button:hover
+{
+    background: var(--ov_hover_color);
+}

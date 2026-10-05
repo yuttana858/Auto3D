@@ -384,63 +384,72 @@ export class Website
 
     OnModelContextMenu (globalMouseCoordinates, mouseCoordinates)
     {
-        let meshUserData = this.viewer.GetMeshUserDataUnderMouse (IntersectionMode.MeshAndLine, mouseCoordinates);
-        let items = [];
+        const meshUserData = this.viewer.GetMeshUserDataUnderMouse (IntersectionMode.MeshAndLine, mouseCoordinates);
+        const items = [];
         if (meshUserData === null) {
             items.push ({
-                name : Loc ('Fit model to window'),
+                name : 'Fit to screen',
                 icon : 'fit',
-                onClick : () => {
-                    this.FitModelToWindow (false);
-                }
+                onClick : () => this.sessionEditor.FitScene ()
             });
             if (this.navigator.HasHiddenMesh ()) {
                 items.push ({
                     name : Loc ('Show all meshes'),
                     icon : 'visible',
-                    onClick : () => {
-                        this.navigator.ShowAllMeshes (true);
-                    }
+                    onClick : () => this.navigator.ShowAllMeshes (true)
                 });
             }
         } else {
+            const instance = meshUserData.originalMeshInstance;
+            const object = this.sessionEditor.document.Owner (instance);
+            if (object) { this.sessionEditor.Select (object); }
             items.push ({
-                name : Loc ('Hide mesh'),
-                icon : 'hidden',
-                onClick : () => {
-                    this.navigator.ToggleMeshVisibility (meshUserData.originalMeshInstance.id);
-                }
-            });
-            items.push ({
-                name : Loc ('Fit mesh to window'),
+                name : 'Focus selected model',
                 icon : 'fit',
-                onClick : () => {
-                    this.navigator.FitMeshToWindow (meshUserData.originalMeshInstance.id);
-                }
+                onClick : () => this.sessionEditor.Focus ()
             });
+            if (!this.sessionEditor.readOnly && object) {
+                items.push ({
+                    name : 'Array selected model…',
+                    icon : 'files',
+                    onClick : () => this.sessionEditor.ArrayDialog ()
+                });
+                items.push ({
+                    name : 'Drop selected model to floor',
+                    icon : 'up_y',
+                    onClick : () => this.sessionEditor.DropToFloor ()
+                });
+                items.push ({
+                    name : 'Duplicate selected model',
+                    icon : 'files',
+                    onClick : () => this.sessionEditor.Run (() => this.sessionEditor.Duplicate ())
+                });
+                items.push ({
+                    name : object.visible ? 'Hide selected model' : 'Show selected model',
+                    icon : object.visible ? 'hidden' : 'visible',
+                    onClick : () => this.sessionEditor.ToggleVisibility ()
+                });
+                items.push ({
+                    name : 'Delete selected model',
+                    icon : 'close',
+                    onClick : () => this.sessionEditor.Run (() => this.sessionEditor.Delete ())
+                });
+            }
             if (this.navigator.MeshItemCount () > 1) {
-                let isMeshIsolated = this.navigator.IsMeshIsolated (meshUserData.originalMeshInstance.id);
+                const isMeshIsolated = this.navigator.IsMeshIsolated (instance.id);
                 items.push ({
                     name : isMeshIsolated ? Loc ('Remove isolation') : Loc ('Isolate mesh'),
                     icon : isMeshIsolated ? 'deisolate' : 'isolate',
                     onClick : () => {
-                        if (isMeshIsolated) {
-                            this.navigator.ShowAllMeshes (true);
-                        } else {
-                            this.navigator.IsolateMesh (meshUserData.originalMeshInstance.id);
-                        }
+                        if (isMeshIsolated) { this.navigator.ShowAllMeshes (true); }
+                        else { this.navigator.IsolateMesh (instance.id); }
                     }
                 });
             }
         }
         ShowListPopup (items, {
-            calculatePosition : (contentDiv) => {
-                return CalculatePopupPositionToScreen (globalMouseCoordinates, contentDiv);
-            },
-            onClick : (index) => {
-                let clickedItem = items[index];
-                clickedItem.onClick ();
-            }
+            calculatePosition : (contentDiv) => CalculatePopupPositionToScreen (globalMouseCoordinates, contentDiv),
+            onClick : (index) => items[index].onClick ()
         });
     }
 
