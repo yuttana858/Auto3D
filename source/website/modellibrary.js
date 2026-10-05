@@ -88,7 +88,6 @@ export class ModelLibrary
         const status = document.createElement ('p'); status.className = 'section_hint'; status.setAttribute ('role', 'status');
         const submit = document.createElement ('button'); submit.className = 'workspace_primary'; submit.type = 'submit';
         destination.addEventListener ('change', updateHint); updateHint ();
-        submit.disabled = !this.editor.document.objects.length;
         const open = document.createElement ('button'); open.type = 'button'; open.textContent = 'Open session file';
         open.addEventListener ('click', () => { dialog.close (); this.editor.OpenSessionFile (); });
         form.append (nameLabel, categoryLabel, kindLabel);
@@ -96,7 +95,36 @@ export class ModelLibrary
         form.append (hint, status, submit);
         if (download) { form.appendChild (open); }
         form.addEventListener ('submit', async (event) => {
-            event.preventDefault (); if (!name.value.trim ()) { return; } catch (error) { status.textContent = error.name === 'AbortError' ? 'Save canceled. Choose a destination to try again.' : error.message; submit.disabled = false; }
+            event.preventDefault (); if (!name.value.trim () || destination.value === 'shared') { return; }
+            submit.disabled = true; status.textContent = 'Preparing session…';
+            try {
+                let fileHandle = null;
+                if (destination.value === 'file' && typeof window.showSaveFilePicker === 'function') {
+                    fileHandle = await window.showSaveFilePicker ({ suggestedName : name.value.trim () + '.auto3d', types : [{ description : 'Auto3D session', accept : { 'application/octet-stream' : ['.auto3d'] } }] });
+                }
+                const objects = kind.value === 'model' ? [this.editor.selected] : this.editor.document.objects;
+                const saved = this.editor.Archive (objects, kind.value, name.value.trim ());
+                if (destination.value === 'file') {
+                    if (fileHandle) {
+                        const writable = await fileHandle.createWritable ();
+                        try { await writable.write (saved); await writable.close (); }
+                        catch (error) { await writable.abort ().catch (() => {}); throw error; }
+                        this.editor.Status ('Session saved: ' + fileHandle.name);
+                    } else {
+                        this.editor.Download (saved, name.value.trim () + '.auto3d', 'application/octet-stream');
+                        this.editor.Status ('Session downloaded.');
+                    }
+                } else {
+                    const thumbnail = this.editor.Thumbnail (objects);
+                    await this.deviceStorage.Save ({ id : crypto.randomUUID (), name : name.value.trim (), category : category.value, kind : kind.value, updatedAt : new Date ().toISOString (), thumbnail, objects : objects.length, archive : new Blob ([saved], { type : 'application/octet-stream' }) });
+                    this.editor.Status ('Saved to device library: ' + name.value.trim ());
+                }
+                if (kind.value === 'session') { this.editor.document.name = name.value.trim (); this.editor.website.parameters.fileNameDiv.textContent = this.editor.document.name; }
+                dialog.close ();
+            } catch (error) {
+                status.textContent = error.name === 'AbortError' ? 'Save canceled. Choose a destination to try again.' : error.message;
+                submit.disabled = false;
+            }
         });
         dialog.appendChild (form);
     }
