@@ -18,6 +18,21 @@ export default function suite ()
             await assert.rejects (() => library.Save ({}), /corporate identity migration/);
             assert.equal (requests, 0);
         });
+        it ('Uses the backend API for shared reads when configured', async () => {
+            const originalFetch = global.fetch;
+            try {
+                const calls = [];
+                global.fetch = async (url) => {
+                    calls.push (String (url));
+                    return new Response (JSON.stringify ([{ id : '577a8d6f-85d7-456d-bb75-4946af3c364b', name : 'API Model', category : 'Accessories', kind : 'model', objectCount : 1, createdAt : '2026-10-05T00:00:00Z' }]), { status : 200, headers : { 'Content-Type' : 'application/json' } });
+                };
+                const library = new CloudLibrary (); library.apiUrl = 'https://api.example.com';
+                const items = await library.List ();
+                assert.equal (items[0].name, 'API Model');
+                assert.equal (items[0].objects, 1);
+                assert.equal (calls[0], 'https://api.example.com/api/library/items');
+            } finally { global.fetch = originalFetch; }
+        });
         it ('Creates persistent viewer links without carrying workspace URL state', () => {
             const originalWindow = global.window;
             try {
