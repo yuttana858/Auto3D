@@ -736,20 +736,40 @@ export class Website
             button.querySelector ('span').textContent = active ? 'Exit full screen' : 'Full screen';
             this.layouter.Resize ();
         };
-        button.addEventListener ('click', async () => {
-            try {
-                if (document.fullscreenElement || document.webkitFullscreenElement) {
-                    const exit = document.exitFullscreen || document.webkitExitFullscreen;
-                    if (exit) { await exit.call (document); }
-                } else {
-                    await request.call (document.documentElement);
-                }
-            } catch { /* Browser or device declined full-screen mode. */ }
-        });
+        button.addEventListener ('click', () => this.ToggleFullscreen ());
         document.addEventListener ('fullscreenchange', update);
         document.addEventListener ('webkitfullscreenchange', update);
         this.parameters.headerButtonsDiv.prepend (button);
         update ();
+    }
+
+    IsFullscreen ()
+    {
+        return Boolean (document.fullscreenElement || document.webkitFullscreenElement);
+    }
+
+    async SetFullscreen (enabled)
+    {
+        if (enabled === this.IsFullscreen ()) { return this.IsFullscreen (); }
+        try {
+            if (enabled) {
+                const request = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen;
+                if (!request) { throw new Error ('Full screen is not supported by this browser.'); }
+                await request.call (document.documentElement);
+            } else {
+                const exit = document.exitFullscreen || document.webkitExitFullscreen;
+                if (exit) { await exit.call (document); }
+            }
+        } catch (error) {
+            if (error?.message) { throw error; }
+            throw new Error ('Full screen request was declined by the browser.');
+        }
+        return this.IsFullscreen ();
+    }
+
+    async ToggleFullscreen ()
+    {
+        return this.SetFullscreen (!this.IsFullscreen ());
     }
 
     InitToolbar ()
