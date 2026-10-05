@@ -477,7 +477,7 @@ export class SessionEditor
                 const save = () => {
                     const nextKey = keyInput.value.trim ().slice (0, 100);
                     const nextValue = valueInput.value.slice (0, 2000);
-                    if (!nextKey) { return; }
+                    if (!nextKey || ['__proto__', 'prototype', 'constructor'].includes (nextKey)) { keyInput.value = key; return; }
                     if (nextKey !== key) { delete object.userData[key]; }
                     object.userData[nextKey] = nextValue;
                     this.MarkDirty ();
