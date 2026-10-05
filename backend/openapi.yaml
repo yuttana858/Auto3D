@@ -4,14 +4,14 @@ info:
   version: 1.0.0
   description: Provider-neutral backend contract for Auto3D shared library operations.
 servers:
-  - url: /api
+  - url: /
 paths:
   /health:
     get:
       summary: Service health
       responses:
         '200': { description: Healthy }
-  /library/items:
+  /api/library/items:
     get:
       summary: List visible library items
       responses:
@@ -48,7 +48,7 @@ paths:
         '201': { description: Published }
         '401': { description: Authentication required }
         '403': { description: Publisher role required }
-  /library/items/{id}:
+  /api/library/items/{id}:
     parameters:
       - in: path
         name: id
@@ -72,7 +72,7 @@ paths:
         '204': { description: Removed }
         '401': { description: Authentication required }
         '403': { description: Admin role required }
-  /library/items/{id}/archive:
+  /api/library/items/{id}/archive:
     parameters:
       - in: path
         name: id
@@ -87,7 +87,7 @@ paths:
             application/octet-stream:
               schema: { type: string, format: binary }
         '404': { description: Not found }
-  /library/items/{id}/thumbnail:
+  /api/library/items/{id}/thumbnail:
     parameters:
       - in: path
         name: id
