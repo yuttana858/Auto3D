@@ -56,21 +56,7 @@ export class HDRILighting
         if (!response.ok) { throw new Error ('HDRI request failed (' + response.status + ').'); }
         const buffer = await response.arrayBuffer ();
         if (buffer.byteLength < 128) { throw new Error ('HDRI response is empty or invalid.'); }
-        const parsed = new RGBELoader ().setDataType (THREE.FloatType).parse (buffer);
-        const texture = new THREE.DataTexture (
-            parsed.data,
-            parsed.width,
-            parsed.height,
-            parsed.format,
-            parsed.type
-        );
-        texture.colorSpace = parsed.colorSpace || THREE.LinearSRGBColorSpace;
-        texture.minFilter = parsed.minFilter || THREE.LinearFilter;
-        texture.magFilter = parsed.magFilter || THREE.LinearFilter;
-        texture.generateMipmaps = parsed.generateMipmaps === true;
-        texture.flipY = parsed.flipY === true;
-        texture.needsUpdate = true;
-        return texture;
+        return new RGBELoader ().setDataType (THREE.FloatType).createDataTexture (buffer);
     }
 
     async Prepare (url)
