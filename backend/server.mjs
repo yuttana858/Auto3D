@@ -90,7 +90,7 @@ export function CreateServer (library = service)
             if (request.method === 'DELETE' && found.name === 'item') {
                 const deleted = await library.Delete (request.headers.authorization, found.id);
                 if (!deleted) { json (request, response, 404, { error : 'Library item not found.' }); return; }
-                response.writeHead (204); response.end (); return;
+                response.writeHead (204, corsHeaders (request)); response.end (); return;
             }
             json (request, response, 405, { error : 'Method not allowed.' });
         } catch (error) {
