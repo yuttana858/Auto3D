@@ -19,6 +19,20 @@ function Element (tag, className, text, parent)
 }
 function TransformState (object) { return { position : [...object.position], rotation : [...object.rotation], scale : [...object.scale] }; }
 
+export function ArrayOffset (size, widthIndex, lengthIndex, heightIndex)
+{
+    return [widthIndex * size.x, heightIndex * size.y, lengthIndex * size.z];
+}
+
+export function DropToFloorDelta (box, upVector)
+{
+    const axis = upVector.direction === Direction.X ? 0 : upVector.direction === Direction.Z ? 2 : 1;
+    const boundary = upVector.isFlipped ? box.max.getComponent (axis) : box.min.getComponent (axis);
+    const delta = [0, 0, 0];
+    delta[axis] = -boundary;
+    return delta;
+}
+
 const Icons = {
     select : '<path d="m6 3 13 10-7 1-3 7Z"/>', move : '<path d="M12 2v20M2 12h20m-13-7 3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3m14-6 3 3-3 3"/>',
     rotate : '<path d="M20 8a9 9 0 1 0 1 8M20 3v6h-6"/>', scale : '<path d="M4 13v7h7M13 4h7v7M4 20l16-16"/>', duplicate : '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M15 8V4H4v11h4"/>',
@@ -523,12 +537,11 @@ export class SessionEditor
         if (!object?.threeObject) { return; }
         const box = new THREE.Box3 ().setFromObject (object.threeObject, true);
         if (box.isEmpty ()) { return; }
-        const up = this.website.viewer.upVector;
-        const axis = up.direction === Direction.X ? 0 : up.direction === Direction.Z ? 2 : 1;
-        const boundary = up.isFlipped ? box.max.getComponent (axis) : box.min.getComponent (axis);
-        if (Math.abs (boundary) < 1e-10) { this.Status (object.name + ' is already on the floor.'); return; }
+        const delta = DropToFloorDelta (box, this.website.viewer.upVector);
+        const axis = delta.findIndex ((value) => Math.abs (value) > 1e-10);
+        if (axis < 0) { this.Status (object.name + ' is already on the floor.'); return; }
         const before = TransformState (object);
-        object.position[axis] -= boundary;
+        object.position[axis] += delta[axis];
         this.ApplyTransform (object);
         this.RecordTransform (object, before);
         this.UpdateDetails ();
@@ -580,11 +593,8 @@ export class SessionEditor
                     if (w === 0 && l === 0 && h === 0) { continue; }
                     const copy = this.document.Duplicate (source);
                     copy.name = source.name + ' [' + (w + 1) + ',' + (l + 1) + ',' + (h + 1) + ']';
-                    copy.position = [
-                        source.position[0] + w * size.x,
-                        source.position[1] + h * size.y,
-                        source.position[2] + l * size.z
-                    ];
+                    const offset = ArrayOffset (size, w, l, h);
+                    copy.position = source.position.map ((value, axis) => value + offset[axis]);
                     this.document.ApplyTransform (copy);
                     added.push (copy);
                 }
