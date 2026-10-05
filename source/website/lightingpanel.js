@@ -29,6 +29,7 @@ export class LightingPanel
         this.mode = 'default';
         this.selected = null;
         this.request = 0;
+        this.restoring = false;
         this.environments = DefaultEnvironments.map ((item) => ({ ...item }));
         this.root = document.getElementById ('lighting_section');
         this.root.innerHTML = `<summary>Lighting</summary><div class="section_content">
@@ -71,19 +72,21 @@ export class LightingPanel
         this.RenderEnvironmentGallery ();
         this.LoadEnvironmentCatalog ();
         document.getElementById ('lighting_default').addEventListener ('click', () => {
+            const before = this.Capture ();
             ++this.request;
             this.SetMode ('default');
             this.lighting.SetDefault ();
             this.website.UpdateViewport ();
             this.SyncBackgroundVisibility ();
             this.Status ('Default dome environment active.');
+            this.RecordHistory (before);
         });
-        document.getElementById ('lighting_hdri').addEventListener ('click', () => {
+        document.getElementById ('lighting_hdri').addEventListener ('click', async () => {
             this.SetMode ('hdri');
             this.website.UpdateViewport ();
             const index = Math.max (0, this.selected === null ? 0 : this.environments.findIndex ((item) => item.id === this.selected));
             const environment = this.environments[index];
-            this.Select (environment, this.gallery.children[index]);
+            await this.Select (environment, this.gallery.children[index], true);
         });
         const adjust = () => {
             const brightness = Number (document.getElementById ('hdri_brightness').value);
@@ -95,28 +98,51 @@ export class LightingPanel
             this.lighting.Adjust (brightness, rotation, elevation);
         };
         document.getElementById ('hdri_background').addEventListener ('change', (event) => {
+            const before = this.Capture ();
             this.lighting.SetBackgroundVisible (event.target.checked);
             this.SyncBackgroundVisibility ();
+            this.RecordHistory (before);
         });
         for (const id of ['hdri_brightness', 'hdri_rotation', 'hdri_elevation']) {
-            document.getElementById (id).addEventListener ('input', adjust);
+            const control = document.getElementById (id);
+            let before = null;
+            const capture = () => { if (!this.restoring && before === null) { before = this.Capture (); } };
+            control.addEventListener ('pointerdown', capture);
+            control.addEventListener ('focus', capture);
+            control.addEventListener ('input', adjust);
+            control.addEventListener ('change', () => { if (before) { this.RecordHistory (before); before = null; } });
         }
         document.getElementById ('hdri_reset').addEventListener ('click', () => {
+            const before = this.Capture ();
             document.getElementById ('hdri_brightness').value = 1;
             document.getElementById ('hdri_rotation').value = 0;
             document.getElementById ('hdri_elevation').value = 0;
             adjust ();
+            this.RecordHistory (before);
         });
 
         const effectControl = (id, key, output = null) => {
             const control = document.getElementById (id);
+            let before = null;
+            const capture = () => { if (!this.restoring && before === null) { before = this.Capture (); } };
             const apply = () => {
                 const value = control.type === 'checkbox' ? control.checked : Number (control.value);
                 this.website.sceneEffects.Set (key, value);
                 if (output) { document.getElementById (output).textContent = Number (control.value).toFixed (2) + '×'; }
                 this.website.sessionEditor?.MarkDirty ();
             };
-            control.addEventListener (control.type === 'checkbox' ? 'change' : 'input', apply);
+            if (control.type === 'checkbox') {
+                control.addEventListener ('change', () => {
+                    const previous = this.Capture ();
+                    apply ();
+                    this.RecordHistory (previous);
+                });
+            } else {
+                control.addEventListener ('pointerdown', capture);
+                control.addEventListener ('focus', capture);
+                control.addEventListener ('input', apply);
+                control.addEventListener ('change', () => { if (before) { this.RecordHistory (before); before = null; } });
+            }
         };
         effectControl ('environment_reflection_intensity', 'environmentIntensity', 'environment_reflection_intensity_value');
         effectControl ('model_reflections', 'modelReflections');
@@ -137,7 +163,7 @@ export class LightingPanel
             button.className = 'hdri_card';
             button.setAttribute ('aria-pressed', String (environment.id === this.selected));
             button.innerHTML = `<img src="${environment.thumbnailUrl}" alt="" loading="lazy"><strong>${environment.name}</strong><span>${environment.category}</span>`;
-            button.addEventListener ('click', () => this.Select (environment, button));
+            button.addEventListener ('click', () => this.Select (environment, button, true));
             this.gallery.appendChild (button);
         }
     }
@@ -207,6 +233,18 @@ export class LightingPanel
         document.getElementById ('lighting_status').textContent = text;
     }
 
+    RecordHistory (before)
+    {
+        if (this.restoring || !before || !this.website.sessionEditor) { return; }
+        const after = this.Capture ();
+        if (JSON.stringify (before) === JSON.stringify (after)) { return; }
+        this.website.sessionEditor.MarkDirty ();
+        this.website.sessionEditor.PushHistory (
+            () => this.Restore (before),
+            () => this.Restore (after)
+        );
+    }
+
     Capture ()
     {
         return { mode : this.mode, environment : this.selected, background : this.lighting.showBackground, brightness : Number (document.getElementById ('hdri_brightness').value), rotation : Number (document.getElementById ('hdri_rotation').value), elevation : Number (document.getElementById ('hdri_elevation').value), effects : this.website.sceneEffects.Capture () };
@@ -214,6 +252,9 @@ export class LightingPanel
 
     async Restore (data)
     {
+        const previousRestoring = this.restoring;
+        this.restoring = true;
+        try {
         const index = this.environments.findIndex ((item) => item.id === data.environment);
         for (const [key, min, max] of [['brightness', 0, 3], ['rotation', -180, 180], ['elevation', -90, 90]]) {
             if (Number.isFinite (data[key])) { const control = document.getElementById ('hdri_' + key); control.value = Math.max (min, Math.min (max, data[key])); control.dispatchEvent (new Event ('input')); }
@@ -223,10 +264,14 @@ export class LightingPanel
         if (data.mode === 'hdri' && index >= 0) { this.SetMode ('hdri'); await this.Select (this.environments[index], this.gallery.children[index]); }
         else { ++this.request; this.SetMode ('default'); this.lighting.SetDefault (); this.website.UpdateViewport (); this.Status ('Default dome environment active.'); }
         this.SyncBackgroundVisibility ();
+        } finally {
+            this.restoring = previousRestoring;
+        }
     }
 
-    async Select (environment, button)
+    async Select (environment, button, recordHistory = false)
     {
+        const before = recordHistory ? this.Capture () : null;
         const request = ++this.request;
         this.Status ('Loading ' + environment.name + ' preview…');
         try {
@@ -240,6 +285,7 @@ export class LightingPanel
             document.getElementById ('hdri_credit').href = environment.sourceUrl || ('https://polyhaven.com/a/' + environment.id);
             this.website.sceneEffects.Refresh ();
             this.Status (environment.name + ' preview active' + (environment.renderUrl ? ' · high-resolution render tier loading.' : ' · high-resolution tier coming soon.'));
+            if (recordHistory) { this.RecordHistory (before); }
         } catch (error) {
             if (request === this.request) {
                 console.error ('Auto3D HDRI load failed', environment.id, error);
