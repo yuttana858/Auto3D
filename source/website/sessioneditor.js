@@ -9,7 +9,7 @@ import { ConvertModelToThreeObject, ModelToThreeConversionParams, ModelToThreeCo
 import { Direction } from '../engine/geometry/geometry.js';
 import { Unit } from '../engine/model/unit.js';
 import { Property, PropertyType } from '../engine/model/property.js';
-import { DisplayLength } from './preferences.js';
+import { DisplayLength, DisplayUnitLabel, UnitFactor } from './preferences.js';
 import { LoadAnimationScene } from './sessionanimation.js';
 import { ShowExportDialog } from './exportdialog.js';
 
@@ -34,6 +34,11 @@ export class SessionEditor
         this.website = website; this.document = new SceneDocument (); this.history = new SceneHistory (() => this.MarkDirty ()); this.selected = null; this.mode = 'select'; this.busy = false; this.players = [];
         this.library = new ModelLibrary (this); this.buttons = new Map (); this.dirty = false; this.recoveryTimer = null;
         const viewer = website.viewer;
+        this.selectionBounds = new THREE.Box3 ();
+        this.selectionBox = new THREE.Box3Helper (this.selectionBounds, 0x5aaee6);
+        this.selectionBox.visible = false;
+        this.selectionBox.renderOrder = 10000;
+        viewer.scene.add (this.selectionBox);
         this.controls = new TransformControls (viewer.camera, viewer.renderer.domElement); this.controls.setSize (0.8); this.helper = this.controls.getHelper (); viewer.scene.add (this.helper);
         const render = viewer.onRender;
         viewer.SetRenderHandler ((camera) => { if (render) { render (camera); } if (this.controls.camera !== camera) { this.controls.camera = camera; } });
@@ -153,18 +158,33 @@ export class SessionEditor
         }
         this.transformPanel = Element ('div', 'scene_transform_panel', undefined, this.website.parameters.viewerDiv); this.transformPanel.hidden = true;
         Element ('strong', null, 'Object transform', this.transformPanel); this.inputs = [];
-        for (const [key, title] of [['position', 'Position'], ['rotation', 'Rotation (°)'], ['scale', 'Scale']]) {
-            const group = Element ('div', 'transform_group', undefined, this.transformPanel); Element ('span', null, title, group);
+        for (const [key, title] of [['position', 'Position'], ['rotation', 'Rotation (°)'], ['scale', 'Size']]) {
+            const group = Element ('div', 'transform_group', undefined, this.transformPanel); const heading = Element ('span', null, title, group);
+            if (key === 'scale') { this.scaleHeading = heading; }
             for (let axis = 0; axis < 3; axis++) {
                 const label = Element ('label', null, 'XYZ'[axis], group); const input = Element ('input', null, undefined, label); input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', title + ' ' + 'XYZ'[axis]); this.inputs.push ({ input, key, axis });
                 input.addEventListener ('input', () => {
-                    if (!this.selected || !Number.isFinite (input.valueAsNumber) || (key === 'scale' && Math.abs (input.valueAsNumber) < 1e-6)) { return; }
-                    const before = TransformState (this.selected); this.selected[key][axis] = input.valueAsNumber; this.ApplyTransform (this.selected); this.RecordTransform (this.selected, before); this.UpdateDetails ();
+                    if (!this.selected || !Number.isFinite (input.valueAsNumber)) { return; }
+                    const before = TransformState (this.selected);
+                    if (key === 'scale') {
+                        const factor = UnitFactor (this.selected.unit, this.website.preferences.units);
+                        const base = this.GetObjectBaseSize (this.selected);
+                        if (factor !== null && base[axis] > 1e-12) {
+                            if (input.valueAsNumber <= 0) { return; }
+                            this.selected.scale[axis] = input.valueAsNumber / (base[axis] * factor);
+                        } else {
+                            if (Math.abs (input.valueAsNumber) < 1e-6) { return; }
+                            this.selected.scale[axis] = input.valueAsNumber;
+                        }
+                    } else {
+                        this.selected[key][axis] = input.valueAsNumber;
+                    }
+                    this.ApplyTransform (this.selected); this.RecordTransform (this.selected, before); this.UpdateDetails ();
                 });
             }
         }
         const space = Element ('select', null, undefined, this.transformPanel); space.setAttribute ('aria-label', 'Transform space'); space.add (new Option ('World', 'world')); space.add (new Option ('Local', 'local')); space.addEventListener ('change', () => this.controls.setSpace (space.value));
-        const hint = Element ('p', 'section_hint', 'Position uses source coordinates; scale is a multiplier.', this.transformPanel);
+        this.transformHint = Element ('p', 'section_hint', 'Position uses source coordinates. Size follows the global unit preference.', this.transformPanel);
         this.status = Element ('div', 'scene_status', 'Add a model to begin', this.website.parameters.viewerDiv); this.status.setAttribute ('role', 'status');
         const section = Element ('details', 'workspace_section'); section.open = true; section.id = 'session_objects'; Element ('summary', null, 'Session objects', section);
         const content = Element ('div', 'section_content', undefined, section); const actions = Element ('div', 'mode_buttons', undefined, content);
@@ -254,7 +274,7 @@ export class SessionEditor
     {
         this.busy = true; this.controls.detach (); this.players.forEach ((player) => player.Dispose ()); this.players = [];
         try {
-            if (!this.document.objects.length) { this.website.ClearModel (); this.website.SetUIState (1); this.RefreshUI (); return; }
+            if (!this.document.objects.length) { this.selectionBox.visible = false; this.website.ClearModel (); this.website.SetUIState (1); this.RefreshUI (); return; }
             const output = new ModelToThreeConversionOutput ();
             const root = await new Promise ((resolve) => ConvertModelToThreeObject (this.document.model, new ModelToThreeConversionParams (), output, { onTextureLoaded : () => this.website.viewer.Render (), onModelLoaded : resolve }));
             for (let index = 0; index < this.document.objects.length; index++) {
@@ -281,7 +301,7 @@ export class SessionEditor
     {
         this.document.ApplyTransform (object);
         if (object.threeObject) { object.threeObject.position.fromArray (object.position); object.threeObject.rotation.set (...object.rotation.map (THREE.MathUtils.degToRad)); object.threeObject.scale.fromArray (object.scale); object.threeObject.updateMatrixWorld (true); }
-        this.website.viewer.UpdateGroundGrid (); this.website.viewer.Render (); this.SyncInputs ();
+        this.website.viewer.UpdateGroundGrid (); this.UpdateSelectionBox (); this.website.viewer.Render (); this.SyncInputs ();
     }
     RecordTransform (object, before)
     {
@@ -302,7 +322,7 @@ export class SessionEditor
             const current = this.website.navigator.GetSelectedMeshId (); if (first && (!current || !current.IsEqual (first))) { this.website.navigator.SetSelection (new Selection (SelectionType.Mesh, first)); }
         }
         if (!this.selected && !fromNavigator && this.website.navigator.GetSelectedMeshId ()) { this.website.navigator.SetSelection (null); }
-        this.SyncInputs (); this.RefreshUI (); this.UpdateDetails (); this.website.viewer.Render ();
+        this.UpdateSelectionBox (); this.SyncInputs (); this.RefreshUI (); this.UpdateDetails (); this.website.viewer.Render ();
     }
     SelectionChanged ()
     {
@@ -310,7 +330,49 @@ export class SessionEditor
         this.Select (this.document.Owner (instance), true);
     }
     IsVisible (instance) { return this.document.Owner (instance)?.visible !== false; }
-    SyncInputs () { for (const { input, key, axis } of this.inputs) { input.value = this.selected ? Number (this.selected[key][axis].toFixed (5)) : ''; } }
+    GetObjectBaseSize (object)
+    {
+        if (!object?.threeObject) { return [0, 0, 0]; }
+        const clone = object.threeObject.clone (true);
+        clone.position.set (0, 0, 0); clone.rotation.set (0, 0, 0); clone.scale.set (1, 1, 1); clone.updateMatrixWorld (true);
+        const size = new THREE.Box3 ().setFromObject (clone, true).getSize (new THREE.Vector3 ());
+        return size.toArray ();
+    }
+
+    UpdateSelectionBox ()
+    {
+        if (!this.selected?.threeObject || !this.selected.visible) {
+            this.selectionBox.visible = false;
+            return;
+        }
+        this.selectionBounds.setFromObject (this.selected.threeObject, true);
+        this.selectionBox.visible = !this.selectionBounds.isEmpty ();
+        this.selectionBox.updateMatrixWorld (true);
+    }
+
+    SyncInputs ()
+    {
+        const units = this.website.preferences?.units || 'metric';
+        const factor = this.selected ? UnitFactor (this.selected.unit, units) : null;
+        const base = this.selected ? this.GetObjectBaseSize (this.selected) : [0, 0, 0];
+        if (this.scaleHeading) {
+            this.scaleHeading.textContent = factor === null ? 'Scale (×)' : 'Size (' + DisplayUnitLabel (units) + ')';
+        }
+        if (this.transformHint) {
+            this.transformHint.textContent = factor === null ? 'Position uses source coordinates; scale is a multiplier because this model has no declared unit.' : 'Position uses source coordinates. Size follows the global ' + DisplayUnitLabel (units) + ' preference.';
+        }
+        for (const { input, key, axis } of this.inputs) {
+            if (!this.selected) { input.value = ''; continue; }
+            const value = key === 'scale' && factor !== null ? base[axis] * Math.abs (this.selected.scale[axis]) * factor : this.selected[key][axis];
+            input.value = Number (value.toFixed (5));
+        }
+    }
+
+    UnitsChanged ()
+    {
+        this.SyncInputs ();
+        this.UpdateDetails ();
+    }
     RefreshButtons ()
     {
         for (const [key, button] of this.buttons) {
@@ -355,7 +417,7 @@ export class SessionEditor
 
     async Duplicate () { if (!this.selected) { return; } const object = this.document.Duplicate (this.selected); const index = this.document.objects.indexOf (object); this.history.Push ({ undo : async () => { this.document.Remove (object); this.selected = null; await this.Render (); }, redo : async () => { this.document.Restore (object, index); this.selected = object; await this.Render (); } }); this.selected = object; await this.Render (); this.Status ('Duplicated ' + object.name); }
     async Delete () { const object = this.selected; if (!object) { return; } const index = this.document.objects.indexOf (object); this.document.Remove (object); this.history.Push ({ undo : async () => { this.document.Restore (object, index); this.selected = object; await this.Render (); }, redo : async () => { this.document.Remove (object); this.selected = null; await this.Render (); } }); this.selected = null; await this.Render (); this.Status ('Deleted ' + object.name + ' · Undo is available'); }
-    ToggleVisibility () { const object = this.selected; if (!object) { return; } const before = object.visible; const apply = (visible) => { object.visible = visible; object.threeObject.visible = visible; this.website.UpdateMeshesVisibility (); this.Select (object); }; apply (!before); this.history.Push ({ undo : () => apply (before), redo : () => apply (!before) }); this.RefreshButtons (); }
+    ToggleVisibility () { const object = this.selected; if (!object) { return; } const before = object.visible; const apply = (visible) => { object.visible = visible; object.threeObject.visible = visible; this.website.UpdateMeshesVisibility (); this.Select (object); this.UpdateSelectionBox (); }; apply (!before); this.history.Push ({ undo : () => apply (before), redo : () => apply (!before) }); this.RefreshButtons (); }
     Focus () { if (!this.selected) { return; } const box = new THREE.Box3 ().setFromObject (this.selected.threeObject, true); if (!box.isEmpty ()) { this.website.viewer.FitSphereToWindow (box.getBoundingSphere (new THREE.Sphere ()), true); } }
     async Undo () { await this.history.Undo (); this.RefreshUI (); }
     async Redo () { await this.history.Redo (); this.RefreshUI (); }
