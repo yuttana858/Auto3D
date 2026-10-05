@@ -31,8 +31,8 @@ export class SessionEditor
 {
     constructor (website)
     {
-        this.website = website; this.document = new SceneDocument (); this.history = new SceneHistory (); this.selected = null; this.mode = 'select'; this.busy = false; this.players = [];
-        this.library = new ModelLibrary (this); this.buttons = new Map ();
+        this.website = website; this.document = new SceneDocument (); this.history = new SceneHistory (() => this.MarkDirty ()); this.selected = null; this.mode = 'select'; this.busy = false; this.players = [];
+        this.library = new ModelLibrary (this); this.buttons = new Map (); this.dirty = false; this.recoveryTimer = null;
         const viewer = website.viewer;
         this.controls = new TransformControls (viewer.camera, viewer.renderer.domElement); this.controls.setSize (0.8); this.helper = this.controls.getHelper (); viewer.scene.add (this.helper);
         const render = viewer.onRender;
@@ -57,6 +57,11 @@ export class SessionEditor
         this.readOnly = this.shareId !== null;
         if (this.readOnly) { document.body.classList.add ('shared_view'); this.RefreshButtons (); }
         window.addEventListener ('keydown', (event) => this.KeyDown (event));
+        window.addEventListener ('beforeunload', (event) => {
+            if (!this.dirty || this.readOnly) { return; }
+            event.preventDefault (); event.returnValue = '';
+        });
+        if (!this.readOnly && !this.website.hashHandler.HasHash ()) { setTimeout (() => this.OfferRecovery (), 0); }
     }
 
     async LoadShared ()
@@ -106,6 +111,52 @@ export class SessionEditor
 
     async Run (action) { if (this.busy) { return; } try { await action (); } catch (error) { this.Status (error.message); } }
     Status (text) { this.status.textContent = text; }
+
+    MarkDirty ()
+    {
+        if (this.readOnly) { return; }
+        this.dirty = true;
+        if (this.recoveryTimer) { clearTimeout (this.recoveryTimer); }
+        if (!this.document.objects.length) { this.library.deviceStorage.ClearRecovery ().catch (() => {}); return; }
+        this.recoveryTimer = setTimeout (() => this.SaveRecovery (), 1500);
+    }
+
+    async SaveRecovery ()
+    {
+        this.recoveryTimer = null;
+        if (!this.dirty || this.readOnly || !this.document.objects.length) { return; }
+        try {
+            const archive = this.Archive (this.document.objects, 'session', this.document.name);
+            await this.library.deviceStorage.SaveRecovery (archive, this.document.name);
+        } catch (error) { console.warn ('Auto3D recovery save failed.', error); }
+    }
+
+    async MarkClean ()
+    {
+        if (this.readOnly) { return; }
+        this.dirty = false;
+        if (this.recoveryTimer) { clearTimeout (this.recoveryTimer); this.recoveryTimer = null; }
+        try { await this.library.deviceStorage.ClearRecovery (); } catch { /* Recovery cleanup is best effort. */ }
+    }
+
+    async OfferRecovery ()
+    {
+        let recovery = null;
+        try { recovery = await this.library.deviceStorage.GetRecovery (); } catch { return; }
+        if (!recovery?.archive || this.document.objects.length) { return; }
+        const dialog = WorkspaceDialog ('Recover unsaved session');
+        const body = document.createElement ('div'); body.className = 'workspace_save_form';
+        const message = document.createElement ('p'); message.textContent = 'Auto3D found an unsaved recovery checkpoint from ' + new Date (recovery.updatedAt).toLocaleString () + '.';
+        const restore = document.createElement ('button'); restore.className = 'workspace_primary'; restore.textContent = 'Restore recovery';
+        const discard = document.createElement ('button'); discard.textContent = 'Discard recovery';
+        restore.addEventListener ('click', async () => {
+            restore.disabled = true; discard.disabled = true;
+            try { await this.OpenArchive (await recovery.archive.arrayBuffer (), false, true); dialog.close (); this.Status ('Recovered unsaved session · Save to keep it.'); }
+            catch (error) { restore.disabled = false; discard.disabled = false; message.textContent = error.message; }
+        });
+        discard.addEventListener ('click', async () => { await this.library.deviceStorage.ClearRecovery ().catch (() => {}); dialog.close (); });
+        body.append (message, restore, discard); dialog.appendChild (body);
+    }
     AddModel () { if (this.readOnly) { return; } this.replaceTarget = null; this.website.OpenFileBrowserDialog (); }
     UpdateModel (object = this.selected) { if (!this.readOnly && object) { this.replaceTarget = object; this.website.OpenFileBrowserDialog (); } }
     OpenSessionFile () { if (!this.readOnly) { this.sessionInput.click (); } }
@@ -245,7 +296,7 @@ export class SessionEditor
     {
         const data = PackSession (this.document, { camera : this.website.viewer.GetCamera (), backgroundPreset : this.website.settings.backgroundPreset, horizonGradient : this.website.settings.horizonGradient, showGroundGrid : this.website.settings.showGroundGrid, lighting : this.website.lightingPanel.Capture () }, objects, kind); data.name = name; return CreateSessionArchive (data);
     }
-    async OpenArchive (buffer, append)
+    async OpenArchive (buffer, append, recovered = false)
     {
         const saved = OpenSessionArchive (buffer); // Validate everything before replacing the current document.
         if (append) {
@@ -255,7 +306,7 @@ export class SessionEditor
                 const object = this.document.AddImported (model, source.name, Direction.Y, false); Object.assign (object, TransformState (source), { source : source.source, visible : source.visible, hiddenParts : [...source.hiddenParts], unit : source.unit, animationAsset : source.animationAsset, playback : source.playback }); this.document.ApplyTransform (object); added.push (object);
             }
             const firstIndex = this.document.objects.length - added.length; this.history.Push ({ undo : async () => { added.forEach ((object) => this.document.Remove (object)); this.selected = null; await this.Render (); }, redo : async () => { added.forEach ((object, index) => this.document.Restore (object, firstIndex + index)); this.selected = added[0]; await this.Render (); } }); this.selected = added[0];
-        } else { this.document = saved.document; this.history = new SceneHistory (); this.selected = this.document.objects[0] || null; if (this.website.hashHandler.HasHash ()) { this.website.hashHandler.SkipNextEventHandler (); this.website.hashHandler.ClearHash (); } }
+        } else { this.document = saved.document; this.history = new SceneHistory (() => this.MarkDirty ()); this.selected = this.document.objects[0] || null; if (this.website.hashHandler.HasHash ()) { this.website.hashHandler.SkipNextEventHandler (); this.website.hashHandler.ClearHash (); } }
         await this.Render (true);
         if (!append) {
             if (['standard', 'dark', 'light', 'sunset', 'outdoor', 'custom'].includes (saved.view.backgroundPreset)) { this.website.settings.backgroundPreset = saved.view.backgroundPreset; }
@@ -268,6 +319,10 @@ export class SessionEditor
             if (['eye', 'center', 'up'].every ((key) => data[key] && ['x', 'y', 'z'].every ((axis) => Number.isFinite (data[key][axis])))) { ['eye', 'center', 'up'].forEach ((key) => Object.assign (camera[key], data[key])); this.website.viewer.SetCamera (camera); }
         }
         this.Status ((append ? 'Added from ' : 'Opened ') + saved.document.name);
+        if (!append) {
+            if (recovered) { this.dirty = true; }
+            else { await this.MarkClean (); }
+        }
     }
     Thumbnail (objects)
     {
