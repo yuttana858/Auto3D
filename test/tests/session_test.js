@@ -14,6 +14,7 @@ import { Unit } from '../../source/engine/model/unit.js';
 import { DisplayLength, DisplaySizeFromScale, ScaleFromDisplaySize, UnitFactor } from '../../source/website/preferences.js';
 import { AnimationPlayer } from '../../source/website/sessionanimation.js';
 import { ArrayOffset, DropToFloorDelta } from '../../source/website/sessioneditor.js';
+import { RecoveryArchiveBuffer, NormalizeLibraryPath, LibraryPathParent, RenameLibraryPath } from '../../source/website/modellibrary.js';
 
 function Asset (material = new PhysicalMaterial ())
 {
@@ -84,6 +85,23 @@ export default function suite ()
             const scene = new SceneDocument (); scene.AddImported (Asset (), 'one'); scene.AddImported (Asset (), 'two'); const data = PackSession (scene);
             data.objects[1].id = data.objects[0].id; assert.throws (() => ReadSession (data), /Repeated/); data.objects[1].id = 'new'; data.objects[0].position[0] = Infinity; assert.throws (() => ReadSession (data), /coordinates/); data.objects[0].position[0] = 0; data.model.meshes[0].triangles[0][0] = 10000; assert.throws (() => ReadSession (data), /geometry/);
         });
+        it ('Normalizes recovery checkpoint Blob, ArrayBuffer and typed-array storage forms', async () => {
+            const source = new Uint8Array ([1, 2, 3, 255]);
+            for (const stored of [source.buffer, source, new Blob ([source])]) {
+                const buffer = await RecoveryArchiveBuffer (stored);
+                assert.deepEqual (new Uint8Array (buffer), source);
+            }
+            await assert.rejects (() => RecoveryArchiveBuffer ({ bad : true }), /unavailable/);
+        });
+
+        it ('Normalizes nested Library paths and cascades folder renames', () => {
+            assert.equal (NormalizeLibraryPath (' Project A / Concepts / Rev 1 '), 'Project A/Concepts/Rev 1');
+            assert.equal (NormalizeLibraryPath ('Project:*?/Concepts'), 'Project/Concepts');
+            assert.equal (LibraryPathParent ('Project A/Concepts/Rev 1'), 'Project A/Concepts');
+            assert.equal (RenameLibraryPath ('Project A/Concepts/Rev 1', 'Project A/Concepts', 'Project A/Development'), 'Project A/Development/Rev 1');
+            assert.equal (RenameLibraryPath ('Other/Concepts', 'Project A', 'Project B'), 'Other/Concepts');
+        });
+
         it ('Undo and redo keep the order and clear redo after another object edit', async () => {
             const history = new SceneHistory (); let value = 1; history.Push ({ undo : () => { value = 0; }, redo : () => { value = 1; } }); await history.Undo (); assert.equal (value, 0); await history.Redo (); assert.equal (value, 1); await history.Undo (); history.Push ({ undo : () => {}, redo : () => {} }); assert.equal (history.redo.length, 0);
         });
