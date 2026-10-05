@@ -21,6 +21,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      - run: npm run check_licenses
+      - run: npm run audit_prod
       - run: npm test
       - run: npm --prefix backend test
+      - run: npm run build_engine
+      - run: npm run build_engine_module
       - run: npm run build_website
