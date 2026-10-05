@@ -168,7 +168,28 @@ export class ModelLibrary
                 if (item.shared) {
                     this.sharedStorage.Thumbnail (item).then ((blob) => { if (current === generation && dialog.isConnected) { const url = URL.createObjectURL (blob); urls.push (url); image.src = url; } }).catch (() => { image.alt = item.name + ' · Preview unavailable'; });
                 } else { image.src = item.thumbnail; }
-                const name = document.createElement ('h3'); name.textContent = item.name;
+                const name = document.createElement ('h3'); name.textContent = item.name; name.className = 'editable_name';
+                name.title = item.shared ? 'Shared Library names are read-only until publishing identity is enabled.' : 'Click to rename saved item';
+                if (!item.shared) {
+                    name.tabIndex = 0; name.setAttribute ('role', 'button');
+                    const rename = async () => {
+                        const previous = item.name;
+                        const value = window.prompt ('Rename Library item', previous);
+                        if (value === null) { return; }
+                        const next = value.trim ().slice (0, 100);
+                        if (!next || next === previous) { return; }
+                        const apply = async (newName) => {
+                            item.name = newName; item.updatedAt = new Date ().toISOString ();
+                            await this.deviceStorage.Save (item);
+                            name.textContent = newName; image.alt = newName + ' preview';
+                            this.editor.Status ('Library item renamed: ' + newName);
+                        };
+                        await apply (next);
+                        this.editor.PushHistory (() => apply (previous), () => apply (next));
+                    };
+                    name.addEventListener ('click', rename);
+                    name.addEventListener ('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault (); rename (); } });
+                }
                 const info = document.createElement ('p'); info.textContent = item.category + ' · ' + item.objects + ' object(s) · ' + new Date (item.updatedAt).toLocaleDateString ();
                 const actions = document.createElement ('div'); actions.className = 'library_actions';
                 for (const [title, append] of [['Open', false], ['Add', true]]) {
