@@ -11,7 +11,7 @@ import { PhongMaterial, PhysicalMaterial, MaterialType, TextureMap } from '../..
 import { GetBoundingBox } from '../../source/engine/model/modelutils.js';
 import { Direction } from '../../source/engine/geometry/geometry.js';
 import { Unit } from '../../source/engine/model/unit.js';
-import { DisplayLength } from '../../source/website/preferences.js';
+import { DisplayLength, DisplaySizeFromScale, ScaleFromDisplaySize, UnitFactor } from '../../source/website/preferences.js';
 import { AnimationPlayer } from '../../source/website/sessionanimation.js';
 
 function Asset (material = new PhysicalMaterial ())
@@ -62,8 +62,15 @@ export default function suite ()
         it ('Undo and redo keep the order and clear redo after another object edit', async () => {
             const history = new SceneHistory (); let value = 1; history.Push ({ undo : () => { value = 0; }, redo : () => { value = 1; } }); await history.Undo (); assert.equal (value, 0); await history.Redo (); assert.equal (value, 1); await history.Undo (); history.Push ({ undo : () => {}, redo : () => {} }); assert.equal (history.redo.length, 0);
         });
-        it ('Converts declared units while leaving unspecified dimensions explicit', () => {
-            assert.equal (DisplayLength (0.0254, Unit.Meter, 'standard'), '1 in'); assert.equal (DisplayLength (1, Unit.Inch, 'metric'), '25.4 mm'); assert.equal (DisplayLength (7, Unit.Unknown, 'metric'), '7 model units');
+        it ('Converts declared units and unit-aware scaling while leaving unspecified units explicit', () => {
+            assert.equal (DisplayLength (0.0254, Unit.Meter, 'standard'), '1 in');
+            assert.equal (DisplayLength (1, Unit.Inch, 'metric'), '25.4 mm');
+            assert.equal (DisplayLength (7, Unit.Unknown, 'metric'), '7 model units');
+            assert.equal (UnitFactor (Unit.Meter, 'metric'), 1000);
+            assert.equal (DisplaySizeFromScale (2, 0.5, Unit.Meter, 'metric'), 1000);
+            assert.equal (ScaleFromDisplaySize (2, 1000, Unit.Meter, 'metric'), 0.5);
+            assert.equal (DisplaySizeFromScale (2, 3, Unit.Unknown, 'metric'), 3);
+            assert.equal (ScaleFromDisplaySize (2, 3, Unit.Unknown, 'metric'), 3);
         });
         it ('Seeks skeletal/morph-compatible tracks and exports distinct UUID targets', () => {
             const root = new THREE.Group (); const target = new THREE.Object3D (); target.name = 'part'; root.add (target);
