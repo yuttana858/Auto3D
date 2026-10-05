@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { HDRILighting, ProjectHDRI } from '../../source/engine/viewer/hdrilighting.js';
 import { ShadingModel } from '../../source/engine/viewer/shadingmodel.js';
 import { ShadingType } from '../../source/engine/threejs/threeutils.js';
-import { GetMaterialEntries, EnumerateUVTriangles } from '../../source/website/materialpanel.js';
+import { MaterialPanel, GetMaterialEntries, EnumerateUVTriangles } from '../../source/website/materialpanel.js';
 import { GetWorldAxisDirections } from '../../source/website/axisindicator.js';
 import { GetBackgroundPreset } from '../../source/engine/viewer/background.js';
 import { GetBoxUVTriangle, GenerateMissingBoxUVs } from '../../source/website/materialuv.js';
@@ -15,6 +15,8 @@ import { Viewer } from '../../source/engine/viewer/viewer.js';
 import { Direction } from '../../source/engine/geometry/geometry.js';
 import { Navigation } from '../../source/engine/viewer/navigation.js';
 import { SceneEffects } from '../../source/engine/viewer/sceneeffects.js';
+import { MaterialReflectionStrength, SetMaterialReflectionStrength } from '../../source/engine/viewer/materialreflection.js';
+import { MergeEnvironmentCatalog } from '../../source/website/lightingpanel.js';
 
 export default function suite ()
 {
@@ -79,6 +81,32 @@ export default function suite ()
             } finally { global.fetch = originalFetch; }
         });
 
+        it ('Keeps packaged HDRI previews authoritative when remote catalog metadata changes or disappears', () => {
+            const defaults = [{
+                id : 'studio_small_09',
+                name : 'Softbox studio',
+                previewUrl : 'assets/hdri/studio_small_09.hdr',
+                thumbnailUrl : 'assets/hdri/studio_small_09.png',
+                renderUrl : null,
+                sourceUrl : 'https://polyhaven.com/a/studio_small_09',
+                license : 'CC0-1.0'
+            }];
+            const merged = MergeEnvironmentCatalog (defaults, [{
+                id : 'studio_small_09',
+                name : 'Studio Small',
+                previewUrl : 'https://cdn.example/preview.hdr',
+                thumbnailUrl : 'https://cdn.example/thumb.png',
+                renderUrl : 'https://cdn.example/render.hdr'
+            }]);
+            assert.equal (merged[0].previewUrl, 'assets/hdri/studio_small_09.hdr');
+            assert.equal (merged[0].thumbnailUrl, 'assets/hdri/studio_small_09.png');
+            assert.equal (merged[0].cdnPreviewUrl, 'https://cdn.example/preview.hdr');
+            assert.equal (merged[0].renderUrl, 'https://cdn.example/render.hdr');
+            const offline = MergeEnvironmentCatalog (defaults, []);
+            assert.equal (offline[0].previewUrl, defaults[0].previewUrl);
+            assert.equal (offline[0].thumbnailUrl, defaults[0].thumbnailUrl);
+        });
+
         it ('Hides HDRI imagery without changing radiance, intensity or rotation and restores the gradient', () => {
             const viewer = MakeViewer ();
             const lighting = new HDRILighting (viewer);
@@ -125,14 +153,24 @@ export default function suite ()
             GenerateMissingBoxUVs (viewer, entry);
             assert.equal (original.TextureUVCount (), 3);
         });
-        it ('Uses a world-up shader dome so the horizon stays on the ground plane', () => {
+        it ('Keeps the default dome centered on the camera while its horizon remains world-up locked', () => {
             const viewer = new Viewer (); viewer.scene = new THREE.Scene (); viewer.Render = () => {};
+            viewer.camera = new THREE.PerspectiveCamera (45, 1, 0.1, 500);
+            viewer.camera.position.set (10, 20, 30);
+            viewer.camera.rotation.set (0.6, 1.2, 0.4);
             viewer.upVector = { direction : Direction.Y, isFlipped : false };
             const palette = GetBackgroundPreset ('outdoor', false).colors;
             viewer.SetDefaultDome (true, palette);
             assert.ok (viewer.defaultDome);
             assert.equal (viewer.defaultDome.name, 'Auto3DDefaultDome');
+            assert.deepEqual (viewer.defaultDome.position.toArray (), [10, 20, 30]);
+            assert.ok (viewer.defaultDome.quaternion.equals (new THREE.Quaternion ()));
             assert.deepEqual (viewer.defaultDome.material.uniforms.upAxis.value.toArray (), [0, 1, 0]);
+            viewer.camera.position.set (-8, 5, 12);
+            viewer.camera.rotation.set (-0.4, 0.2, -1.1);
+            viewer.UpdateDefaultDomeCamera ();
+            assert.deepEqual (viewer.defaultDome.position.toArray (), [-8, 5, 12]);
+            assert.ok (viewer.defaultDome.quaternion.equals (new THREE.Quaternion ()));
             viewer.upVector.direction = Direction.Z; viewer.UpdateDefaultDomeUpVector ();
             assert.deepEqual (viewer.defaultDome.material.uniforms.upAxis.value.toArray (), [0, 0, 1]);
             viewer.upVector.isFlipped = true; viewer.UpdateDefaultDomeUpVector ();
@@ -251,6 +289,71 @@ export default function suite ()
             assert.ok (newer.disposed ());
             assert.equal (lighting.texture, null);
             assert.equal (lighting.enabled, false);
+        });
+
+        it ('Multiplies realtime reflection by the material Reflective property without replacing texture maps', () => {
+            const scene = new THREE.Scene ();
+            const root = new THREE.Group ();
+            const material = new THREE.MeshPhysicalMaterial ({ roughness : 0.35, metalness : 0.7 });
+            const roughnessMap = new THREE.Texture (); const metalnessMap = new THREE.Texture (); const normalMap = new THREE.Texture ();
+            material.roughnessMap = roughnessMap; material.metalnessMap = metalnessMap; material.normalMap = normalMap;
+            SetMaterialReflectionStrength (material, 0.4);
+            const mesh = new THREE.Mesh (new THREE.BoxGeometry (1, 1, 1), material); root.add (mesh); scene.add (root);
+            const light = new THREE.DirectionalLight (); scene.add (light);
+            const viewer = {
+                scene,
+                renderer : { shadowMap : { enabled : false, type : null }, render : () => {} },
+                shadingModel : { directionalLight : light, hdriEnvironment : null, UpdateShading : () => {} },
+                mainModel : { mainModel : { GetRootObject : () => root } },
+                upVector : { direction : Direction.Y, isFlipped : false },
+                canvas : { width : 800, height : 600 },
+                Render : () => {}
+            };
+            const effects = new SceneEffects (viewer);
+            effects.settings.modelReflections = true;
+            effects.settings.modelReflectionIntensity = 0.5;
+            effects.cubeTarget = { texture : new THREE.Texture (), dispose : () => {} };
+            effects.cubeCamera = new THREE.Object3D (); effects.cubeCamera.update = () => {};
+            effects.UpdateDynamicReflection ();
+            assert.equal (material.envMapIntensity, 0.2);
+            assert.equal (material.roughnessMap, roughnessMap);
+            assert.equal (material.metalnessMap, metalnessMap);
+            assert.equal (material.normalMap, normalMap);
+            SetMaterialReflectionStrength (material, 0.8);
+            effects.SyncMaterialProperties ();
+            assert.equal (material.envMapIntensity, 0.4);
+            effects.RestoreMaterialReflections ();
+            effects.Dispose ();
+        });
+
+        it ('Applies the material Reflective multiplier to Phong HDRI response', () => {
+            const viewer = MakeViewer ();
+            const material = new THREE.MeshPhongMaterial ({ specular : 0xffffff });
+            SetMaterialReflectionStrength (material, 0.25);
+            viewer.scene.add (new THREE.Mesh (new THREE.BoxGeometry (1, 1, 1), material));
+            const lighting = new HDRILighting (viewer);
+            lighting.texture = new THREE.DataTexture (new Float32Array (8 * 8 * 4).fill (1), 8, 8, THREE.RGBAFormat, THREE.FloatType);
+            lighting.target = { texture : new THREE.Texture (), dispose : () => {} };
+            lighting.enabled = true;
+            lighting.Adjust (0.8, 0, 0);
+            assert.equal (MaterialReflectionStrength (material), 0.25);
+            assert.equal (material.envMapIntensity, 0.2);
+            lighting.SetDefault ();
+        });
+
+        it ('Flashes the affected material white when a material or texture is selected, then restores it', async () => {
+            const material = new THREE.MeshPhysicalMaterial ();
+            material.emissive.set (0x112233); material.emissiveIntensity = 0.18;
+            const panel = Object.create (MaterialPanel.prototype);
+            panel.emphasisState = new Map (); panel.flashTimers = new Map ();
+            panel.website = { viewer : { Render : () => {} } };
+            const entry = { material };
+            panel.Flash (entry);
+            assert.equal (material.emissive.getHex (), 0xffffff);
+            assert.equal (material.emissiveIntensity, 1);
+            await new Promise ((resolve) => setTimeout (resolve, 220));
+            assert.equal (material.emissive.getHex (), 0x112233);
+            assert.equal (material.emissiveIntensity, 0.18);
         });
 
         it ('Keeps per-model shadow flags stable while the global shadow renderer toggles', () => {
