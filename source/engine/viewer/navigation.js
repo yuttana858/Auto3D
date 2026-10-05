@@ -517,11 +517,13 @@ export class Navigation
 	OnContextMenu (ev)
 	{
 		ev.preventDefault ();
+        if (!this.enabled) { return; }
 
-		if (this.clickDetector.IsClick ()) {
-			this.Context (ev.clientX, ev.clientY);
-			this.clickDetector.Cancel ();
-		}
+        // Browsers dispatch contextmenu after the right-button mouseup. Mouseup
+        // clears ClickDetector, so gating this event on IsClick makes the menu
+        // unreachable even for a normal right-click.
+        this.Context (ev.clientX, ev.clientY);
+        this.clickDetector.Cancel ();
 	}
 
 	Orbit (angleX, angleY)
