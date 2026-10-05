@@ -276,7 +276,7 @@ export default function suite ()
             effects.settings.modelReflections = true;
             effects.settings.modelReflectionIntensity = 0.5;
             effects.cubeTarget = { texture : new THREE.Texture (), dispose : () => {} };
-            effects.cubeCamera = { visible : true, position : new THREE.Vector3 (), update : () => {} };
+            effects.cubeCamera = new THREE.Object3D (); effects.cubeCamera.update = () => {};
             effects.UpdateDynamicReflection ();
             assert.equal (material.envMapIntensity, 0.2);
             assert.equal (material.roughnessMap, roughnessMap);
