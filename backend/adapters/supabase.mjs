@@ -50,13 +50,13 @@ export class SupabaseLibraryAdapter
 
     async List ()
     {
-        const response = await this.Request ('/rest/v1/' + this.table + '?select=*&order=created_at.desc,id.asc&limit=1000');
+        const response = await this.Request ('/rest/v1/' + this.table + '?select=*&status=eq.published&order=created_at.desc,id.asc&limit=1000');
         return (await response.json ()).map ((row) => this.Row (row));
     }
 
     async Get (id)
     {
-        const response = await this.Request ('/rest/v1/' + this.table + '?select=*&id=eq.' + encodeURIComponent (id) + '&limit=1');
+        const response = await this.Request ('/rest/v1/' + this.table + '?select=*&id=eq.' + encodeURIComponent (id) + '&status=eq.published&limit=1');
         const rows = await response.json ();
         return rows.length ? this.Row (rows[0]) : null;
     }
@@ -64,7 +64,7 @@ export class SupabaseLibraryAdapter
     async Download (id, type)
     {
         const field = type === 'archive' ? 'archive_path' : 'thumbnail_path';
-        const meta = await this.Request ('/rest/v1/' + this.table + '?select=' + field + '&id=eq.' + encodeURIComponent (id) + '&limit=1');
+        const meta = await this.Request ('/rest/v1/' + this.table + '?select=' + field + '&id=eq.' + encodeURIComponent (id) + '&status=eq.published&limit=1');
         const rows = await meta.json ();
         if (!rows.length) { return null; }
         const path = rows[0][field].split ('/').map (encodeURIComponent).join ('/');
@@ -123,7 +123,11 @@ export class SupabaseLibraryAdapter
         const meta = await this.Request ('/rest/v1/' + this.table + '?select=archive_path,thumbnail_path&id=eq.' + encodeURIComponent (id) + '&limit=1');
         const rows = await meta.json ();
         if (!rows.length) { return false; }
-        await this.Request ('/rest/v1/' + this.table + '?id=eq.' + encodeURIComponent (id), { method : 'DELETE' });
+        await this.Request ('/rest/v1/' + this.table + '?id=eq.' + encodeURIComponent (id), {
+            method : 'PATCH',
+            headers : { 'Content-Type' : 'application/json', Prefer : 'return=minimal' },
+            body : JSON.stringify ({ status : 'archived' })
+        });
         await this.DeleteObjects ([rows[0].archive_path, rows[0].thumbnail_path]);
         return true;
     }
