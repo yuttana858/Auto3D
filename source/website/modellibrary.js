@@ -2,6 +2,18 @@ import { LibraryCategories } from './sessionarchive.js';
 import { CloudLibrary } from './cloudlibrary.js';
 import { EnablePopupFade } from './popuptransition.js';
 
+export async function RecoveryArchiveBuffer (archive)
+{
+    if (archive instanceof ArrayBuffer) { return archive.slice (0); }
+    if (ArrayBuffer.isView (archive)) {
+        return archive.buffer.slice (archive.byteOffset, archive.byteOffset + archive.byteLength);
+    }
+    if (archive instanceof Blob || typeof archive?.arrayBuffer === 'function') {
+        return await archive.arrayBuffer ();
+    }
+    throw new Error ('Recovery checkpoint data is unavailable.');
+}
+
 export class DeviceLibrary
 {
     async Database ()
