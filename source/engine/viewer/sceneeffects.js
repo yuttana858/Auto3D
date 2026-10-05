@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 import { Direction } from '../geometry/geometry.js';
+import { MaterialReflectionStrength } from './materialreflection.js';
 
 function MeshMaterials (root, callback)
 {
@@ -171,7 +172,7 @@ export class SceneEffects
                 this.reflectionState.set (material, { envMap : material.envMap || null, envMapIntensity : material.envMapIntensity });
             }
             material.envMap = this.cubeTarget.texture;
-            if ('envMapIntensity' in material) { material.envMapIntensity = this.settings.modelReflectionIntensity; }
+            if ('envMapIntensity' in material) { material.envMapIntensity = this.settings.modelReflectionIntensity * MaterialReflectionStrength (material); }
             material.needsUpdate = true;
         });
     }
@@ -204,6 +205,17 @@ export class SceneEffects
         this.floorReflector.geometry.dispose ();
         this.floorReflector.material?.dispose?. ();
         this.floorReflector = null;
+    }
+
+    SyncMaterialProperties ()
+    {
+        if (!this.settings.modelReflections) { return; }
+        for (const [material] of this.reflectionState) {
+            if ('envMapIntensity' in material) {
+                material.envMapIntensity = this.settings.modelReflectionIntensity * MaterialReflectionStrength (material);
+            }
+        }
+        this.viewer.Render ();
     }
 
     UpdateFloorReflection ()
