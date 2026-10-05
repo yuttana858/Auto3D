@@ -45,13 +45,7 @@ export class DeviceLibrary
     async Get (id) { return this.Request ('readonly', (store) => store.get (id)); }
     async Remove (id) { return this.Request ('readwrite', (store) => store.delete (id)); }
     async SaveRecovery (archive, name) { return this.Save ({ id : '__auto3d_recovery__', name, updatedAt : new Date ().toISOString (), archive : new Blob ([archive], { type : 'application/octet-stream' }) }); }
-    async GetRecovery ()
-    {
-        const recovery = await this.Get ('__auto3d_recovery__');
-        if (!recovery) { return null; }
-        const buffer = await RecoveryArchiveBuffer (recovery.archive);
-        return { ...recovery, archive : new Blob ([buffer], { type : 'application/octet-stream' }) };
-    }
+    async GetRecovery () { return this.Get ('__auto3d_recovery__'); }
     async ClearRecovery () { return this.Remove ('__auto3d_recovery__'); }
 }
 
