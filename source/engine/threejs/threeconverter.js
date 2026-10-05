@@ -7,6 +7,7 @@ import { IsEmptyMesh } from '../model/meshutils.js';
 import { ConvertColorToThreeColor, GetShadingType, ShadingType } from './threeutils.js';
 
 import * as THREE from 'three';
+import { SetMaterialReflectionStrength } from '../viewer/materialreflection.js';
 
 export const MaterialGeometryType =
 {
@@ -213,6 +214,14 @@ export class ThreeMaterialHandler
 		});
         this.LoadFaceTexture (threeMaterial, material.aoMap, (threeTexture) => { threeMaterial.aoMap = threeTexture; });
         this.LoadFaceTexture (threeMaterial, material.displacementMap, (threeTexture) => { threeMaterial.displacementMap = threeTexture; });
+
+        if (material.type === MaterialType.Physical) {
+            SetMaterialReflectionStrength (threeMaterial, material.specularIntensity);
+        } else if (material.type === MaterialType.Phong) {
+            SetMaterialReflectionStrength (threeMaterial, Math.max (material.specular.r / 255, material.specular.g / 255, material.specular.b / 255));
+        } else {
+            SetMaterialReflectionStrength (threeMaterial, 1);
+        }
 
 		if (material.source !== MaterialSource.Model) {
 			threeMaterial.userData.source = material.source;
