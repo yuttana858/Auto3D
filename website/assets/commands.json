@@ -177,6 +177,28 @@
       "example": {}
     },
     {
+      "id": "view.fullscreen",
+      "title": "Set full screen",
+      "category": "View",
+      "description": "Enter or exit browser full-screen mode.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "enabled": true
+      }
+    },
+    {
       "id": "history.undo",
       "title": "Undo",
       "category": "History",

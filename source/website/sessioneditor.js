@@ -53,9 +53,19 @@ export class SessionEditor
         headerLibrary.title = 'Saved models and sessions'; headerLibrary.setAttribute ('aria-label', 'Library');
         headerLibrary.innerHTML = '<svg viewBox="0 0 26 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6">' + Icons.library + '</svg><span>Library</span>';
         headerLibrary.addEventListener ('click', () => this.library.Open ());
-        this.shareId = new URLSearchParams (window.location.search).get ('share');
-        this.readOnly = this.shareId !== null;
-        if (this.readOnly) { document.body.classList.add ('shared_view'); this.RefreshButtons (); }
+        const query = new URLSearchParams (window.location.search);
+        this.shareId = query.get ('share');
+        this.shareToken = query.get ('view');
+        this.readOnly = this.shareId !== null || this.shareToken !== null;
+        if (this.readOnly) {
+            document.body.classList.add ('shared_view');
+            if (this.shareToken !== null) {
+                document.body.classList.add ('mini_shared_view');
+                const compact = window.matchMedia ('(max-width: 800px)').matches || navigator.maxTouchPoints > 0;
+                document.body.classList.toggle ('share_mobile', compact);
+            }
+            this.RefreshButtons ();
+        }
         window.addEventListener ('keydown', (event) => this.KeyDown (event));
         window.addEventListener ('beforeunload', (event) => {
             if (!this.dirty || this.readOnly) { return; }
@@ -69,10 +79,68 @@ export class SessionEditor
         if (!this.readOnly) { return; }
         this.Status ('Loading shared view…');
         try {
+            if (this.shareToken !== null) {
+                const info = await this.library.sharedStorage.ShareInfo (this.shareToken);
+                const access = await this.OpenShareLink (info);
+                await this.OpenArchive (access.archive, false);
+                this.ConfigureMiniViewer (info, access.archive);
+                this.Status ('Shared view · ' + info.name);
+                return;
+            }
             const item = await this.library.sharedStorage.Get (this.shareId);
             await this.OpenArchive (await this.library.sharedStorage.Archive (item), false);
             this.Status ('Shared view · ' + item.name);
         } catch (error) { this.Status (error.message); }
+    }
+
+    async OpenShareLink (info)
+    {
+        if (!info.codeRequired) {
+            return { archive : await this.library.sharedStorage.ShareArchive (this.shareToken, ''), code : '' };
+        }
+        return new Promise ((resolve, reject) => {
+            const dialog = WorkspaceDialog ('Access shared model');
+            const form = Element ('form', 'workspace_save_form', undefined, dialog);
+            const hint = Element ('p', 'section_hint', 'Enter the 4-digit access code supplied with this link.', form);
+            const input = Element ('input', null, undefined, form); input.type = 'password'; input.inputMode = 'numeric'; input.maxLength = 4; input.pattern = '[0-9]{4}'; input.autocomplete = 'one-time-code'; input.setAttribute ('aria-label', 'Four digit access code');
+            const status = Element ('p', 'section_hint', '', form); status.setAttribute ('role', 'status');
+            const submit = Element ('button', 'workspace_primary', 'Open model', form); submit.type = 'submit';
+            let settled = false;
+            input.addEventListener ('input', () => { input.value = input.value.replace (/\D/g, '').slice (0, 4); });
+            form.addEventListener ('submit', async (event) => {
+                event.preventDefault ();
+                if (!/^\d{4}$/.test (input.value)) { status.textContent = 'Enter exactly four digits.'; return; }
+                submit.disabled = true; status.textContent = 'Checking code…';
+                try {
+                    const archive = await this.library.sharedStorage.ShareArchive (this.shareToken, input.value);
+                    settled = true; dialog.close (); resolve ({ archive, code : input.value });
+                } catch (error) { status.textContent = error.message; submit.disabled = false; input.select (); }
+            });
+            dialog.addEventListener ('close', () => { if (!settled) { reject (new Error ('Shared view access was canceled.')); } }, { once : true });
+            setTimeout (() => input.focus (), 0);
+        });
+    }
+
+    ConfigureMiniViewer (info, archive)
+    {
+        document.title = info.name + ' · Auto3D';
+        this.website.parameters.fileNameDiv.textContent = info.name;
+        if (info.allowDownload) {
+            const download = Element ('button', 'header_share_download', undefined, document.getElementById ('header_buttons'));
+            download.title = 'Download Auto3D session'; download.setAttribute ('aria-label', 'Download shared model');
+            download.innerHTML = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m-5-5 5 5 5-5M5 21h14"/></svg><span>Download</span>';
+            download.addEventListener ('click', () => this.Download (archive, info.name + '.auto3d', 'application/octet-stream'));
+        }
+        const touch = Element ('div', 'share_touch_hint', 'Drag to orbit · Pinch to zoom · Two-finger drag to pan', this.website.parameters.viewerDiv);
+        touch.setAttribute ('aria-hidden', 'true');
+        const resize = () => {
+            const compact = window.matchMedia ('(max-width: 800px)').matches || navigator.maxTouchPoints > 0;
+            document.body.classList.toggle ('share_mobile', compact);
+            this.website.layouter.Resize ();
+        };
+        window.addEventListener ('orientationchange', resize);
+        window.visualViewport?.addEventListener ('resize', resize);
+        resize ();
     }
 
     CreateUI ()

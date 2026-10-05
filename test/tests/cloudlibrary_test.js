@@ -42,6 +42,36 @@ export default function suite ()
                 assert.equal (calls[0], 'https://api.example.com/api/library/items');
             } finally { global.fetch = originalFetch; }
         });
+        it ('Creates managed mini-viewer links through the share API', async () => {
+            const library = new CloudLibrary ();
+            let request;
+            library.Request = async (path, options) => {
+                request = { path, options };
+                return new Response (JSON.stringify ({ token : 'c4db39ad-bb0a-4f91-86fc-30e7a4dd7284', url : 'https://auto3d.example/?view=c4db39ad-bb0a-4f91-86fc-30e7a4dd7284', allowDownload : true, codeRequired : true }), { status : 201, headers : { 'Content-Type' : 'application/json' } });
+            };
+            const item = { id : '577a8d6f-85d7-456d-bb75-4946af3c364b' };
+            const result = await library.CreateShare (item, true, '1234');
+            assert.equal (request.path, '/api/share');
+            assert.equal (request.options.method, 'POST');
+            assert.deepEqual (JSON.parse (request.options.body), { itemId : item.id, allowDownload : true, code : '1234' });
+            assert.match (result.url, /\?view=/);
+        });
+
+        it ('Uses POST for protected share archives so access codes stay out of URLs', async () => {
+            const library = new CloudLibrary ();
+            let request;
+            library.Request = async (path, options) => {
+                request = { path, options };
+                return new Response (new Uint8Array ([1, 2, 3]), { status : 200, headers : { 'Content-Type' : 'application/octet-stream' } });
+            };
+            const token = 'c4db39ad-bb0a-4f91-86fc-30e7a4dd7284';
+            const archive = await library.ShareArchive (token, '1234');
+            assert.equal (request.path, '/api/share/' + token + '/archive');
+            assert.equal (request.options.method, 'POST');
+            assert.deepEqual (JSON.parse (request.options.body), { code : '1234' });
+            assert.deepEqual (Array.from (new Uint8Array (archive)), [1, 2, 3]);
+        });
+
         it ('Creates persistent viewer links without carrying workspace URL state', () => {
             const originalWindow = global.window;
             try {

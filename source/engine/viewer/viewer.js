@@ -177,6 +177,7 @@ export class Viewer
         this.onRender = null;
         this.groundGrid = null;
         this.groundGridSettings = { show : false, dark : false };
+        this.defaultDome = null;
         this.settings = {
             animationSteps : 40
         };
@@ -286,6 +287,72 @@ export class Viewer
         this.Render ();
     }
 
+    SetDefaultDome (enabled, colors = null)
+    {
+        if (this.defaultDome !== null) {
+            this.scene.remove (this.defaultDome);
+            this.defaultDome.geometry.dispose ();
+            this.defaultDome.material.dispose ();
+            this.defaultDome = null;
+        }
+        if (!enabled) {
+            this.Render ();
+            return;
+        }
+        const palette = colors || ['#76afe0', '#c4dfef', '#e9eddd', '#adbda3', '#566b58'];
+        const up = this.upVector.direction === Direction.X ? [1, 0, 0] : this.upVector.direction === Direction.Z ? [0, 0, 1] : [0, 1, 0];
+        if (this.upVector.isFlipped) { up[0] *= -1; up[1] *= -1; up[2] *= -1; }
+        const geometry = new THREE.SphereGeometry (1, 48, 24);
+        const material = new THREE.ShaderMaterial ({
+            side : THREE.BackSide,
+            depthWrite : false,
+            depthTest : false,
+            uniforms : {
+                skyTop : { value : new THREE.Color (palette[0]) },
+                horizon : { value : new THREE.Color (palette[2]) },
+                ground : { value : new THREE.Color (palette[4]) },
+                upAxis : { value : new THREE.Vector3 (...up) }
+            },
+            vertexShader : `
+                varying vec3 vDirection;
+                void main () {
+                    vDirection = position;
+                    vec4 clip = projectionMatrix * mat4(mat3(viewMatrix)) * vec4(position, 1.0);
+                    gl_Position = clip.xyww;
+                }
+            `,
+            fragmentShader : `
+                uniform vec3 skyTop;
+                uniform vec3 horizon;
+                uniform vec3 ground;
+                uniform vec3 upAxis;
+                varying vec3 vDirection;
+                void main () {
+                    float height = dot(normalize(vDirection), normalize(upAxis));
+                    float skyMix = pow(clamp(height, 0.0, 1.0), 0.55);
+                    float groundMix = pow(clamp(-height, 0.0, 1.0), 0.65);
+                    vec3 color = height >= 0.0 ? mix(horizon, skyTop, skyMix) : mix(horizon, ground, groundMix);
+                    gl_FragColor = vec4(color, 1.0);
+                }
+            `
+        });
+        const dome = new THREE.Mesh (geometry, material);
+        dome.frustumCulled = false;
+        dome.renderOrder = -10000;
+        dome.name = 'Auto3DDefaultDome';
+        this.defaultDome = dome;
+        this.scene.add (dome);
+        this.Render ();
+    }
+
+    UpdateDefaultDomeUpVector ()
+    {
+        if (this.defaultDome === null) { return; }
+        const up = this.upVector.direction === Direction.X ? [1, 0, 0] : this.upVector.direction === Direction.Z ? [0, 0, 1] : [0, 1, 0];
+        if (this.upVector.isFlipped) { up[0] *= -1; up[1] *= -1; up[2] *= -1; }
+        this.defaultDome.material.uniforms.upAxis.value.set (...up);
+    }
+
     SetGroundGrid (show, dark)
     {
         this.groundGridSettings = { show, dark };
@@ -295,6 +362,7 @@ export class Viewer
 
     UpdateGroundGrid ()
     {
+        this.UpdateDefaultDomeUpVector ();
         if (this.groundGrid !== null) {
             this.scene.remove (this.groundGrid);
             this.groundGrid.dispose ();

@@ -24,3 +24,12 @@ Expected production network destinations before the GIS transition are:
 - Supabase only from the Cloudflare Pages Function for the existing shared-library read path.
 
 Local model content is not sent to Supabase or Cloudflare API endpoints merely by opening or editing it.
+
+
+## Generated share links
+
+Auto3D can create random-token, read-only mini-viewer links for existing Shared Library items. A link can hide the download control and can require a four-digit access code. Access-code hashes are stored in the private database schema rather than in the browser or API-exposed share table; the plaintext code is never stored.
+
+The current pre-Entra Shared Library remains publicly browseable by design. Therefore, a four-digit code gates the generated mini-viewer route but should not be represented as enterprise confidentiality for an item that is already published in the Shared Library. When GIS supplies corporate identity, the same share-link contract should be moved behind the corporate authorization boundary.
+
+Similarly, disabling the download control prevents ordinary UI downloading but cannot make rendered browser-delivered model bytes technically unrecoverable by a determined recipient. Use the option as a product permission/UX control, not as DRM.

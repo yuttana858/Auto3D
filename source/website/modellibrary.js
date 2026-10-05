@@ -183,13 +183,35 @@ export class ModelLibrary
                 }
                 const share = document.createElement ('button'); share.textContent = 'Share'; share.setAttribute ('aria-label', 'Share ' + item.name);
                 share.addEventListener ('click', () => {
-                    if (!item.shared) { status.textContent = 'This save is on this device. Open it and save to Shared library to create a viewer link.'; return; }
+                    if (!item.shared) { status.textContent = 'This save is on this device. Shared links are created from Shared library items.'; return; }
                     const shared = WorkspaceDialog ('Share model'); const form = document.createElement ('div'); form.className = 'workspace_save_form';
-                    const hint = document.createElement ('p'); hint.className = 'section_hint'; hint.textContent = 'Anyone with this link can view the saved session and play its animations. Editing tools are hidden.';
-                    const input = document.createElement ('input'); input.readOnly = true; input.setAttribute ('aria-label', 'Shared viewer link'); input.value = this.sharedStorage.Share (item); input.addEventListener ('click', () => input.select ());
-                    const copy = document.createElement ('button'); copy.textContent = 'Copy link'; copy.addEventListener ('click', async () => { try { await navigator.clipboard.writeText (input.value); copy.textContent = 'Copied'; } catch { input.select (); copy.textContent = 'Select and copy link'; } });
-                    const link = document.createElement ('a'); link.href = input.value; link.target = '_blank'; link.rel = 'noopener'; link.textContent = 'Open shared view';
-                    form.append (hint, input, copy, link); shared.appendChild (form);
+                    const hint = document.createElement ('p'); hint.className = 'section_hint'; hint.textContent = 'Create a read-only Auto3D viewer link for internal or external users. The viewer adapts to desktop, tablet and mobile screens.';
+                    const downloadLabel = document.createElement ('label'); downloadLabel.className = 'share_option';
+                    const allowDownload = document.createElement ('input'); allowDownload.type = 'checkbox';
+                    downloadLabel.append (allowDownload, document.createTextNode (' Allow .auto3d download'));
+                    const codeLabel = document.createElement ('label'); codeLabel.className = 'share_option';
+                    const requireCode = document.createElement ('input'); requireCode.type = 'checkbox';
+                    codeLabel.append (requireCode, document.createTextNode (' Require 4-digit access code'));
+                    const codeInput = document.createElement ('input'); codeInput.type = 'password'; codeInput.inputMode = 'numeric'; codeInput.pattern = '[0-9]{4}'; codeInput.maxLength = 4; codeInput.placeholder = '4-digit code'; codeInput.setAttribute ('aria-label', 'Four digit access code'); codeInput.hidden = true;
+                    requireCode.addEventListener ('change', () => { codeInput.hidden = !requireCode.checked; if (!requireCode.checked) { codeInput.value = ''; } else { codeInput.focus (); } });
+                    codeInput.addEventListener ('input', () => { codeInput.value = codeInput.value.replace (/\D/g, '').slice (0, 4); });
+                    const generate = document.createElement ('button'); generate.className = 'workspace_primary'; generate.textContent = 'Generate viewer link';
+                    const shareStatus = document.createElement ('p'); shareStatus.className = 'section_hint'; shareStatus.setAttribute ('role', 'status');
+                    const input = document.createElement ('input'); input.readOnly = true; input.hidden = true; input.setAttribute ('aria-label', 'Shared viewer link'); input.addEventListener ('click', () => input.select ());
+                    const copy = document.createElement ('button'); copy.textContent = 'Copy link'; copy.hidden = true;
+                    const link = document.createElement ('a'); link.target = '_blank'; link.rel = 'noopener'; link.textContent = 'Open mini viewer'; link.hidden = true;
+                    generate.addEventListener ('click', async () => {
+                        if (requireCode.checked && !/^\d{4}$/.test (codeInput.value)) { shareStatus.textContent = 'Enter exactly four digits for the access code.'; codeInput.focus (); return; }
+                        generate.disabled = true; shareStatus.textContent = 'Creating secure viewer link…';
+                        try {
+                            const result = await this.sharedStorage.CreateShare (item, allowDownload.checked, requireCode.checked ? codeInput.value : '');
+                            input.value = result.url; input.hidden = false; copy.hidden = false; link.hidden = false; link.href = result.url;
+                            shareStatus.textContent = (result.codeRequired ? 'Access code required · ' : 'No access code · ') + (result.allowDownload ? 'Download enabled.' : 'Download hidden.');
+                            input.select ();
+                        } catch (error) { shareStatus.textContent = error.message; generate.disabled = false; }
+                    });
+                    copy.addEventListener ('click', async () => { try { await navigator.clipboard.writeText (input.value); copy.textContent = 'Copied'; } catch { input.select (); copy.textContent = 'Select and copy link'; } });
+                    form.append (hint, downloadLabel, codeLabel, codeInput, generate, shareStatus, input, copy, link); shared.appendChild (form);
                 });
                 actions.appendChild (share); card.append (image, name, info, actions); grid.appendChild (card);
             }

@@ -3,9 +3,11 @@
 .preferences_button { padding: 4px; border: 0; background: transparent; color: var(--ov_foreground_color); cursor: pointer; }
 .header_library_button { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; padding: 5px 8px; background: transparent; color: var(--ov_foreground_color); border: 1px solid var(--ov_border_color); border-radius: 4px; font-size: 9.33px; cursor: pointer; }
 .header_library_button:hover { background: var(--ov_hover_color); }
+.header_share_download { display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; padding: 5px 8px; background: transparent; color: var(--ov_foreground_color); border: 1px solid var(--ov_border_color); border-radius: 4px; font-size: 9.33px; cursor: pointer; }
+.header_share_download:hover { background: var(--ov_hover_color); }
 .library_source_tabs { display: flex; gap: 8px; flex-wrap: wrap; }
 .library_source_tabs button[aria-pressed="true"] { border-color: var(--ov_button_color); background: var(--ov_hover_color); }
-.shared_view #toolbar, .shared_view .header_library_button, .shared_view #upload_slot, .shared_view #intro, .shared_view #materials_section, .shared_view #material_drawer, .shared_view #session_objects > .section_content > .mode_buttons, .shared_view .session_object_row button:not(.object_name), .shared_view .scene_tool:not([aria-label="Select (V)"]):not([aria-label="Focus object (F)"]) { display: none !important; }
+.shared_view #toolbar, .shared_view .header_library_button:not(.header_fullscreen_button), .shared_view #upload_slot, .shared_view #intro, .shared_view #materials_section, .shared_view #material_drawer, .shared_view #session_objects > .section_content > .mode_buttons, .shared_view .session_object_row button:not(.object_name), .shared_view .scene_tool:not([aria-label="Select (V)"]):not([aria-label="Focus object (F)"]) { display: none !important; }
 .scene_tools { position: absolute; top: 12px; right: 10px; bottom: 12px; z-index: 5; display: flex; flex-direction: column; gap: 3px; width: 36px; padding: 5px; box-sizing: border-box; overflow: auto; max-height: fit-content; background: var(--ov_background_color); border: 1px solid var(--ov_border_color); border-radius: 7px; box-shadow: 0 3px 14px #0002; }
 .scene_tool { flex: 0 0 29px; width: 25px; height: 29px; border: 0; background: transparent; color: var(--ov_foreground_color); padding: 3px; cursor: pointer; border-radius: 4px; }
 .scene_tool svg { width: 100%; height: 100%; }
@@ -41,6 +43,8 @@
 .workspace_save_form { display: flex; flex-direction: column; gap: 14px; font-size: 9.33px; }
 .workspace_save_form label { display: flex; flex-direction: column; gap: 6px; }
 .workspace_save_form .password_visibility { flex-direction: row; align-items: center; }
+.workspace_save_form .share_option { flex-direction: row; align-items: center; gap: 8px; }
+.workspace_save_form .share_option input { width: auto; margin: 0; }
 .password_visibility input { width: auto; margin: 0; }
 .workspace_dialog .workspace_primary { background: var(--ov_button_color); color: var(--ov_button_text_color); border-color: var(--ov_button_color); }
 .preferences_about { margin: 0; line-height: 1.7; font-size: 9.33px; }
@@ -58,3 +62,96 @@
 .library_actions { display: flex; flex-wrap: wrap; gap: 3px; padding: 0 6px 6px; }
 .library_actions button { flex: 1; padding: 6px 4px; }
 @media (max-width: 700px) { .library_shell { grid-template-columns: 1fr; } .library_categories { flex-direction: row; flex-wrap: wrap; } .library_grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .scene_transform_panel { width: 180px; } .version_badge { margin-left: 4px; font-size: 6.33px; } }
+
+
+/* Minimal, responsive browser used by generated share links. */
+.mini_shared_view #main_left_container,
+.mini_shared_view #main_right_container,
+.mini_shared_view #toolbar,
+.mini_shared_view #main_file_name,
+.mini_shared_view #intro,
+.mini_shared_view .scene_tools,
+.mini_shared_view .scene_transform_panel,
+.mini_shared_view #material_drawer
+{
+    display: none !important;
+}
+
+.mini_shared_view #main_viewer
+{
+    float: none;
+    width: 100% !important;
+    position: relative;
+}
+
+.mini_shared_view #main_viewer canvas
+{
+    margin: 0;
+    border: 0;
+    touch-action: none;
+}
+
+.mini_shared_view .scene_status
+{
+    left: 12px;
+    right: 12px;
+    bottom: 10px;
+}
+
+.share_touch_hint
+{
+    display: none;
+    position: absolute;
+    z-index: 4;
+    left: 50%;
+    bottom: 34px;
+    transform: translateX(-50%);
+    max-width: calc(100% - 32px);
+    padding: 6px 10px;
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--ov_background_color) 84%, transparent);
+    border: 1px solid var(--ov_border_color);
+    color: var(--ov_foreground_color);
+    font-size: 8.33px;
+    text-align: center;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.share_mobile .share_touch_hint
+{
+    display: block;
+}
+
+@media (max-width: 800px)
+{
+    .mini_shared_view div.title
+    {
+        padding: 4px 6px;
+    }
+
+    .mini_shared_view div.title svg.logo_image
+    {
+        width: 132px;
+        height: 32px;
+    }
+
+    .mini_shared_view .header_library_button,
+    .mini_shared_view .header_share_download
+    {
+        margin-right: 4px;
+        padding: 5px 6px;
+    }
+
+    .mini_shared_view .header_library_button span,
+    .mini_shared_view .header_share_download span
+    {
+        display: none;
+    }
+
+    .share_touch_hint
+    {
+        font-size: 7.33px;
+        white-space: normal;
+    }
+}

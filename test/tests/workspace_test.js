@@ -11,6 +11,8 @@ import { GetBoxUVTriangle, GenerateMissingBoxUVs } from '../../source/website/ma
 import { Mesh } from '../../source/engine/model/mesh.js';
 import { Triangle } from '../../source/engine/model/triangle.js';
 import { Coord3D } from '../../source/engine/geometry/coord3d.js';
+import { Viewer } from '../../source/engine/viewer/viewer.js';
+import { Direction } from '../../source/engine/geometry/geometry.js';
 
 export default function suite ()
 {
@@ -61,6 +63,22 @@ export default function suite ()
             GenerateMissingBoxUVs (viewer, entry);
             assert.equal (original.TextureUVCount (), 3);
         });
+        it ('Uses a world-up shader dome so the horizon stays on the ground plane', () => {
+            const viewer = new Viewer (); viewer.scene = new THREE.Scene (); viewer.Render = () => {};
+            viewer.upVector = { direction : Direction.Y, isFlipped : false };
+            const palette = GetBackgroundPreset ('outdoor', false).colors;
+            viewer.SetDefaultDome (true, palette);
+            assert.ok (viewer.defaultDome);
+            assert.equal (viewer.defaultDome.name, 'Auto3DDefaultDome');
+            assert.deepEqual (viewer.defaultDome.material.uniforms.upAxis.value.toArray (), [0, 1, 0]);
+            viewer.upVector.direction = Direction.Z; viewer.UpdateDefaultDomeUpVector ();
+            assert.deepEqual (viewer.defaultDome.material.uniforms.upAxis.value.toArray (), [0, 0, 1]);
+            viewer.upVector.isFlipped = true; viewer.UpdateDefaultDomeUpVector ();
+            assert.deepEqual (viewer.defaultDome.material.uniforms.upAxis.value.toArray (), [0, 0, -1]);
+            viewer.SetDefaultDome (false);
+            assert.equal (viewer.defaultDome, null);
+        });
+
         it ('Follows the theme for Standard while preserving explicitly selected background colors', () => {
             assert.deepEqual (GetBackgroundPreset ('standard', true).colors, GetBackgroundPreset ('dark', false).colors);
             assert.deepEqual (GetBackgroundPreset ('standard', false).colors, GetBackgroundPreset ('light', true).colors);

@@ -35,6 +35,8 @@ import { GetBackgroundPreset, GetBackgroundGradientCSS } from '../engine/viewer/
 import { SessionEditor } from './sessioneditor.js';
 import { Preferences } from './preferences.js';
 
+const MultiModelExtensions = new Set (['3dm', '3ds', '3mf', 'amf', 'bim', 'brep', 'dae', 'fbx', 'fcstd', 'gltf', 'glb', 'ifc', 'iges', 'igs', 'step', 'stp', 'stl', 'obj', 'off', 'ply', 'wrl', 'zae']);
+
 const WebsiteUIState =
 {
     Undefined : 0,
@@ -210,6 +212,7 @@ export class Website
         this.InitSidebar ();
         this.InitNavigator ();
         this.InitWorkspace ();
+        this.InitFullscreen ();
 
         this.viewer.SetMouseClickHandler (this.OnModelClicked.bind (this));
         this.viewer.SetMouseMoveHandler (this.OnModelMouseMoved.bind (this));
@@ -531,21 +534,40 @@ export class Website
         this.ClearHashIfNotOnlyUrlList ();
     }
 
-    LoadModelFromFileList (files)
+    async LoadModelFromFileList (files)
     {
         if (this.sessionEditor.readOnly) { return; }
-        const session = Array.from (files).find ((file) => file.name.toLowerCase ().endsWith ('.auto3d'));
-        if (session) { this.sessionEditor.Run (() => this.sessionEditor.OpenArchiveFile (session)); return; }
+        const selected = Array.from (files);
+        const session = selected.find ((file) => file.name.toLowerCase ().endsWith ('.auto3d'));
+        if (session) { await this.sessionEditor.Run (() => this.sessionEditor.OpenArchiveFile (session)); return; }
+
+        const candidates = selected.filter ((file) => MultiModelExtensions.has (GetFileExtension (file.name).toLowerCase ()));
+        if (!this.sessionEditor.replaceTarget && candidates.length > 1) {
+            this.sessionEditor.Status ('Importing ' + candidates.length + ' models into this session…');
+            let imported = 0;
+            for (const candidate of candidates) {
+                const importSettings = new ImportSettings ();
+                importSettings.defaultLineColor = this.settings.defaultLineColor;
+                importSettings.defaultColor = this.settings.defaultColor;
+                importSettings.mainFileName = candidate.name;
+                if (await this.LoadModelFromInputFiles (InputFilesFromFileObjects (selected), importSettings)) { imported++; }
+            }
+            this.ClearHashIfNotOnlyUrlList ();
+            this.sessionEditor.Status ('Imported ' + imported + ' of ' + candidates.length + ' selected models · ' + this.sessionEditor.document.objects.length + ' session object(s)');
+            return;
+        }
+
         let importSettings = new ImportSettings ();
         importSettings.defaultLineColor = this.settings.defaultLineColor;
         importSettings.defaultColor = this.settings.defaultColor;
-        let inputFiles = InputFilesFromFileObjects (files);
-        this.LoadModelFromInputFiles (inputFiles, importSettings);
+        let inputFiles = InputFilesFromFileObjects (selected);
+        await this.LoadModelFromInputFiles (inputFiles, importSettings);
         this.ClearHashIfNotOnlyUrlList ();
     }
 
     LoadModelFromInputFiles (files, settings)
     {
+        return new Promise ((resolve) => {
         this.modelLoaderUI.LoadModel (files, settings, {
             onStart : () =>
             {
@@ -555,7 +577,7 @@ export class Website
             onFinish : (importResult, threeObject) =>
             {
                 this.SetUIState (WebsiteUIState.Model);
-                this.sessionEditor.Run (() => this.sessionEditor.Import (importResult, threeObject));
+                this.sessionEditor.Run (() => this.sessionEditor.Import (importResult, threeObject)).then (() => resolve (true));
                 let importedExtension = GetFileExtension (importResult.mainFile);
                 HandleEvent ('model_loaded', importedExtension);
             },
@@ -581,6 +603,7 @@ export class Website
                     }
                     extensionStr = extensions.join (',');
                 }
+                resolve (false);
                 if (importError.code === ImportErrorCode.NoImportableFile) {
                     HandleEvent ('no_importable_file', extensionStr);
                 } else if (importError.code === ImportErrorCode.FailedToLoadFile) {
@@ -591,6 +614,7 @@ export class Website
                     });
                 }
             }
+        });
         });
     }
 
@@ -674,7 +698,9 @@ export class Website
         this.parameters.viewerDiv.classList.toggle ('dark_viewport', dark);
         this.parameters.viewerDiv.classList.toggle ('horizon_viewport', this.settings.horizonGradient);
         this.viewer.SetBackgroundColor (this.settings.backgroundColor);
-        this.viewer.SetBackgroundGradient (this.settings.horizonGradient, dark, background.colors);
+        const useDefaultDome = this.settings.horizonGradient && (!this.lightingPanel || this.lightingPanel.mode === 'default');
+        this.viewer.SetBackgroundGradient (this.settings.horizonGradient && !useDefaultDome, dark, background.colors);
+        this.viewer.SetDefaultDome (useDefaultDome, background.colors);
         const darkGrid = this.settings.backgroundPreset === 'custom' ? (color.r + color.g + color.b) / 3 < 128 : background.dark;
         this.parameters.viewerDiv.style.setProperty ('--sw_axis_text', darkGrid ? '#d5dce3' : '#394650');
         this.viewer.SetGroundGrid (this.settings.showGroundGrid, darkGrid);
@@ -692,6 +718,58 @@ export class Website
         this.UpdateViewport ();
         this.sidebar.UpdateControlsStatus ();
         this.settings.SaveToCookies ();
+    }
+
+    InitFullscreen ()
+    {
+        const request = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen;
+        if (!request) { return; }
+        const button = document.createElement ('button');
+        button.className = 'header_library_button header_fullscreen_button';
+        button.setAttribute ('aria-label', 'Enter full screen');
+        button.title = 'Full screen';
+        button.innerHTML = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5"/></svg><span>Full screen</span>';
+        const update = () => {
+            const active = Boolean (document.fullscreenElement || document.webkitFullscreenElement);
+            button.setAttribute ('aria-label', active ? 'Exit full screen' : 'Enter full screen');
+            button.title = active ? 'Exit full screen' : 'Full screen';
+            button.querySelector ('span').textContent = active ? 'Exit full screen' : 'Full screen';
+            this.layouter.Resize ();
+        };
+        button.addEventListener ('click', () => this.ToggleFullscreen ());
+        document.addEventListener ('fullscreenchange', update);
+        document.addEventListener ('webkitfullscreenchange', update);
+        this.parameters.headerButtonsDiv.prepend (button);
+        update ();
+    }
+
+    IsFullscreen ()
+    {
+        return Boolean (document.fullscreenElement || document.webkitFullscreenElement);
+    }
+
+    async SetFullscreen (enabled)
+    {
+        if (enabled === this.IsFullscreen ()) { return this.IsFullscreen (); }
+        try {
+            if (enabled) {
+                const request = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen;
+                if (!request) { throw new Error ('Full screen is not supported by this browser.'); }
+                await request.call (document.documentElement);
+            } else {
+                const exit = document.exitFullscreen || document.webkitExitFullscreen;
+                if (exit) { await exit.call (document); }
+            }
+        } catch (error) {
+            if (error?.message) { throw error; }
+            throw new Error ('Full screen request was declined by the browser.');
+        }
+        return this.IsFullscreen ();
+    }
+
+    async ToggleFullscreen ()
+    {
+        return this.SetFullscreen (!this.IsFullscreen ());
     }
 
     InitToolbar ()

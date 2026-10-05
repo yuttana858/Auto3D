@@ -10,9 +10,9 @@ export class CloudLibrary
         this.apiUrl = typeof window !== 'undefined' && window.AUTO3D_LIBRARY_API_URL ? window.AUTO3D_LIBRARY_API_URL : '';
     }
 
-    async Request (path)
+    async Request (path, options = {})
     {
-        const response = await fetch (this.apiUrl.replace (/\/$/, '') + path);
+        const response = await fetch (this.apiUrl.replace (/\/$/, '') + path, options);
         if (!response.ok) {
             let detail = null; try { detail = await response.json (); } catch { /* Non-JSON backend error. */ }
             throw new Error (detail?.error || 'Shared library request failed (' + response.status + ').');
@@ -59,6 +59,41 @@ export class CloudLibrary
     async Save ()
     {
         throw new Error ('Shared publishing is disabled until corporate identity is connected. Save to Device library or File on disk.');
+    }
+
+    async CreateShare (item, allowDownload, code)
+    {
+        const response = await this.Request ('/api/share', {
+            method : 'POST',
+            headers : { 'Content-Type' : 'application/json' },
+            body : JSON.stringify ({ itemId : item.id, allowDownload, code : code || null })
+        });
+        return response.json ();
+    }
+
+    async ShareInfo (token)
+    {
+        const response = await this.Request ('/api/share/' + encodeURIComponent (token));
+        return response.json ();
+    }
+
+    async ShareArchive (token, code = '')
+    {
+        const response = await this.Request ('/api/share/' + encodeURIComponent (token) + '/archive', {
+            method : 'POST',
+            headers : { 'Content-Type' : 'application/json' },
+            body : JSON.stringify ({ code })
+        });
+        return response.arrayBuffer ();
+    }
+
+    async DownloadShare (token, code = '')
+    {
+        return this.Request ('/api/share/' + encodeURIComponent (token) + '/download', {
+            method : 'POST',
+            headers : { 'Content-Type' : 'application/json' },
+            body : JSON.stringify ({ code })
+        });
     }
 
     Share (item)
