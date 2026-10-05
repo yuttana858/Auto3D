@@ -4,11 +4,24 @@ import { LibraryService } from './library-service.mjs';
 
 const service = new LibraryService (new SupabaseLibraryAdapter ());
 const maxRequest = Number (process.env.AUTO3D_MAX_REQUEST_BYTES || 70 * 1024 * 1024);
+const allowedOrigins = String (process.env.AUTO3D_ALLOWED_ORIGINS || '').split (',').map ((item) => item.trim ()).filter (Boolean);
 
-function json (response, status, value)
+function corsHeaders (request)
+{
+    const origin = request.headers.origin;
+    if (!origin || !allowedOrigins.includes (origin)) { return {}; }
+    return {
+        'Access-Control-Allow-Origin' : origin,
+        'Access-Control-Allow-Headers' : 'authorization, content-type',
+        'Access-Control-Allow-Methods' : 'GET, POST, DELETE, OPTIONS',
+        'Vary' : 'Origin'
+    };
+}
+
+function json (request, response, status, value)
 {
     const data = JSON.stringify (value);
-    response.writeHead (status, { 'Content-Type' : 'application/json', 'Content-Length' : Buffer.byteLength (data), 'Cache-Control' : 'no-store' });
+    response.writeHead (status, { ...corsHeaders (request), 'Content-Type' : 'application/json', 'Content-Length' : Buffer.byteLength (data), 'Cache-Control' : 'no-store' });
     response.end (data);
 }
 
@@ -16,6 +29,7 @@ function route (url)
 {
     const path = url.pathname.replace (/\/+$/, '') || '/';
     const match = /^\/api\/library\/items\/([0-9a-f-]+)(?:\/(archive|thumbnail))?$/.exec (path);
+    if (path === '/health') { return { name : 'health' }; }
     if (path === '/api/library/items') { return { name : 'items' }; }
     if (match) { return { name : match[2] || 'item', id : match[1] }; }
     return null;
@@ -51,32 +65,36 @@ export function CreateServer (library = service)
         try {
             const url = new URL (request.url, 'http://localhost');
             const found = route (url);
-            if (!found) { json (response, 404, { error : 'Not found.' }); return; }
+            if (!found) { json (request, response, 404, { error : 'Not found.' }); return; }
+            if (request.method === 'OPTIONS') {
+                response.writeHead (204, corsHeaders (request)); response.end (); return;
+            }
+            if (request.method === 'GET' && found.name === 'health') { json (request, response, 200, { service : 'auto3d-library-api', status : 'ok' }); return; }
 
-            if (request.method === 'GET' && found.name === 'items') { json (response, 200, await library.List ()); return; }
+            if (request.method === 'GET' && found.name === 'items') { json (request, response, 200, await library.List ()); return; }
             if (request.method === 'GET' && found.name === 'item') {
-                const item = await library.Get (found.id); if (!item) { json (response, 404, { error : 'Library item not found.' }); return; }
-                json (response, 200, item); return;
+                const item = await library.Get (found.id); if (!item) { json (request, response, 404, { error : 'Library item not found.' }); return; }
+                json (request, response, 200, item); return;
             }
             if (request.method === 'GET' && (found.name === 'archive' || found.name === 'thumbnail')) {
                 const file = await library.Download (found.id, found.name);
-                if (!file) { json (response, 404, { error : 'Library file not found.' }); return; }
-                response.writeHead (file.status || 200, { 'Content-Type' : found.name === 'archive' ? 'application/octet-stream' : 'image/png', 'Cache-Control' : 'private, max-age=60' });
+                if (!file) { json (request, response, 404, { error : 'Library file not found.' }); return; }
+                response.writeHead (file.status || 200, { ...corsHeaders (request), 'Content-Type' : found.name === 'archive' ? 'application/octet-stream' : 'image/png', 'Cache-Control' : 'private, max-age=60' });
                 if (file.body) { for await (const chunk of file.body) { response.write (chunk); } }
                 response.end (); return;
             }
             if (request.method === 'POST' && found.name === 'items') {
                 const { metadata, archive, thumbnail } = await publishForm (request);
-                json (response, 201, await library.Publish (request.headers.authorization, metadata, archive, thumbnail)); return;
+                json (request, response, 201, await library.Publish (request.headers.authorization, metadata, archive, thumbnail)); return;
             }
             if (request.method === 'DELETE' && found.name === 'item') {
                 const deleted = await library.Delete (request.headers.authorization, found.id);
-                if (!deleted) { json (response, 404, { error : 'Library item not found.' }); return; }
+                if (!deleted) { json (request, response, 404, { error : 'Library item not found.' }); return; }
                 response.writeHead (204); response.end (); return;
             }
-            json (response, 405, { error : 'Method not allowed.' });
+            json (request, response, 405, { error : 'Method not allowed.' });
         } catch (error) {
-            json (response, Number (error.status) || 500, { error : Number (error.status) ? error.message : 'Internal server error.' });
+            json (request, response, Number (error.status) || 500, { error : Number (error.status) ? error.message : 'Internal server error.' });
         }
     });
 }
