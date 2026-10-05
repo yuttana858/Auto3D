@@ -406,7 +406,6 @@ export class MaterialPanel
                     material.specular.setRGB (strength, strength, strength);
                     entry.original.specular = HexStringToRGBColor (material.specular.getHexString ());
                 }
-                this.website.lightingPanel?.RefreshMaterialProperties ();
             });
             for (const [key, originalKey, title, map, max] of [
                 ['bumpScale', 'bumpScale', 'Bump', 'bumpMap', 2],
@@ -433,7 +432,7 @@ export class MaterialPanel
             this.Control (properties, 'Double sided', 'checkbox', material.side === THREE.DoubleSide, {}, (value) => {
                 material.side = value ? THREE.DoubleSide : THREE.FrontSide; entry.original.doubleSided = value;
             });
-            const note = this.Text (properties, 'Shared material · Load Bump, AO or Displacement maps in Textures to enable their controls.');
+            const note = this.Text (properties, 'Global reflection multiplies this material’s Reflective value. Roughness, metalness, specular, normal/bump and assigned texture maps remain material-specific. Load Bump, AO or Displacement maps in Textures to enable their controls.');
             note.classList.add ('editor_note');
             this.ShowTextureThumbnails (content, entry);
             return;
