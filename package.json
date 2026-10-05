@@ -59,19 +59,19 @@
 		"update_engine_exports": "run-python3 tools/update_engine_exports.py"
 	},
 	"devDependencies": {
-		"@types/node": "^22.15.0",
-		"esbuild": "^0.25.4",
-		"eslint": "^8.57.0",
-		"eslint-plugin-unused-imports": "^4.1.0",
+		"@types/node": "^22.20.5",
+		"esbuild": "^0.28.2",
+		"eslint": "^8.57.1",
+		"eslint-plugin-unused-imports": "^4.4.1",
 		"fantasticon": "^1.2.2",
 		"http-server": "^14.0.0",
-		"jsdoc": "^4.0.4",
-		"mocha": "^11.5.0",
+		"jsdoc": "^4.0.5",
+		"mocha": "^11.8.0",
 		"oslllo-svg-fixer": "^3.0.0",
-		"rollup": "^4.41.0",
+		"rollup": "^4.64.0",
 		"run-python3": "^0.0.5",
-		"svgo": "^3.3.2",
-		"typescript": "^5.0.4"
+		"svgo": "^3.3.5",
+		"typescript": "^5.9.3"
 	},
 	"dependencies": {
 		"@simonwep/pickr": "1.9.0",
