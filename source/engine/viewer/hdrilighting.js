@@ -50,18 +50,37 @@ export class HDRILighting
         viewer.shadingModel.hdriProbe = this.probe;
     }
 
-    async Load (url)
+    async Decode (url)
     {
-        const request = ++this.request;
-        const texture = await new RGBELoader ().setDataType (THREE.FloatType).loadAsync (url);
-        if (request !== this.request) {
-            texture.dispose ();
-            return false;
-        }
+        const response = await fetch (url, { cache : 'force-cache' });
+        if (!response.ok) { throw new Error ('HDRI request failed (' + response.status + ').'); }
+        const buffer = await response.arrayBuffer ();
+        if (buffer.byteLength < 128) { throw new Error ('HDRI response is empty or invalid.'); }
+        const parsed = new RGBELoader ().setDataType (THREE.FloatType).parse (buffer);
+        const texture = new THREE.DataTexture (
+            parsed.data,
+            parsed.width,
+            parsed.height,
+            parsed.format,
+            parsed.type
+        );
+        texture.colorSpace = parsed.colorSpace || THREE.LinearSRGBColorSpace;
+        texture.minFilter = parsed.minFilter || THREE.LinearFilter;
+        texture.magFilter = parsed.magFilter || THREE.LinearFilter;
+        texture.generateMipmaps = parsed.generateMipmaps === true;
+        texture.flipY = parsed.flipY === true;
+        texture.needsUpdate = true;
+        return texture;
+    }
+
+    async Prepare (url)
+    {
+        const texture = await this.Decode (url);
         texture.mapping = THREE.EquirectangularReflectionMapping;
         const generator = new THREE.PMREMGenerator (this.viewer.renderer);
         let target;
         try {
+            generator.compileEquirectangularShader ();
             target = generator.fromEquirectangular (texture);
         } catch (error) {
             texture.dispose ();
@@ -69,10 +88,48 @@ export class HDRILighting
         } finally {
             generator.dispose ();
         }
+        return { texture, target };
+    }
+
+    async Load (previewUrl, renderUrl = null, fallbackUrl = null)
+    {
+        const request = ++this.request;
+        let prepared;
+        try {
+            prepared = await this.Prepare (previewUrl);
+        } catch (previewError) {
+            if (!fallbackUrl || fallbackUrl === previewUrl) { throw previewError; }
+            prepared = await this.Prepare (fallbackUrl);
+        }
+        if (request !== this.request) {
+            prepared.texture.dispose (); prepared.target.dispose ();
+            return false;
+        }
         this.Release ();
-        this.texture = texture;
-        this.target = target;
+        this.texture = prepared.texture;
+        this.target = prepared.target;
         this.enabled = true;
+        this.Update ();
+
+        // The current catalog ships a low-resolution preview tier. When a
+        // high-resolution render asset is added later, upgrade in-place after
+        // the preview is already interactive.
+        if (renderUrl) {
+            this.Upgrade (request, renderUrl).catch (() => {});
+        }
+        return true;
+    }
+
+    async Upgrade (request, renderUrl)
+    {
+        const prepared = await this.Prepare (renderUrl);
+        if (request !== this.request || !this.enabled) {
+            prepared.texture.dispose (); prepared.target.dispose ();
+            return false;
+        }
+        this.Release ();
+        this.texture = prepared.texture;
+        this.target = prepared.target;
         this.Update ();
         return true;
     }
@@ -115,7 +172,7 @@ export class HDRILighting
                 if (active) {
                     const changed = material.envMap !== this.texture;
                     material.envMap = this.texture;
-                    material.envMapIntensity = this.brightness;
+                    material.envMapIntensity = this.brightness * (this.viewer.scene.userData.auto3dEnvironmentIntensity ?? 1);
                     if (material.envMapRotation?.copy) { material.envMapRotation.copy (this.rotation); }
                     if (changed) { material.needsUpdate = true; }
                 } else {
@@ -141,7 +198,8 @@ export class HDRILighting
         if (active) {
             this.probe.sh.copy (ProjectHDRI (this.texture.image, this.rotation));
         }
-        this.viewer.scene.environmentIntensity = active ? this.brightness : 1;
+        const globalReflection = this.viewer.scene.userData.auto3dEnvironmentIntensity ?? 1;
+        this.viewer.scene.environmentIntensity = active ? this.brightness * globalReflection : globalReflection;
         this.viewer.scene.environmentRotation.copy (active ? this.rotation : new THREE.Euler ());
         this.viewer.scene.backgroundRotation.copy (active ? this.rotation : new THREE.Euler ());
         this.viewer.scene.backgroundIntensity = active && this.showBackground ? this.brightness : 1;
