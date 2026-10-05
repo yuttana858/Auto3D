@@ -103,6 +103,8 @@ export class MaterialPanel
         this.mapSlot = 'map';
         this.textureRequest = 0;
         this.editorTextures = new Set ();
+        this.emphasisState = new Map ();
+        this.flashTimers = new Map ();
         this.drawer = document.getElementById ('material_drawer');
         const tabs = document.createElement ('div');
         tabs.className = 'editor_tabs';
@@ -137,6 +139,8 @@ export class MaterialPanel
     Clear ()
     {
         ++this.textureRequest;
+        for (const timer of this.flashTimers.values ()) { clearTimeout (timer); }
+        this.flashTimers.clear (); this.emphasisState.clear ();
         for (const texture of this.editorTextures) { texture.dispose (); }
         this.editorTextures.clear ();
         this.open = false;
@@ -160,6 +164,98 @@ export class MaterialPanel
         }
     }
 
+    CaptureMaterialState (entry)
+    {
+        const material = entry.material;
+        return {
+            color : material.color?.getHexString?.() || null,
+            emissive : material.emissive?.getHexString?.() || null,
+            emissiveIntensity : material.emissiveIntensity,
+            opacity : material.opacity,
+            transparent : material.transparent,
+            roughness : material.roughness,
+            metalness : material.metalness,
+            specularIntensity : material.specularIntensity,
+            specular : material.specular?.getHexString?.() || null,
+            shininess : material.shininess,
+            bumpScale : material.bumpScale,
+            normalScale : material.normalScale?.x,
+            aoMapIntensity : material.aoMapIntensity,
+            displacementScale : material.displacementScale,
+            side : material.side
+        };
+    }
+
+    RestoreMaterialState (entry, state)
+    {
+        const material = entry.material;
+        if (state.color !== null && material.color) { material.color.set ('#' + state.color); entry.original.color = HexStringToRGBColor (state.color); }
+        if (state.emissive !== null && material.emissive) { material.emissive.set ('#' + state.emissive); }
+        for (const key of ['emissiveIntensity', 'opacity', 'roughness', 'metalness', 'specularIntensity', 'shininess', 'bumpScale', 'aoMapIntensity', 'displacementScale', 'side']) {
+            if (state[key] !== undefined) { material[key] = state[key]; }
+        }
+        if (state.specular !== null && material.specular) { material.specular.set ('#' + state.specular); }
+        if (state.normalScale !== undefined && material.normalScale) { material.normalScale.setScalar (state.normalScale); }
+        material.transparent = state.transparent;
+        material.needsUpdate = true;
+        this.ShowSummary (); if (this.open) { this.FillDrawer (); } this.website.viewer.Render ();
+    }
+
+    Emphasize (entry, strength = 0.35)
+    {
+        const material = entry?.material;
+        if (!material?.emissive) { return; }
+        if (!this.emphasisState.has (material)) {
+            this.emphasisState.set (material, { emissive : material.emissive.clone (), intensity : material.emissiveIntensity });
+        }
+        material.emissive.set (0xffffff);
+        material.emissiveIntensity = strength;
+        material.needsUpdate = true;
+        this.website.viewer.Render ();
+    }
+
+    ClearEmphasis (entry)
+    {
+        const material = entry?.material; const state = this.emphasisState.get (material);
+        if (!material || !state) { return; }
+        material.emissive.copy (state.emissive);
+        material.emissiveIntensity = state.intensity;
+        material.needsUpdate = true;
+        this.emphasisState.delete (material);
+        this.website.viewer.Render ();
+    }
+
+    Flash (entry)
+    {
+        const material = entry?.material;
+        if (!material) { return; }
+        const previous = this.flashTimers.get (material);
+        if (previous) { clearTimeout (previous); }
+        this.Emphasize (entry, 1.0);
+        this.flashTimers.set (material, setTimeout (() => {
+            this.flashTimers.delete (material);
+            this.ClearEmphasis (entry);
+        }, 180));
+    }
+
+    RenameMaterial (entry)
+    {
+        const previous = entry.original.name || 'Material ' + (entry.index + 1);
+        const value = window.prompt ('Rename material', previous);
+        if (value === null) { return; }
+        const next = value.trim ().slice (0, 100);
+        if (!next || next === previous) { return; }
+        const apply = (name) => {
+            entry.original.name = name;
+            entry.material.name = name;
+            this.ShowSummary ();
+            if (this.open) { this.FillDrawer (); }
+            this.website.sessionEditor?.MarkDirty ();
+        };
+        apply (next);
+        this.website.sessionEditor?.PushHistory (() => apply (previous), () => apply (next));
+    }
+
     ShowSummary ()
     {
         document.getElementById ('material_context').textContent = this.entries.length ? (this.website.navigator.GetSelectedMeshId () ? 'Selected part' : 'Whole model') + ' · ' + this.entries.length + ' material(s)' : 'Load a model, then select a part to inspect its materials.';
@@ -173,11 +269,16 @@ export class MaterialPanel
             swatch.className = 'material_swatch';
             swatch.style.backgroundColor = '#' + entry.material.color.getHexString ();
             if (image) { swatch.width = 22; swatch.height = 22; DrawTextureThumbnail (swatch, image); }
-            const text = document.createElement ('span');
+            const text = document.createElement ('span'); text.className = 'material_card_text';
+            const name = document.createElement ('span'); name.className = 'material_name editable_name'; name.textContent = entry.original.name || 'Material ' + (entry.index + 1); name.title = 'Click to rename material';
             const maps = TextureSlots.filter ((slot) => entry.material[slot[0]]);
-            text.textContent = (entry.original.name || 'Material ' + (entry.index + 1)) + ' · ' + (maps.length ? maps.map ((slot) => slot[1]).join (', ') : 'Solid color · no texture');
+            const detail = document.createElement ('span'); detail.className = 'material_map_summary'; detail.textContent = ' · ' + (maps.length ? maps.map ((slot) => slot[1]).join (', ') : 'Solid color · no texture');
+            text.append (name, detail);
             button.append (swatch, text);
-            button.addEventListener ('click', () => { this.active = index; this.Open (); });
+            button.addEventListener ('mouseenter', () => this.Emphasize (entry, 0.32));
+            button.addEventListener ('mouseleave', () => { if (!this.flashTimers.has (entry.material)) { this.ClearEmphasis (entry); } });
+            name.addEventListener ('click', (event) => { event.stopPropagation (); this.ClearEmphasis (entry); this.RenameMaterial (entry); });
+            button.addEventListener ('click', () => { this.active = index; this.Flash (entry); this.Open (); });
             list.appendChild (button);
         });
         document.getElementById ('material_advance').disabled = !this.entries.length;
@@ -224,7 +325,7 @@ export class MaterialPanel
         select.setAttribute ('aria-label', 'Material');
         this.entries.forEach ((item, index) => select.add (new Option (item.original.name || 'Material ' + (item.index + 1), index)));
         select.value = this.active;
-        select.addEventListener ('change', () => { this.active = Number (select.value); this.FillDrawer (); });
+        select.addEventListener ('change', () => { this.active = Number (select.value); this.Flash (this.entries[this.active]); this.FillDrawer (); });
         contextLabel.appendChild (select);
         for (const button of this.drawer.querySelectorAll ('[role="tab"]')) {
             const selected = button.id === 'editor_tab_' + this.page;
@@ -556,6 +657,11 @@ export class MaterialPanel
         const output = document.createElement ('output');
         output.textContent = type === 'range' ? this.FormatValue (value) : '';
         label.append (caption, input, output);
+        const entry = this.entries[this.active];
+        let beforeState = null;
+        const captureBefore = () => { if (beforeState === null) { beforeState = this.CaptureMaterialState (entry); } };
+        input.addEventListener ('pointerdown', captureBefore);
+        input.addEventListener ('focus', captureBefore);
         input.addEventListener ('input', () => {
             if (type === 'number' && (!input.value || !Number.isFinite (Number (input.value)))) { return; }
             onChange (type === 'checkbox' ? input.checked : input.value);
@@ -563,6 +669,15 @@ export class MaterialPanel
             output.textContent = type === 'range' ? this.FormatValue (input.value) : '';
             this.entries[this.active].material.needsUpdate = true;
             this.website.viewer.Render ();
+        });
+        input.addEventListener ('change', () => {
+            if (beforeState === null) { return; }
+            const before = beforeState; const after = this.CaptureMaterialState (entry); beforeState = null;
+            if (JSON.stringify (before) === JSON.stringify (after)) { return; }
+            this.website.sessionEditor?.PushHistory (
+                () => this.RestoreMaterialState (entry, before),
+                () => this.RestoreMaterialState (entry, after)
+            );
         });
         parent.appendChild (label);
     }
