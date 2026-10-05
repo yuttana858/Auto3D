@@ -1,0 +1,49 @@
+name: Deploy Cloudflare Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: cloudflare-pages-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build_website
+      - run: node tools/build_pages.mjs
+
+      - name: Ensure Cloudflare Pages project exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! npx --yes wrangler@4.146.0 pages project list | grep -Eq '(^|[[:space:]])auto3d([[:space:]]|$)'; then
+            npx --yes wrangler@4.146.0 pages project create auto3d --production-branch=main
+          fi
+
+      - name: Deploy Auto3D
+        run: >
+          npx --yes wrangler@4.146.0 pages deploy build/pages
+          --project-name=auto3d
+          --branch=main
+          --commit-hash="${GITHUB_SHA}"
