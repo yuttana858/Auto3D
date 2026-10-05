@@ -2,7 +2,6 @@ import http from 'node:http';
 import { SupabaseLibraryAdapter } from './adapters/supabase.mjs';
 import { LibraryService } from './library-service.mjs';
 
-const service = new LibraryService (new SupabaseLibraryAdapter ());
 const maxRequest = Number (process.env.AUTO3D_MAX_REQUEST_BYTES || 70 * 1024 * 1024);
 const allowedOrigins = String (process.env.AUTO3D_ALLOWED_ORIGINS || '').split (',').map ((item) => item.trim ()).filter (Boolean);
 
@@ -57,8 +56,14 @@ async function publishForm (request)
     return { metadata, archive : Buffer.from (await archive.arrayBuffer ()), thumbnail : Buffer.from (await thumbnail.arrayBuffer ()) };
 }
 
-export function CreateServer (library = service)
+function DefaultService ()
 {
+    return new LibraryService (new SupabaseLibraryAdapter ());
+}
+
+export function CreateServer (library = null)
+{
+    const activeLibrary = library || DefaultService ();
     return http.createServer (async (request, response) => {
         response.setHeader ('X-Content-Type-Options', 'nosniff');
         response.setHeader ('Referrer-Policy', 'no-referrer');
@@ -71,13 +76,13 @@ export function CreateServer (library = service)
             }
             if (request.method === 'GET' && found.name === 'health') { json (request, response, 200, { service : 'auto3d-library-api', status : 'ok' }); return; }
 
-            if (request.method === 'GET' && found.name === 'items') { json (request, response, 200, await library.List ()); return; }
+            if (request.method === 'GET' && found.name === 'items') { json (request, response, 200, await activeLibrary.List ()); return; }
             if (request.method === 'GET' && found.name === 'item') {
-                const item = await library.Get (found.id); if (!item) { json (request, response, 404, { error : 'Library item not found.' }); return; }
+                const item = await activeLibrary.Get (found.id); if (!item) { json (request, response, 404, { error : 'Library item not found.' }); return; }
                 json (request, response, 200, item); return;
             }
             if (request.method === 'GET' && (found.name === 'archive' || found.name === 'thumbnail')) {
-                const file = await library.Download (found.id, found.name);
+                const file = await activeLibrary.Download (found.id, found.name);
                 if (!file) { json (request, response, 404, { error : 'Library file not found.' }); return; }
                 response.writeHead (file.status || 200, { ...corsHeaders (request), 'Content-Type' : found.name === 'archive' ? 'application/octet-stream' : 'image/png', 'Cache-Control' : 'private, max-age=60' });
                 if (file.body) { for await (const chunk of file.body) { response.write (chunk); } }
@@ -85,10 +90,10 @@ export function CreateServer (library = service)
             }
             if (request.method === 'POST' && found.name === 'items') {
                 const { metadata, archive, thumbnail } = await publishForm (request);
-                json (request, response, 201, await library.Publish (request.headers.authorization, metadata, archive, thumbnail)); return;
+                json (request, response, 201, await activeLibrary.Publish (request.headers.authorization, metadata, archive, thumbnail)); return;
             }
             if (request.method === 'DELETE' && found.name === 'item') {
-                const deleted = await library.Delete (request.headers.authorization, found.id);
+                const deleted = await activeLibrary.Delete (request.headers.authorization, found.id);
                 if (!deleted) { json (request, response, 404, { error : 'Library item not found.' }); return; }
                 response.writeHead (204, corsHeaders (request)); response.end (); return;
             }
