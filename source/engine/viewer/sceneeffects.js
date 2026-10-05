@@ -135,6 +135,13 @@ export class SceneEffects
         this.reflectionState.clear ();
     }
 
+    SuspendDynamicReflection ()
+    {
+        if (!this.settings.modelReflections) { return; }
+        this.RestoreMaterialReflections ();
+        if (this.cubeCamera) { this.cubeCamera.visible = false; }
+    }
+
     UpdateDynamicReflection ()
     {
         if (!this.settings.modelReflections) {
