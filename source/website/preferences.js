@@ -68,10 +68,38 @@ export class Preferences
         units.addEventListener ('change', () => {
             this.SetUnits (units.value);
         }); unitLabel.appendChild (units);
+        const aiHeading = document.createElement ('strong'); aiHeading.textContent = 'AI connections';
+        const aiProviderLabel = document.createElement ('label'); aiProviderLabel.textContent = 'Provider';
+        const aiProvider = document.createElement ('select'); aiProvider.setAttribute ('aria-label', 'AI provider'); aiProvider.add (new Option ('Meshy', 'meshy')); aiProvider.add (new Option ('Custom REST provider', 'custom')); aiProvider.value = this.website.aiWorkspace?.settings.provider || 'meshy'; aiProviderLabel.appendChild (aiProvider);
+        const aiBaseLabel = document.createElement ('label'); aiBaseLabel.textContent = 'API base URL';
+        const aiBase = document.createElement ('input'); aiBase.type = 'url'; aiBase.value = this.website.aiWorkspace?.settings.baseUrl || 'https://api.meshy.ai'; aiBase.autocomplete = 'off'; aiBase.spellcheck = false; aiBase.setAttribute ('aria-label', 'AI provider base URL'); aiBaseLabel.appendChild (aiBase);
+        const aiKeyLabel = document.createElement ('label'); aiKeyLabel.textContent = 'API key';
+        const aiKey = document.createElement ('input'); aiKey.type = 'password'; aiKey.value = this.website.aiWorkspace?.settings.apiKey || ''; aiKey.placeholder = 'Bearer API key'; aiKey.autocomplete = 'off'; aiKey.setAttribute ('aria-label', 'AI provider API key'); aiKeyLabel.appendChild (aiKey);
+        const rememberLabel = document.createElement ('label'); rememberLabel.className = 'share_option'; const remember = document.createElement ('input'); remember.type = 'checkbox'; remember.checked = this.website.aiWorkspace?.settings.remember === true; rememberLabel.append (remember, document.createTextNode (' Remember key on this device'));
+        const aiNote = document.createElement ('p'); aiNote.className = 'section_hint'; aiNote.textContent = 'API keys are never saved inside .auto3d sessions. Remembering a key stores it in this browser profile; for shared or production deployments, use a server-side proxy so the provider key is not exposed to browser code.';
+        const aiActions = document.createElement ('div'); aiActions.className = 'mode_buttons';
+        const saveAI = document.createElement ('button'); saveAI.textContent = 'Save connection'; saveAI.className = 'workspace_primary';
+        const testAI = document.createElement ('button'); testAI.textContent = 'Test connection';
+        const clearAI = document.createElement ('button'); clearAI.textContent = 'Clear key';
+        const aiStatus = document.createElement ('p'); aiStatus.className = 'section_hint'; aiStatus.setAttribute ('role', 'status');
+        const saveConnection = () => {
+            this.website.aiWorkspace?.SaveSettings ({ provider : aiProvider.value, baseUrl : aiBase.value, apiKey : aiKey.value, remember : remember.checked });
+            aiStatus.textContent = 'AI connection settings saved for this ' + (remember.checked ? 'browser profile.' : 'browser session.');
+        };
+        saveAI.addEventListener ('click', saveConnection);
+        testAI.addEventListener ('click', async () => {
+            saveConnection (); testAI.disabled = true; aiStatus.textContent = 'Testing connection…';
+            try { const result = await this.website.aiWorkspace.TestConnection (); aiStatus.textContent = Number.isFinite (result.balance) ? 'Connected · ' + result.balance + ' credits available.' : 'Connection succeeded.'; }
+            catch (error) { aiStatus.textContent = error.message; }
+            finally { testAI.disabled = false; }
+        });
+        clearAI.addEventListener ('click', () => { aiKey.value = ''; this.website.aiWorkspace?.ClearKey (); aiStatus.textContent = 'API key cleared.'; });
+        aiProvider.addEventListener ('change', () => { if (aiProvider.value === 'meshy' && (!aiBase.value || aiBase.value.includes ('meshy.ai'))) { aiBase.value = 'https://api.meshy.ai'; } });
+        aiActions.append (saveAI, testAI, clearAI);
         const about = document.createElement ('p'); about.className = 'preferences_about';
         about.textContent = 'SW Auto3D v' + AppVersion + ' — A browser workspace for inspecting, arranging and reviewing 3D models, materials, lighting and reusable layouts. Dimensions use the units declared by the source model; unspecified units remain model units.';
         const commands = document.createElement ('button'); commands.textContent = 'Commands and macros'; commands.className = 'workspace_primary'; commands.addEventListener ('click', () => { dialog.close (); OpenCommandPanel (this.website); });
-        const heading = document.createElement ('strong'); heading.textContent = 'About'; form.append (appearance, unitLabel, commands, heading, about); dialog.appendChild (form);
+        const heading = document.createElement ('strong'); heading.textContent = 'About'; form.append (appearance, unitLabel, commands, aiHeading, aiProviderLabel, aiBaseLabel, aiKeyLabel, rememberLabel, aiNote, aiActions, aiStatus, heading, about); dialog.appendChild (form);
     }
 
     SetUnits (units)
