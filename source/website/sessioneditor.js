@@ -478,6 +478,11 @@ export class SessionEditor
         }
         if (!this.selected && !fromNavigator && this.website.navigator.GetSelectedMeshId ()) { this.website.navigator.SetSelection (null); }
         this.UpdateSelectionBox (); this.SyncInputs (); this.RefreshUI (); this.UpdateDetails (); this.website.viewer.Render ();
+        // Viewer click selection can complete its own render after this callback. Re-assert the
+        // object bounds on the next frame so a simple click is visually identical to click-drag.
+        requestAnimationFrame (() => {
+            if (this.selected === object) { this.UpdateSelectionBox (); this.website.viewer.Render (); }
+        });
     }
     SelectionChanged ()
     {
@@ -503,6 +508,7 @@ export class SessionEditor
         this.selectionBounds.setFromObject (this.selected.threeObject, true);
         this.selectionBox.visible = !this.selectionBounds.isEmpty ();
         this.selectionBox.updateMatrixWorld (true);
+        if (this.selectionBox.material) { this.selectionBox.material.needsUpdate = true; }
     }
 
     SyncInputs ()
@@ -559,8 +565,8 @@ export class SessionEditor
         if (!object?.threeObject || !this.website.model) { this.DisposeModelPreview (); return; }
         const panel = this.website.sidebar.detailsPanel;
         const table = panel.contentDiv.querySelector ('.ov_property_table');
-        if (!table) { return; }
         this.UpdateModelPreview (panel, object);
+        if (!table) { panel.Resize (); return; }
 
         table.querySelectorAll ('.scene_dimension').forEach ((row) => row.remove ());
         table.querySelectorAll ('.ov_property_table_row').forEach ((row) => {
