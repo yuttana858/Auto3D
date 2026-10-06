@@ -538,8 +538,9 @@ export class Website
     LoadModelFromUrlList (urls, settings)
     {
         let inputFiles = InputFilesFromUrls (urls);
-        this.LoadModelFromInputFiles (inputFiles, settings);
+        const loading = this.LoadModelFromInputFiles (inputFiles, settings);
         this.ClearHashIfNotOnlyUrlList ();
+        return loading;
     }
 
     async LoadModelFromFileList (files)
