@@ -847,7 +847,7 @@ export class SessionEditor
 
     Archive (objects, kind, name)
     {
-        const data = PackSession (this.document, { camera : this.website.viewer.GetCamera (), backgroundPreset : this.website.settings.backgroundPreset, horizonGradient : this.website.settings.horizonGradient, showGroundGrid : this.website.settings.showGroundGrid, lighting : this.website.lightingPanel.Capture () }, objects, kind); data.name = name; return CreateSessionArchive (data);
+        const data = PackSession (this.document, { camera : this.website.viewer.GetCamera (), cameraState : CaptureCameraState (this.website.viewer), timeline : this.timeline.Serialize (), backgroundPreset : this.website.settings.backgroundPreset, horizonGradient : this.website.settings.horizonGradient, showGroundGrid : this.website.settings.showGroundGrid, lighting : this.website.lightingPanel.Capture () }, objects, kind); data.name = name; return CreateSessionArchive (data);
     }
     async OpenArchive (buffer, append, recovered = false)
     {
@@ -856,10 +856,10 @@ export class SessionEditor
             const added = [];
             for (const source of saved.document.objects) {
                 const model = saved.document.CompactModel ([source], true); model.root = model.root.GetChildNode (0);
-                const object = this.document.AddImported (model, source.name, Direction.Y, false); Object.assign (object, TransformState (source), { source : source.source, visible : source.visible, hiddenParts : [...source.hiddenParts], unit : source.unit, userData : { ...(source.userData || {}) }, castShadow : source.castShadow !== false, receiveShadow : source.receiveShadow !== false, animationAsset : source.animationAsset, playback : source.playback }); this.document.ApplyTransform (object); added.push (object);
+                const object = this.document.AddImported (model, source.name, Direction.Y, false); Object.assign (object, TransformState (source), { source : source.source, visible : source.visible, hiddenParts : [...source.hiddenParts], unit : source.unit, userData : { ...(source.userData || {}) }, castShadow : source.castShadow !== false, receiveShadow : source.receiveShadow !== false, keyframes : (source.keyframes || []).map ((keyframe) => ({ ...keyframe, position : [...keyframe.position], rotation : [...keyframe.rotation], scale : [...keyframe.scale] })), animationAsset : source.animationAsset, playback : source.playback }); this.document.ApplyTransform (object); added.push (object);
             }
             const firstIndex = this.document.objects.length - added.length; this.history.Push ({ undo : async () => { added.forEach ((object) => this.document.Remove (object)); this.selected = null; await this.Render (); }, redo : async () => { added.forEach ((object, index) => this.document.Restore (object, firstIndex + index)); this.selected = added[0]; await this.Render (); } }); this.selected = added[0];
-        } else { this.document = saved.document; this.history = new SceneHistory (() => this.MarkDirty ()); this.selected = this.document.objects[0] || null; if (this.website.hashHandler.HasHash ()) { this.website.hashHandler.SkipNextEventHandler (); this.website.hashHandler.ClearHash (); } }
+        } else { this.document = saved.document; this.history = new SceneHistory (() => this.MarkDirty ()); this.timeline.Load (saved.view.timeline); this.selected = this.document.objects[0] || null; if (this.website.hashHandler.HasHash ()) { this.website.hashHandler.SkipNextEventHandler (); this.website.hashHandler.ClearHash (); } }
         await this.Render (true);
         if (!append) {
             if (['standard', 'dark', 'light', 'sunset', 'outdoor', 'custom'].includes (saved.view.backgroundPreset)) { this.website.settings.backgroundPreset = saved.view.backgroundPreset; }
@@ -867,9 +867,11 @@ export class SessionEditor
             this.website.UpdateViewport ();
             if (saved.view.lighting) { await this.website.lightingPanel.Restore (saved.view.lighting); }
         }
-        if (!append && saved.view.camera) {
+        if (!append && saved.view.cameraState) {
+            ApplyCameraState (this.website.viewer, saved.view.cameraState);
+        } else if (!append && saved.view.camera) {
             const camera = this.website.viewer.GetCamera (); const data = saved.view.camera;
-            if (['eye', 'center', 'up'].every ((key) => data[key] && ['x', 'y', 'z'].every ((axis) => Number.isFinite (data[key][axis])))) { ['eye', 'center', 'up'].forEach ((key) => Object.assign (camera[key], data[key])); this.website.viewer.SetCamera (camera); }
+            if (['eye', 'center', 'up'].every ((key) => data[key] && ['x', 'y', 'z'].every ((axis) => Number.isFinite (data[key][axis])))) { ['eye', 'center', 'up'].forEach ((key) => Object.assign (camera[key], data[key])); if (Number.isFinite (data.fov)) { camera.fov = data.fov; } this.website.viewer.SetCamera (camera); }
         }
         this.Status ((append ? 'Added from ' : 'Opened ') + saved.document.name);
         if (!append) {
