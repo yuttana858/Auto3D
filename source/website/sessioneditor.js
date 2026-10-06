@@ -58,7 +58,7 @@ export class SessionEditor
         viewer.scene.add (this.selectionBox);
         this.controls = new TransformControls (viewer.camera, viewer.renderer.domElement); this.controls.setSize (0.8); this.helper = this.controls.getHelper (); viewer.scene.add (this.helper);
         const render = viewer.onRender;
-        viewer.SetRenderHandler ((camera) => { if (render) { render (camera); } if (this.controls.camera !== camera) { this.controls.camera = camera; } });
+        viewer.SetRenderHandler ((camera) => { if (render) { render (camera); } if (this.controls.camera !== camera) { this.controls.camera = camera; } this.website.modelPreview?.Render (); });
         this.controls.addEventListener ('change', () => viewer.Render ());
         this.controls.addEventListener ('dragging-changed', (event) => {
             viewer.navigation.enabled = !event.value; viewer.navigation.clickDetector.Cancel ();
@@ -422,7 +422,7 @@ export class SessionEditor
     {
         const after = TransformState (object); if (JSON.stringify (before) === JSON.stringify (after)) { return; }
         const apply = (state) => { Object.assign (object, { position : [...state.position], rotation : [...state.rotation], scale : [...state.scale] }); this.ApplyTransform (object); this.UpdateDetails (); };
-        this.history.Push ({ undo : () => apply (before), redo : () => apply (after) }); this.RefreshButtons ();
+        this.history.Push ({ undo : () => apply (before), redo : () => apply (after) }); this.RefreshButtons (); this.website.modelPreview?.Update ();
     }
 
     SetMode (mode) { if (this.readOnly && mode !== 'select') { return; } this.mode = mode; this.Select (this.selected); }
