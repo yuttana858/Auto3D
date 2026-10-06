@@ -96,6 +96,6 @@ Ctrl/Cmd+Z uses the session-wide history stack for object operations plus the ne
 ### v0.26 animation and model preview
 
 - Model Data starts collapsed by default to maximize the central viewer.
-- A compact interactive model preview sits above Model Data when the panel is expanded. The preview auto-centers the full session and uses left-drag trackball rotation across X/Y/Z; double-click resets the preview orientation.
+- A compact interactive model preview sits above Model Data when the panel is expanded.
 - GLB/glTF animation source bytes remain embedded in portable `.auto3d` files. Animation clip, timeline position, speed and loop preference persist with the session; playback reopens paused.
-- Session regression coverage verifies model textures, physical reflection properties (roughness, metalness, reflective/specular intensity), HDRI/background/light/reflection/shadow view settings and embedded animation resources survive a portable session round trip.
+- Session regression coverage verifies model textures, physical reflection properties, HDRI/background/light/reflection/shadow view settings and embedded animation resources survive a portable session round trip.

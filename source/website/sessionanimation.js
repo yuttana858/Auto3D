@@ -14,10 +14,9 @@ export class AnimationPlayer
     }
     Choose (index, time = 0)
     {
-        this.mixer.stopAllAction (); this.state.clip = index; this.action = this.mixer.clipAction (this.clips[index]);
-        this.ApplyLoop (); this.action.reset ().play (); this.Seek (time);
+        this.mixer.stopAllAction (); this.state.clip = index; this.action = this.mixer.clipAction (this.clips[index]); this.ApplyLoopMode (); this.action.reset ().play (); this.Seek (time);
     }
-    ApplyLoop ()
+    ApplyLoopMode ()
     {
         if (!this.action) { return; }
         this.action.setLoop (this.state.loop ? THREE.LoopRepeat : THREE.LoopOnce, this.state.loop ? Infinity : 1);
@@ -26,7 +25,7 @@ export class AnimationPlayer
     SetLoop (loop)
     {
         this.state.loop = loop !== false;
-        this.ApplyLoop ();
+        this.ApplyLoopMode ();
     }
     Seek (time)
     {
@@ -39,7 +38,9 @@ export class AnimationPlayer
         const tick = (time) => {
             this.frame = null; if (!this.state.playing) { return; }
             const delta = Math.min ((time - this.previous) / 1000, 0.1); this.previous = time; this.mixer.update (delta * this.state.speed); this.state.time = this.action.time;
-            if (this.onTime) { this.onTime (this.state.time); } this.render (); this.frame = requestAnimationFrame (tick);
+            if (this.onTime) { this.onTime (this.state.time); } this.render ();
+            if (!this.state.loop && this.action.time >= this.clips[this.state.clip].duration - 1e-6) { this.state.playing = false; if (this.onPlaybackChanged) { this.onPlaybackChanged (false); } return; }
+            this.frame = requestAnimationFrame (tick);
         }; this.frame = requestAnimationFrame (tick);
     }
     ExportClips ()

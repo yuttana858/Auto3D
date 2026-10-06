@@ -68,6 +68,33 @@ export function CreateAgentCommands (website)
         if (entry.material[slot] === before) { throw new Error (status.textContent || 'Texture replacement failed.'); }
         return { index, slot, name };
     });
+    add ('knowledge.paper_packaging', 'Search corrugated packaging knowledge', 'Knowledge', 'Search Auto3D\'s curated corrugated-paper packaging knowledge base for FEFCO styles, board/flute specifications, material properties, strength metrics and design guidance.', { query : text }, ['query'], false, async ({ query }) => {
+        const response = await fetch ('/api/knowledge/paper-packaging?q=' + encodeURIComponent (query.trim ()));
+        if (!response.ok) { throw new Error ('Paper packaging knowledge is unavailable.'); }
+        return response.json ();
+    }, { query : 'FEFCO 0201 C flute 32 ECT stacking' });
+    add ('knowledge.paper_packaging_section', 'Read corrugated packaging section', 'Knowledge', 'Read one complete section from Auto3D\'s corrugated packaging knowledge base.', { section : enumOf ('terminology', 'fefco', 'papers', 'flutes', 'multiwall', 'performance', 'referenceGrades', 'cadReferences', 'selectionGuidance', 'agentRules', 'sources') }, ['section'], false, async ({ section }) => {
+        const response = await fetch ('/api/knowledge/paper-packaging?section=' + encodeURIComponent (section));
+        if (!response.ok) { throw new Error ('Paper packaging knowledge is unavailable.'); }
+        return response.json ();
+    }, { section : 'flutes' });
+    add ('animation.timeline.inspect', 'Inspect keyframe timeline', 'Animation', 'Return native Auto3D timeline duration, playhead, interpolation mode, camera keyframes and per-object keyframe counts.', {}, [], false, () => ({
+        duration : editor.timeline.duration,
+        time : editor.timeline.time,
+        loop : editor.timeline.loop,
+        interpolation : editor.timeline.interpolation,
+        cameraKeyframes : editor.timeline.cameraKeyframes.map ((item) => ({ ...item })),
+        objects : editor.document.objects.map ((item) => ({ objectId : item.id, name : item.name, keyframes : (item.keyframes || []).map ((keyframe) => ({ ...keyframe })) }))
+    }));
+    add ('animation.timeline.seek', 'Seek keyframe timeline', 'Animation', 'Move the native Auto3D timeline playhead and evaluate object/camera tweening.', { time : { ...number, minimum : 0 } }, ['time'], false, ({ time }) => { editor.timeline.Seek (Math.min (time, editor.timeline.duration)); return { time : editor.timeline.time }; }, { time : 1 });
+    add ('animation.keyframe.object', 'Save object keyframe', 'Animation', 'Capture an object position, rotation and scale on the native timeline.', { objectId : text, time : { ...number, minimum : 0 }, interpolation : enumOf ('smooth', 'linear', 'step') }, ['objectId'], true, ({ objectId, time, interpolation }) => {
+        const item = object (objectId); if (Number.isFinite (time)) { editor.timeline.time = Math.min (time, editor.timeline.duration); } if (interpolation) { editor.timeline.interpolation = interpolation; }
+        const keyframe = editor.timeline.CaptureObject (item); editor.MarkDirty (); editor.AnimationUI (); return keyframe;
+    }, { time : 0, interpolation : 'smooth' });
+    add ('animation.keyframe.camera', 'Save camera keyframe', 'Animation', 'Capture the current viewer camera position, target, orientation, FOV, azimuth and elevation on the native timeline.', { time : { ...number, minimum : 0 }, interpolation : enumOf ('smooth', 'linear', 'step') }, [], true, ({ time, interpolation }) => {
+        if (Number.isFinite (time)) { editor.timeline.time = Math.min (time, editor.timeline.duration); } if (interpolation) { editor.timeline.interpolation = interpolation; }
+        const keyframe = editor.timeline.CaptureCamera (); editor.MarkDirty (); editor.AnimationUI (); return keyframe;
+    }, { time : 0, interpolation : 'smooth' });
     add ('macro.list', 'List saved macros', 'Macros', 'Return macros stored in this browser.', {}, [], false, () => { const macros = JSON.parse (localStorage.getItem ('auto3d-macros-v1') || '[]'); if (!Array.isArray (macros)) { throw new Error ('Invalid macro storage.'); } return macros; });
     add ('macro.save', 'Save macro', 'Macros', 'Save a named version 1 macro locally. Definition is a JSON string; matching names are replaced.', { name : text, definition : text }, ['name', 'definition'], false, ({ name, definition }) => {
         const macro = JSON.parse (definition); if (!name.trim () || macro.version !== 1 || !Array.isArray (macro.steps) || !macro.steps.length || macro.steps.length > 100) { throw new Error ('Enter a name and a version 1 macro with 1–100 steps.'); }

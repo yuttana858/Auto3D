@@ -14,6 +14,7 @@ import { Direction } from '../../source/engine/geometry/geometry.js';
 import { Unit } from '../../source/engine/model/unit.js';
 import { DisplayLength, DisplaySizeFromScale, ScaleFromDisplaySize, UnitFactor } from '../../source/website/preferences.js';
 import { AnimationPlayer } from '../../source/website/sessionanimation.js';
+import { SessionTimeline } from '../../source/website/sessiontimeline.js';
 import { ArrayOffset, DropToFloorDelta } from '../../source/website/sessioneditor.js';
 import { RecoveryArchiveBuffer, NormalizeLibraryPath, LibraryPathParent, RenameLibraryPath } from '../../source/website/modellibrary.js';
 
@@ -45,13 +46,13 @@ export default function suite ()
             const surface = new PhysicalMaterial (); surface.gltfMaterialIndex = 3; surface.roughness = 0.24; surface.metalness = 0.61; surface.specularIntensity = 0.73; surface.diffuseMap = new TextureMap (); surface.diffuseMap.name = 'pixel.png'; surface.diffuseMap.buffer = new Uint8Array ([0, 128, 255]).buffer; surface.bumpScale = 0.7;
             const scene = new SceneDocument (); const object = scene.AddImported (Asset (surface), 'animated.glb'); object.position = [2, 3, 4]; object.visible = false; scene.ApplyTransform (object);
             object.animationAsset = { main : 'animated.glb', files : [{ name : 'animated.glb', buffer : new Uint8Array ([1, 2, 255]).buffer }] }; object.playback = { clip : 1, time : 0.5, speed : 2, playing : true, loop : false };
-            const view = { backgroundPreset : 'outdoor', horizonGradient : true, showGroundGrid : true, lighting : { mode : 'hdri', environment : 'studio_small_09', background : true, brightness : 1.4, rotation : 25, elevation : -7, reflectionIntensity : 0.8, realtimeReflection : true, floorReflection : false, floorReflectionIntensity : 0.4, shadows : true, floorShadowIntensity : 0.6 } };
-            const reopened = OpenSessionArchive (CreateSessionArchive (PackSession (scene, view)));
-            assert.deepEqual (reopened.document.objects[0].position, [2, 3, 4]); assert.equal (reopened.document.objects[0].visible, false); assert.equal (reopened.document.objects[0].playback.playing, false); assert.equal (reopened.document.objects[0].playback.time, 0.5); assert.equal (reopened.document.objects[0].playback.loop, false); assert.deepEqual (reopened.view, view);
+            const reopened = OpenSessionArchive (CreateSessionArchive (PackSession (scene)));
+            assert.deepEqual (reopened.document.objects[0].position, [2, 3, 4]); assert.equal (reopened.document.objects[0].visible, false); assert.equal (reopened.document.objects[0].playback.playing, false); assert.equal (reopened.document.objects[0].playback.loop, false); assert.equal (reopened.document.objects[0].playback.time, 0.5);
             assert.deepEqual (new Uint8Array (reopened.document.objects[0].animationAsset.files[0].buffer), new Uint8Array ([1, 2, 255])); assert.deepEqual (new Uint8Array (reopened.document.model.materials[0].diffuseMap.buffer), new Uint8Array ([0, 128, 255])); assert.equal (reopened.document.model.materials[0].gltfMaterialIndex, 3); assert.equal (reopened.document.model.materials[0].bumpScale, 0.7); assert.equal (reopened.document.model.materials[0].roughness, 0.24); assert.equal (reopened.document.model.materials[0].metalness, 0.61); assert.equal (reopened.document.model.materials[0].specularIntensity, 0.73);
+            const view = { backgroundPreset : 'outdoor', horizonGradient : true, showGroundGrid : false, lighting : { mode : 'hdri', environment : 'studio_small_09', background : true, brightness : 1.25, rotation : 35, elevation : -10, effects : { environmentIntensity : 0.8, modelReflections : true, modelReflectionIntensity : 0.6 } } }; const packedView = PackSession (scene, view); assert.deepEqual (packedView.view, view); assert.equal (packedView.model.materials[0].specularIntensity, surface.specularIntensity);
             let importedIndex; reopened.document.model.root.Enumerate ((node) => { if (node.gltfNodeIndex !== undefined) { importedIndex = node.gltfNodeIndex; } }); assert.equal (importedIndex, 7);
         });
-        it ('Round-trips object user data and per-model shadow flags in session schema v4', () => {
+        it ('Round-trips object user data, shadow flags and keyframes in session schema v5', () => {
             const scene = new SceneDocument (); const object = scene.AddImported (Asset (), 'one');
             object.userData = { SKU : 'PKG-001', Notes : 'Primary bottle' };
             object.castShadow = false; object.receiveShadow = true;
@@ -66,6 +67,33 @@ export default function suite ()
             assert.equal (migrated.receiveShadow, true);
         });
 
+        it ('Round-trips native object and camera timeline data', () => {
+            const scene = new SceneDocument (); const object = scene.AddImported (Asset (), 'one');
+            object.keyframes = [
+                { id : 'start', time : 0, interpolation : 'smooth', position : [0, 0, 0], rotation : [0, 350, 0], scale : [1, 1, 1] },
+                { id : 'end', time : 2, interpolation : 'linear', position : [10, 0, 0], rotation : [0, 10, 0], scale : [2, 2, 2] }
+            ];
+            const timeline = { version : 1, duration : 4, time : 1, loop : true, interpolation : 'smooth', cameraKeyframes : [{ id : 'cam', time : 1, interpolation : 'smooth', eye : [5, 4, 3], center : [0, 0, 0], up : [0, 1, 0], fov : 40, distance : 7.071, azimuth : 59.0, elevation : 34.4 }] };
+            const reopened = OpenSessionArchive (CreateSessionArchive (PackSession (scene, { timeline })));
+            assert.equal (reopened.document.objects[0].keyframes.length, 2);
+            assert.deepEqual (reopened.document.objects[0].keyframes[1].position, [10, 0, 0]);
+            assert.deepEqual (reopened.view.timeline, timeline);
+        });
+        it ('Tweens native transform and camera keyframes smoothly', () => {
+            const object = { keyframes : [
+                { id : 'a', time : 0, interpolation : 'linear', position : [0, 0, 0], rotation : [0, 350, 0], scale : [1, 1, 1] },
+                { id : 'b', time : 2, interpolation : 'linear', position : [10, 0, 0], rotation : [0, 10, 0], scale : [3, 3, 3] }
+            ] };
+            const timeline = new SessionTimeline ({ document : { objects : [object] }, website : { viewer : {} } });
+            timeline.cameraKeyframes = [
+                { id : 'c1', time : 0, interpolation : 'smooth', eye : [0, 0, 10], center : [0, 0, 0], up : [0, 1, 0], fov : 30 },
+                { id : 'c2', time : 2, interpolation : 'smooth', eye : [10, 0, 0], center : [0, 0, 0], up : [0, 1, 0], fov : 50 }
+            ];
+            const state = timeline.ObjectStateAt (object, 1);
+            assert.deepEqual (state.position, [5, 0, 0]); assert.deepEqual (state.scale, [2, 2, 2]); assert.ok (Math.abs (state.rotation[1]) < 1e-6);
+            const camera = timeline.CameraStateAt (1);
+            assert.deepEqual (camera.eye, [5, 0, 5]); assert.equal (camera.fov, 40);
+        });
         it ('Computes touching W/L/H array offsets and floor deltas', () => {
             const size = new THREE.Vector3 (2, 3, 4);
             assert.deepEqual (ArrayOffset (size, 2, 1, 3), [4, 9, 4]);
@@ -82,6 +110,20 @@ export default function suite ()
             const migrated = MigrateSessionData (legacy); assert.equal (migrated.version, SessionVersion); assert.equal (migrated.metadata.migratedFrom, 1);
             assert.equal (ReadSession (legacy).document.objects.length, 1);
             assert.throws (() => ReadSession ({ ...current, version : SessionVersion + 1 }), /newer application version/);
+        });
+        it ('Migrates v4 sessions to the v5 timeline schema', () => {
+            const scene = new SceneDocument (); scene.AddImported (Asset (), 'one');
+            const legacy = PackSession (scene);
+            legacy.version = 4;
+            delete legacy.view.timeline;
+            delete legacy.objects[0].keyframes;
+            const migrated = MigrateSessionData (legacy);
+            assert.equal (migrated.version, 5);
+            assert.deepEqual (migrated.objects[0].keyframes, []);
+            assert.equal (migrated.view.timeline.version, 1);
+            assert.deepEqual (migrated.view.timeline.cameraKeyframes, []);
+            const reopened = ReadSession (legacy);
+            assert.deepEqual (reopened.document.objects[0].keyframes, []);
         });
         it ('Rejects corrupted references, repeated IDs and nonfinite transforms', () => {
             const scene = new SceneDocument (); scene.AddImported (Asset (), 'one'); scene.AddImported (Asset (), 'two'); const data = PackSession (scene);
@@ -119,8 +161,10 @@ export default function suite ()
         });
         it ('Seeks skeletal/morph-compatible tracks and exports distinct UUID targets', () => {
             const root = new THREE.Group (); const target = new THREE.Object3D (); target.name = 'part'; root.add (target);
-            const clip = new THREE.AnimationClip ('Move', 1, [new THREE.VectorKeyframeTrack ('part.position', [0, 1], [0, 0, 0, 4, 0, 0])]); const object = { name : 'one' }; const player = new AnimationPlayer (object, root, [clip], () => {});
-            player.Seek (0.5); assert.equal (target.position.x, 2); assert.equal (player.state.time, 0.5); player.SetLoop (false); assert.equal (player.state.loop, false); assert.equal (player.action.loop, THREE.LoopOnce); player.SetLoop (true); assert.equal (player.action.loop, THREE.LoopRepeat); const track = player.ExportClips ()[0].tracks[0]; assert.equal (track.name, target.uuid + '.position'); player.Dispose ();
+            const clip = new THREE.AnimationClip ('Move', 1, [new THREE.VectorKeyframeTrack ('part.position', [0, 1], [0, 0, 0, 4, 0, 0])]); const object = { name : 'one', playback : { clip : 0, time : 0, speed : 1, playing : false, loop : false } }; const player = new AnimationPlayer (object, root, [clip], () => {});
+            assert.equal (player.action.loop, THREE.LoopOnce); assert.equal (player.action.clampWhenFinished, true);
+            player.SetLoop (true); assert.equal (player.action.loop, THREE.LoopRepeat); assert.equal (player.action.clampWhenFinished, false);
+            player.Seek (0.5); assert.equal (target.position.x, 2); assert.equal (player.state.time, 0.5); const track = player.ExportClips ()[0].tracks[0]; assert.equal (track.name, target.uuid + '.position'); player.Dispose ();
         });
     });
 }

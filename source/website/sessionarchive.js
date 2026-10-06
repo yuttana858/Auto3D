@@ -16,7 +16,7 @@ import { SceneDocument } from './scenedocument.js';
 
 const TriangleKeys = ['v0', 'v1', 'v2', 'c0', 'c1', 'c2', 'n0', 'n1', 'n2', 'u0', 'u1', 'u2', 'mat', 'curve'];
 const MaxArchiveBytes = 256 * 1024 * 1024;
-export const SessionVersion = 4;
+export const SessionVersion = 5;
 export const LibraryCategories = ['Primary products', 'Retail shelf', 'Pallets', 'Accessories'];
 
 export function EncodeBuffer (buffer)
@@ -145,6 +145,15 @@ export function MigrateSessionData (data)
             metadata : { ...(current.metadata || {}), migratedFrom : current.metadata?.migratedFrom || 3 }
         };
     }
+    if (current.version === 4) {
+        current = {
+            ...current,
+            version : 5,
+            view : { ...(current.view || {}), timeline : current.view?.timeline || { version : 1, duration : 5, time : 0, loop : false, interpolation : 'smooth', cameraKeyframes : [] } },
+            objects : current.objects.map ((object) => ({ ...object, keyframes : Array.isArray (object.keyframes) ? object.keyframes : [] })),
+            metadata : { ...(current.metadata || {}), migratedFrom : current.metadata?.migratedFrom || 4 }
+        };
+    }
     if (current.version !== SessionVersion) { throw new Error ('This Auto3D session version cannot be migrated.'); }
     return current;
 }
@@ -154,7 +163,7 @@ export function PackSession (document, view = {}, objects = document.objects, ki
     const model = document.CompactModel (objects);
     return {
         format : 'SW Auto3D', version : SessionVersion, metadata : { savedAt : new Date ().toISOString () }, kind, name : document.name, view,
-        objects : objects.map ((object) => ({ id : object.id, name : object.name, source : object.source, unit : object.unit, visible : object.visible, hiddenParts : object.hiddenParts || [], position : object.position, rotation : object.rotation, scale : object.scale, userData : object.userData || {}, castShadow : object.castShadow !== false, receiveShadow : object.receiveShadow !== false, playback : object.playback, animationAsset : object.animationAsset ? { main : object.animationAsset.main, files : object.animationAsset.files.map ((file) => ({ name : file.name, buffer : EncodeBuffer (file.buffer) })) } : null })),
+        objects : objects.map ((object) => ({ id : object.id, name : object.name, source : object.source, unit : object.unit, visible : object.visible, hiddenParts : object.hiddenParts || [], position : object.position, rotation : object.rotation, scale : object.scale, userData : object.userData || {}, castShadow : object.castShadow !== false, receiveShadow : object.receiveShadow !== false, keyframes : Array.isArray (object.keyframes) ? object.keyframes : [], playback : object.playback, animationAsset : object.animationAsset ? { main : object.animationAsset.main, files : object.animationAsset.files.map ((file) => ({ name : file.name, buffer : EncodeBuffer (file.buffer) })) } : null })),
         model : { unit : model.unit, properties : model.propertyGroups, materials : model.materials.map (PackMaterial), meshes : model.meshes.map (PackMesh), nodes : model.root.childNodes.map (PackNode) }
     };
 }
@@ -201,6 +210,14 @@ export function ReadSession (data)
         object.castShadow = data.castShadow !== false;
         object.receiveShadow = data.receiveShadow !== false;
         object.userData = {};
+        object.keyframes = Array.isArray (data.keyframes) ? data.keyframes.filter ((item) => item && Number.isFinite (item.time) && item.time >= 0 && [item.position, item.rotation, item.scale].every ((value) => Array.isArray (value) && value.length === 3 && value.every (Number.isFinite))).slice (0, 1000).map ((item) => ({
+            id : String (item.id || ''),
+            time : item.time,
+            interpolation : ['linear', 'smooth', 'step'].includes (item.interpolation) ? item.interpolation : 'smooth',
+            position : [...item.position],
+            rotation : [...item.rotation],
+            scale : item.scale.map ((value) => Math.abs (value) < 1e-6 ? 1e-6 : value)
+        })).sort ((a, b) => a.time - b.time) : [];
         if (data.userData && typeof data.userData === 'object' && !Array.isArray (data.userData)) {
             for (const [key, value] of Object.entries (data.userData).slice (0, 100)) {
                 const name = String (key).trim ().slice (0, 100);
