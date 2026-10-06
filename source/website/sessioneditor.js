@@ -57,6 +57,13 @@ export class SessionEditor
         this.selectionBox = new THREE.Box3Helper (this.selectionBounds, 0x5aaee6);
         this.selectionBox.visible = false;
         this.selectionBox.renderOrder = 10000;
+        this.selectionBox.frustumCulled = false;
+        if (this.selectionBox.material) {
+            this.selectionBox.material.depthTest = false;
+            this.selectionBox.material.depthWrite = false;
+            this.selectionBox.material.transparent = true;
+            this.selectionBox.material.opacity = 1;
+        }
         viewer.scene.add (this.selectionBox);
         this.controls = new TransformControls (viewer.camera, viewer.renderer.domElement); this.controls.setSize (0.8); this.helper = this.controls.getHelper (); viewer.scene.add (this.helper);
         const render = viewer.onRender;
@@ -73,6 +80,11 @@ export class SessionEditor
             object.scale = object.scale.map ((value) => Math.abs (value) < 1e-6 ? 1e-6 : value); this.document.ApplyTransform (object); this.SyncInputs ();
         });
         this.CreateUI ();
+        viewer.renderer.domElement.addEventListener ('contextmenu', (event) => {
+            if (this.readOnly || !this.selected) { return; }
+            event.preventDefault ();
+            this.OpenContextMenu (event);
+        });
         const headerLibrary = Element ('button', 'header_library_button', undefined, document.getElementById ('header_buttons'));
         headerLibrary.title = 'Saved models and sessions'; headerLibrary.setAttribute ('aria-label', 'Library');
         headerLibrary.innerHTML = '<svg viewBox="0 0 26 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6">' + Icons.library + '</svg><span>Library</span>';
@@ -227,6 +239,33 @@ export class SessionEditor
         this.sessionInput.addEventListener ('change', async () => { const file = this.sessionInput.files[0]; this.sessionInput.value = ''; if (file) { await this.Run (() => this.OpenArchiveFile (file)); } });
         this.website.parameters.fileInput.addEventListener ('cancel', () => { this.replaceTarget = null; });
         this.RefreshUI ();
+    }
+
+    OpenContextMenu (event)
+    {
+        document.querySelectorAll ('.auto3d_context_menu').forEach ((menu) => menu.remove ());
+        const menu = Element ('div', 'auto3d_context_menu', undefined, document.body);
+        Object.assign (menu.style, { position : 'fixed', zIndex : '100000', left : event.clientX + 'px', top : event.clientY + 'px', minWidth : '170px', padding : '6px', borderRadius : '8px', background : 'var(--ov_background_color, #242424)', boxShadow : '0 8px 28px rgba(0,0,0,.35)' });
+        const actions = [
+            ['Move', () => this.SetMode ('translate')],
+            ['Rotate', () => this.SetMode ('rotate')],
+            ['Scale', () => this.SetMode ('scale')],
+            ['Focus', () => this.Focus ()],
+            ['Duplicate', () => this.Duplicate ()],
+            [this.selected.visible ? 'Hide' : 'Show', () => this.ToggleVisibility ()],
+            ['Delete', () => this.Delete ()]
+        ];
+        const close = () => menu.remove ();
+        for (const [label, action] of actions) {
+            const button = Element ('button', 'scene_context_action', label, menu);
+            Object.assign (button.style, { display : 'block', width : '100%', padding : '7px 10px', textAlign : 'left' });
+            button.addEventListener ('click', async () => { close (); await this.Run (action); });
+        }
+        const dismiss = (dismissEvent) => { if (!menu.contains (dismissEvent.target)) { close (); } };
+        setTimeout (() => {
+            window.addEventListener ('pointerdown', dismiss, { once : true });
+            window.addEventListener ('blur', close, { once : true });
+        }, 0);
     }
 
     async Run (action) { if (this.busy) { return; } try { await action (); } catch (error) { this.Status (error.message); } }
