@@ -691,15 +691,17 @@ export class SessionEditor
 
         const settings = Element ('div', 'timeline_settings', undefined, native);
         const durationLabel = Element ('label', null, 'Duration', settings); const duration = Element ('input', null, undefined, durationLabel); duration.type = 'number'; duration.min = '0.1'; duration.max = '3600'; duration.step = '0.1'; duration.value = String (timeline.duration); duration.setAttribute ('aria-label', 'Timeline duration in seconds');
+        duration.disabled = this.readOnly;
         duration.addEventListener ('change', () => { timeline.SetDuration (Number (duration.value)); this.MarkDirty (); this.AnimationUI (); });
         const tweenLabel = Element ('label', null, 'Tween', settings); const tween = Element ('select', null, undefined, tweenLabel); tween.setAttribute ('aria-label', 'Keyframe interpolation'); [['smooth', 'Smooth'], ['linear', 'Linear'], ['step', 'Step']].forEach (([value, label]) => tween.add (new Option (label, value))); tween.value = timeline.interpolation;
+        tween.disabled = this.readOnly;
         tween.addEventListener ('change', () => { timeline.interpolation = tween.value; this.MarkDirty (); });
-        const loopLabel = Element ('label', 'timeline_loop_label', undefined, settings); const loop = Element ('input', null, undefined, loopLabel); loop.type = 'checkbox'; loop.checked = timeline.loop; loopLabel.appendChild (document.createTextNode (' Loop')); loop.addEventListener ('change', () => { timeline.loop = loop.checked; this.MarkDirty (); });
+        const loopLabel = Element ('label', 'timeline_loop_label', undefined, settings); const loop = Element ('input', null, undefined, loopLabel); loop.type = 'checkbox'; loop.checked = timeline.loop; loop.disabled = this.readOnly; loopLabel.appendChild (document.createTextNode (' Loop')); loop.addEventListener ('change', () => { timeline.loop = loop.checked; this.MarkDirty (); });
 
         const capture = Element ('div', 'mode_buttons timeline_capture_buttons', undefined, native);
-        const addObject = Element ('button', null, 'Keyframe object', capture); addObject.disabled = !this.selected; addObject.title = 'Save selected object position, rotation and scale at the current time.';
+        const addObject = Element ('button', null, 'Keyframe object', capture); addObject.disabled = this.readOnly || !this.selected; addObject.title = 'Save selected object position, rotation and scale at the current time.';
         addObject.addEventListener ('click', () => { timeline.CaptureObject (this.selected); this.MarkDirty (); this.AnimationUI (); });
-        const addCamera = Element ('button', null, 'Keyframe camera', capture); addCamera.title = 'Save viewer eye, target, up vector, FOV, azimuth and elevation at the current time.';
+        const addCamera = Element ('button', null, 'Keyframe camera', capture); addCamera.disabled = this.readOnly; addCamera.title = 'Save viewer eye, target, up vector, FOV, azimuth and elevation at the current time.';
         addCamera.addEventListener ('click', () => { timeline.CaptureCamera (); this.MarkDirty (); this.AnimationUI (); });
 
         const controls = Element ('div', 'mode_buttons timeline_transport', undefined, native);
