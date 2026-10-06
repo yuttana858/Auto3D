@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "updated": "2026-10-06",
+  "purpose": "External CAD/vector references for Auto3D Packaging. Keep license and provenance with each source; do not treat third-party drawings as production-certified tooling.",
+  "sources": [
+    {
+      "id": "boxblanks",
+      "styles": [
+        "FEFCO 0201",
+        "FEFCO 0200",
+        "FEFCO 0202",
+        "FEFCO 0203",
+        "many additional FEFCO/ECMA styles"
+      ],
+      "formats": [
+        "DXF",
+        "SVG",
+        "PDF",
+        "JSON"
+      ],
+      "type": "parametric generator/API",
+      "url": "https://boxblanks.com/",
+      "api": "https://boxblanks.com/api/",
+      "rights": "Website-generated dielines are stated as commercially usable without attribution. API output is commercially usable under API terms and carries attribution metadata.",
+      "notes": "Strongest validation/reference source found. 0201 is explicitly checked against the published FEFCO plate. API requires a beta key."
+    },
+    {
+      "id": "free-box-template",
+      "styles": [
+        "FEFCO 0200",
+        "FEFCO 0401",
+        "FEFCO 0422",
+        "FEFCO 0423",
+        "FEFCO 0426",
+        "FEFCO 0427",
+        "FEFCO 0452",
+        "FEFCO 0453",
+        "FEFCO 0458",
+        "FEFCO 0460",
+        "FEFCO 0502",
+        "FEFCO 0802"
+      ],
+      "formats": [
+        "DXF",
+        "SVG",
+        "PDF"
+      ],
+      "type": "browser parametric generator",
+      "url": "https://www.freeboxtemplate.com/",
+      "rights": "Site states templates are free for personal and commercial projects; 0427 page explicitly permits commercial use of generated dieline geometry.",
+      "notes": "Downloads are generated interactively in-browser rather than exposed as stable static URLs."
+    },
+    {
+      "id": "packaging-workbench",
+      "styles": [
+        "FEFCO 0201",
+        "FEFCO 0301",
+        "FEFCO 0713"
+      ],
+      "formats": [
+        "FreeCAD parametric geometry",
+        "DXF export"
+      ],
+      "type": "open-source CAD generator",
+      "url": "https://github.com/stoneproof-tech/PackagingWorkbench",
+      "license": "LGPL-2.1-or-later",
+      "rights": "Reference/use subject to LGPL-2.1-or-later obligations.",
+      "notes": "Useful independent implementation for panel topology, cut/crease/perforation separation and parametric tests. Keep implementation external unless LGPL integration is deliberate."
+    },
+    {
+      "id": "rhino-packaging-toolkit",
+      "styles": [
+        "ECMA and FEFCO generators; expanding library"
+      ],
+      "formats": [
+        "Rhino 7/8 IronPython parametric geometry",
+        "prepress utilities"
+      ],
+      "type": "open-source CAD toolkit",
+      "url": "https://github.com/DDR68/Rhino_Packaging_Toolkit",
+      "license": "MIT",
+      "rights": "MIT licensed.",
+      "notes": "Permissive reference architecture for packaging geometry and manufacturing utilities."
+    },
+    {
+      "id": "d0427",
+      "styles": [
+        "FEFCO 0427"
+      ],
+      "formats": [
+        "DXF generator source"
+      ],
+      "type": "legacy Java CAD generator",
+      "url": "https://github.com/bikinon/d0427",
+      "license": null,
+      "rights": "No license located in repository. Reference-only; do not copy or redistribute implementation.",
+      "notes": "Confirms a historical parametric DXF implementation exists, but absence of a license blocks reuse."
+    },
+    {
+      "id": "packos-rsc",
+      "styles": [
+        "RSC / regular slotted container"
+      ],
+      "formats": [
+        "SVG"
+      ],
+      "type": "schematic vector generator",
+      "url": "https://packos.ai/box-styles/regular-slotted-container-rsc.html",
+      "rights": "Reference schematic; verify site terms before redistributing generated files.",
+      "notes": "Useful for formula-level validation only; site warns the SVG is schematic rather than a production die."
+    }
+  ]
+}
