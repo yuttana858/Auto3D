@@ -1,5 +1,3 @@
-import { ImportSettings } from '../engine/import/importer.js';
-
 const AIStorageKey = 'auto3d-ai-connections-v1';
 
 function Element (tag, className, text, parent)
@@ -30,7 +28,7 @@ export class AIWorkspace
 
     LoadSettings ()
     {
-        const fallback = { provider : 'meshy', baseUrl : 'https://api.meshy.ai', apiKey : '', remember : false };
+        const fallback = { provider : 'meshy', baseUrl : '/api/ai', apiKey : '', remember : false };
         try {
             const session = JSON.parse (sessionStorage.getItem (AIStorageKey) || 'null');
             const local = JSON.parse (localStorage.getItem (AIStorageKey) || 'null');
@@ -44,7 +42,7 @@ export class AIWorkspace
     {
         this.settings = {
             provider : settings.provider === 'custom' ? 'custom' : 'meshy',
-            baseUrl : String (settings.baseUrl || 'https://api.meshy.ai').trim ().replace (/\/$/, ''),
+            baseUrl : String (settings.baseUrl || '/api/ai').trim ().replace (/\/$/, ''),
             apiKey : String (settings.apiKey || '').trim (),
             remember : settings.remember === true
         };
@@ -143,7 +141,8 @@ export class AIWorkspace
 
     Headers (json = false)
     {
-        const headers = { Authorization : 'Bearer ' + this.settings.apiKey };
+        const headers = {};
+        if (this.settings.apiKey) { headers['X-Auto3D-AI-Key'] = this.settings.apiKey; }
         if (json) { headers['Content-Type'] = 'application/json'; }
         return headers;
     }
@@ -165,9 +164,8 @@ export class AIWorkspace
 
     async TestConnection ()
     {
-        if (!this.settings.apiKey) { throw new Error ('Enter an API key first.'); }
         if (this.settings.provider !== 'meshy') { throw new Error ('Custom provider testing will be wired when its API contract is selected.'); }
-        const { result } = await this.RequestJSON (this.settings.baseUrl + '/openapi/v1/balance', { headers : this.Headers () });
+        const { result } = await this.RequestJSON (this.settings.baseUrl + '/balance', { headers : this.Headers () });
         this.lastBalance = Number.isFinite (result.balance) ? result.balance : null;
         this.RefreshConnection ();
         return result;
@@ -176,8 +174,8 @@ export class AIWorkspace
     RefreshConnection ()
     {
         if (!this.connectionBadge) { return; }
-        const configured = Boolean (this.settings.apiKey);
-        this.connectionBadge.textContent = configured ? (this.settings.provider === 'meshy' ? 'Meshy configured' : 'Provider configured') : 'Not connected';
+        const configured = this.settings.provider === 'meshy';
+        this.connectionBadge.textContent = configured ? (this.settings.apiKey ? 'Meshy · personal key' : 'Meshy · server key') : 'Not connected';
         this.connectionBadge.classList.toggle ('connected', configured);
         if (this.lastBalance !== undefined && this.lastBalance !== null) { this.connectionBadge.textContent = 'Meshy · ' + this.lastBalance + ' credits'; }
         this.RefreshActions ();
@@ -186,7 +184,7 @@ export class AIWorkspace
     RefreshActions ()
     {
         if (!this.actionButtons) { return; }
-        const connected = Boolean (this.settings.apiKey);
+        const connected = this.settings.provider === 'meshy';
         this.actionButtons.get ('text3d').disabled = !connected || !this.prompt?.value.trim ();
         this.actionButtons.get ('image3d').disabled = !connected || !this.imageFile;
         this.actionButtons.get ('textimage').disabled = !connected || !this.prompt?.value.trim ();
@@ -216,7 +214,7 @@ export class AIWorkspace
     async StartTextTo3D ()
     {
         const prompt = this.prompt.value.trim ();
-        if (!prompt || !this.settings.apiKey) { return; }
+        if (!prompt) { return; }
         if (this.settings.provider !== 'meshy') { this.status.textContent = 'Text to 3D submission is currently wired for Meshy only.'; return; }
 
         const button = this.actionButtons.get ('text3d');
@@ -229,7 +227,7 @@ export class AIWorkspace
                 target_formats : ['glb'],
                 ...this.TextTo3DOptions ()
             };
-            const { result } = await this.RequestJSON (this.settings.baseUrl + '/openapi/v2/text-to-3d', {
+            const { result } = await this.RequestJSON (this.settings.baseUrl + '/text-to-3d', {
                 method : 'POST',
                 headers : this.Headers (true),
                 body : JSON.stringify (payload)
@@ -279,7 +277,7 @@ export class AIWorkspace
         if (!item?.id || item.status !== 'SUCCEEDED') { return; }
         this.status.textContent = 'Submitting textured refine…';
         try {
-            const { result } = await this.RequestJSON (this.settings.baseUrl + '/openapi/v2/text-to-3d', {
+            const { result } = await this.RequestJSON (this.settings.baseUrl + '/text-to-3d', {
                 method : 'POST',
                 headers : this.Headers (true),
                 body : JSON.stringify ({
@@ -311,10 +309,15 @@ export class AIWorkspace
         if (!item?.modelUrl) { this.status.textContent = 'This task does not have a GLB result yet.'; return; }
         this.status.textContent = 'Importing generated GLB into the current session…';
         try {
-            const importSettings = new ImportSettings ();
-            importSettings.defaultLineColor = this.website.settings.defaultLineColor;
-            importSettings.defaultColor = this.website.settings.defaultColor;
-            await this.website.LoadModelFromUrlList ([item.modelUrl], importSettings);
+            const response = await fetch (this.settings.baseUrl + '/model?url=' + encodeURIComponent (item.modelUrl), { headers : this.Headers () });
+            if (!response.ok) {
+                let message = 'Generated model download failed (' + response.status + ').';
+                try { const body = await response.json (); message = body.error || body.message || message; } catch { /* Keep fallback. */ }
+                throw new Error (message);
+            }
+            const blob = await response.blob ();
+            const file = new File ([blob], 'meshy-' + item.id + '.glb', { type : blob.type || 'model/gltf-binary' });
+            await this.website.LoadModelFromFileList ([file]);
             this.status.textContent = 'Generated GLB imported into the current Auto3D session.';
         } catch (error) {
             this.status.textContent = 'Import failed: ' + error.message;
@@ -355,13 +358,13 @@ export class AIWorkspace
 
     async RefreshRecent ()
     {
-        if (!this.settings.apiKey) { this.status.textContent = 'Connect an AI provider before loading recent creations.'; return; }
+        if (this.settings.provider !== 'meshy') { this.status.textContent = 'Connect a supported AI provider before loading recent creations.'; return; }
         if (this.settings.provider !== 'meshy') { this.status.textContent = 'Recent-model discovery for custom providers will be added with the provider adapter.'; return; }
         this.status.textContent = 'Loading recent Meshy creations…';
         try {
             const urls = [
                 this.settings.baseUrl + '/openapi/v2/text-to-3d?page_size=8&sort_by=-created_at',
-                this.settings.baseUrl + '/openapi/v1/image-to-3d?page_size=4&sort_by=-created_at'
+                this.settings.baseUrl + '/image-to-3d?page_size=4&sort_by=-created_at'
             ];
             const groups = [];
             for (const url of urls) {
