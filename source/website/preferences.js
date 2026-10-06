@@ -3,7 +3,7 @@ import { WorkspaceDialog } from './modellibrary.js';
 import { Unit } from '../engine/model/unit.js';
 import { OpenCommandPanel } from './commandpanel.js';
 
-export const AppVersion = '0.25.2';
+export const AppVersion = '0.26.0';
 
 export function UnitFactor (sourceUnit, system)
 {
