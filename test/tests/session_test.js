@@ -1,5 +1,6 @@
 import * as assert from 'node:assert';
 import * as THREE from 'three';
+import { Blob as NodeBlob } from 'node:buffer';
 import { SceneDocument, SceneHistory } from '../../source/website/scenedocument.js';
 import { PackSession, ReadSession, CreateSessionArchive, OpenSessionArchive, MigrateSessionData, SessionVersion } from '../../source/website/sessionarchive.js';
 import { Model } from '../../source/engine/model/model.js';
@@ -42,12 +43,12 @@ export default function suite ()
             const compact = scene.CompactModel (); const bounds = GetBoundingBox (compact); assert.equal (compact.MeshCount (), 1); assert.equal (compact.MaterialCount (), 1); assert.equal (bounds.min.x, 10); assert.equal (bounds.max.x, 14);
         });
         it ('Round-trips visibility, transforms, textured materials and original animation data', () => {
-            const surface = new PhysicalMaterial (); surface.gltfMaterialIndex = 3; surface.diffuseMap = new TextureMap (); surface.diffuseMap.name = 'pixel.png'; surface.diffuseMap.buffer = new Uint8Array ([0, 128, 255]).buffer; surface.bumpScale = 0.7;
+            const surface = new PhysicalMaterial (); surface.gltfMaterialIndex = 3; surface.roughness = 0.24; surface.metalness = 0.61; surface.specularIntensity = 0.73; surface.diffuseMap = new TextureMap (); surface.diffuseMap.name = 'pixel.png'; surface.diffuseMap.buffer = new Uint8Array ([0, 128, 255]).buffer; surface.bumpScale = 0.7;
             const scene = new SceneDocument (); const object = scene.AddImported (Asset (surface), 'animated.glb'); object.position = [2, 3, 4]; object.visible = false; scene.ApplyTransform (object);
             object.animationAsset = { main : 'animated.glb', files : [{ name : 'animated.glb', buffer : new Uint8Array ([1, 2, 255]).buffer }] }; object.playback = { clip : 1, time : 0.5, speed : 2, playing : true, loop : false };
             const reopened = OpenSessionArchive (CreateSessionArchive (PackSession (scene)));
-            assert.deepEqual (reopened.document.objects[0].position, [2, 3, 4]); assert.equal (reopened.document.objects[0].visible, false); assert.equal (reopened.document.objects[0].playback.playing, true); assert.equal (reopened.document.objects[0].playback.loop, false); assert.equal (reopened.document.objects[0].playback.time, 0.5);
-            assert.deepEqual (new Uint8Array (reopened.document.objects[0].animationAsset.files[0].buffer), new Uint8Array ([1, 2, 255])); assert.deepEqual (new Uint8Array (reopened.document.model.materials[0].diffuseMap.buffer), new Uint8Array ([0, 128, 255])); assert.equal (reopened.document.model.materials[0].gltfMaterialIndex, 3); assert.equal (reopened.document.model.materials[0].bumpScale, 0.7);
+            assert.deepEqual (reopened.document.objects[0].position, [2, 3, 4]); assert.equal (reopened.document.objects[0].visible, false); assert.equal (reopened.document.objects[0].playback.playing, false); assert.equal (reopened.document.objects[0].playback.loop, false); assert.equal (reopened.document.objects[0].playback.time, 0.5);
+            assert.deepEqual (new Uint8Array (reopened.document.objects[0].animationAsset.files[0].buffer), new Uint8Array ([1, 2, 255])); assert.deepEqual (new Uint8Array (reopened.document.model.materials[0].diffuseMap.buffer), new Uint8Array ([0, 128, 255])); assert.equal (reopened.document.model.materials[0].gltfMaterialIndex, 3); assert.equal (reopened.document.model.materials[0].bumpScale, 0.7); assert.equal (reopened.document.model.materials[0].roughness, 0.24); assert.equal (reopened.document.model.materials[0].metalness, 0.61); assert.equal (reopened.document.model.materials[0].specularIntensity, 0.73);
             const view = { backgroundPreset : 'outdoor', horizonGradient : true, showGroundGrid : false, lighting : { mode : 'hdri', environment : 'studio_small_09', background : true, brightness : 1.25, rotation : 35, elevation : -10, effects : { environmentIntensity : 0.8, modelReflections : true, modelReflectionIntensity : 0.6 } } }; const packedView = PackSession (scene, view); assert.deepEqual (packedView.view, view); assert.equal (packedView.model.materials[0].specularIntensity, surface.specularIntensity);
             let importedIndex; reopened.document.model.root.Enumerate ((node) => { if (node.gltfNodeIndex !== undefined) { importedIndex = node.gltfNodeIndex; } }); assert.equal (importedIndex, 7);
         });
@@ -130,7 +131,7 @@ export default function suite ()
         });
         it ('Normalizes recovery checkpoint Blob, ArrayBuffer and typed-array storage forms', async () => {
             const source = new Uint8Array ([1, 2, 3, 255]);
-            for (const stored of [source.buffer, source, new Blob ([source])]) {
+            for (const stored of [source.buffer, source, new NodeBlob ([source])]) {
                 const buffer = await RecoveryArchiveBuffer (stored);
                 assert.deepEqual (new Uint8Array (buffer), source);
             }
