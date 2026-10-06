@@ -394,25 +394,31 @@ export function ConvertModelToThreeObject (model, conversionParams, conversionOu
 			let v0 = mesh.GetVertex (triangle.v0);
 			let v1 = mesh.GetVertex (triangle.v1);
 			let v2 = mesh.GetVertex (triangle.v2);
-			vertices.set ([v0.x, v0.y, v0.z, v1.x, v1.y, v1.z, v2.x, v2.y, v2.z], vertexOffset);
+			vertices[vertexOffset] = v0.x; vertices[vertexOffset + 1] = v0.y; vertices[vertexOffset + 2] = v0.z;
+			vertices[vertexOffset + 3] = v1.x; vertices[vertexOffset + 4] = v1.y; vertices[vertexOffset + 5] = v1.z;
+			vertices[vertexOffset + 6] = v2.x; vertices[vertexOffset + 7] = v2.y; vertices[vertexOffset + 8] = v2.z;
 
 			if (vertexColors !== null && triangle.HasVertexColors ()) {
 				let vc0 = ConvertColorToThreeColor (mesh.GetVertexColor (triangle.c0));
 				let vc1 = ConvertColorToThreeColor (mesh.GetVertexColor (triangle.c1));
 				let vc2 = ConvertColorToThreeColor (mesh.GetVertexColor (triangle.c2));
-				vertexColors.set ([vc0.r, vc0.g, vc0.b, vc1.r, vc1.g, vc1.b, vc2.r, vc2.g, vc2.b], vertexOffset);
+				vertexColors[vertexOffset] = vc0.r; vertexColors[vertexOffset + 1] = vc0.g; vertexColors[vertexOffset + 2] = vc0.b;
+				vertexColors[vertexOffset + 3] = vc1.r; vertexColors[vertexOffset + 4] = vc1.g; vertexColors[vertexOffset + 5] = vc1.b;
+				vertexColors[vertexOffset + 6] = vc2.r; vertexColors[vertexOffset + 7] = vc2.g; vertexColors[vertexOffset + 8] = vc2.b;
 			}
 
 			let n0 = mesh.GetNormal (triangle.n0);
 			let n1 = mesh.GetNormal (triangle.n1);
 			let n2 = mesh.GetNormal (triangle.n2);
-			normals.set ([n0.x, n0.y, n0.z, n1.x, n1.y, n1.z, n2.x, n2.y, n2.z], vertexOffset);
+			normals[vertexOffset] = n0.x; normals[vertexOffset + 1] = n0.y; normals[vertexOffset + 2] = n0.z;
+			normals[vertexOffset + 3] = n1.x; normals[vertexOffset + 4] = n1.y; normals[vertexOffset + 5] = n1.z;
+			normals[vertexOffset + 6] = n2.x; normals[vertexOffset + 7] = n2.y; normals[vertexOffset + 8] = n2.z;
 
 			if (uvs !== null && triangle.HasTextureUVs ()) {
 				let u0 = mesh.GetTextureUV (triangle.u0);
 				let u1 = mesh.GetTextureUV (triangle.u1);
 				let u2 = mesh.GetTextureUV (triangle.u2);
-				uvs.set ([u0.x, u0.y, u1.x, u1.y, u2.x, u2.y], uvOffset);
+				uvs[uvOffset] = u0.x; uvs[uvOffset + 1] = u0.y; uvs[uvOffset + 2] = u1.x; uvs[uvOffset + 3] = u1.y; uvs[uvOffset + 4] = u2.x; uvs[uvOffset + 5] = u2.y;
 			}
 
 			meshMaterialHandler.ProcessItem (processedTriangleCount, triangle.mat);
