@@ -662,3 +662,86 @@ div.main_viewer
     display: block;
     padding: 5px 6px;
 }
+
+.ai_generation_options
+{
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: end;
+    margin-top: 8px;
+}
+
+.ai_generation_options label
+{
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    font-size: 7.33px;
+    color: var(--ov_light_icon_color);
+}
+
+.ai_generation_options select
+{
+    min-width: 0;
+    padding: 5px 6px;
+    border: 1px solid var(--ov_border_color);
+    border-radius: 4px;
+    background: var(--ov_background_color);
+    color: var(--ov_foreground_color);
+    font: inherit;
+}
+
+.ai_generation_options .ai_checkbox_label
+{
+    flex-direction: row;
+    align-items: center;
+    white-space: nowrap;
+    padding-bottom: 5px;
+    color: var(--ov_foreground_color);
+}
+
+.ai_recent_placeholder
+{
+    display: grid;
+    place-items: center;
+    width: 100%;
+    aspect-ratio: 1.25;
+    background: linear-gradient(135deg, rgba(255,255,255,.04), rgba(255,255,255,.01));
+    color: var(--ov_light_icon_color);
+    font-size: 11px;
+}
+
+.ai_recent_meta
+{
+    color: var(--ov_light_icon_color);
+    border-top: 1px solid var(--ov_border_color);
+}
+
+.ai_recent_actions
+{
+    display: flex;
+    gap: 5px;
+    padding: 6px;
+    border-top: 1px solid var(--ov_border_color);
+}
+
+.ai_recent_actions button
+{
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--ov_border_color);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--ov_foreground_color);
+    cursor: pointer;
+    font: inherit;
+    font-size: 7.33px;
+    padding: 5px 6px;
+}
+
+.ai_recent_actions button:hover
+{
+    background: var(--ov_hover_color);
+}
