@@ -387,7 +387,7 @@ export class SessionEditor
     {
         this.busy = true; this.controls.detach (); this.players.forEach ((player) => player.Dispose ()); this.players = [];
         try {
-            if (!this.document.objects.length) { this.selectionBox.visible = false; this.website.ClearModel (); this.website.SetUIState (1); this.RefreshUI (); return; }
+            if (!this.document.objects.length) { this.selectionBox.visible = false; this.DisposeModelPreview (); this.website.ClearModel (); this.website.SetUIState (1); this.RefreshUI (); return; }
             const output = new ModelToThreeConversionOutput ();
             const root = await new Promise ((resolve) => ConvertModelToThreeObject (this.document.model, new ModelToThreeConversionParams (), output, { onTextureLoaded : () => this.website.viewer.Render (), onModelLoaded : resolve }));
             for (let index = 0; index < this.document.objects.length; index++) {
@@ -515,7 +515,7 @@ export class SessionEditor
     UpdateDetails ()
     {
         const object = this.selected;
-        if (!object?.threeObject || !this.website.model) { return; }
+        if (!object?.threeObject || !this.website.model) { this.DisposeModelPreview (); return; }
         const panel = this.website.sidebar.detailsPanel;
         const table = panel.contentDiv.querySelector ('.ov_property_table');
         if (!table) { return; }
@@ -686,7 +686,7 @@ export class SessionEditor
         const settings = Element ('div', 'animation_settings', undefined, this.animationPanel);
         const speedLabel = Element ('label', null, 'Speed', settings); const speed = Element ('select', null, undefined, speedLabel); speed.setAttribute ('aria-label', 'Animation speed'); [0.25, 0.5, 1, 1.5, 2].forEach ((value) => speed.add (new Option (value + '×', value))); speed.value = String (player.state.speed); speed.addEventListener ('change', () => { player.state.speed = Number (speed.value); this.MarkDirty (); });
         const loopLabel = Element ('label', null, 'Loop', settings); const loop = Element ('input', null, undefined, loopLabel); loop.type = 'checkbox'; loop.checked = player.state.loop !== false; loop.setAttribute ('aria-label', 'Loop animation'); loop.addEventListener ('change', () => { player.SetLoop (loop.checked); this.MarkDirty (); });
-        const scrub = Element ('input', null, undefined, this.animationPanel); scrub.type = 'range'; scrub.min = '0'; scrub.max = String (player.clips[player.state.clip].duration); scrub.step = '0.01'; scrub.value = String (player.state.time); scrub.setAttribute ('aria-label', 'Animation timeline'); scrub.addEventListener ('input', () => { player.Seek (Number (scrub.value)); this.MarkDirty (); this.UpdateDetails (); }); player.onTime = (time) => { if (document.activeElement !== scrub) { scrub.value = String (time); } };
+        const scrub = Element ('input', null, undefined, this.animationPanel); scrub.type = 'range'; scrub.min = '0'; scrub.max = String (player.clips[player.state.clip].duration); scrub.step = '0.01'; scrub.value = String (player.state.time); scrub.setAttribute ('aria-label', 'Animation timeline'); scrub.addEventListener ('input', () => { player.Seek (Number (scrub.value)); this.MarkDirty (); this.UpdateDetails (); }); player.onTime = (time) => { if (document.activeElement !== scrub) { scrub.value = String (time); } }; player.onPlaybackChanged = (playing) => { play.textContent = playing ? 'Pause' : 'Play'; this.MarkDirty (); };
     }
 
     FitScene ()
