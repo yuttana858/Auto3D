@@ -3,7 +3,7 @@ import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { SceneDocument, SceneHistory } from './scenedocument.js';
 import { PackSession, CreateSessionArchive, OpenSessionArchive } from './sessionarchive.js';
-import { ModelLibrary, WorkspaceDialog } from './modellibrary.js';
+import { ModelLibrary, WorkspaceDialog, RecoveryArchiveBuffer } from './modellibrary.js';
 import { Selection, SelectionType } from './navigator.js';
 import { ConvertModelToThreeObject, ModelToThreeConversionParams, ModelToThreeConversionOutput } from '../engine/threejs/threeconverter.js';
 import { Direction } from '../engine/geometry/geometry.js';
@@ -49,7 +49,7 @@ export class SessionEditor
     constructor (website)
     {
         this.website = website; this.document = new SceneDocument (); this.history = new SceneHistory (() => this.MarkDirty ()); this.selected = null; this.mode = 'select'; this.busy = false; this.players = [];
-        this.library = new ModelLibrary (this); this.buttons = new Map (); this.dirty = false; this.recoveryTimer = null;
+        this.library = new ModelLibrary (this); this.buttons = new Map (); this.dirty = false; this.recoveryTimer = null; this.recoveryPromptOpen = false; this.recoveryPromptHandled = false;
         const viewer = website.viewer;
         this.selectionBounds = new THREE.Box3 ();
         this.selectionBox = new THREE.Box3Helper (this.selectionBounds, 0x5aaee6);
@@ -58,7 +58,7 @@ export class SessionEditor
         viewer.scene.add (this.selectionBox);
         this.controls = new TransformControls (viewer.camera, viewer.renderer.domElement); this.controls.setSize (0.8); this.helper = this.controls.getHelper (); viewer.scene.add (this.helper);
         const render = viewer.onRender;
-        viewer.SetRenderHandler ((camera) => { if (render) { render (camera); } if (this.controls.camera !== camera) { this.controls.camera = camera; } });
+        viewer.SetRenderHandler ((camera) => { if (render) { render (camera); } if (this.controls.camera !== camera) { this.controls.camera = camera; } this.website.modelPreview?.Render (); });
         this.controls.addEventListener ('change', () => viewer.Render ());
         this.controls.addEventListener ('dragging-changed', (event) => {
             viewer.navigation.enabled = !event.value; viewer.navigation.clickDetector.Cancel ();
@@ -216,8 +216,12 @@ export class SessionEditor
         const section = Element ('details', 'workspace_section'); section.open = true; section.id = 'session_objects'; Element ('summary', null, 'Session objects', section);
         const content = Element ('div', 'section_content', undefined, section); const actions = Element ('div', 'mode_buttons', undefined, content);
         const add = Element ('button', null, 'Add model', actions); add.addEventListener ('click', () => this.AddModel ()); const library = Element ('button', null, 'Library', actions); library.addEventListener ('click', () => this.library.Open ());
-        this.objectList = Element ('div', 'session_object_list', undefined, content); this.animationPanel = Element ('div', 'animation_panel', undefined, content);
-        document.getElementById ('upload_panel_content').insertBefore (section, document.getElementById ('materials_section'));
+        this.objectList = Element ('div', 'session_object_list', undefined, content);
+        const animationSection = Element ('details', 'workspace_section'); animationSection.open = true; animationSection.id = 'animation_section'; Element ('summary', null, 'Animation', animationSection);
+        const animationContent = Element ('div', 'section_content', undefined, animationSection); this.animationPanel = Element ('div', 'animation_panel', undefined, animationContent);
+        const uploadPanel = document.getElementById ('upload_panel_content');
+        uploadPanel.insertBefore (section, document.getElementById ('materials_section'));
+        uploadPanel.insertBefore (animationSection, document.getElementById ('materials_section'));
         this.sessionInput = Element ('input', null, undefined, document.body); this.sessionInput.type = 'file'; this.sessionInput.accept = '.auto3d'; this.sessionInput.hidden = true;
         this.sessionInput.addEventListener ('change', async () => { const file = this.sessionInput.files[0]; this.sessionInput.value = ''; if (file) { await this.Run (() => this.OpenArchiveFile (file)); } });
         this.website.parameters.fileInput.addEventListener ('cancel', () => { this.replaceTarget = null; });
@@ -297,20 +301,62 @@ export class SessionEditor
 
     async OfferRecovery ()
     {
+        if (this.recoveryPromptOpen || this.recoveryPromptHandled) { return; }
         let recovery = null;
-        try { recovery = await this.library.deviceStorage.GetRecovery (); } catch { return; }
+        try { recovery = await this.library.deviceStorage.GetRecovery (); }
+        catch (error) { console.warn ('Auto3D recovery lookup failed.', error); return; }
         if (!recovery?.archive || this.document.objects.length) { return; }
+
+        let buffer = null;
+        let validationError = null;
+        try {
+            buffer = await RecoveryArchiveBuffer (recovery.archive);
+            OpenSessionArchive (buffer);
+        } catch (error) {
+            validationError = error;
+        }
+
+        this.recoveryPromptOpen = true;
         const dialog = WorkspaceDialog ('Recover unsaved session');
         const body = document.createElement ('div'); body.className = 'workspace_save_form';
-        const message = document.createElement ('p'); message.textContent = 'Auto3D found an unsaved recovery checkpoint from ' + new Date (recovery.updatedAt).toLocaleString () + '.';
-        const restore = document.createElement ('button'); restore.className = 'workspace_primary'; restore.textContent = 'Restore recovery';
-        const discard = document.createElement ('button'); discard.textContent = 'Discard recovery';
+        const timestamp = recovery.updatedAt ? new Date (recovery.updatedAt) : null;
+        const message = document.createElement ('p');
+        message.textContent = validationError
+            ? 'The saved recovery checkpoint cannot be opened: ' + validationError.message
+            : 'Auto3D found an unsaved recovery checkpoint' + (timestamp && !Number.isNaN (timestamp.getTime ()) ? ' from ' + timestamp.toLocaleString () : '') + '.';
+        const restore = document.createElement ('button'); restore.type = 'button'; restore.className = 'workspace_primary'; restore.textContent = 'Restore recovery'; restore.disabled = Boolean (validationError);
+        const discard = document.createElement ('button'); discard.type = 'button'; discard.textContent = validationError ? 'Discard invalid recovery' : 'Discard recovery';
+
+        const dismiss = () => {
+            this.recoveryPromptHandled = true;
+            this.recoveryPromptOpen = false;
+            if (dialog.open) { dialog.close (); }
+        };
+
         restore.addEventListener ('click', async () => {
-            restore.disabled = true; discard.disabled = true;
-            try { await this.OpenArchive (await recovery.archive.arrayBuffer (), false, true); dialog.close (); this.Status ('Recovered unsaved session · Save to keep it.'); }
-            catch (error) { restore.disabled = false; discard.disabled = false; message.textContent = error.message; }
-        });
-        discard.addEventListener ('click', async () => { await this.library.deviceStorage.ClearRecovery ().catch (() => {}); dialog.close (); });
+            if (!buffer) { return; }
+            dismiss ();
+            this.Status ('Restoring recovery…');
+            try {
+                await this.OpenArchive (buffer.slice (0), false, true);
+                await this.library.deviceStorage.ClearRecovery ().catch (() => {});
+                this.Status ('Recovered unsaved session · Save to keep it.');
+            } catch (error) {
+                this.Status ('Recovery could not be restored: ' + error.message);
+            }
+        }, { once : true });
+
+        discard.addEventListener ('click', async () => {
+            dismiss ();
+            try {
+                await this.library.deviceStorage.ClearRecovery ();
+                this.Status ('Recovery checkpoint discarded.');
+            } catch (error) {
+                this.Status ('Recovery could not be discarded: ' + error.message);
+            }
+        }, { once : true });
+
+        dialog.addEventListener ('close', () => { this.recoveryPromptOpen = false; }, { once : true });
         body.append (message, restore, discard); dialog.appendChild (body);
     }
     AddModel () { if (this.readOnly) { return; } this.replaceTarget = null; this.website.OpenFileBrowserDialog (); }
@@ -376,7 +422,7 @@ export class SessionEditor
     {
         const after = TransformState (object); if (JSON.stringify (before) === JSON.stringify (after)) { return; }
         const apply = (state) => { Object.assign (object, { position : [...state.position], rotation : [...state.rotation], scale : [...state.scale] }); this.ApplyTransform (object); this.UpdateDetails (); };
-        this.history.Push ({ undo : () => apply (before), redo : () => apply (after) }); this.RefreshButtons ();
+        this.history.Push ({ undo : () => apply (before), redo : () => apply (after) }); this.RefreshButtons (); this.website.modelPreview?.Update ();
     }
 
     SetMode (mode) { if (this.readOnly && mode !== 'select') { return; } this.mode = mode; this.Select (this.selected); }
@@ -584,11 +630,12 @@ export class SessionEditor
         if (!player) { if (this.selected) { Element ('p', 'section_hint', this.selected.animationError || 'No embedded animation in this model.', this.animationPanel); } return; }
         Element ('strong', null, 'Animation', this.animationPanel);
         const clips = Element ('select', null, undefined, this.animationPanel); clips.setAttribute ('aria-label', 'Animation clip'); player.clips.forEach ((clip, index) => clips.add (new Option (clip.name || 'Clip ' + (index + 1), index))); clips.value = String (player.state.clip);
-        clips.addEventListener ('change', () => { player.Choose (Number (clips.value)); this.AnimationUI (); this.UpdateDetails (); });
-        const actions = Element ('div', 'mode_buttons', undefined, this.animationPanel); const play = Element ('button', null, player.state.playing ? 'Pause' : 'Play', actions); play.setAttribute ('aria-label', 'Play or pause animation'); play.addEventListener ('click', () => { player.Toggle (); play.textContent = player.state.playing ? 'Pause' : 'Play'; if (!player.state.playing) { this.UpdateDetails (); } });
-        const reset = Element ('button', null, 'Reset', actions); reset.addEventListener ('click', () => { player.Seek (0); scrub.value = '0'; this.UpdateDetails (); });
-        const speed = Element ('select', null, undefined, this.animationPanel); speed.setAttribute ('aria-label', 'Animation speed'); [0.25, 0.5, 1, 1.5, 2].forEach ((value) => speed.add (new Option (value + '×', value))); speed.value = String (player.state.speed); speed.addEventListener ('change', () => { player.state.speed = Number (speed.value); });
-        const scrub = Element ('input', null, undefined, this.animationPanel); scrub.type = 'range'; scrub.min = '0'; scrub.max = String (player.clips[player.state.clip].duration); scrub.step = '0.01'; scrub.value = String (player.state.time); scrub.setAttribute ('aria-label', 'Animation timeline'); scrub.addEventListener ('input', () => { player.Seek (Number (scrub.value)); this.UpdateDetails (); }); player.onTime = (time) => { if (document.activeElement !== scrub) { scrub.value = String (time); } };
+        clips.addEventListener ('change', () => { player.Choose (Number (clips.value)); this.MarkDirty (); this.AnimationUI (); this.UpdateDetails (); });
+        const actions = Element ('div', 'mode_buttons', undefined, this.animationPanel); const play = Element ('button', null, player.state.playing ? 'Pause' : 'Play', actions); play.setAttribute ('aria-label', 'Play or pause animation'); play.addEventListener ('click', () => { player.Toggle (); this.MarkDirty (); play.textContent = player.state.playing ? 'Pause' : 'Play'; if (!player.state.playing) { this.UpdateDetails (); } });
+        const loopLabel = Element ('label', 'animation_loop', undefined, this.animationPanel); const loop = Element ('input', null, undefined, loopLabel); loop.type = 'checkbox'; loop.checked = player.state.loop !== false; loopLabel.appendChild (document.createTextNode (' Loop')); loop.addEventListener ('change', () => { player.SetLoop (loop.checked); this.MarkDirty (); });
+        const reset = Element ('button', null, 'Reset', actions); reset.addEventListener ('click', () => { player.Seek (0); this.MarkDirty (); scrub.value = '0'; this.UpdateDetails (); });
+        const speed = Element ('select', null, undefined, this.animationPanel); speed.setAttribute ('aria-label', 'Animation speed'); [0.25, 0.5, 1, 1.5, 2].forEach ((value) => speed.add (new Option (value + '×', value))); speed.value = String (player.state.speed); speed.addEventListener ('change', () => { player.state.speed = Number (speed.value); this.MarkDirty (); });
+        const scrub = Element ('input', null, undefined, this.animationPanel); scrub.type = 'range'; scrub.min = '0'; scrub.max = String (player.clips[player.state.clip].duration); scrub.step = '0.01'; scrub.value = String (player.state.time); scrub.setAttribute ('aria-label', 'Animation timeline'); scrub.addEventListener ('input', () => { player.Seek (Number (scrub.value)); this.MarkDirty (); this.UpdateDetails (); }); player.onTime = (time) => { if (document.activeElement !== scrub) { scrub.value = String (time); } };
     }
 
     FitScene ()

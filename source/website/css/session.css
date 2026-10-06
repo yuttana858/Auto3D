@@ -321,3 +321,152 @@ div.main_viewer
     display: block;
     margin-bottom: 7px;
 }
+
+
+.library_sidebar
+{
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.library_folder_tools,
+.library_bulk_actions
+{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: center;
+}
+
+.library_folder_tools button
+{
+    flex: 1 1 auto;
+    padding: 6px;
+}
+
+.library_bulk_actions
+{
+    margin: 8px 0;
+}
+
+.library_bulk_actions span
+{
+    margin-left: auto;
+    color: var(--ov_light_icon_color);
+    font-size: 8.33px;
+}
+
+.library_card
+{
+    position: relative;
+}
+
+.library_card.selected
+{
+    border-color: var(--ov_button_color);
+    box-shadow: 0 0 0 1px var(--ov_button_color);
+}
+
+.library_select_item
+{
+    position: absolute;
+    z-index: 2;
+    top: 5px;
+    left: 5px;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--ov_background_color) 88%, transparent);
+    border: 1px solid var(--ov_border_color);
+}
+
+.library_select_item input
+{
+    margin: 0;
+}
+
+.library_categories button
+{
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media (max-width: 700px)
+{
+    .library_sidebar
+    {
+        gap: 5px;
+    }
+
+    .library_folder_tools
+    {
+        flex-direction: row;
+    }
+}
+
+
+.animation_loop
+{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 9.33px;
+}
+
+.animation_loop input
+{
+    width: auto;
+    margin: 0;
+    accent-color: var(--ov_button_color);
+}
+
+.model_preview_panel
+{
+    flex: 0 0 auto;
+    margin: 10px 12px 6px;
+    border: 1px solid var(--ov_border_color);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--ov_background_color);
+}
+
+.model_preview_title
+{
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--ov_border_color);
+    color: var(--ov_light_icon_color);
+    font-size: 8.33px;
+}
+
+.model_preview_panel canvas
+{
+    display: block;
+    width: 100%;
+    min-height: 120px;
+    cursor: grab;
+    touch-action: none;
+    background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--ov_background_color) 88%, #ffffff 12%), var(--ov_background_color));
+}
+
+.model_preview_panel canvas:active
+{
+    cursor: grabbing;
+}
+
+.model_preview_panel:not(.has_model) canvas
+{
+    opacity: 0.35;
+}
+
+@media (max-width: 800px)
+{
+    .model_preview_panel
+    {
+        margin: 6px;
+    }
+}

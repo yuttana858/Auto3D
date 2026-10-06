@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { TextureMap } from '../engine/model/material.js';
 import { HexStringToRGBColor } from '../engine/model/color.js';
 import { GenerateMissingBoxUVs } from './materialuv.js';
+import { SetMaterialReflectionStrength } from '../engine/viewer/materialreflection.js';
 
 const TextureSlots = [
     ['map', 'Base color', 'diffuseMap'], ['normalMap', 'Normal', 'normalMap'],
@@ -398,9 +399,11 @@ export class MaterialPanel
                 });
             }
             this.Control (properties, 'Reflective', 'range', physical ? material.specularIntensity : Math.max (material.specular.r, material.specular.g, material.specular.b), { min : 0, max : 1, step : 0.01 }, (value) => {
-                if (physical) { material.specularIntensity = Number (value); entry.original.specularIntensity = Number (value); }
+                const strength = Number (value);
+                SetMaterialReflectionStrength (material, strength);
+                if (physical) { material.specularIntensity = strength; entry.original.specularIntensity = strength; }
                 else {
-                    material.specular.setRGB (Number (value), Number (value), Number (value));
+                    material.specular.setRGB (strength, strength, strength);
                     entry.original.specular = HexStringToRGBColor (material.specular.getHexString ());
                 }
             });
@@ -429,7 +432,7 @@ export class MaterialPanel
             this.Control (properties, 'Double sided', 'checkbox', material.side === THREE.DoubleSide, {}, (value) => {
                 material.side = value ? THREE.DoubleSide : THREE.FrontSide; entry.original.doubleSided = value;
             });
-            const note = this.Text (properties, 'Shared material · Load Bump, AO or Displacement maps in Textures to enable their controls.');
+            const note = this.Text (properties, 'Global reflection multiplies this material’s Reflective value. Roughness, metalness, specular, normal/bump, AO and assigned texture maps remain material-specific. Load Bump, AO or Displacement maps in Textures to enable their controls.');
             note.classList.add ('editor_note');
             this.ShowTextureThumbnails (content, entry);
             return;
@@ -520,7 +523,7 @@ export class MaterialPanel
             const title = document.createElement ('strong'); title.textContent = map.title;
             const filename = document.createElement ('span'); filename.textContent = map.name;
             label.append (title, filename); card.append (thumbnail, label);
-            card.addEventListener ('click', () => { this.mapSlot = map.key; this.page = 'textures'; this.FillDrawer (); });
+            card.addEventListener ('click', () => { this.mapSlot = map.key; this.page = 'textures'; this.Flash (entry); this.FillDrawer (); });
             gallery.appendChild (card);
         }
     }
@@ -536,7 +539,7 @@ export class MaterialPanel
         maps.forEach ((slot) => picker.add (new Option ((slot[0] === 'metalnessMap' ? 'Metalness / roughness' : slot[1]) + (material[slot[0]] ? ' · assigned' : ' · empty'), slot[0])));
         picker.value = maps.some ((slot) => slot[0] === this.mapSlot) ? this.mapSlot : 'map';
         this.mapSlot = picker.value;
-        picker.addEventListener ('change', () => { this.mapSlot = picker.value; this.FillDrawer (); });
+        picker.addEventListener ('change', () => { this.mapSlot = picker.value; this.Flash (entry); this.FillDrawer (); });
         controls.appendChild (picker);
         const slot = maps.find ((slot) => slot[0] === this.mapSlot);
         const fileInput = document.createElement ('input');
@@ -573,6 +576,9 @@ export class MaterialPanel
         } else {
             const preview = document.createElement ('canvas');
             preview.className = 'texture_preview'; preview.setAttribute ('aria-label', slot[1] + ' texture preview');
+            preview.tabIndex = 0; preview.setAttribute ('role', 'button'); preview.title = 'Identify this texture on the model';
+            preview.addEventListener ('click', () => this.Flash (entry));
+            preview.addEventListener ('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault (); this.Flash (entry); } });
             if (texture.image) {
                 preview.width = 176; preview.height = 176;
                 DrawTextureThumbnail (preview, texture.image);
@@ -625,7 +631,7 @@ export class MaterialPanel
             }
             entry.material.needsUpdate = true;
             this.website.sessionEditor?.MarkDirty ();
-            this.website.viewer.Render (); this.ShowSummary ();
+            this.Flash (entry); this.website.viewer.Render (); this.ShowSummary ();
             if (this.open && this.entries[this.active] && this.entries[this.active].material === entry.material) { this.FillDrawer (); }
         } catch (error) {
             if (request === this.textureRequest) { status.textContent = 'Image could not be loaded. Choose a PNG, JPEG or WebP.'; }
@@ -695,6 +701,7 @@ export class MaterialPanel
             this.website.sessionEditor?.MarkDirty ();
             output.textContent = type === 'range' ? this.FormatValue (input.value) : '';
             this.entries[this.active].material.needsUpdate = true;
+            this.website.lightingPanel?.RefreshMaterialProperties ();
             this.website.viewer.Render ();
         });
         input.addEventListener ('change', () => {
