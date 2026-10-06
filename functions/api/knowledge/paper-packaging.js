@@ -8,7 +8,12 @@ const Sources = [
     { id : 'fba-handbook', authority : 'Fibre Box Association', title : 'Fibre Box Handbook', url : 'https://www.fibrebox.org/fibre-box-handbook', access : 'commercial reference; metadata only' },
     { id : 'fba-ect', authority : 'Fibre Box Association', title : 'ECT Application and Reference Guide', url : 'https://store.fibrebox.org/products/ect-application-and-reference-guide-1', access : 'commercial reference; metadata only' },
     { id : 'fba-walmart', authority : 'Fibre Box Association / Walmart', title : 'Corrugated Board Specifications / Automation Packaging Standards', url : 'https://www.fibrebox.org/assets/2025/09/Walmart_Corrugated-Board_Specifications_Automation_Packaging_Standards.pdf', access : 'public reference table; retailer-specific, not universal design law' },
-    { id : 'pca-profiles', authority : 'Packaging Corporation of America', title : 'Profiles with a Purpose', url : 'https://www.packagingcorp.com/resource-hub/beyond-the-box/profiles-with-a-purpose/', access : 'public' }
+    { id : 'pca-profiles', authority : 'Packaging Corporation of America', title : 'Profiles with a Purpose', url : 'https://www.packagingcorp.com/resource-hub/beyond-the-box/profiles-with-a-purpose/', access : 'public' },
+    { id : 'boxblanks-cad', authority : 'Box Blanks', title : 'Parametric FEFCO dieline generator and API', url : 'https://boxblanks.com/', access : 'generated site dielines may be used commercially; API output follows API terms/attribution' },
+    { id : 'freeboxtemplate-cad', authority : 'Free Box Template', title : 'Free parametric corrugated dielines', url : 'https://www.freeboxtemplate.com/', access : 'site states templates are free for personal and commercial projects; verify per-template terms before redistribution' },
+    { id : 'packagingworkbench', authority : 'stoneproof-tech', title : 'PackagingWorkbench for FreeCAD', url : 'https://github.com/stoneproof-tech/PackagingWorkbench', access : 'LGPL-2.1-or-later; parametric FEFCO 0201, 0301, 0713 and DXF dieline export' },
+    { id : 'rhino-packaging-toolkit', authority : 'DDR68', title : 'Rhino Packaging Toolkit', url : 'https://github.com/DDR68/Rhino_Packaging_Toolkit', access : 'MIT; open-source parametric packaging generators and prepress utilities' },
+    { id : 'd0427-reference', authority : 'bikinon', title : 'd0427 FEFCO 0427 DXF generator', url : 'https://github.com/bikinon/d0427', access : 'no repository license found; reference-only, do not copy code into Auto3D' },
 ];
 
 const Knowledge = {
@@ -153,6 +158,14 @@ const Knowledge = {
         ],
         sources : ['fba-walmart']
     },
+    cadReferences : [
+        { style : 'FEFCO 0201 / RSC', formats : ['DXF', 'SVG', 'PDF', 'JSON'], source : 'Box Blanks', parametric : true, verifiedAgainstPublishedPlate : true, licenseUse : 'commercial generated output allowed; preserve API attribution when API terms require it', url : 'https://boxblanks.com/fefco/0201/' },
+        { style : 'FEFCO 0200 / HSC', formats : ['DXF', 'SVG', 'PDF'], source : 'Free Box Template', parametric : true, licenseUse : 'site states free for personal/commercial projects', url : 'https://www.freeboxtemplate.com/corrugated/half-slotted-container-fefco-0200/' },
+        { style : 'FEFCO 0427 / hinged-lid tray', formats : ['DXF', 'SVG', 'PDF'], source : 'Free Box Template', parametric : true, licenseUse : 'template page explicitly permits commercial dieline use', url : 'https://www.freeboxtemplate.com/corrugated/tray-with-hinged-lid-fefco-0427/' },
+        { style : 'FEFCO 0201, 0301, 0713', formats : ['FreeCAD parametric model', 'DXF export'], source : 'PackagingWorkbench', parametric : true, licenseUse : 'LGPL-2.1-or-later; use as external/reference implementation unless license obligations are intentionally accepted', url : 'https://github.com/stoneproof-tech/PackagingWorkbench' },
+        { style : 'mixed ECMA/FEFCO packaging generators', formats : ['Rhino 7/8 IronPython geometry'], source : 'Rhino Packaging Toolkit', parametric : true, licenseUse : 'MIT', url : 'https://github.com/DDR68/Rhino_Packaging_Toolkit' },
+        { style : 'FEFCO 0427', formats : ['DXF generator source'], source : 'bikinon/d0427', parametric : true, licenseUse : 'no license located; reference behavior only, do not redistribute/copy implementation', url : 'https://github.com/bikinon/d0427' }
+    ],
     selectionGuidance : [
         { need : 'lowest-cost general transit case', consider : ['FEFCO 0201', 'C or B single wall', 'ECT/BCT sized to stacking and distribution'], validate : ['gross weight', 'case dimensions', 'pallet pattern', 'humidity', 'compression test'] },
         { need : 'fragile product / cushioning', consider : ['A or C flute', 'double wall if compression and puncture loads are high', 'interior fitments from FEFCO 09 family'], validate : ['shock/drop test', 'flat crush', 'product resonance/cushioning study'] },
@@ -236,7 +249,7 @@ export function onRequestGet (context)
     }
 
     if (section) {
-        const allowed = new Set (['terminology', 'fefco', 'papers', 'flutes', 'multiwall', 'performance', 'referenceGrades', 'selectionGuidance', 'agentRules', 'sources']);
+        const allowed = new Set (['terminology', 'fefco', 'papers', 'flutes', 'multiwall', 'performance', 'referenceGrades', 'cadReferences', 'selectionGuidance', 'agentRules', 'sources']);
         if (!allowed.has (section)) { return response ({ error : 'Unknown knowledge section.' }, 404); }
         return response ({
             knowledgeBase : { id : Knowledge.id, name : Knowledge.name, updated : Knowledge.updated, scope : Knowledge.scope },
