@@ -71,12 +71,12 @@ export class Preferences
         const aiHeading = document.createElement ('strong'); aiHeading.textContent = 'AI connections';
         const aiProviderLabel = document.createElement ('label'); aiProviderLabel.textContent = 'Provider';
         const aiProvider = document.createElement ('select'); aiProvider.setAttribute ('aria-label', 'AI provider'); aiProvider.add (new Option ('Meshy', 'meshy')); aiProvider.add (new Option ('Custom REST provider', 'custom')); aiProvider.value = this.website.aiWorkspace?.settings.provider || 'meshy'; aiProviderLabel.appendChild (aiProvider);
-        const aiBaseLabel = document.createElement ('label'); aiBaseLabel.textContent = 'API base URL';
-        const aiBase = document.createElement ('input'); aiBase.type = 'url'; aiBase.value = this.website.aiWorkspace?.settings.baseUrl || 'https://api.meshy.ai'; aiBase.autocomplete = 'off'; aiBase.spellcheck = false; aiBase.setAttribute ('aria-label', 'AI provider base URL'); aiBaseLabel.appendChild (aiBase);
-        const aiKeyLabel = document.createElement ('label'); aiKeyLabel.textContent = 'API key';
-        const aiKey = document.createElement ('input'); aiKey.type = 'password'; aiKey.value = this.website.aiWorkspace?.settings.apiKey || ''; aiKey.placeholder = 'Bearer API key'; aiKey.autocomplete = 'off'; aiKey.setAttribute ('aria-label', 'AI provider API key'); aiKeyLabel.appendChild (aiKey);
+        const aiBaseLabel = document.createElement ('label'); aiBaseLabel.textContent = 'Auto3D AI proxy';
+        const aiBase = document.createElement ('input'); aiBase.type = 'text'; aiBase.value = this.website.aiWorkspace?.settings.baseUrl || '/api/ai'; aiBase.autocomplete = 'off'; aiBase.spellcheck = false; aiBase.setAttribute ('aria-label', 'Auto3D AI proxy URL'); aiBaseLabel.appendChild (aiBase);
+        const aiKeyLabel = document.createElement ('label'); aiKeyLabel.textContent = 'Meshy API key (optional when server key is configured)';
+        const aiKey = document.createElement ('input'); aiKey.type = 'password'; aiKey.value = this.website.aiWorkspace?.settings.apiKey || ''; aiKey.placeholder = 'msy_… or leave blank for server key'; aiKey.autocomplete = 'off'; aiKey.setAttribute ('aria-label', 'AI provider API key'); aiKeyLabel.appendChild (aiKey);
         const rememberLabel = document.createElement ('label'); rememberLabel.className = 'share_option'; const remember = document.createElement ('input'); remember.type = 'checkbox'; remember.checked = this.website.aiWorkspace?.settings.remember === true; rememberLabel.append (remember, document.createTextNode (' Remember key on this device'));
-        const aiNote = document.createElement ('p'); aiNote.className = 'section_hint'; aiNote.textContent = 'API keys are never saved inside .auto3d sessions. Remembering a key stores it in this browser profile; for shared or production deployments, use a server-side proxy so the provider key is not exposed to browser code.';
+        const aiNote = document.createElement ('p'); aiNote.className = 'section_hint'; aiNote.textContent = 'Auto3D routes Meshy requests through its same-origin server proxy because Meshy blocks browser CORS requests. API keys are never saved inside .auto3d sessions. For shared deployments, leave this field blank and configure MESHY_API_KEY as a server secret; the browser-stored key is intended only for personal/local use.';
         const aiActions = document.createElement ('div'); aiActions.className = 'mode_buttons';
         const saveAI = document.createElement ('button'); saveAI.textContent = 'Save connection'; saveAI.className = 'workspace_primary';
         const testAI = document.createElement ('button'); testAI.textContent = 'Test connection';
@@ -94,7 +94,7 @@ export class Preferences
             finally { testAI.disabled = false; }
         });
         clearAI.addEventListener ('click', () => { aiKey.value = ''; this.website.aiWorkspace?.ClearKey (); aiStatus.textContent = 'API key cleared.'; });
-        aiProvider.addEventListener ('change', () => { if (aiProvider.value === 'meshy' && (!aiBase.value || aiBase.value.includes ('meshy.ai'))) { aiBase.value = 'https://api.meshy.ai'; } });
+        aiProvider.addEventListener ('change', () => { if (aiProvider.value === 'meshy' && (!aiBase.value || aiBase.value.includes ('meshy.ai'))) { aiBase.value = '/api/ai'; } });
         aiActions.append (saveAI, testAI, clearAI);
         const about = document.createElement ('p'); about.className = 'preferences_about';
         about.textContent = 'SW Auto3D v' + AppVersion + ' — A browser workspace for inspecting, arranging and reviewing 3D models, materials, lighting and reusable layouts. Dimensions use the units declared by the source model; unspecified units remain model units.';
