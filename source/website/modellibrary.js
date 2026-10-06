@@ -316,6 +316,7 @@ export class ModelLibrary
 
         const hint = document.createElement ('p'); hint.className = 'section_hint';
         const status = document.createElement ('p'); status.className = 'section_hint'; status.setAttribute ('role', 'status');
+        const progress = document.createElement ('progress'); progress.className = 'save_progress'; progress.hidden = true; progress.setAttribute ('aria-label', 'Save progress'); progress.style.width = '100%';
         const submit = document.createElement ('button'); submit.className = 'workspace_primary'; submit.type = 'submit';
         const updateHint = () => {
             categoryLabel.hidden = destination.value === 'file';
@@ -332,13 +333,14 @@ export class ModelLibrary
         const open = document.createElement ('button'); open.type = 'button'; open.textContent = 'Open session file';
         open.addEventListener ('click', () => { dialog.close (); this.editor.OpenSessionFile (); });
 
-        form.append (nameLabel, categoryLabel, kindLabel, destinationLabel, hint, status, submit);
+        form.append (nameLabel, categoryLabel, kindLabel, destinationLabel, hint, progress, status, submit);
         if (download) { form.appendChild (open); }
 
         form.addEventListener ('submit', async (event) => {
             event.preventDefault ();
             if (!name.value.trim () || destination.value === 'shared' || category.value === '__new_folder__') { return; }
-            submit.disabled = true; status.textContent = 'Preparing session…';
+            submit.disabled = true; progress.hidden = false; progress.removeAttribute ('value'); status.textContent = 'Preparing session…';
+            await new Promise ((resolve) => requestAnimationFrame (() => requestAnimationFrame (resolve)));
             try {
                 let fileHandle = null;
                 if (destination.value === 'file' && typeof window.showSaveFilePicker === 'function') {
@@ -349,12 +351,24 @@ export class ModelLibrary
                 if (destination.value === 'file') {
                     if (fileHandle) {
                         const writable = await fileHandle.createWritable ();
-                        try { await writable.write (saved); await writable.close (); }
-                        catch (error) { await writable.abort ().catch (() => {}); throw error; }
+                        try {
+                            const bytes = saved instanceof ArrayBuffer ? new Uint8Array (saved) : new Uint8Array (saved.buffer, saved.byteOffset || 0, saved.byteLength);
+                            const chunkSize = 4 * 1024 * 1024;
+                            progress.max = Math.max (1, bytes.byteLength); progress.value = 0;
+                            status.textContent = 'Saving ' + fileHandle.name + '…';
+                            for (let offset = 0; offset < bytes.byteLength; offset += chunkSize) {
+                                const chunk = bytes.subarray (offset, Math.min (bytes.byteLength, offset + chunkSize));
+                                await writable.write ({ type : 'write', position : offset, data : chunk });
+                                progress.value = Math.min (bytes.byteLength, offset + chunk.byteLength);
+                                await new Promise ((resolve) => requestAnimationFrame (resolve));
+                            }
+                            await writable.close ();
+                        } catch (error) { await writable.abort ().catch (() => {}); throw error; }
+                        status.textContent = 'Saved successfully: ' + fileHandle.name;
                         this.editor.Status ('Session saved: ' + fileHandle.name);
                     } else {
                         this.editor.Download (saved, name.value.trim () + '.auto3d', 'application/octet-stream');
-                        this.editor.Status ('Session downloaded.');
+                        status.textContent = 'Download started successfully.'; progress.max = 1; progress.value = 1; this.editor.Status ('Session downloaded.');
                     }
                 } else {
                     const folder = await this.deviceStorage.AddFolder (category.value || 'Uncategorized');
@@ -365,16 +379,20 @@ export class ModelLibrary
                         archive : new Blob ([saved], { type : 'application/octet-stream' })
                     });
                     this.category = folder;
-                    this.editor.Status ('Saved to ' + folder + ': ' + name.value.trim ());
+                    status.textContent = 'Saved successfully to ' + folder + '.'; progress.max = 1; progress.value = 1; this.editor.Status ('Saved to ' + folder + ': ' + name.value.trim ());
                 }
                 if (kind.value === 'session') {
                     this.editor.document.name = name.value.trim ();
                     this.editor.website.parameters.fileNameDiv.textContent = this.editor.document.name;
                     await this.editor.MarkClean ();
                 }
+                if (!progress.hasAttribute ('value')) { progress.max = 1; progress.value = 1; }
+                await new Promise ((resolve) => setTimeout (resolve, 650));
                 dialog.close ();
             } catch (error) {
-                status.textContent = error.name === 'AbortError' ? 'Save canceled.' : error.message;
+                progress.hidden = true;
+                status.textContent = error.name === 'AbortError' ? 'Save canceled.' : 'Save failed: ' + error.message;
+                this.editor.Status (status.textContent);
                 submit.disabled = false;
             }
         });
