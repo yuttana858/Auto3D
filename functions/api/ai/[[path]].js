@@ -18,9 +18,11 @@ function json (data, status = 200, extraHeaders = null)
 
 function apiKey (context)
 {
+    const personal = String (context.request.headers.get ('X-Auto3D-AI-Key') || '').trim ();
+    if (personal) { return personal; }
+    const allowShared = String (context.env.AUTO3D_AI_ALLOW_SHARED_KEY || '').toLowerCase () === 'true';
     const secret = String (context.env.MESHY_API_KEY || '').trim ();
-    if (secret) { return secret; }
-    return String (context.request.headers.get ('X-Auto3D-AI-Key') || '').trim ();
+    return allowShared ? secret : '';
 }
 
 function meshyUrl (context, path)
