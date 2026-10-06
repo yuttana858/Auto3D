@@ -110,6 +110,20 @@ export default function suite ()
             assert.equal (ReadSession (legacy).document.objects.length, 1);
             assert.throws (() => ReadSession ({ ...current, version : SessionVersion + 1 }), /newer application version/);
         });
+        it ('Migrates v4 sessions to the v5 timeline schema', () => {
+            const scene = new SceneDocument (); scene.AddImported (Asset (), 'one');
+            const legacy = PackSession (scene);
+            legacy.version = 4;
+            delete legacy.view.timeline;
+            delete legacy.objects[0].keyframes;
+            const migrated = MigrateSessionData (legacy);
+            assert.equal (migrated.version, 5);
+            assert.deepEqual (migrated.objects[0].keyframes, []);
+            assert.equal (migrated.view.timeline.version, 1);
+            assert.deepEqual (migrated.view.timeline.cameraKeyframes, []);
+            const reopened = ReadSession (legacy);
+            assert.deepEqual (reopened.document.objects[0].keyframes, []);
+        });
         it ('Rejects corrupted references, repeated IDs and nonfinite transforms', () => {
             const scene = new SceneDocument (); scene.AddImported (Asset (), 'one'); scene.AddImported (Asset (), 'two'); const data = PackSession (scene);
             data.objects[1].id = data.objects[0].id; assert.throws (() => ReadSession (data), /Repeated/); data.objects[1].id = 'new'; data.objects[0].position[0] = Infinity; assert.throws (() => ReadSession (data), /coordinates/); data.objects[0].position[0] = 0; data.model.meshes[0].triangles[0][0] = 10000; assert.throws (() => ReadSession (data), /geometry/);
