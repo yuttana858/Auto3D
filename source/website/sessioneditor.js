@@ -679,16 +679,79 @@ export class SessionEditor
 
     AnimationUI ()
     {
-        this.animationPanel.replaceChildren (); const player = this.selected?.player;
-        if (!player) { if (this.selected) { Element ('p', 'section_hint', this.selected.animationError || 'No embedded animation in this model.', this.animationPanel); } return; }
-        const clips = Element ('select', null, undefined, this.animationPanel); clips.setAttribute ('aria-label', 'Animation clip'); player.clips.forEach ((clip, index) => clips.add (new Option (clip.name || 'Clip ' + (index + 1), index))); clips.value = String (player.state.clip);
+        this.animationPanel.replaceChildren ();
+        const timeline = this.timeline;
+        timeline.ExtendDurationForKeys ();
+
+        const native = Element ('div', 'native_timeline', undefined, this.animationPanel);
+        const nativeHeader = Element ('div', 'timeline_header', undefined, native);
+        Element ('strong', null, 'Auto3D Timeline', nativeHeader);
+        const cameraNow = CaptureCameraState (this.website.viewer);
+        Element ('span', 'timeline_camera_readout', 'Cam ' + cameraNow.azimuth.toFixed (1) + '° az · ' + cameraNow.elevation.toFixed (1) + '° el', nativeHeader);
+
+        const settings = Element ('div', 'timeline_settings', undefined, native);
+        const durationLabel = Element ('label', null, 'Duration', settings); const duration = Element ('input', null, undefined, durationLabel); duration.type = 'number'; duration.min = '0.1'; duration.max = '3600'; duration.step = '0.1'; duration.value = String (timeline.duration); duration.setAttribute ('aria-label', 'Timeline duration in seconds');
+        duration.addEventListener ('change', () => { timeline.SetDuration (Number (duration.value)); this.MarkDirty (); this.AnimationUI (); });
+        const tweenLabel = Element ('label', null, 'Tween', settings); const tween = Element ('select', null, undefined, tweenLabel); tween.setAttribute ('aria-label', 'Keyframe interpolation'); [['smooth', 'Smooth'], ['linear', 'Linear'], ['step', 'Step']].forEach (([value, label]) => tween.add (new Option (label, value))); tween.value = timeline.interpolation;
+        tween.addEventListener ('change', () => { timeline.interpolation = tween.value; this.MarkDirty (); });
+        const loopLabel = Element ('label', 'timeline_loop_label', undefined, settings); const loop = Element ('input', null, undefined, loopLabel); loop.type = 'checkbox'; loop.checked = timeline.loop; loopLabel.appendChild (document.createTextNode (' Loop')); loop.addEventListener ('change', () => { timeline.loop = loop.checked; this.MarkDirty (); });
+
+        const capture = Element ('div', 'mode_buttons timeline_capture_buttons', undefined, native);
+        const addObject = Element ('button', null, 'Keyframe object', capture); addObject.disabled = !this.selected; addObject.title = 'Save selected object position, rotation and scale at the current time.';
+        addObject.addEventListener ('click', () => { timeline.CaptureObject (this.selected); this.MarkDirty (); this.AnimationUI (); });
+        const addCamera = Element ('button', null, 'Keyframe camera', capture); addCamera.title = 'Save viewer eye, target, up vector, FOV, azimuth and elevation at the current time.';
+        addCamera.addEventListener ('click', () => { timeline.CaptureCamera (); this.MarkDirty (); this.AnimationUI (); });
+
+        const controls = Element ('div', 'mode_buttons timeline_transport', undefined, native);
+        const play = Element ('button', null, timeline.playing ? 'Pause' : 'Play', controls); play.addEventListener ('click', () => { timeline.Toggle (); play.textContent = timeline.playing ? 'Pause' : 'Play'; });
+        const reset = Element ('button', null, 'Reset', controls); reset.addEventListener ('click', () => { timeline.Reset (); this.MarkDirty (); this.AnimationUI (); });
+        const timeText = Element ('span', 'timeline_time_text', timeline.time.toFixed (2) + ' / ' + timeline.duration.toFixed (2) + ' s', controls);
+
+        const scrub = Element ('input', 'timeline_scrub', undefined, native); scrub.type = 'range'; scrub.min = '0'; scrub.max = String (timeline.duration); scrub.step = '0.01'; scrub.value = String (timeline.time); scrub.setAttribute ('aria-label', 'Auto3D keyframe timeline');
+        scrub.addEventListener ('input', () => { timeline.Seek (Number (scrub.value)); timeText.textContent = timeline.time.toFixed (2) + ' / ' + timeline.duration.toFixed (2) + ' s'; this.MarkDirty (); });
+        timeline.onTime = (time) => { if (document.activeElement !== scrub) { scrub.value = String (time); } timeText.textContent = time.toFixed (2) + ' / ' + timeline.duration.toFixed (2) + ' s'; };
+        timeline.onPlaybackChanged = (playing) => { play.textContent = playing ? 'Pause' : 'Play'; this.MarkDirty (); };
+
+        const keys = Element ('div', 'timeline_keyframes', undefined, native);
+        const entries = timeline.cameraKeyframes.map ((keyframe) => ({ type : 'camera', keyframe, object : null, label : 'Camera' }));
+        for (const object of this.document.objects) {
+            timeline.NormalizeObjectKeyframes (object).forEach ((keyframe) => entries.push ({ type : 'object', keyframe, object, label : object.name }));
+        }
+        entries.sort ((left, right) => left.keyframe.time - right.keyframe.time || left.type.localeCompare (right.type));
+        if (!entries.length) {
+            Element ('p', 'section_hint', 'Set the timeline time, position an object or the viewer camera, then save a keyframe. Smooth tweening is applied between keyframes by default.', keys);
+        } else {
+            for (const entry of entries) {
+                const row = Element ('div', 'timeline_keyframe_row', undefined, keys);
+                const seek = Element ('button', 'timeline_keyframe_seek', entry.keyframe.time.toFixed (2) + 's · ' + entry.label, row);
+                seek.title = entry.type === 'camera'
+                    ? 'Camera · ' + entry.keyframe.azimuth.toFixed (1) + '° az · ' + entry.keyframe.elevation.toFixed (1) + '° el · ' + entry.keyframe.distance.toFixed (2) + ' distance'
+                    : entry.label + ' · ' + entry.keyframe.interpolation + ' tween';
+                seek.addEventListener ('click', () => { timeline.Seek (entry.keyframe.time); this.AnimationUI (); });
+                Element ('span', 'timeline_keyframe_mode', entry.keyframe.interpolation, row);
+                if (!this.readOnly) {
+                    const remove = Element ('button', 'timeline_keyframe_delete', '×', row); remove.title = 'Delete keyframe';
+                    remove.addEventListener ('click', () => { timeline.DeleteKeyframe (entry.type, entry.keyframe.id, entry.object); this.MarkDirty (); this.AnimationUI (); });
+                }
+            }
+        }
+
+        const player = this.selected?.player;
+        const embedded = Element ('div', 'embedded_animation', undefined, this.animationPanel);
+        Element ('strong', null, 'Embedded animation', embedded);
+        if (!player) {
+            if (this.selected) { Element ('p', 'section_hint', this.selected.animationError || 'No embedded animation in this model. Auto3D keyframes above are available for every model.', embedded); }
+            else { Element ('p', 'section_hint', 'Select a model to inspect any embedded GLB/glTF animation clips.', embedded); }
+            return;
+        }
+        const clips = Element ('select', null, undefined, embedded); clips.setAttribute ('aria-label', 'Animation clip'); player.clips.forEach ((clip, index) => clips.add (new Option (clip.name || 'Clip ' + (index + 1), index))); clips.value = String (player.state.clip);
         clips.addEventListener ('change', () => { player.Choose (Number (clips.value)); this.MarkDirty (); this.AnimationUI (); this.UpdateDetails (); });
-        const actions = Element ('div', 'mode_buttons', undefined, this.animationPanel); const play = Element ('button', null, player.state.playing ? 'Pause' : 'Play', actions); play.setAttribute ('aria-label', 'Play or pause animation'); play.addEventListener ('click', () => { player.Toggle (); this.MarkDirty (); play.textContent = player.state.playing ? 'Pause' : 'Play'; if (!player.state.playing) { this.UpdateDetails (); } });
-        const reset = Element ('button', null, 'Reset', actions); reset.addEventListener ('click', () => { player.Seek (0); scrub.value = '0'; this.MarkDirty (); this.UpdateDetails (); });
-        const settings = Element ('div', 'animation_settings', undefined, this.animationPanel);
-        const speedLabel = Element ('label', null, 'Speed', settings); const speed = Element ('select', null, undefined, speedLabel); speed.setAttribute ('aria-label', 'Animation speed'); [0.25, 0.5, 1, 1.5, 2].forEach ((value) => speed.add (new Option (value + '×', value))); speed.value = String (player.state.speed); speed.addEventListener ('change', () => { player.state.speed = Number (speed.value); this.MarkDirty (); });
-        const loopLabel = Element ('label', null, 'Loop', settings); const loop = Element ('input', null, undefined, loopLabel); loop.type = 'checkbox'; loop.checked = player.state.loop !== false; loop.setAttribute ('aria-label', 'Loop animation'); loop.addEventListener ('change', () => { player.SetLoop (loop.checked); this.MarkDirty (); });
-        const scrub = Element ('input', null, undefined, this.animationPanel); scrub.type = 'range'; scrub.min = '0'; scrub.max = String (player.clips[player.state.clip].duration); scrub.step = '0.01'; scrub.value = String (player.state.time); scrub.setAttribute ('aria-label', 'Animation timeline'); scrub.addEventListener ('input', () => { player.Seek (Number (scrub.value)); this.MarkDirty (); this.UpdateDetails (); }); player.onTime = (time) => { if (document.activeElement !== scrub) { scrub.value = String (time); } }; player.onPlaybackChanged = (playing) => { play.textContent = playing ? 'Pause' : 'Play'; this.MarkDirty (); };
+        const actions = Element ('div', 'mode_buttons', undefined, embedded); const clipPlay = Element ('button', null, player.state.playing ? 'Pause' : 'Play', actions); clipPlay.setAttribute ('aria-label', 'Play or pause embedded animation'); clipPlay.addEventListener ('click', () => { player.Toggle (); this.MarkDirty (); clipPlay.textContent = player.state.playing ? 'Pause' : 'Play'; if (!player.state.playing) { this.UpdateDetails (); } });
+        const clipReset = Element ('button', null, 'Reset', actions); clipReset.addEventListener ('click', () => { player.Seek (0); clipScrub.value = '0'; this.MarkDirty (); this.UpdateDetails (); });
+        const clipSettings = Element ('div', 'animation_settings', undefined, embedded);
+        const speedLabel = Element ('label', null, 'Speed', clipSettings); const speed = Element ('select', null, undefined, speedLabel); speed.setAttribute ('aria-label', 'Animation speed'); [0.25, 0.5, 1, 1.5, 2].forEach ((value) => speed.add (new Option (value + '×', value))); speed.value = String (player.state.speed); speed.addEventListener ('change', () => { player.state.speed = Number (speed.value); this.MarkDirty (); });
+        const clipLoopLabel = Element ('label', null, 'Loop', clipSettings); const clipLoop = Element ('input', null, undefined, clipLoopLabel); clipLoop.type = 'checkbox'; clipLoop.checked = player.state.loop !== false; clipLoop.setAttribute ('aria-label', 'Loop embedded animation'); clipLoop.addEventListener ('change', () => { player.SetLoop (clipLoop.checked); this.MarkDirty (); });
+        const clipScrub = Element ('input', null, undefined, embedded); clipScrub.type = 'range'; clipScrub.min = '0'; clipScrub.max = String (player.clips[player.state.clip].duration); clipScrub.step = '0.01'; clipScrub.value = String (player.state.time); clipScrub.setAttribute ('aria-label', 'Embedded animation timeline'); clipScrub.addEventListener ('input', () => { player.Seek (Number (clipScrub.value)); this.MarkDirty (); this.UpdateDetails (); }); player.onTime = (time) => { if (document.activeElement !== clipScrub) { clipScrub.value = String (time); } }; player.onPlaybackChanged = (playing) => { clipPlay.textContent = playing ? 'Pause' : 'Play'; this.MarkDirty (); };
     }
 
     FitScene ()
