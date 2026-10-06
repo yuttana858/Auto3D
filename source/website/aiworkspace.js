@@ -32,7 +32,9 @@ export class AIWorkspace
         try {
             const session = JSON.parse (sessionStorage.getItem (AIStorageKey) || 'null');
             const local = JSON.parse (localStorage.getItem (AIStorageKey) || 'null');
-            return { ...fallback, ...(session || local || {}) };
+            const settings = { ...fallback, ...(session || local || {}) };
+            if (settings.provider === 'meshy' && String (settings.baseUrl || '').includes ('meshy.ai')) { settings.baseUrl = '/api/ai'; }
+            return settings;
         } catch {
             return fallback;
         }
@@ -40,9 +42,12 @@ export class AIWorkspace
 
     SaveSettings (settings)
     {
+        const provider = settings.provider === 'custom' ? 'custom' : 'meshy';
+        let baseUrl = String (settings.baseUrl || '/api/ai').trim ().replace (/\/$/, '');
+        if (provider === 'meshy' && baseUrl.includes ('meshy.ai')) { baseUrl = '/api/ai'; }
         this.settings = {
-            provider : settings.provider === 'custom' ? 'custom' : 'meshy',
-            baseUrl : String (settings.baseUrl || '/api/ai').trim ().replace (/\/$/, ''),
+            provider,
+            baseUrl,
             apiKey : String (settings.apiKey || '').trim (),
             remember : settings.remember === true
         };
@@ -156,7 +161,7 @@ export class AIWorkspace
             try { result = JSON.parse (text); } catch { result = { message : text }; }
         }
         if (!response.ok) {
-            const message = result?.message || result?.task_error?.message || ('Provider request failed (' + response.status + ').');
+            const message = result?.error || result?.message || result?.task_error?.message || ('Provider request failed (' + response.status + ').');
             throw new Error (message);
         }
         return { result, response };
@@ -175,7 +180,7 @@ export class AIWorkspace
     {
         if (!this.connectionBadge) { return; }
         const configured = this.settings.provider === 'meshy';
-        this.connectionBadge.textContent = configured ? (this.settings.apiKey ? 'Meshy · personal key' : 'Meshy · server key') : 'Not connected';
+        this.connectionBadge.textContent = configured ? (this.settings.apiKey ? 'Meshy · personal key' : 'Meshy via Auto3D') : 'Not connected';
         this.connectionBadge.classList.toggle ('connected', configured);
         if (this.lastBalance !== undefined && this.lastBalance !== null) { this.connectionBadge.textContent = 'Meshy · ' + this.lastBalance + ' credits'; }
         this.RefreshActions ();
