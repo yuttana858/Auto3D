@@ -1,5 +1,6 @@
 import * as assert from 'node:assert';
 import * as THREE from 'three';
+import { Blob as NodeBlob } from 'node:buffer';
 import { SceneDocument, SceneHistory } from '../../source/website/scenedocument.js';
 import { PackSession, ReadSession, CreateSessionArchive, OpenSessionArchive, MigrateSessionData, SessionVersion } from '../../source/website/sessionarchive.js';
 import { Model } from '../../source/engine/model/model.js';
@@ -88,7 +89,7 @@ export default function suite ()
         });
         it ('Normalizes recovery checkpoint Blob, ArrayBuffer and typed-array storage forms', async () => {
             const source = new Uint8Array ([1, 2, 3, 255]);
-            for (const stored of [source.buffer, source, new Blob ([source])]) {
+            for (const stored of [source.buffer, source, new NodeBlob ([source])]) {
                 const buffer = await RecoveryArchiveBuffer (stored);
                 assert.deepEqual (new Uint8Array (buffer), source);
             }
