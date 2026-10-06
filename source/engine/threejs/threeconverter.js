@@ -353,77 +353,78 @@ export function ConvertModelToThreeObject (model, conversionParams, conversionOu
 			return null;
 		}
 
-		let triangleIndices = [];
-		for (let i = 0; i < triangleCount; i++) {
-			triangleIndices.push (i);
+		// Most generated meshes use a single material. Avoid allocating and sorting
+		// a triangle-index array in that common case; for dense meshes this removes
+		// a large O(n log n) main-thread step and significant temporary memory.
+		let firstMaterial = mesh.GetTriangle (0).mat;
+		let hasMultipleMaterials = false;
+		for (let i = 1; i < triangleCount; i++) {
+			if (mesh.GetTriangle (i).mat !== firstMaterial) {
+				hasMultipleMaterials = true;
+				break;
+			}
 		}
-		triangleIndices.sort ((a, b) => {
-			let aTriangle = mesh.GetTriangle (a);
-			let bTriangle = mesh.GetTriangle (b);
-			return aTriangle.mat - bTriangle.mat;
-		});
+		let triangleIndices = null;
+		if (hasMultipleMaterials) {
+			triangleIndices = new Array (triangleCount);
+			for (let i = 0; i < triangleCount; i++) {
+				triangleIndices[i] = i;
+			}
+			triangleIndices.sort ((a, b) => mesh.GetTriangle (a).mat - mesh.GetTriangle (b).mat);
+		}
 
 		let threeGeometry = new THREE.BufferGeometry ();
 		let meshMaterialHandler = new ThreeMeshMaterialHandler (threeGeometry, MaterialGeometryType.Face, materialHandler);
 
-		let vertices = [];
-		let vertexColors = [];
-		let normals = [];
-		let uvs = [];
-
 		let meshHasVertexColors = (mesh.VertexColorCount () > 0);
 		let meshHasUVs = (mesh.TextureUVCount () > 0);
-		let processedTriangleCount = 0;
-		for (let triangleIndex of triangleIndices) {
+		// Preallocate GPU-ready buffers instead of growing large JavaScript number
+		// arrays and then copying them again into Float32Array inside Three.js.
+		let vertices = new Float32Array (triangleCount * 9);
+		let vertexColors = meshHasVertexColors ? new Float32Array (triangleCount * 9) : null;
+		let normals = new Float32Array (triangleCount * 9);
+		let uvs = meshHasUVs ? new Float32Array (triangleCount * 6) : null;
+
+		for (let processedTriangleCount = 0; processedTriangleCount < triangleCount; processedTriangleCount++) {
+			let triangleIndex = triangleIndices === null ? processedTriangleCount : triangleIndices[processedTriangleCount];
 			let triangle = mesh.GetTriangle (triangleIndex);
+			let vertexOffset = processedTriangleCount * 9;
+			let uvOffset = processedTriangleCount * 6;
 
 			let v0 = mesh.GetVertex (triangle.v0);
 			let v1 = mesh.GetVertex (triangle.v1);
 			let v2 = mesh.GetVertex (triangle.v2);
-			vertices.push (v0.x, v0.y, v0.z, v1.x, v1.y, v1.z, v2.x, v2.y, v2.z);
+			vertices.set ([v0.x, v0.y, v0.z, v1.x, v1.y, v1.z, v2.x, v2.y, v2.z], vertexOffset);
 
-			if (triangle.HasVertexColors ()) {
+			if (vertexColors !== null && triangle.HasVertexColors ()) {
 				let vc0 = ConvertColorToThreeColor (mesh.GetVertexColor (triangle.c0));
 				let vc1 = ConvertColorToThreeColor (mesh.GetVertexColor (triangle.c1));
 				let vc2 = ConvertColorToThreeColor (mesh.GetVertexColor (triangle.c2));
-				vertexColors.push (
-					vc0.r, vc0.g, vc0.b,
-					vc1.r, vc1.g, vc1.b,
-					vc2.r, vc2.g, vc2.b
-				);
-			} else if (meshHasVertexColors) {
-				vertexColors.push (
-					0.0, 0.0, 0.0,
-					0.0, 0.0, 0.0,
-					0.0, 0.0, 0.0
-				);
+				vertexColors.set ([vc0.r, vc0.g, vc0.b, vc1.r, vc1.g, vc1.b, vc2.r, vc2.g, vc2.b], vertexOffset);
 			}
 
 			let n0 = mesh.GetNormal (triangle.n0);
 			let n1 = mesh.GetNormal (triangle.n1);
 			let n2 = mesh.GetNormal (triangle.n2);
-			normals.push (n0.x, n0.y, n0.z, n1.x, n1.y, n1.z, n2.x, n2.y, n2.z);
+			normals.set ([n0.x, n0.y, n0.z, n1.x, n1.y, n1.z, n2.x, n2.y, n2.z], vertexOffset);
 
-			if (triangle.HasTextureUVs ()) {
+			if (uvs !== null && triangle.HasTextureUVs ()) {
 				let u0 = mesh.GetTextureUV (triangle.u0);
 				let u1 = mesh.GetTextureUV (triangle.u1);
 				let u2 = mesh.GetTextureUV (triangle.u2);
-				uvs.push (u0.x, u0.y, u1.x, u1.y, u2.x, u2.y);
-			} else if (meshHasUVs) {
-				uvs.push (0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+				uvs.set ([u0.x, u0.y, u1.x, u1.y, u2.x, u2.y], uvOffset);
 			}
 
 			meshMaterialHandler.ProcessItem (processedTriangleCount, triangle.mat);
-			processedTriangleCount += 1;
 		}
-		meshMaterialHandler.Finalize (processedTriangleCount);
+		meshMaterialHandler.Finalize (triangleCount);
 
 		threeGeometry.setAttribute ('position', new THREE.Float32BufferAttribute (vertices, 3));
-		if (vertexColors.length !== 0) {
+		if (vertexColors !== null) {
 			threeGeometry.setAttribute ('color', new THREE.Float32BufferAttribute (vertexColors, 3));
 		}
 		threeGeometry.setAttribute ('normal', new THREE.Float32BufferAttribute (normals, 3));
-		if (uvs.length !== 0) {
+		if (uvs !== null) {
 			threeGeometry.setAttribute ('uv', new THREE.Float32BufferAttribute (uvs, 2));
 		}
 
