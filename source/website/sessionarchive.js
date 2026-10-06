@@ -227,7 +227,7 @@ export function ReadSession (data)
         }
         if (data.animationAsset) {
             object.animationAsset = { main : String (data.animationAsset.main), files : data.animationAsset.files.map ((file) => ({ name : String (file.name), buffer : DecodeBuffer (file.buffer) })) };
-            object.playback = { clip : Number.isInteger (data.playback?.clip) ? data.playback.clip : 0, time : Number.isFinite (data.playback?.time) ? Math.max (0, data.playback.time) : 0, speed : Number.isFinite (data.playback?.speed) ? Math.max (0.1, Math.min (4, data.playback.speed)) : 1, playing : data.playback?.playing === true, loop : data.playback?.loop !== false };
+            object.playback = { clip : Number.isInteger (data.playback?.clip) ? data.playback.clip : 0, time : Number.isFinite (data.playback?.time) ? Math.max (0, data.playback.time) : 0, speed : Number.isFinite (data.playback?.speed) ? Math.max (0.1, Math.min (4, data.playback.speed)) : 1, playing : false, loop : data.playback?.loop !== false };
         }
         if (object.scale.some ((value) => Math.abs (value) < 1e-6)) { throw new Error ('An object has zero scale.'); }
         document.ApplyTransform (object);
