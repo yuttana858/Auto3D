@@ -1130,6 +1130,7 @@ export class Website
             },
             onMaterialSelected : (materialIndex) => {
                 this.sidebar.AddMaterialProperties (this.model.GetMaterial (materialIndex));
+                this.materialPanel?.FlashMaterialIndex (materialIndex);
             },
             onResizeRequested : () => {
                 this.layouter.Resize ();
@@ -1144,7 +1145,7 @@ export class Website
     UpdatePanelsVisibility ()
     {
         let showNavigator = CookieGetBoolVal ('ov_show_navigator', true);
-        let showSidebar = CookieGetBoolVal ('ov_show_sidebar', true);
+        let showSidebar = CookieGetBoolVal ('ov_show_sidebar', false);
         this.navigator.ShowPanels (showNavigator);
         this.sidebar.ShowPanels (showSidebar);
     }
