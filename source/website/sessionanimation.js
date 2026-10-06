@@ -6,12 +6,27 @@ export class AnimationPlayer
     constructor (object, scene, clips, render)
     {
         this.object = object; this.scene = scene; this.clips = clips; this.render = render; this.mixer = new THREE.AnimationMixer (scene);
-        this.state = object.playback || { clip : 0, time : 0, speed : 1, playing : false }; this.state.clip = Math.min (clips.length - 1, Math.max (0, this.state.clip)); object.playback = this.state;
+        this.state = object.playback || { clip : 0, time : 0, speed : 1, playing : false, loop : true };
+        this.state.clip = Math.min (clips.length - 1, Math.max (0, this.state.clip));
+        this.state.loop = this.state.loop !== false;
+        object.playback = this.state;
         this.Choose (this.state.clip, this.state.time); if (this.state.playing) { this.Schedule (); }
     }
     Choose (index, time = 0)
     {
-        this.mixer.stopAllAction (); this.state.clip = index; this.action = this.mixer.clipAction (this.clips[index]); this.action.reset ().play (); this.Seek (time);
+        this.mixer.stopAllAction (); this.state.clip = index; this.action = this.mixer.clipAction (this.clips[index]);
+        this.ApplyLoop (); this.action.reset ().play (); this.Seek (time);
+    }
+    ApplyLoop ()
+    {
+        if (!this.action) { return; }
+        this.action.setLoop (this.state.loop ? THREE.LoopRepeat : THREE.LoopOnce, this.state.loop ? Infinity : 1);
+        this.action.clampWhenFinished = !this.state.loop;
+    }
+    SetLoop (loop)
+    {
+        this.state.loop = loop !== false;
+        this.ApplyLoop ();
     }
     Seek (time)
     {
