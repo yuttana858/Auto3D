@@ -61,7 +61,7 @@ export default function suite ()
             lighting.enabled = true;
             lighting.Adjust (0.8, 30, 10);
             assert.equal (material.envMap, lighting.texture);
-            assert.equal (material.envMapIntensity, 0.8);
+            assert.equal (material.envMapIntensity, 0.8 * MaterialReflectionStrength (material));
             lighting.SetDefault ();
             assert.equal (material.envMap, originalMap);
             assert.equal (material.envMapIntensity, 0.35);
