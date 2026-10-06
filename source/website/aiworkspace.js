@@ -90,7 +90,7 @@ export class AIWorkspace
         this.status = Element ('p', 'section_hint ai_status', 'Connect a provider in Preferences to enable the generation workspace.', inputSection);
 
         const recentSection = Element ('div', 'ai_workspace_section ai_recent_section', undefined, panel);
-        const recentHeader = Element ('div', 'ai_recent_header', undefined, recentSection); Element ('strong', null, 'Latest creations', recentHeader); const refresh = Element ('button', null, 'Refresh', recentHeader); refresh.addEventListener ('click', () => this.RenderRecent ());
+        const recentHeader = Element ('div', 'ai_recent_header', undefined, recentSection); Element ('strong', null, 'Latest creations', recentHeader); const refresh = Element ('button', null, 'Refresh', recentHeader); refresh.addEventListener ('click', () => this.RefreshRecent ());
         this.recentGrid = Element ('div', 'ai_recent_grid', undefined, recentSection);
         this.RenderRecent (); this.RefreshConnection ();
         this.panel = panel;
@@ -155,6 +155,36 @@ export class AIWorkspace
         this.status.textContent = labels[id] + ' is ready for provider endpoint wiring. Connection and input capture are in place; generation is intentionally not submitted yet.';
     }
 
+    async RefreshRecent ()
+    {
+        if (!this.settings.apiKey) { this.status.textContent = 'Connect an AI provider before loading recent creations.'; return; }
+        if (this.settings.provider !== 'meshy') { this.status.textContent = 'Recent-model discovery for custom providers will be added with the provider adapter.'; return; }
+        this.status.textContent = 'Loading recent Meshy creations…';
+        const headers = { Authorization : 'Bearer ' + this.settings.apiKey };
+        try {
+            const urls = [
+                this.settings.baseUrl + '/openapi/v2/text-to-3d?page_size=6&sort_by=-created_at',
+                this.settings.baseUrl + '/openapi/v1/image-to-3d?page_size=6&sort_by=-created_at'
+            ];
+            const responses = await Promise.all (urls.map ((url) => fetch (url, { headers })));
+            for (const response of responses) { if (!response.ok) { throw new Error ('Could not load recent creations (' + response.status + ').'); } }
+            const groups = await Promise.all (responses.map ((response) => response.json ()));
+            this.recent = groups.flat ().filter ((item) => item && item.id).sort ((a, b) => (b.created_at || 0) - (a.created_at || 0)).slice (0, 12).map ((item) => ({
+                id : item.id,
+                name : item.prompt || (item.type === 'image-to-3d' ? 'Image to 3D' : 'Text to 3D'),
+                status : item.status || 'UNKNOWN',
+                thumbnail : item.thumbnail_url || null,
+                modelUrl : item.model_urls?.glb || null,
+                createdAt : item.created_at || null,
+                provider : 'Meshy'
+            }));
+            this.RenderRecent ();
+            this.status.textContent = this.recent.length ? 'Loaded ' + this.recent.length + ' recent creations.' : 'No recent Meshy 3D creations found.';
+        } catch (error) {
+            this.status.textContent = error.message;
+        }
+    }
+
     RenderRecent ()
     {
         if (!this.recentGrid) { return; }
@@ -165,7 +195,7 @@ export class AIWorkspace
         for (const item of this.recent.slice (0, 12)) {
             const card = Element ('div', 'ai_recent_card', undefined, this.recentGrid);
             if (item.thumbnail) { const image = Element ('img', null, undefined, card); image.src = item.thumbnail; image.alt = ''; }
-            Element ('strong', null, item.name || 'Generated asset', card); Element ('span', null, item.status || 'Ready', card);
+            Element ('strong', null, item.name || 'Generated asset', card); Element ('span', null, (item.provider ? item.provider + ' · ' : '') + (item.status || 'Ready'), card);
         }
     }
 }
