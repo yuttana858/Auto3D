@@ -43,10 +43,11 @@ export default function suite ()
         it ('Round-trips visibility, transforms, textured materials and original animation data', () => {
             const surface = new PhysicalMaterial (); surface.gltfMaterialIndex = 3; surface.diffuseMap = new TextureMap (); surface.diffuseMap.name = 'pixel.png'; surface.diffuseMap.buffer = new Uint8Array ([0, 128, 255]).buffer; surface.bumpScale = 0.7;
             const scene = new SceneDocument (); const object = scene.AddImported (Asset (surface), 'animated.glb'); object.position = [2, 3, 4]; object.visible = false; scene.ApplyTransform (object);
-            object.animationAsset = { main : 'animated.glb', files : [{ name : 'animated.glb', buffer : new Uint8Array ([1, 2, 255]).buffer }] }; object.playback = { clip : 1, time : 0.5, speed : 2, playing : true };
+            object.animationAsset = { main : 'animated.glb', files : [{ name : 'animated.glb', buffer : new Uint8Array ([1, 2, 255]).buffer }] }; object.playback = { clip : 1, time : 0.5, speed : 2, playing : true, loop : false };
             const reopened = OpenSessionArchive (CreateSessionArchive (PackSession (scene)));
-            assert.deepEqual (reopened.document.objects[0].position, [2, 3, 4]); assert.equal (reopened.document.objects[0].visible, false); assert.equal (reopened.document.objects[0].playback.playing, false); assert.equal (reopened.document.objects[0].playback.time, 0.5);
+            assert.deepEqual (reopened.document.objects[0].position, [2, 3, 4]); assert.equal (reopened.document.objects[0].visible, false); assert.equal (reopened.document.objects[0].playback.playing, true); assert.equal (reopened.document.objects[0].playback.loop, false); assert.equal (reopened.document.objects[0].playback.time, 0.5);
             assert.deepEqual (new Uint8Array (reopened.document.objects[0].animationAsset.files[0].buffer), new Uint8Array ([1, 2, 255])); assert.deepEqual (new Uint8Array (reopened.document.model.materials[0].diffuseMap.buffer), new Uint8Array ([0, 128, 255])); assert.equal (reopened.document.model.materials[0].gltfMaterialIndex, 3); assert.equal (reopened.document.model.materials[0].bumpScale, 0.7);
+            const view = { backgroundPreset : 'outdoor', horizonGradient : true, showGroundGrid : false, lighting : { mode : 'hdri', environment : 'studio_small_09', background : true, brightness : 1.25, rotation : 35, elevation : -10, effects : { environmentIntensity : 0.8, modelReflections : true, modelReflectionIntensity : 0.6 } } }; const packedView = PackSession (scene, view); assert.deepEqual (packedView.view, view); assert.equal (packedView.model.materials[0].specularIntensity, surface.specularIntensity);
             let importedIndex; reopened.document.model.root.Enumerate ((node) => { if (node.gltfNodeIndex !== undefined) { importedIndex = node.gltfNodeIndex; } }); assert.equal (importedIndex, 7);
         });
         it ('Round-trips object user data and per-model shadow flags in session schema v4', () => {
@@ -117,7 +118,9 @@ export default function suite ()
         });
         it ('Seeks skeletal/morph-compatible tracks and exports distinct UUID targets', () => {
             const root = new THREE.Group (); const target = new THREE.Object3D (); target.name = 'part'; root.add (target);
-            const clip = new THREE.AnimationClip ('Move', 1, [new THREE.VectorKeyframeTrack ('part.position', [0, 1], [0, 0, 0, 4, 0, 0])]); const object = { name : 'one' }; const player = new AnimationPlayer (object, root, [clip], () => {});
+            const clip = new THREE.AnimationClip ('Move', 1, [new THREE.VectorKeyframeTrack ('part.position', [0, 1], [0, 0, 0, 4, 0, 0])]); const object = { name : 'one', playback : { clip : 0, time : 0, speed : 1, playing : false, loop : false } }; const player = new AnimationPlayer (object, root, [clip], () => {});
+            assert.equal (player.action.loop, THREE.LoopOnce); assert.equal (player.action.clampWhenFinished, true);
+            player.SetLoop (true); assert.equal (player.action.loop, THREE.LoopRepeat); assert.equal (player.action.clampWhenFinished, false);
             player.Seek (0.5); assert.equal (target.position.x, 2); assert.equal (player.state.time, 0.5); const track = player.ExportClips ()[0].tracks[0]; assert.equal (track.name, target.uuid + '.position'); player.Dispose ();
         });
     });
