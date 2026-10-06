@@ -254,7 +254,7 @@ export class AIWorkspace
     async PollTextTo3DTask (taskId)
     {
         for (let attempt = 0; attempt < 720; attempt++) {
-            const { result, response } = await this.RequestJSON (this.settings.baseUrl + '/openapi/v2/text-to-3d/' + encodeURIComponent (taskId), { headers : this.Headers () });
+            const { result, response } = await this.RequestJSON (this.settings.baseUrl + '/text-to-3d/' + encodeURIComponent (taskId), { headers : this.Headers () });
             const task = this.NormalizeMeshyTask (result);
             this.UpsertTask (task);
             const progress = Number.isFinite (task.progress) ? task.progress : 0;
@@ -363,7 +363,7 @@ export class AIWorkspace
         this.status.textContent = 'Loading recent Meshy creations…';
         try {
             const urls = [
-                this.settings.baseUrl + '/openapi/v2/text-to-3d?page_size=8&sort_by=-created_at',
+                this.settings.baseUrl + '/text-to-3d?page_size=8&sort_by=-created_at',
                 this.settings.baseUrl + '/image-to-3d?page_size=4&sort_by=-created_at'
             ];
             const groups = [];
