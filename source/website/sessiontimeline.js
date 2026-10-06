@@ -27,15 +27,23 @@ export function CaptureCameraState (viewer)
     const eye = CameraVector (camera.eye);
     const center = CameraVector (camera.center);
     const up = CameraVector (camera.up);
-    const offset = new THREE.Vector3 (...eye).sub (new THREE.Vector3 (...center));
+    const eyeVector = new THREE.Vector3 (...eye);
+    const centerVector = new THREE.Vector3 (...center);
+    const upVector = new THREE.Vector3 (...up).normalize ();
+    const offset = eyeVector.clone ().sub (centerVector);
     const distance = Math.max (offset.length (), 1e-9);
     const azimuth = THREE.MathUtils.radToDeg (Math.atan2 (offset.x, offset.z));
     const elevation = THREE.MathUtils.radToDeg (Math.asin (Clamp (offset.y / distance, -1, 1)));
+    const orientation = new THREE.Quaternion ().setFromRotationMatrix (new THREE.Matrix4 ().lookAt (eyeVector, centerVector, upVector));
+    const euler = new THREE.Euler ().setFromQuaternion (orientation, 'XYZ');
     return {
         eye,
         center,
         up,
         fov : Number.isFinite (camera.fov) ? camera.fov : 45,
+        projectionMode : Number.isInteger (viewer.GetProjectionMode?.()) ? viewer.GetProjectionMode () : null,
+        rotation : [euler.x, euler.y, euler.z].map (THREE.MathUtils.radToDeg),
+        quaternion : orientation.toArray (),
         distance,
         azimuth,
         elevation
@@ -45,6 +53,7 @@ export function CaptureCameraState (viewer)
 export function ApplyCameraState (viewer, state)
 {
     if (!state || !['eye', 'center', 'up'].every ((key) => Array.isArray (state[key]) && state[key].length === 3 && state[key].every (Number.isFinite))) { return; }
+    if (Number.isInteger (state.projectionMode) && viewer.GetProjectionMode?.() !== state.projectionMode) { viewer.SetProjectionMode (state.projectionMode); }
     const camera = viewer.GetCamera ().Clone ();
     for (const [key, value] of [['eye', state.eye], ['center', state.center], ['up', state.up]]) {
         camera[key].x = value[0]; camera[key].y = value[1]; camera[key].z = value[2];
@@ -84,12 +93,17 @@ function NormalizeCameraKeyframe (item)
         eye : [...item.eye],
         center : [...item.center],
         up : [...item.up],
-        fov : Number.isFinite (item.fov) ? item.fov : 45
+        fov : Number.isFinite (item.fov) ? item.fov : 45,
+        projectionMode : Number.isInteger (item.projectionMode) ? item.projectionMode : null
     };
     const offset = new THREE.Vector3 (...result.eye).sub (new THREE.Vector3 (...result.center));
     result.distance = Math.max (offset.length (), 1e-9);
     result.azimuth = THREE.MathUtils.radToDeg (Math.atan2 (offset.x, offset.z));
     result.elevation = THREE.MathUtils.radToDeg (Math.asin (Clamp (offset.y / result.distance, -1, 1)));
+    const orientation = new THREE.Quaternion ().setFromRotationMatrix (new THREE.Matrix4 ().lookAt (new THREE.Vector3 (...result.eye), new THREE.Vector3 (...result.center), new THREE.Vector3 (...result.up).normalize ()));
+    const euler = new THREE.Euler ().setFromQuaternion (orientation, 'XYZ');
+    result.rotation = [euler.x, euler.y, euler.z].map (THREE.MathUtils.radToDeg);
+    result.quaternion = orientation.toArray ();
     return result;
 }
 
@@ -236,7 +250,8 @@ export class SessionTimeline
             eye : LerpArray (a.eye, b.eye, t),
             center : LerpArray (a.center, b.center, t),
             up : up.toArray (),
-            fov : THREE.MathUtils.lerp (a.fov, b.fov, t)
+            fov : THREE.MathUtils.lerp (a.fov, b.fov, t),
+            projectionMode : t < 0.5 ? a.projectionMode : b.projectionMode
         };
     }
 
