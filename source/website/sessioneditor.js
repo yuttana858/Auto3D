@@ -48,7 +48,7 @@ export class SessionEditor
 {
     constructor (website)
     {
-        this.website = website; this.document = new SceneDocument (); this.history = new SceneHistory (() => this.MarkDirty ()); this.selected = null; this.mode = 'select'; this.busy = false; this.players = [];
+        this.website = website; this.document = new SceneDocument (); this.history = new SceneHistory (() => this.MarkDirty ()); this.selected = null; this.mode = 'select'; this.busy = false; this.players = []; this.modelPreview = null;
         this.library = new ModelLibrary (this); this.buttons = new Map (); this.dirty = false; this.recoveryTimer = null; this.recoveryPromptOpen = false; this.recoveryPromptHandled = false;
         const viewer = website.viewer;
         this.selectionBounds = new THREE.Box3 ();
@@ -216,8 +216,11 @@ export class SessionEditor
         const section = Element ('details', 'workspace_section'); section.open = true; section.id = 'session_objects'; Element ('summary', null, 'Session objects', section);
         const content = Element ('div', 'section_content', undefined, section); const actions = Element ('div', 'mode_buttons', undefined, content);
         const add = Element ('button', null, 'Add model', actions); add.addEventListener ('click', () => this.AddModel ()); const library = Element ('button', null, 'Library', actions); library.addEventListener ('click', () => this.library.Open ());
-        this.objectList = Element ('div', 'session_object_list', undefined, content); this.animationPanel = Element ('div', 'animation_panel', undefined, content);
-        document.getElementById ('upload_panel_content').insertBefore (section, document.getElementById ('materials_section'));
+        this.objectList = Element ('div', 'session_object_list', undefined, content);
+        const animationSection = Element ('details', 'workspace_section'); animationSection.open = true; animationSection.id = 'session_animation'; Element ('summary', null, 'Animation', animationSection);
+        const animationContent = Element ('div', 'section_content', undefined, animationSection); this.animationPanel = Element ('div', 'animation_panel', undefined, animationContent);
+        const uploadContent = document.getElementById ('upload_panel_content'); const materials = document.getElementById ('materials_section');
+        uploadContent.insertBefore (section, materials); uploadContent.insertBefore (animationSection, materials);
         this.sessionInput = Element ('input', null, undefined, document.body); this.sessionInput.type = 'file'; this.sessionInput.accept = '.auto3d'; this.sessionInput.hidden = true;
         this.sessionInput.addEventListener ('change', async () => { const file = this.sessionInput.files[0]; this.sessionInput.value = ''; if (file) { await this.Run (() => this.OpenArchiveFile (file)); } });
         this.website.parameters.fileInput.addEventListener ('cancel', () => { this.replaceTarget = null; });
@@ -516,6 +519,7 @@ export class SessionEditor
         const panel = this.website.sidebar.detailsPanel;
         const table = panel.contentDiv.querySelector ('.ov_property_table');
         if (!table) { return; }
+        this.UpdateModelPreview (panel, object);
 
         table.querySelectorAll ('.scene_dimension').forEach ((row) => row.remove ());
         table.querySelectorAll ('.ov_property_table_row').forEach ((row) => {
@@ -608,6 +612,57 @@ export class SessionEditor
         panel.Resize ();
     }
 
+    DisposeModelPreview ()
+    {
+        if (!this.modelPreview) { return; }
+        this.modelPreview.renderer.dispose ();
+        this.modelPreview.element.remove ();
+        this.modelPreview = null;
+    }
+
+    UpdateModelPreview (panel, object)
+    {
+        if (this.modelPreview && this.modelPreview.object === object && this.modelPreview.root === object.threeObject && this.modelPreview.element.isConnected) { return; }
+        this.DisposeModelPreview ();
+
+        const element = Element ('div', 'scene_model_preview');
+        const title = Element ('div', 'scene_model_preview_title', undefined, element); Element ('strong', null, 'Model preview', title); Element ('span', null, 'Drag X/Y · Shift+drag Z', title);
+        const canvas = Element ('canvas', 'scene_model_preview_canvas', undefined, element); canvas.width = 300; canvas.height = 190; canvas.setAttribute ('aria-label', 'Interactive model preview'); canvas.setAttribute ('role', 'img');
+        panel.contentDiv.insertBefore (element, panel.contentDiv.firstChild);
+
+        const renderer = new THREE.WebGLRenderer ({ canvas, antialias : true, alpha : true, preserveDrawingBuffer : false });
+        renderer.setPixelRatio (Math.min (window.devicePixelRatio || 1, 2)); renderer.setSize (300, 190, false); renderer.outputColorSpace = THREE.SRGBColorSpace;
+        const scene = new THREE.Scene ();
+        const camera = new THREE.PerspectiveCamera (32, 300 / 190, 0.01, 100); camera.position.set (1.8, 1.25, 2.6); camera.lookAt (0, 0, 0);
+        scene.add (new THREE.HemisphereLight (0xffffff, 0x777777, 2.0));
+        const key = new THREE.DirectionalLight (0xffffff, 2.4); key.position.set (3, 4, 5); scene.add (key);
+
+        const pivot = new THREE.Group (); scene.add (pivot);
+        const clone = object.threeObject.clone (true); clone.position.copy (object.threeObject.position); clone.rotation.copy (object.threeObject.rotation); clone.scale.copy (object.threeObject.scale); clone.updateMatrixWorld (true);
+        pivot.add (clone);
+        const box = new THREE.Box3 ().setFromObject (clone, true);
+        if (!box.isEmpty ()) {
+            const center = box.getCenter (new THREE.Vector3 ()); const size = box.getSize (new THREE.Vector3 ()); const extent = Math.max (size.x, size.y, size.z, 1e-6);
+            clone.position.sub (center);
+            pivot.scale.setScalar (1.45 / extent);
+        }
+
+        const render = () => renderer.render (scene, camera);
+        let pointer = null;
+        canvas.addEventListener ('pointerdown', (event) => { if (event.button !== 0) { return; } pointer = { id : event.pointerId, x : event.clientX, y : event.clientY }; canvas.setPointerCapture (event.pointerId); event.preventDefault (); });
+        canvas.addEventListener ('pointermove', (event) => {
+            if (!pointer || pointer.id !== event.pointerId) { return; }
+            const dx = event.clientX - pointer.x; const dy = event.clientY - pointer.y; pointer.x = event.clientX; pointer.y = event.clientY;
+            if (event.shiftKey) { pivot.rotation.z += dx * 0.012; pivot.rotation.x += dy * 0.004; }
+            else { pivot.rotation.y += dx * 0.012; pivot.rotation.x += dy * 0.012; }
+            render (); event.preventDefault ();
+        });
+        const release = (event) => { if (pointer?.id === event.pointerId) { pointer = null; } };
+        canvas.addEventListener ('pointerup', release); canvas.addEventListener ('pointercancel', release); canvas.addEventListener ('contextmenu', (event) => event.preventDefault ());
+        render ();
+        this.modelPreview = { object, root : object.threeObject, element, renderer, scene, camera, pivot };
+    }
+
     SetObjectDisplayDimension (object, axis, value)
     {
         const base = this.GetObjectBaseSize (object);
@@ -624,13 +679,14 @@ export class SessionEditor
     {
         this.animationPanel.replaceChildren (); const player = this.selected?.player;
         if (!player) { if (this.selected) { Element ('p', 'section_hint', this.selected.animationError || 'No embedded animation in this model.', this.animationPanel); } return; }
-        Element ('strong', null, 'Animation', this.animationPanel);
         const clips = Element ('select', null, undefined, this.animationPanel); clips.setAttribute ('aria-label', 'Animation clip'); player.clips.forEach ((clip, index) => clips.add (new Option (clip.name || 'Clip ' + (index + 1), index))); clips.value = String (player.state.clip);
-        clips.addEventListener ('change', () => { player.Choose (Number (clips.value)); this.AnimationUI (); this.UpdateDetails (); });
-        const actions = Element ('div', 'mode_buttons', undefined, this.animationPanel); const play = Element ('button', null, player.state.playing ? 'Pause' : 'Play', actions); play.setAttribute ('aria-label', 'Play or pause animation'); play.addEventListener ('click', () => { player.Toggle (); play.textContent = player.state.playing ? 'Pause' : 'Play'; if (!player.state.playing) { this.UpdateDetails (); } });
-        const reset = Element ('button', null, 'Reset', actions); reset.addEventListener ('click', () => { player.Seek (0); scrub.value = '0'; this.UpdateDetails (); });
-        const speed = Element ('select', null, undefined, this.animationPanel); speed.setAttribute ('aria-label', 'Animation speed'); [0.25, 0.5, 1, 1.5, 2].forEach ((value) => speed.add (new Option (value + '×', value))); speed.value = String (player.state.speed); speed.addEventListener ('change', () => { player.state.speed = Number (speed.value); });
-        const scrub = Element ('input', null, undefined, this.animationPanel); scrub.type = 'range'; scrub.min = '0'; scrub.max = String (player.clips[player.state.clip].duration); scrub.step = '0.01'; scrub.value = String (player.state.time); scrub.setAttribute ('aria-label', 'Animation timeline'); scrub.addEventListener ('input', () => { player.Seek (Number (scrub.value)); this.UpdateDetails (); }); player.onTime = (time) => { if (document.activeElement !== scrub) { scrub.value = String (time); } };
+        clips.addEventListener ('change', () => { player.Choose (Number (clips.value)); this.MarkDirty (); this.AnimationUI (); this.UpdateDetails (); });
+        const actions = Element ('div', 'mode_buttons', undefined, this.animationPanel); const play = Element ('button', null, player.state.playing ? 'Pause' : 'Play', actions); play.setAttribute ('aria-label', 'Play or pause animation'); play.addEventListener ('click', () => { player.Toggle (); this.MarkDirty (); play.textContent = player.state.playing ? 'Pause' : 'Play'; if (!player.state.playing) { this.UpdateDetails (); } });
+        const reset = Element ('button', null, 'Reset', actions); reset.addEventListener ('click', () => { player.Seek (0); scrub.value = '0'; this.MarkDirty (); this.UpdateDetails (); });
+        const settings = Element ('div', 'animation_settings', undefined, this.animationPanel);
+        const speedLabel = Element ('label', null, 'Speed', settings); const speed = Element ('select', null, undefined, speedLabel); speed.setAttribute ('aria-label', 'Animation speed'); [0.25, 0.5, 1, 1.5, 2].forEach ((value) => speed.add (new Option (value + '×', value))); speed.value = String (player.state.speed); speed.addEventListener ('change', () => { player.state.speed = Number (speed.value); this.MarkDirty (); });
+        const loopLabel = Element ('label', null, 'Loop', settings); const loop = Element ('input', null, undefined, loopLabel); loop.type = 'checkbox'; loop.checked = player.state.loop !== false; loop.setAttribute ('aria-label', 'Loop animation'); loop.addEventListener ('change', () => { player.SetLoop (loop.checked); this.MarkDirty (); });
+        const scrub = Element ('input', null, undefined, this.animationPanel); scrub.type = 'range'; scrub.min = '0'; scrub.max = String (player.clips[player.state.clip].duration); scrub.step = '0.01'; scrub.value = String (player.state.time); scrub.setAttribute ('aria-label', 'Animation timeline'); scrub.addEventListener ('input', () => { player.Seek (Number (scrub.value)); this.MarkDirty (); this.UpdateDetails (); }); player.onTime = (time) => { if (document.activeElement !== scrub) { scrub.value = String (time); } };
     }
 
     FitScene ()
