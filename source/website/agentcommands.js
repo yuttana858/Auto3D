@@ -73,7 +73,7 @@ export function CreateAgentCommands (website)
         if (!response.ok) { throw new Error ('Paper packaging knowledge is unavailable.'); }
         return response.json ();
     }, { query : 'FEFCO 0201 C flute 32 ECT stacking' });
-    add ('knowledge.paper_packaging_section', 'Read corrugated packaging section', 'Knowledge', 'Read one complete section from Auto3D\'s corrugated packaging knowledge base.', { section : enumOf ('terminology', 'fefco', 'papers', 'flutes', 'multiwall', 'performance', 'referenceGrades', 'cadReferences', 'selectionGuidance', 'agentRules', 'sources') }, ['section'], false, async ({ section }) => {
+    add ('knowledge.paper_packaging_section', 'Read corrugated packaging section', 'Knowledge', 'Read one complete section from Auto3D\'s corrugated packaging knowledge base.', { section : enumOf ('terminology', 'fefco', 'papers', 'flutes', 'multiwall', 'performance', 'referenceGrades', 'cadReferences', 'svgCad', 'manufacturingLineTypes', 'onlineDesignTools', 'cadInterfaceConcept', 'selectionGuidance', 'agentRules', 'sources') }, ['section'], false, async ({ section }) => {
         const response = await fetch ('/api/knowledge/paper-packaging?section=' + encodeURIComponent (section));
         if (!response.ok) { throw new Error ('Paper packaging knowledge is unavailable.'); }
         return response.json ();
