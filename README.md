@@ -4,7 +4,7 @@ Auto3D is a branded, self-hostable browser 3D viewer based on [Online3DViewer](h
 
 ## Run locally
 
-Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.24.0**.
+Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.26.0**.
 
 ## Hosting
 
@@ -22,7 +22,7 @@ The left panel has collapsible Session objects, Materials and Lighting sections.
 
 Uploads and files dropped directly onto the main viewer append objects to the current session. Selecting multiple standalone model files in one upload imports each model as a separate session object while still making selected sidecar files available to the importers. **Update** replaces the selected object's source geometry while retaining its placement. The viewer tool strip supports Select (V), Move (W), Rotate (E), Scale (R), Duplicate (Ctrl+D), visibility (H), Focus (F), Delete, and Undo/Redo for object edits. Transform tools provide a gizmo and numeric fields. Undo applies to object and placement edits; material controls are saved in the session but do not use that history.
 
-GLB/glTF models with embedded clips have independent Play/Pause, clip selection, timeline, Reset and speed controls. Skeletal and morph animations are retained in portable sessions and GLB/glTF exports. Include referenced binary/texture files when uploading a glTF. Animation extensions requiring additional decoders may show an unavailable-animation message while retaining a static preview. Mesh-format exports use the engine's static geometry.
+GLB/glTF models with embedded clips have independent Play/Pause, clip selection, timeline, Reset, speed and Loop controls in a dedicated Animation section. Skeletal and morph animations are retained in portable sessions and GLB/glTF exports. Include referenced binary/texture files when uploading a glTF. Animation extensions requiring additional decoders may show an unavailable-animation message while retaining a static preview. Mesh-format exports use the engine's static geometry.
 
 The top-right menu now includes **Library**, **Export**, **Preferences** and **Full screen**, with Full screen kept last. Library opens shared models and device saves, with categories Primary products, Retail shelf, Pallets and Accessories. Cards include thumbnails: **Open** replaces the workspace; **Add** appends its objects; **Share** creates a persistent viewer link for a shared save. Library **Share** creates a dedicated read-only mini Auto3D viewer link for internal or external recipients. Links can optionally expose a `.auto3d` download control and can require a 4-digit access code. The mini viewer adapts to desktop/tablet/mobile layouts and reuses Auto3D touch navigation (drag to orbit, pinch to zoom and two-finger drag to pan). Legacy shared views remain supported. Device saves remain in IndexedDB and are never uploaded automatically.
 
@@ -91,3 +91,11 @@ Ctrl/Cmd+Z uses the session-wide history stack for object operations plus the ne
 - Device Library now supports nested category/project folders, manual add/rename/delete folder operations, moving saved items between folders, individual delete, and multi-select bulk delete.
 - Deleting a folder preserves saved models by moving them to its parent folder or Uncategorized. Existing flat categories migrate automatically into the folder tree.
 - Save Session now offers existing nested folders plus a New category/project option.
+
+
+### v0.26 animation and model preview
+
+- Model Data starts collapsed by default to maximize the central viewer.
+- A compact interactive model preview sits above Model Data when the panel is expanded. The preview auto-centers the full session and uses left-drag trackball rotation across X/Y/Z; double-click resets the preview orientation.
+- GLB/glTF animation source bytes remain embedded in portable `.auto3d` files. Animation clip, timeline position, speed and loop preference persist with the session; playback reopens paused.
+- Session regression coverage verifies model textures, physical reflection properties (roughness, metalness, reflective/specular intensity), HDRI/background/light/reflection/shadow view settings and embedded animation resources survive a portable session round trip.
