@@ -8,8 +8,11 @@ export async function RecoveryArchiveBuffer (archive)
     if (ArrayBuffer.isView (archive)) {
         return archive.buffer.slice (archive.byteOffset, archive.byteOffset + archive.byteLength);
     }
-    if (archive instanceof Blob || typeof archive?.arrayBuffer === 'function') {
+    if (typeof archive?.arrayBuffer === 'function') {
         return await archive.arrayBuffer ();
+    }
+    if (typeof Blob !== 'undefined' && archive instanceof Blob) {
+        return await new Response (archive).arrayBuffer ();
     }
     throw new Error ('Recovery checkpoint data is unavailable.');
 }
