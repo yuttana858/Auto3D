@@ -82,7 +82,11 @@ export async function LoadAnimationScene (object, model, render)
         let parent = mesh; let association = null;
         while (parent && !Number.isInteger (association?.nodes)) { association = gltf.parser.associations.get (parent); parent = parent.parent; }
         const reference = references.find ((data) => data.originalMeshInstance.node.gltfNodeIndex === association?.nodes);
-        if (!reference) { throw new Error ('Could not associate the animated mesh with the object hierarchy.'); }
+        if (!reference) {
+            // Some exporters insert helper/rig nodes that don't map 1:1 to the converted
+            // engine hierarchy. Keep those animated nodes instead of failing the entire clip.
+            return;
+        }
         const original = Array.isArray (mesh.material) ? mesh.material : [mesh.material];
         const indices = original.map ((material) => {
             const sourceIndex = gltf.parser.associations.get (material)?.materials;
