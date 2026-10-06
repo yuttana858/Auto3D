@@ -13,6 +13,7 @@ import { Direction } from '../../source/engine/geometry/geometry.js';
 import { Unit } from '../../source/engine/model/unit.js';
 import { DisplayLength, DisplaySizeFromScale, ScaleFromDisplaySize, UnitFactor } from '../../source/website/preferences.js';
 import { AnimationPlayer } from '../../source/website/sessionanimation.js';
+import { SessionTimeline } from '../../source/website/sessiontimeline.js';
 import { ArrayOffset, DropToFloorDelta } from '../../source/website/sessioneditor.js';
 import { RecoveryArchiveBuffer, NormalizeLibraryPath, LibraryPathParent, RenameLibraryPath } from '../../source/website/modellibrary.js';
 
@@ -50,7 +51,7 @@ export default function suite ()
             const view = { backgroundPreset : 'outdoor', horizonGradient : true, showGroundGrid : false, lighting : { mode : 'hdri', environment : 'studio_small_09', background : true, brightness : 1.25, rotation : 35, elevation : -10, effects : { environmentIntensity : 0.8, modelReflections : true, modelReflectionIntensity : 0.6 } } }; const packedView = PackSession (scene, view); assert.deepEqual (packedView.view, view); assert.equal (packedView.model.materials[0].specularIntensity, surface.specularIntensity);
             let importedIndex; reopened.document.model.root.Enumerate ((node) => { if (node.gltfNodeIndex !== undefined) { importedIndex = node.gltfNodeIndex; } }); assert.equal (importedIndex, 7);
         });
-        it ('Round-trips object user data and per-model shadow flags in session schema v4', () => {
+        it ('Round-trips object user data, shadow flags and keyframes in session schema v5', () => {
             const scene = new SceneDocument (); const object = scene.AddImported (Asset (), 'one');
             object.userData = { SKU : 'PKG-001', Notes : 'Primary bottle' };
             object.castShadow = false; object.receiveShadow = true;
@@ -65,6 +66,33 @@ export default function suite ()
             assert.equal (migrated.receiveShadow, true);
         });
 
+        it ('Round-trips native object and camera timeline data', () => {
+            const scene = new SceneDocument (); const object = scene.AddImported (Asset (), 'one');
+            object.keyframes = [
+                { id : 'start', time : 0, interpolation : 'smooth', position : [0, 0, 0], rotation : [0, 350, 0], scale : [1, 1, 1] },
+                { id : 'end', time : 2, interpolation : 'linear', position : [10, 0, 0], rotation : [0, 10, 0], scale : [2, 2, 2] }
+            ];
+            const timeline = { version : 1, duration : 4, time : 1, loop : true, interpolation : 'smooth', cameraKeyframes : [{ id : 'cam', time : 1, interpolation : 'smooth', eye : [5, 4, 3], center : [0, 0, 0], up : [0, 1, 0], fov : 40, distance : 7.071, azimuth : 59.0, elevation : 34.4 }] };
+            const reopened = OpenSessionArchive (CreateSessionArchive (PackSession (scene, { timeline })));
+            assert.equal (reopened.document.objects[0].keyframes.length, 2);
+            assert.deepEqual (reopened.document.objects[0].keyframes[1].position, [10, 0, 0]);
+            assert.deepEqual (reopened.view.timeline, timeline);
+        });
+        it ('Tweens native transform and camera keyframes smoothly', () => {
+            const object = { keyframes : [
+                { id : 'a', time : 0, interpolation : 'linear', position : [0, 0, 0], rotation : [0, 350, 0], scale : [1, 1, 1] },
+                { id : 'b', time : 2, interpolation : 'linear', position : [10, 0, 0], rotation : [0, 10, 0], scale : [3, 3, 3] }
+            ] };
+            const timeline = new SessionTimeline ({ document : { objects : [object] }, website : { viewer : {} } });
+            timeline.cameraKeyframes = [
+                { id : 'c1', time : 0, interpolation : 'smooth', eye : [0, 0, 10], center : [0, 0, 0], up : [0, 1, 0], fov : 30 },
+                { id : 'c2', time : 2, interpolation : 'smooth', eye : [10, 0, 0], center : [0, 0, 0], up : [0, 1, 0], fov : 50 }
+            ];
+            const state = timeline.ObjectStateAt (object, 1);
+            assert.deepEqual (state.position, [5, 0, 0]); assert.deepEqual (state.scale, [2, 2, 2]); assert.ok (Math.abs (state.rotation[1]) < 1e-6);
+            const camera = timeline.CameraStateAt (1);
+            assert.deepEqual (camera.eye, [5, 0, 5]); assert.equal (camera.fov, 40);
+        });
         it ('Computes touching W/L/H array offsets and floor deltas', () => {
             const size = new THREE.Vector3 (2, 3, 4);
             assert.deepEqual (ArrayOffset (size, 2, 1, 3), [4, 9, 4]);
