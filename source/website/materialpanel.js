@@ -266,6 +266,12 @@ export class MaterialPanel
         }, 180));
     }
 
+    FlashMaterialIndex (materialIndex)
+    {
+        const entry = this.entries.find ((item) => item.index === materialIndex) || GetMaterialEntries (this.website.viewer, this.website.model, null).find ((item) => item.index === materialIndex);
+        if (entry) { this.Flash (entry); }
+    }
+
     RenameMaterial (entry)
     {
         const previous = entry.original.name || 'Material ' + (entry.index + 1);
