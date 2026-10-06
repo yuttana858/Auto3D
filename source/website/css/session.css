@@ -29,6 +29,10 @@
 .session_object_row .object_name { text-align: left; flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .animation_panel { display: flex; flex-direction: column; gap: 7px; font-size: 9.33px; margin-top: 8px; }
 .animation_panel input[type="range"] { width: 100%; accent-color: var(--ov_button_color); }
+.animation_settings { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: end; }
+.animation_settings label { display: flex; flex-direction: column; gap: 4px; font-size: 7.33px; }
+.animation_settings label:last-child { align-items: center; justify-content: end; }
+.animation_settings input[type="checkbox"] { width: auto; margin: 3px 0 0; }
 .workspace_dialog { background: var(--ov_background_color); color: var(--ov_foreground_color); border: 1px solid var(--ov_border_color); border-radius: 8px; padding: 20px; width: 380px; max-width: calc(100vw - 64px); max-height: calc(100vh - 80px); overflow: auto; box-shadow: 0 12px 64px #0005; }
 .workspace_dialog::backdrop { background: #0007; }
 .workspace_dialog::backdrop { transition: background 250ms ease-out; }
@@ -186,6 +190,48 @@ div.main_viewer
     cursor: default;
 }
 
+
+.scene_model_preview
+{
+    margin: 0 0 10px;
+    padding: 8px;
+    border: 1px solid var(--ov_border_color);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--ov_background_color) 94%, var(--ov_hover_color));
+}
+
+.scene_model_preview_title
+{
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: baseline;
+    margin-bottom: 6px;
+    font-size: 8.33px;
+}
+
+.scene_model_preview_title span
+{
+    color: var(--ov_light_icon_color);
+    font-size: 7.33px;
+    text-align: right;
+}
+
+.scene_model_preview_canvas
+{
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 300 / 190;
+    border-radius: 4px;
+    cursor: grab;
+    touch-action: none;
+}
+
+.scene_model_preview_canvas:active
+{
+    cursor: grabbing;
+}
 
 .scene_object_details
 {
