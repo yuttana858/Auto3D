@@ -745,3 +745,145 @@ div.main_viewer
 {
     background: var(--ov_hover_color);
 }
+
+.native_timeline
+{
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 8px;
+    border: 1px solid var(--ov_border_color);
+    border-radius: 6px;
+}
+
+.timeline_header
+{
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.timeline_camera_readout
+{
+    color: var(--ov_light_icon_color);
+    font-size: 7.33px;
+    text-align: right;
+}
+
+.timeline_settings
+{
+    display: grid;
+    grid-template-columns: minmax(0, .8fr) minmax(0, 1fr) auto;
+    gap: 6px;
+    align-items: end;
+}
+
+.timeline_settings label
+{
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    font-size: 7.33px;
+}
+
+.timeline_settings input[type="number"],
+.timeline_settings select
+{
+    width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+    padding: 5px;
+    border: 1px solid var(--ov_border_color);
+    border-radius: 4px;
+    background: var(--ov_background_color);
+    color: var(--ov_foreground_color);
+    font: inherit;
+}
+
+.timeline_settings .timeline_loop_label
+{
+    flex-direction: row;
+    align-items: center;
+    white-space: nowrap;
+    padding-bottom: 5px;
+}
+
+.timeline_settings .timeline_loop_label input
+{
+    width: auto;
+    margin: 0;
+}
+
+.timeline_transport
+{
+    align-items: center;
+}
+
+.timeline_time_text
+{
+    margin-left: auto;
+    color: var(--ov_light_icon_color);
+    font-variant-numeric: tabular-nums;
+    font-size: 7.33px;
+}
+
+.timeline_keyframes
+{
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-height: 145px;
+    overflow-y: auto;
+}
+
+.timeline_keyframe_row
+{
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto 24px;
+    gap: 4px;
+    align-items: center;
+}
+
+.timeline_keyframe_seek,
+.timeline_keyframe_delete
+{
+    border: 1px solid var(--ov_border_color);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--ov_foreground_color);
+    cursor: pointer;
+    font: inherit;
+    padding: 5px 6px;
+}
+
+.timeline_keyframe_seek
+{
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-align: left;
+}
+
+.timeline_keyframe_seek:hover,
+.timeline_keyframe_delete:hover
+{
+    background: var(--ov_hover_color);
+}
+
+.timeline_keyframe_mode
+{
+    color: var(--ov_light_icon_color);
+    font-size: 6.83px;
+    text-transform: capitalize;
+}
+
+.embedded_animation
+{
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding-top: 9px;
+    border-top: 1px solid var(--ov_border_color);
+}
