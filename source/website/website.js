@@ -34,6 +34,7 @@ import { AxisIndicator } from './axisindicator.js';
 import { GetBackgroundPreset, GetBackgroundGradientCSS } from '../engine/viewer/background.js';
 import { SessionEditor } from './sessioneditor.js';
 import { Preferences } from './preferences.js';
+import { AIWorkspace } from './aiworkspace.js';
 import { SceneEffects } from '../engine/viewer/sceneeffects.js';
 
 const MultiModelExtensions = new Set (['3dm', '3ds', '3mf', 'amf', 'bim', 'brep', 'dae', 'fbx', 'fcstd', 'gltf', 'glb', 'ifc', 'iges', 'igs', 'step', 'stp', 'stl', 'obj', 'off', 'ply', 'wrl', 'zae']);
@@ -243,6 +244,7 @@ export class Website
         this.axisIndicator = new AxisIndicator (this.viewer, document.getElementById ('world_axis'));
         this.sessionEditor = new SessionEditor (this);
         this.preferences = new Preferences (this);
+        this.aiWorkspace = new AIWorkspace (this);
         for (const [id, setting] of [['horizon_gradient', 'horizonGradient'], ['ground_grid', 'showGroundGrid']]) {
             const checkbox = document.getElementById (id);
             checkbox.addEventListener ('change', () => {
