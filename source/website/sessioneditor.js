@@ -11,6 +11,7 @@ import { Unit } from '../engine/model/unit.js';
 import { Property, PropertyType } from '../engine/model/property.js';
 import { DisplayLength, DisplayUnitLabel, UnitFactor, DisplaySizeFromScale, ScaleFromDisplaySize } from './preferences.js';
 import { LoadAnimationScene } from './sessionanimation.js';
+import { SessionTimeline, CaptureCameraState, ApplyCameraState } from './sessiontimeline.js';
 import { ShowExportDialog } from './exportdialog.js';
 
 function Element (tag, className, text, parent)
@@ -49,6 +50,7 @@ export class SessionEditor
     constructor (website)
     {
         this.website = website; this.document = new SceneDocument (); this.history = new SceneHistory (() => this.MarkDirty ()); this.selected = null; this.mode = 'select'; this.busy = false; this.players = []; this.modelPreview = null;
+        this.timeline = new SessionTimeline (this);
         this.library = new ModelLibrary (this); this.buttons = new Map (); this.dirty = false; this.recoveryTimer = null; this.recoveryPromptOpen = false; this.recoveryPromptHandled = false;
         const viewer = website.viewer;
         this.selectionBounds = new THREE.Box3 ();
