@@ -34,6 +34,7 @@ import { AxisIndicator } from './axisindicator.js';
 import { GetBackgroundPreset, GetBackgroundGradientCSS } from '../engine/viewer/background.js';
 import { SessionEditor } from './sessioneditor.js';
 import { Preferences } from './preferences.js';
+import { ModelPreview } from './modelpreview.js';
 
 const MultiModelExtensions = new Set (['3dm', '3ds', '3mf', 'amf', 'bim', 'brep', 'dae', 'fbx', 'fcstd', 'gltf', 'glb', 'ifc', 'iges', 'igs', 'step', 'stp', 'stl', 'obj', 'off', 'ply', 'wrl', 'zae']);
 
@@ -241,6 +242,7 @@ export class Website
         this.axisIndicator = new AxisIndicator (this.viewer, document.getElementById ('world_axis'));
         this.sessionEditor = new SessionEditor (this);
         this.preferences = new Preferences (this);
+        this.modelPreview = new ModelPreview (this);
         for (const [id, setting] of [['horizon_gradient', 'horizonGradient'], ['ground_grid', 'showGroundGrid']]) {
             const checkbox = document.getElementById (id);
             checkbox.addEventListener ('change', () => {
@@ -327,6 +329,7 @@ export class Website
     ClearModel ()
     {
         if (this.materialPanel) { this.materialPanel.Clear (); }
+        if (this.modelPreview) { this.modelPreview.Clear (); }
         CloseAllDialogs ();
 
         this.model = null;
@@ -351,6 +354,7 @@ export class Website
         this.viewer.SetUpVector (Direction.Y, false);
         this.navigator.FillTree (importResult);
         if (this.materialPanel) { this.materialPanel.Update (); }
+        if (this.modelPreview) { this.modelPreview.Update (); }
         this.sidebar.UpdateControlsVisibility ();
         if (fit) { this.FitModelToWindow (true); }
     }
