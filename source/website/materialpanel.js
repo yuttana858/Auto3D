@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { TextureMap } from '../engine/model/material.js';
-import { HexStringToRGBColor } from '../engine/model/color.js';
+import { HexStringToRGBColor, RGBColor } from '../engine/model/color.js';
 import { GenerateMissingBoxUVs } from './materialuv.js';
 
 const TextureSlots = [
@@ -177,10 +177,24 @@ export class MaterialPanel
             const maps = TextureSlots.filter ((slot) => entry.material[slot[0]]);
             text.textContent = (entry.original.name || 'Material ' + (entry.index + 1)) + ' · ' + (maps.length ? maps.map ((slot) => slot[1]).join (', ') : 'Solid color · no texture');
             button.append (swatch, text);
-            button.addEventListener ('click', () => { this.active = index; this.Open (); });
+            button.addEventListener ('click', () => { this.active = index; this.FlashMaterial (entry); this.Open (); });
             list.appendChild (button);
         });
         document.getElementById ('material_advance').disabled = !this.entries.length;
+    }
+
+    FlashMaterial (entry)
+    {
+        if (!entry) { return; }
+        const ids = new Set (entry.meshes.map ((item) => item.mesh.userData.originalMeshInstance.id.GetKey ()));
+        this.website.viewer.SetMeshesHighlight (new RGBColor (255, 255, 255), (meshUserData) => ids.has (meshUserData.originalMeshInstance.id.GetKey ()));
+        this.website.viewer.Render ();
+        clearTimeout (this.flashTimer);
+        this.flashTimer = setTimeout (() => {
+            if (this.open) { this.website.viewer.SetMeshesHighlight (this.website.highlightColor, () => false); }
+            else { this.website.UpdateMeshesSelection (); }
+            this.website.viewer.Render ();
+        }, 180);
     }
 
     Open ()
@@ -224,7 +238,7 @@ export class MaterialPanel
         select.setAttribute ('aria-label', 'Material');
         this.entries.forEach ((item, index) => select.add (new Option (item.original.name || 'Material ' + (item.index + 1), index)));
         select.value = this.active;
-        select.addEventListener ('change', () => { this.active = Number (select.value); this.FillDrawer (); });
+        select.addEventListener ('change', () => { this.active = Number (select.value); this.FlashMaterial (this.entries[this.active]); this.FillDrawer (); });
         contextLabel.appendChild (select);
         for (const button of this.drawer.querySelectorAll ('[role="tab"]')) {
             const selected = button.id === 'editor_tab_' + this.page;
