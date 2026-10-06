@@ -14,6 +14,15 @@ const Sources = [
     { id : 'packagingworkbench', authority : 'stoneproof-tech', title : 'PackagingWorkbench for FreeCAD', url : 'https://github.com/stoneproof-tech/PackagingWorkbench', access : 'LGPL-2.1-or-later; parametric FEFCO 0201, 0301, 0713 and DXF dieline export' },
     { id : 'rhino-packaging-toolkit', authority : 'DDR68', title : 'Rhino Packaging Toolkit', url : 'https://github.com/DDR68/Rhino_Packaging_Toolkit', access : 'MIT; open-source parametric packaging generators and prepress utilities' },
     { id : 'd0427-reference', authority : 'bikinon', title : 'd0427 FEFCO 0427 DXF generator', url : 'https://github.com/bikinon/d0427', access : 'no repository license found; reference-only, do not copy code into Auto3D' },
+    { id : 'svg-edit', authority : 'SVG-Edit', title : 'SVGEdit browser vector editor', url : 'https://github.com/SVG-Edit/svgedit', access : 'MIT; browser-native SVG editing engine with reusable svgcanvas component' },
+    { id : 'makerjs', authority : 'Microsoft', title : 'Maker.js parametric 2D geometry', url : 'https://github.com/microsoft/maker.js', access : 'Apache-2.0; browser/Node line-arc geometry with layers and SVG/DXF/PDF export' },
+    { id : 'jscad', authority : 'JSCAD', title : 'OpenJSCAD browser parametric geometry', url : 'https://github.com/jscad/OpenJSCAD.org', access : 'MIT; modular browser/CLI parametric 2D and 3D geometry' },
+    { id : 'librecad', authority : 'LibreCAD', title : 'LibreCAD 2D CAD', url : 'https://github.com/LibreCAD/LibreCAD', access : 'GPLv2 project; reads DXF/DWG and writes DXF/DWG/PDF/SVG; desktop reference/editor rather than embeddable web component' },
+    { id : 'pacdora-dieline', authority : 'Pacdora', title : 'Dieline to 3D and online packaging design', url : 'https://www.pacdora.com/tools/dieline-to-3d-mockup', access : 'commercial web service; accepts SVG/DXF cut and crease lines and assigns fold direction/animation' },
+    { id : 'impact-cad', authority : 'Arden Software', title : 'Impact packaging CAD', url : 'https://www.ardensoftware.com/products/impact-for-designers/', access : 'commercial packaging CAD; parametric standards, cut/crease/perf palettes, 3D folding and manufacturing tools' },
+    { id : 'artioscad-lines', authority : 'Esko', title : 'ArtiosCAD line types and layer classes', url : 'https://docs.esko.com/docs/en-us/artioscadenterprise/18/userguide/pdf/ACE18_UserGuide.pdf', access : 'commercial packaging CAD documentation; line-type taxonomy reference' },
+    { id : 'packmage-cad', authority : 'Packmage', title : 'Packmage CAD and browser packaging structure tools', url : 'https://www.packmage.com/Cad', access : 'commercial packaging CAD/browser generator; parametric structures, 3D proofing, step-and-repeat' },
+    { id : 'engview', authority : 'EngView', title : 'EngView packaging design suite', url : 'https://www.engview.com/en/engview/products/designer-standard', access : 'commercial packaging CAD; parametric drafting, packaging libraries and 3D visualization' },
 ];
 
 const Knowledge = {
@@ -166,6 +175,101 @@ const Knowledge = {
         { style : 'mixed ECMA/FEFCO packaging generators', formats : ['Rhino 7/8 IronPython geometry'], source : 'Rhino Packaging Toolkit', parametric : true, licenseUse : 'MIT', url : 'https://github.com/DDR68/Rhino_Packaging_Toolkit' },
         { style : 'FEFCO 0427', formats : ['DXF generator source'], source : 'bikinon/d0427', parametric : true, licenseUse : 'no license located; reference behavior only, do not redistribute/copy implementation', url : 'https://github.com/bikinon/d0427' }
     ],
+    svgCad : {
+        recommendation : 'Use SVG as Auto3D\'s primary editable 2D packaging interchange/view format, while preserving DXF import/export for converter workflows. Keep a normalized internal geometry model rather than editing raw SVG strings directly.',
+        browserCapability : [
+            'Modern browsers render SVG natively and allow inline SVG elements to be selected, transformed and edited through the DOM.',
+            'An SVG file can be parsed with DOMParser, normalized into Auto3D geometry, edited, regenerated as SVG XML and saved as a Blob/download or persisted inside an .auto3d archive.',
+            'SVG viewBox, physical width/height units and transform matrices must be normalized so dimensional CAD data is not accidentally rescaled.',
+            'SVG is well suited to cut/crease/perforation display because semantic operations can be stored as group/layer IDs, data attributes, classes, stroke patterns and metadata while the underlying geometry remains vector.',
+            'Imported SVG must be sanitized: remove scripts/event handlers, foreignObject, unsafe external href/url references and unexpected embedded content before inserting it into the live DOM.'
+        ],
+        proposedInternalModel : {
+            units : 'mm',
+            primitives : ['line', 'polyline', 'polygon', 'path', 'circle', 'arc', 'bezier'],
+            entities : ['cut', 'crease', 'score', 'reverse-crease', 'perforation', 'cut-crease', 'construction', 'dimension', 'annotation', 'bleed', 'artwork-safe-area'],
+            requiredFields : ['id', 'type', 'geometry', 'layer', 'visible', 'locked'],
+            packagingFields : ['ruleType', 'foldAngle', 'foldDirection', 'panelIds', 'creaseAxis', 'perfPattern', 'boardSide', 'manufacturingNotes']
+        },
+        svgLayerConvention : [
+            { id : 'CUT', semantic : 'through cut / knife', suggestedDisplay : 'solid stroke', exportNote : 'do not rely on color alone; preserve semantic layer/type metadata' },
+            { id : 'CREASE', semantic : 'crease/fold line', suggestedDisplay : 'dashed stroke', exportNote : 'may carry fold angle/direction metadata for 3D' },
+            { id : 'SCORE', semantic : 'score rule', suggestedDisplay : 'dash-dot or distinct pattern', exportNote : 'score can differ from crease in manufacturing treatment' },
+            { id : 'PERF', semantic : 'perforation rule', suggestedDisplay : 'short repeating dash/gap', exportNote : 'store cut:gap pitch/pattern separately from visual dasharray' },
+            { id : 'CUT_CREASE', semantic : 'alternating cut and crease combination', suggestedDisplay : 'custom repeating pattern', exportNote : 'manufacturing semantics must survive DXF/CFF2 conversion' },
+            { id : 'CONSTRUCTION', semantic : 'non-manufacturing reference geometry', suggestedDisplay : 'thin muted stroke', exportNote : 'exclude from manufacturing output unless explicitly requested' },
+            { id : 'DIMENSIONS', semantic : 'dimension and annotation geometry', suggestedDisplay : 'non-production overlay', exportNote : 'keep separate from knife/crease geometry' }
+        ],
+        editFunctions : [
+            'pan/zoom/grid/snap',
+            'select/multi-select/marquee',
+            'move/rotate/mirror/scale',
+            'node/vertex editing and bezier handles',
+            'line/arc/rectangle/polyline tools',
+            'trim/extend/split/join',
+            'offset/parallel line',
+            'fillet/chamfer',
+            'align/distribute',
+            'measure/dimension',
+            'layer/type reassignment',
+            'perf pattern editor',
+            'crease fold-angle/direction editor',
+            'undo/redo and change history',
+            'SVG save-as plus DXF export'
+        ],
+        implementationCandidates : [
+            { tool : 'SVGEdit svgcanvas', fit : 'best starting point for browser SVG selection/path editing/UI primitives', license : 'MIT', caution : 'adapt as an editor surface, but keep packaging semantics in Auto3D data model rather than coupling them to SVGEdit internals', sources : ['svg-edit'] },
+            { tool : 'Maker.js', fit : 'strong geometry/export layer for exact lines/arcs, layer organization, DXF/SVG/PDF generation and programmatic parametric dielines', license : 'Apache-2.0', caution : 'imports SVG path data rather than arbitrary full SVG documents; use Auto3D parser for complete file ingestion', sources : ['makerjs'] },
+            { tool : 'JSCAD', fit : 'useful for parametric generation and future 2D-to-3D packaging solids/panels', license : 'MIT', caution : 'not a ready-made Illustrator-style editor', sources : ['jscad'] },
+            { tool : 'LibreCAD', fit : 'excellent desktop reference for 2D CAD behavior and DXF/SVG conversion', license : 'GPLv2', caution : 'not appropriate to embed directly into Auto3D without accepting GPL obligations', sources : ['librecad'] }
+        ],
+        sources : ['svg-edit', 'makerjs', 'jscad', 'librecad']
+    },
+    manufacturingLineTypes : {
+        principle : 'Packaging CAD should treat manufacturing operation as semantic data, not merely a stroke color. Professional systems distinguish cut, crease, score, perforation, cut-crease and multiple specialty rules because those operations drive tooling, make-ready and 3D folding behavior.',
+        types : [
+            { id : 'cut', function : 'separates material completely', threeD : 'panel boundary unless joined elsewhere', manufacturing : 'knife/cutting rule' },
+            { id : 'crease', function : 'compresses/forms a hinge without cutting through', threeD : 'primary fold axis', manufacturing : 'creasing rule/channel' },
+            { id : 'score', function : 'surface indentation or score treatment', threeD : 'may behave as fold depending board/process setup', manufacturing : 'professional systems may map score differently from crease' },
+            { id : 'reverse-crease', function : 'crease in opposite board direction', threeD : 'fold-direction metadata required', manufacturing : 'separate rule/palette in packaging CAD' },
+            { id : 'perforation', function : 'alternating cut/gap for tear or fold behavior', threeD : 'may optionally act as fold axis', manufacturing : 'store explicit cut length, gap length and phase/pitch' },
+            { id : 'cut-crease', function : 'alternating cut and crease segments', threeD : 'hinge plus weakening/opening behavior', manufacturing : 'must retain sequence rather than flattening to generic dashed line' },
+            { id : 'construction', function : 'design/reference geometry only', threeD : 'ignored', manufacturing : 'excluded from knife output' }
+        ],
+        professionalReference : 'ArtiosCAD and Impact both use typed manufacturing geometry rather than simple visual colors. Impact exposes internal palette types such as Cut, Crease, Cut_crease, Perf, Score and Rev_crease; ArtiosCAD assigns line types to appropriate manufacturing/main layers.',
+        foldMetadata : 'Professional packaging tools can map crease/perforation palettes to 3D folding and attach fold angles to individual entities. Auto3D should mirror this model by storing fold angle/direction on semantic crease/perf entities.',
+        sources : ['impact-cad', 'artioscad-lines']
+    },
+    onlineDesignTools : [
+        { name : 'Pacdora', category : 'browser packaging design', strengths : ['SVG/DXF dieline upload', 'cut/crease interpretation', 'fold direction and animation', 'large parametric dieline library', 'graphics/mockup workflow'], lessonForAuto3D : 'tight 2D dieline to 3D folding loop; require explicit cut/crease semantics', sources : ['pacdora-dieline'] },
+        { name : 'Packmage', category : 'packaging CAD + browser generator', strengths : ['large template library', 'L/W/H/caliper parametrics', '2D structure to 3D', 'folding line definition', 'step-and-repeat'], lessonForAuto3D : 'board caliper and dimensional basis belong in the geometry generator; nesting/step-and-repeat is a later manufacturing feature', sources : ['packmage-cad'] },
+        { name : 'Arden Impact', category : 'professional packaging CAD/CAM', strengths : ['FEFCO/ECMA standards', 'dynamic constraints', 'cut/crease/perf/score palettes', '3D animation', 'rule length/area/weight/waste calculations', 'nesting', 'machine output'], lessonForAuto3D : 'semantic rule types, constraints and costing/material metrics are core packaging-CAD concepts', sources : ['impact-cad'] },
+        { name : 'EngView', category : 'professional packaging CAD', strengths : ['parametric + conventional drafting', 'packaging design libraries', '3D proofing', 'folding sequences', 'web-shareable 3D'], lessonForAuto3D : 'combine parametric standards with editable drafting rather than forcing every design to remain template-driven', sources : ['engview'] },
+        { name : 'SVGEdit', category : 'open-source browser vector editor', strengths : ['selection', 'drawing primitives', 'path editing', 'browser embedding', 'SVG load/edit/save'], lessonForAuto3D : 'good editor-canvas foundation if packaging layers and constraints remain Auto3D-owned', sources : ['svg-edit'] },
+        { name : 'Maker.js', category : 'open-source browser geometry engine', strengths : ['exact 2D line/arc models', 'layers', 'boolean/outline utilities', 'SVG/DXF/PDF output'], lessonForAuto3D : 'good parametric/export engine underneath a custom packaging UI', sources : ['makerjs'] },
+        { name : 'JSCAD', category : 'open-source parametric browser CAD', strengths : ['reproducible JavaScript geometry', '2D and 3D', 'browser/CLI'], lessonForAuto3D : 'candidate for generated structure/panel operations rather than interactive vector editing', sources : ['jscad'] },
+        { name : 'LibreCAD', category : 'open-source desktop 2D CAD', strengths : ['DXF/DWG read', 'DXF/DWG/PDF/SVG write', 'traditional CAD primitives'], lessonForAuto3D : 'reference UX for precision CAD commands and DXF interoperability; license makes direct embedding unattractive', sources : ['librecad'] }
+    ],
+    cadInterfaceConcept : {
+        layout : {
+            topBar : ['file name', 'undo/redo', 'units', 'snap', '2D/3D split toggle', 'validate', 'save', 'export'],
+            leftRail : ['select', 'line/polyline', 'arc', 'rectangle', 'trim', 'extend', 'offset', 'fillet', 'dimension', 'text', 'crease', 'perforation'],
+            center : 'large 2D vector canvas with rulers, grid, page/blank boundary and semantic manufacturing colors/patterns',
+            rightPanel : ['entity properties', 'geometry coordinates', 'manufacturing type', 'fold angle/direction', 'perf pattern', 'layer visibility/lock', 'board/material'],
+            bottomTimeline : 'optional packaging fold timeline using Auto3D keyframes; panel/crease events align with the native animation engine',
+            secondary3D : 'dockable live folded preview synchronized with 2D crease semantics'
+        },
+        workflow : [
+            'Open SVG/DXF or choose FEFCO template',
+            'normalize all geometry to mm and classify imported strokes/layers',
+            'repair/assign Cut, Crease, Perf, Score and Construction semantics',
+            'edit dimensions and geometry with snapping/constraints',
+            'define panels and fold directions/angles',
+            'preview/fold in 3D',
+            'validate open paths, duplicate rules, non-manufacturing entities and ambiguous line types',
+            'save editable Auto3D packaging document and export SVG/DXF'
+        ]
+    },
     selectionGuidance : [
         { need : 'lowest-cost general transit case', consider : ['FEFCO 0201', 'C or B single wall', 'ECT/BCT sized to stacking and distribution'], validate : ['gross weight', 'case dimensions', 'pallet pattern', 'humidity', 'compression test'] },
         { need : 'fragile product / cushioning', consider : ['A or C flute', 'double wall if compression and puncture loads are high', 'interior fitments from FEFCO 09 family'], validate : ['shock/drop test', 'flat crush', 'product resonance/cushioning study'] },
@@ -215,6 +319,9 @@ function searchKnowledge (query)
     Knowledge.flutes.forEach ((item) => add ('flute', item.code, item));
     Knowledge.performance.metrics.forEach ((item) => add ('performance-metric', item.id, item));
     Knowledge.selectionGuidance.forEach ((item, index) => add ('selection-guidance', String (index), item));
+    Knowledge.onlineDesignTools.forEach ((item, index) => add ('online-design-tool', String (index), item));
+    Knowledge.manufacturingLineTypes.types.forEach ((item) => add ('manufacturing-line-type', item.id, item));
+    Knowledge.svgCad.implementationCandidates.forEach ((item, index) => add ('svg-cad-tool', String (index), item));
     Knowledge.terminology.forEach ((item) => add ('term', item.term, item));
     candidates.sort ((a, b) => b.relevance - a.relevance);
     return candidates.slice (0, 12);
@@ -249,7 +356,7 @@ export function onRequestGet (context)
     }
 
     if (section) {
-        const allowed = new Set (['terminology', 'fefco', 'papers', 'flutes', 'multiwall', 'performance', 'referenceGrades', 'cadReferences', 'selectionGuidance', 'agentRules', 'sources']);
+        const allowed = new Set (['terminology', 'fefco', 'papers', 'flutes', 'multiwall', 'performance', 'referenceGrades', 'cadReferences', 'svgCad', 'manufacturingLineTypes', 'onlineDesignTools', 'cadInterfaceConcept', 'selectionGuidance', 'agentRules', 'sources']);
         if (!allowed.has (section)) { return response ({ error : 'Unknown knowledge section.' }, 404); }
         return response ({
             knowledgeBase : { id : Knowledge.id, name : Knowledge.name, updated : Knowledge.updated, scope : Knowledge.scope },
