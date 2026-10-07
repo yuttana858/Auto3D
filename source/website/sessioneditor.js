@@ -493,7 +493,7 @@ export class SessionEditor
     GetObjectBaseSize (object)
     {
         if (!object?.threeObject) { return [0, 0, 0]; }
-        const clone = object.threeObject.clone (true);
+        const clone = THREE.SkeletonUtils ? THREE.SkeletonUtils.clone (object.threeObject) : object.threeObject.clone (true);
         clone.position.set (0, 0, 0); clone.rotation.set (0, 0, 0); clone.scale.set (1, 1, 1); clone.updateMatrixWorld (true);
         const size = new THREE.Box3 ().setFromObject (clone, true).getSize (new THREE.Vector3 ());
         return size.toArray ();
@@ -731,6 +731,8 @@ export class SessionEditor
         const native = Element ('div', 'native_timeline', undefined, this.animationPanel);
         const nativeHeader = Element ('div', 'timeline_header', undefined, native);
         Element ('strong', null, 'Auto3D Timeline', nativeHeader);
+        const closeTimeline = Element ('button', 'timeline_close', '×', nativeHeader); closeTimeline.title = 'Close timeline'; closeTimeline.setAttribute ('aria-label', 'Close animation timeline');
+        closeTimeline.addEventListener ('click', () => { const section = this.animationPanel.closest ('details'); if (section) { section.open = false; } });
         const cameraNow = CaptureCameraState (this.website.viewer);
         Element ('span', 'timeline_camera_readout', 'Cam ' + cameraNow.azimuth.toFixed (1) + '° az · ' + cameraNow.elevation.toFixed (1) + '° el', nativeHeader);
 
