@@ -1,3 +1,4 @@
+import { ModuleHost } from './modulehost.js';
 const AIStorageKey = 'auto3d-ai-connections-v1';
 
 function Element (tag, className, text, parent)
@@ -82,7 +83,27 @@ export class AIWorkspace
         const title = Element ('div', null, undefined, header); Element ('strong', null, 'AI Generative', title); this.connectionBadge = Element ('span', 'ai_connection_badge', 'Not connected', title);
         const close = Element ('button', null, '×', header); close.title = 'Return to model data'; close.setAttribute ('aria-label', 'Close AI Generative'); close.addEventListener ('click', () => this.Close ());
 
-        const inputSection = Element ('div', 'ai_workspace_section', undefined, panel);
+        const tabs = Element ('div', 'ai_module_tabs', undefined, panel);
+        const aiTab = Element ('button', null, 'AI Generative', tabs); aiTab.setAttribute ('aria-pressed', 'true');
+        const packagingTab = Element ('button', null, 'Packaging', tabs);
+        const primaryTab = Element ('button', null, 'Primary', tabs);
+        const moduleMount = Element ('div', 'ai_module_mount', undefined, panel); moduleMount.hidden = true;
+        this.moduleHost = new ModuleHost (this.website, moduleMount);
+        const selectTab = async (id, button) => {
+            [aiTab, packagingTab, primaryTab].forEach ((item) => item.setAttribute ('aria-pressed', String (item === button)));
+            this.aiContent.hidden = id !== 'ai';
+            moduleMount.hidden = id === 'ai';
+            if (id !== 'ai') {
+                moduleMount.textContent = 'Loading ' + button.textContent + '…';
+                try { await this.moduleHost.Activate (id); } catch (error) { moduleMount.textContent = 'Module failed to load: ' + error.message; }
+            }
+        };
+        aiTab.addEventListener ('click', () => selectTab ('ai', aiTab));
+        packagingTab.addEventListener ('click', () => selectTab ('packaging', packagingTab));
+        primaryTab.addEventListener ('click', () => selectTab ('primary', primaryTab));
+        this.aiContent = Element ('div', 'ai_core_content', undefined, panel);
+
+        const inputSection = Element ('div', 'ai_workspace_section', undefined, this.aiContent);
         Element ('strong', null, 'Create', inputSection);
         this.prompt = Element ('textarea', 'ai_prompt', undefined, inputSection); this.prompt.rows = 4; this.prompt.maxLength = 800; this.prompt.placeholder = 'Describe the object, image, or texture you want to create…'; this.prompt.setAttribute ('aria-label', 'AI generation prompt'); this.prompt.addEventListener ('input', () => this.RefreshActions ());
 
@@ -116,7 +137,7 @@ export class AIWorkspace
         }
         this.status = Element ('p', 'section_hint ai_status', 'Connect a provider in Preferences to enable the generation workspace.', inputSection);
 
-        const recentSection = Element ('div', 'ai_workspace_section ai_recent_section', undefined, panel);
+        const recentSection = Element ('div', 'ai_workspace_section ai_recent_section', undefined, this.aiContent);
         const recentHeader = Element ('div', 'ai_recent_header', undefined, recentSection); Element ('strong', null, 'Latest creations', recentHeader); const refresh = Element ('button', null, 'Refresh', recentHeader); refresh.addEventListener ('click', () => this.RefreshRecent ());
         this.recentGrid = Element ('div', 'ai_recent_grid', undefined, recentSection);
         this.RenderRecent (); this.RefreshConnection ();
