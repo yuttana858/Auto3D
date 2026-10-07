@@ -887,3 +887,11 @@ div.main_viewer
     padding-top: 9px;
     border-top: 1px solid var(--ov_border_color);
 }
+
+.timeline_close { margin-left: auto; border: 0; background: transparent; color: var(--ov_foreground_color); font-size: 17px; line-height: 1; cursor: pointer; padding: 0 3px; }
+.timeline_camera_readout { margin-left: auto; }
+.ai_module_tabs { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 4px; margin: 0 0 10px; }
+.ai_module_tabs button { padding: 7px 5px; border: 1px solid var(--ov_border_color); border-radius: 4px; background: transparent; color: var(--ov_foreground_color); font: inherit; font-size: 8.33px; cursor: pointer; }
+.ai_module_tabs button[aria-pressed="true"] { border-color: var(--ov_button_color); background: var(--ov_hover_color); color: var(--ov_button_color); }
+.ai_module_mount { min-height: 180px; }
+.auto3d_module { padding: 12px 2px; }
