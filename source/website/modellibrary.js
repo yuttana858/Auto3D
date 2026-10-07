@@ -312,7 +312,13 @@ export class ModelLibrary
         destination.add (new Option ('Device library (this browser)', 'device'));
         destination.add (new Option ('File on disk (.auto3d)', 'file'));
         destination.add (new Option ('Shared library (publishing disabled)', 'shared'));
-        destination.value = download ? 'file' : 'device'; destinationLabel.appendChild (destination);
+        const defaultKey = 'auto3d_save_default_v1';
+        let savedDefault = null;
+        try { savedDefault = JSON.parse (localStorage.getItem (defaultKey) || 'null'); } catch { savedDefault = null; }
+        destination.value = download ? 'file' : (['device', 'file'].includes (savedDefault?.destination) ? savedDefault.destination : 'device');
+        if (savedDefault?.category && folders.includes (savedDefault.category)) { category.value = savedDefault.category; }
+        if (savedDefault?.kind && [...kind.options].some ((option) => option.value === savedDefault.kind)) { kind.value = savedDefault.kind; }
+        destinationLabel.appendChild (destination);
 
         const hint = document.createElement ('p'); hint.className = 'section_hint';
         const status = document.createElement ('p'); status.className = 'section_hint'; status.setAttribute ('role', 'status');
@@ -329,6 +335,15 @@ export class ModelLibrary
             submit.disabled = !this.editor.document.objects.length || destination.value === 'shared';
         };
         destination.addEventListener ('change', updateHint); updateHint ();
+
+        const saveDefault = document.createElement ('button'); saveDefault.type = 'button'; saveDefault.textContent = 'Save to default';
+        saveDefault.title = 'Remember this destination, folder and save type for this browser user.';
+        saveDefault.addEventListener ('click', () => {
+            if (destination.value === 'shared' || category.value === '__new_folder__') { return; }
+            localStorage.setItem (defaultKey, JSON.stringify ({ destination : destination.value, category : category.value, kind : kind.value }));
+            status.textContent = 'Default save preference remembered for this user.';
+        });
+        form.appendChild (saveDefault);
 
         const open = document.createElement ('button'); open.type = 'button'; open.textContent = 'Open session file';
         open.addEventListener ('click', () => { dialog.close (); this.editor.OpenSessionFile (); });
