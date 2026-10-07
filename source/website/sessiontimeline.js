@@ -136,9 +136,10 @@ export class SessionTimeline
         this.editor = editor;
         this.duration = 5;
         this.time = 0;
+        this.rangeStart = 0; this.rangeEnd = 5;
         this.loop = false;
         this.interpolation = 'smooth';
-        this.cameraKeyframes = [];
+        this.cameraKeyframes = []; this.objectKeyCache = new WeakMap ();
         this.playing = false;
         this.frame = null;
         this.onTime = null;
@@ -155,12 +156,16 @@ export class SessionTimeline
         this.interpolation = NormalizeInterpolation (source.interpolation);
         this.cameraKeyframes = Array.isArray (source.cameraKeyframes) ? source.cameraKeyframes.map (NormalizeCameraKeyframe).filter (Boolean).sort ((a, b) => a.time - b.time) : [];
         this.ExtendDurationForKeys ();
+        const start = Number.isFinite (source.rangeStart) ? Clamp (source.rangeStart, 0, this.duration - 0.01) : 0;
+        const end = Number.isFinite (source.rangeEnd) ? Clamp (source.rangeEnd, start + 0.01, this.duration) : this.duration;
+        this.SetRange (start, end);
     }
 
     Serialize ()
     {
         return {
-            version : 1,
+            version : 2,
+            rangeStart : this.rangeStart, rangeEnd : this.rangeEnd,
             duration : this.duration,
             time : this.time,
             loop : this.loop,
@@ -181,7 +186,9 @@ export class SessionTimeline
 
     NormalizeObjectKeyframes (object)
     {
+        if (this.objectKeyCache.get (object) === object.keyframes && object.keyframes) { return object.keyframes; }
         object.keyframes = Array.isArray (object.keyframes) ? object.keyframes.map (NormalizeObjectKeyframe).filter (Boolean).sort ((a, b) => a.time - b.time) : [];
+        this.objectKeyCache.set (object, object.keyframes);
         return object.keyframes;
     }
 
@@ -203,6 +210,18 @@ export class SessionTimeline
         keyframes.sort ((a, b) => a.time - b.time);
         this.ExtendDurationForKeys ();
         return keyframe;
+    }
+
+    CaptureScene ()
+    {
+        return this.editor.document.objects.map ((object) => this.CaptureObject (object));
+    }
+
+    SetRange (start, end)
+    {
+        if (![start, end].every (Number.isFinite) || start < 0 || end > this.duration || end - start < 0.01 - 1e-9) { throw new Error ('Animation range must fit the duration and end after its beginning.'); }
+        this.rangeStart = start; this.rangeEnd = end;
+        return { start, end };
     }
 
     CaptureCamera ()
@@ -275,8 +294,7 @@ export class SessionTimeline
         if (render) {
             this.editor.UpdateSelectionBox ();
             this.editor.SyncInputs ();
-            this.editor.website.viewer.UpdateGroundGrid ();
-            this.editor.website.sceneEffects?.Refresh ();
+            if (!this.playing) { this.editor.website.viewer.UpdateGroundGrid (); this.editor.website.sceneEffects?.Refresh (); }
             this.editor.website.viewer.Render ();
         }
         this.onTime?.(this.time);
@@ -284,25 +302,29 @@ export class SessionTimeline
 
     SetDuration (duration)
     {
+        const followedEnd = this.rangeEnd === this.duration;
         this.duration = Clamp (Number (duration) || 5, 0.1, 3600);
         this.ExtendDurationForKeys ();
+        this.rangeStart = Math.min (this.rangeStart, this.duration - 0.01);
+        this.rangeEnd = followedEnd ? this.duration : Clamp (this.rangeEnd, this.rangeStart + 0.01, this.duration);
         this.Seek (Math.min (this.time, this.duration));
     }
 
     Toggle ()
     {
         if (this.playing) { this.Stop (); return; }
+        if (this.time < this.rangeStart || this.time >= this.rangeEnd) { this.Seek (this.rangeStart); }
         this.playing = true;
         this.previous = performance.now ();
         this.onPlaybackChanged?.(true);
         const tick = (now) => {
             this.frame = null;
             if (!this.playing) { return; }
-            const delta = Math.min ((now - this.previous) / 1000, 0.1); this.previous = now;
+            const delta = Math.max (0, Math.min ((now - this.previous) / 1000, 0.1)); this.previous = now;
             let next = this.time + delta;
-            if (next >= this.duration) {
-                if (this.loop) { next = next % this.duration; }
-                else { this.Seek (this.duration); this.Stop (); return; }
+            if (next >= this.rangeEnd) {
+                if (this.loop) { next = this.rangeStart + (next - this.rangeStart) % (this.rangeEnd - this.rangeStart); }
+                else { this.Seek (this.rangeEnd); this.Stop (); return; }
             }
             this.Seek (next);
             this.frame = requestAnimationFrame (tick);
@@ -322,6 +344,6 @@ export class SessionTimeline
     Reset ()
     {
         this.Stop ();
-        this.Seek (0);
+        this.Seek (this.rangeStart);
     }
 }

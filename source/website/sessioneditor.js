@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
+import { clone as CloneRig } from 'three/addons/utils/SkeletonUtils.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { SceneDocument, SceneHistory } from './scenedocument.js';
 import { PackSession, CreateSessionArchive, OpenSessionArchive } from './sessionarchive.js';
@@ -11,6 +12,8 @@ import { Unit } from '../engine/model/unit.js';
 import { Property, PropertyType } from '../engine/model/property.js';
 import { DisplayLength, DisplayUnitLabel, UnitFactor, DisplaySizeFromScale, ScaleFromDisplaySize } from './preferences.js';
 import { LoadAnimationScene } from './sessionanimation.js';
+import { ShowAdvanceAnimation, CreateTimelineTracks, UpdatePlayheads } from './advanceanimation.js';
+import { RecoveryWriter } from './sessionrecovery.js';
 import { SessionTimeline, CaptureCameraState, ApplyCameraState } from './sessiontimeline.js';
 import { ShowExportDialog } from './exportdialog.js';
 
@@ -51,6 +54,7 @@ export class SessionEditor
     {
         this.website = website; this.document = new SceneDocument (); this.history = new SceneHistory (() => this.MarkDirty ()); this.selected = null; this.mode = 'select'; this.busy = false; this.players = []; this.modelPreview = null;
         this.timeline = new SessionTimeline (this);
+        this.baseSizes = new WeakMap (); this.recoveryWriter = new RecoveryWriter (); this.recoveryRevision = 0;
         this.library = new ModelLibrary (this); this.buttons = new Map (); this.dirty = false; this.recoveryTimer = null; this.recoveryPromptOpen = false; this.recoveryPromptHandled = false;
         const viewer = website.viewer;
         this.selectionBounds = new THREE.Box3 ();
@@ -68,17 +72,21 @@ export class SessionEditor
         this.controls = new TransformControls (viewer.camera, viewer.renderer.domElement); this.controls.setSize (0.8); this.helper = this.controls.getHelper (); viewer.scene.add (this.helper);
         const render = viewer.onRender;
         viewer.SetRenderHandler ((camera) => { if (render) { render (camera); } if (this.controls.camera !== camera) { this.controls.camera = camera; } });
-        this.controls.addEventListener ('change', () => viewer.Render ());
+        this.controls.addEventListener ('change', () => this.RequestInteractionRender ());
         this.controls.addEventListener ('dragging-changed', (event) => {
             viewer.navigation.enabled = !event.value; viewer.navigation.clickDetector.Cancel ();
             if (event.value && this.selected) { this.dragStart = TransformState (this.selected); }
-            if (!event.value && this.selected && this.dragStart) { this.RecordTransform (this.selected, this.dragStart); this.dragStart = null; this.UpdateDetails (); viewer.UpdateGroundGrid (); }
+            if (!event.value) { this.FinishDrag (); }
         });
         this.controls.addEventListener ('objectChange', () => {
             if (!this.selected?.threeObject) { return; }
             const object = this.selected; object.position = object.threeObject.position.toArray (); object.rotation = [object.threeObject.rotation.x, object.threeObject.rotation.y, object.threeObject.rotation.z].map (THREE.MathUtils.radToDeg); object.scale = object.threeObject.scale.toArray ();
-            object.scale = object.scale.map ((value) => Math.abs (value) < 1e-6 ? 1e-6 : value); this.document.ApplyTransform (object); this.SyncInputs ();
+            object.scale = object.scale.map ((value) => Math.abs (value) < 1e-6 ? 1e-6 : value); this.document.ApplyTransform (object); this.RequestInteractionRender ();
         });
+        const cancelDrag = () => { if (this.controls.dragging) { this.controls.pointerUp (null); } this.FinishDrag (); };
+        viewer.renderer.domElement.addEventListener ('pointercancel', cancelDrag);
+        viewer.renderer.domElement.addEventListener ('lostpointercapture', cancelDrag);
+        window.addEventListener ('blur', cancelDrag);
         this.CreateUI ();
         viewer.renderer.domElement.addEventListener ('contextmenu', (event) => {
             if (this.readOnly || !this.selected) { return; }
@@ -312,12 +320,29 @@ export class SessionEditor
         this.PushHistory (() => apply (previous), () => apply (next));
     }
 
+    RequestInteractionRender ()
+    {
+        if (this.interactionFrame) { return; }
+        this.interactionFrame = requestAnimationFrame (() => {
+            this.interactionFrame = null;
+            this.UpdateSelectionBox (); this.SyncInputs (); this.website.viewer.Render ();
+        });
+    }
+
+    FinishDrag ()
+    {
+        this.website.viewer.navigation.enabled = true;
+        const before = this.dragStart; this.dragStart = null;
+        if (before && this.selected) { this.RecordTransform (this.selected, before); this.UpdateDetails (); this.website.viewer.UpdateGroundGrid (); this.website.sceneEffects?.Refresh (); }
+        this.RequestInteractionRender ();
+    }
+
     MarkDirty ()
     {
         if (this.readOnly) { return; }
-        this.dirty = true;
+        this.dirty = true; this.recoveryRevision++;
         if (this.recoveryTimer) { clearTimeout (this.recoveryTimer); }
-        if (!this.document.objects.length) { this.library.deviceStorage.ClearRecovery ().catch (() => {}); return; }
+        if (!this.document.objects.length) { this.recoveryWriter.Cancel (); this.library.deviceStorage.ClearRecovery ().catch (() => {}); return; }
         this.recoveryTimer = setTimeout (() => this.SaveRecovery (), 1500);
     }
 
@@ -325,16 +350,22 @@ export class SessionEditor
     {
         this.recoveryTimer = null;
         if (!this.dirty || this.readOnly || !this.document.objects.length) { return; }
+        if (this.busy || this.controls.dragging || this.timeline.playing || this.players.some ((player) => player.state.playing) || this.recoverySaving) {
+            this.recoveryTimer = setTimeout (() => this.SaveRecovery (), 1500); return;
+        }
+        const revision = this.recoveryRevision; const document = this.document;
+        this.recoverySaving = true;
         try {
-            const archive = this.Archive (this.document.objects, 'session', this.document.name);
-            await this.library.deviceStorage.SaveRecovery (archive, this.document.name);
+            const archive = await this.recoveryWriter.Create (document, this.CaptureView ());
+            if (this.dirty && this.document === document && revision === this.recoveryRevision) { await this.library.deviceStorage.SaveRecovery (archive, document.name); }
         } catch (error) { console.warn ('Auto3D recovery save failed.', error); }
+        finally { this.recoverySaving = false; }
     }
 
     async MarkClean ()
     {
         if (this.readOnly) { return; }
-        this.dirty = false;
+        this.dirty = false; this.recoveryRevision++; this.recoveryWriter.Cancel ();
         if (this.recoveryTimer) { clearTimeout (this.recoveryTimer); this.recoveryTimer = null; }
         try { await this.library.deviceStorage.ClearRecovery (); } catch { /* Recovery cleanup is best effort. */ }
     }
@@ -426,6 +457,7 @@ export class SessionEditor
 
     async Render (fit = false)
     {
+        this.timeline.Stop (); this.DisposeModelPreview ();
         this.busy = true; this.controls.detach (); this.players.forEach ((player) => player.Dispose ()); this.players = [];
         try {
             if (!this.document.objects.length) { this.selectionBox.visible = false; this.DisposeModelPreview (); this.website.ClearModel (); this.website.SetUIState (1); this.RefreshUI (); return; }
@@ -488,10 +520,20 @@ export class SessionEditor
     GetObjectBaseSize (object)
     {
         if (!object?.threeObject) { return [0, 0, 0]; }
-        const clone = object.threeObject.clone (true);
-        clone.position.set (0, 0, 0); clone.rotation.set (0, 0, 0); clone.scale.set (1, 1, 1); clone.updateMatrixWorld (true);
-        const size = new THREE.Box3 ().setFromObject (clone, true).getSize (new THREE.Vector3 ());
-        return size.toArray ();
+        const cached = this.baseSizes.get (object.threeObject);
+        if (cached) { return [...cached]; }
+        const root = object.threeObject; root.updateWorldMatrix (true, true);
+        const inverse = root.matrixWorld.clone ().invert (); const box = new THREE.Box3 (); const point = new THREE.Vector3 ();
+        root.traverse ((mesh) => {
+            const positions = mesh.geometry?.attributes?.position; if (!positions) { return; }
+            const relative = new THREE.Matrix4 ().multiplyMatrices (inverse, mesh.matrixWorld);
+            for (let index = 0; index < positions.count; index++) {
+                if (mesh.isMesh) { mesh.getVertexPosition (index, point); } else { point.fromBufferAttribute (positions, index); }
+                box.expandByPoint (point.applyMatrix4 (relative));
+            }
+        });
+        const result = box.getSize (new THREE.Vector3 ()).toArray (); this.baseSizes.set (root, result);
+        return result;
     }
 
     UpdateSelectionBox ()
@@ -500,7 +542,7 @@ export class SessionEditor
             this.selectionBox.visible = false;
             return;
         }
-        this.selectionBounds.setFromObject (this.selected.threeObject, true);
+        this.selectionBounds.setFromObject (this.selected.threeObject, false);
         this.selectionBox.visible = !this.selectionBounds.isEmpty ();
         this.selectionBox.updateMatrixWorld (true);
     }
@@ -671,6 +713,7 @@ export class SessionEditor
         const canvas = Element ('canvas', 'scene_model_preview_canvas', undefined, element); canvas.width = 300; canvas.height = 190; canvas.setAttribute ('aria-label', 'Interactive model preview'); canvas.setAttribute ('role', 'img');
         panel.contentDiv.insertBefore (element, panel.contentDiv.firstChild);
 
+        if (!panel.IsVisible () || this.website.parameters.rightContainerDiv.classList.contains ('collapsed')) { element.remove (); return; }
         const renderer = new THREE.WebGLRenderer ({ canvas, antialias : true, alpha : true, preserveDrawingBuffer : false });
         renderer.setPixelRatio (Math.min (window.devicePixelRatio || 1, 2)); renderer.setSize (300, 190, false); renderer.outputColorSpace = THREE.SRGBColorSpace;
         const scene = new THREE.Scene ();
@@ -679,7 +722,11 @@ export class SessionEditor
         const key = new THREE.DirectionalLight (0xffffff, 2.4); key.position.set (3, 4, 5); scene.add (key);
 
         const pivot = new THREE.Group (); scene.add (pivot);
-        const clone = object.threeObject.clone (true); clone.position.copy (object.threeObject.position); clone.rotation.copy (object.threeObject.rotation); clone.scale.copy (object.threeObject.scale); clone.updateMatrixWorld (true);
+        const metadata = new Map (); object.threeObject.traverse ((item) => { metadata.set (item, item.userData); item.userData = {}; });
+        let clone;
+        try { clone = CloneRig (object.threeObject); }
+        finally { metadata.forEach ((data, item) => { item.userData = data; }); }
+        clone.position.copy (object.threeObject.position); clone.rotation.copy (object.threeObject.rotation); clone.scale.copy (object.threeObject.scale); clone.updateMatrixWorld (true);
         pivot.add (clone);
         const box = new THREE.Box3 ().setFromObject (clone, true);
         if (!box.isEmpty ()) {
@@ -716,15 +763,29 @@ export class SessionEditor
         this.UpdateDetails ();
     }
 
+    ShowAdvanceAnimation (visible) { ShowAdvanceAnimation (this, visible); }
+    CreateTimelineTracks (parent) { CreateTimelineTracks (this, parent); }
+    UpdatePlayheads () { UpdatePlayheads (this); }
+
     AnimationUI ()
     {
         this.animationPanel.replaceChildren ();
         const timeline = this.timeline;
         timeline.ExtendDurationForKeys ();
 
-        const native = Element ('div', 'native_timeline', undefined, this.animationPanel);
+        if (!this.advancePanel) {
+            this.advancePanel = Element ('section', 'advance_animation_panel', undefined, document.body);
+            this.advancePanel.id = 'advance_animation_panel'; this.advancePanel.hidden = true; this.advancePanel.setAttribute ('aria-label', 'Advance animation');
+        }
+        this.advancePanel.replaceChildren ();
+        const open = Element ('button', 'advance_animation_button', 'Advance animation', this.animationPanel);
+        open.setAttribute ('aria-expanded', String (!this.advancePanel.hidden)); open.setAttribute ('aria-controls', this.advancePanel.id);
+        open.addEventListener ('click', () => this.ShowAdvanceAnimation (this.advancePanel.hidden));
+        const close = Element ('button', 'advance_animation_close', 'Close', this.advancePanel); close.setAttribute ('aria-label', 'Close Advance animation');
+        close.addEventListener ('click', () => this.ShowAdvanceAnimation (false));
+        const native = Element ('div', 'native_timeline', undefined, this.advancePanel);
         const nativeHeader = Element ('div', 'timeline_header', undefined, native);
-        Element ('strong', null, 'Auto3D Timeline', nativeHeader);
+        Element ('strong', null, 'Advance animation', nativeHeader);
         const cameraNow = CaptureCameraState (this.website.viewer);
         Element ('span', 'timeline_camera_readout', 'Cam ' + cameraNow.azimuth.toFixed (1) + '° az · ' + cameraNow.elevation.toFixed (1) + '° el', nativeHeader);
 
@@ -738,8 +799,8 @@ export class SessionEditor
         const loopLabel = Element ('label', 'timeline_loop_label', undefined, settings); const loop = Element ('input', null, undefined, loopLabel); loop.type = 'checkbox'; loop.checked = timeline.loop; loop.disabled = this.readOnly; loopLabel.appendChild (document.createTextNode (' Loop')); loop.addEventListener ('change', () => { timeline.loop = loop.checked; this.MarkDirty (); });
 
         const capture = Element ('div', 'mode_buttons timeline_capture_buttons', undefined, native);
-        const addObject = Element ('button', null, 'Keyframe object', capture); addObject.disabled = this.readOnly || !this.selected; addObject.title = 'Save selected object position, rotation and scale at the current time.';
-        addObject.addEventListener ('click', () => { timeline.CaptureObject (this.selected); this.MarkDirty (); this.AnimationUI (); });
+        const addObject = Element ('button', null, 'Keyframe scene state', capture); addObject.disabled = this.readOnly || !this.document.objects.length; addObject.title = 'Save every scene object position, rotation and scale at the current time.';
+        addObject.addEventListener ('click', () => { timeline.CaptureScene (); this.MarkDirty (); this.AnimationUI (); });
         const addCamera = Element ('button', null, 'Keyframe camera', capture); addCamera.disabled = this.readOnly; addCamera.title = 'Save viewer eye, target, up vector, FOV, azimuth and elevation at the current time.';
         addCamera.addEventListener ('click', () => { timeline.CaptureCamera (); this.MarkDirty (); this.AnimationUI (); });
 
@@ -748,9 +809,10 @@ export class SessionEditor
         const reset = Element ('button', null, 'Reset', controls); reset.addEventListener ('click', () => { timeline.Reset (); this.MarkDirty (); this.AnimationUI (); });
         const timeText = Element ('span', 'timeline_time_text', timeline.time.toFixed (2) + ' / ' + timeline.duration.toFixed (2) + ' s', controls);
 
+        this.CreateTimelineTracks (native);
         const scrub = Element ('input', 'timeline_scrub', undefined, native); scrub.type = 'range'; scrub.min = '0'; scrub.max = String (timeline.duration); scrub.step = '0.01'; scrub.value = String (timeline.time); scrub.setAttribute ('aria-label', 'Auto3D keyframe timeline');
         scrub.addEventListener ('input', () => { timeline.Seek (Number (scrub.value)); timeText.textContent = timeline.time.toFixed (2) + ' / ' + timeline.duration.toFixed (2) + ' s'; this.MarkDirty (); });
-        timeline.onTime = (time) => { if (document.activeElement !== scrub) { scrub.value = String (time); } timeText.textContent = time.toFixed (2) + ' / ' + timeline.duration.toFixed (2) + ' s'; };
+        timeline.onTime = (time) => { this.UpdatePlayheads (); if (document.activeElement !== scrub) { scrub.value = String (time); } timeText.textContent = time.toFixed (2) + ' / ' + timeline.duration.toFixed (2) + ' s'; };
         timeline.onPlaybackChanged = (playing) => { play.textContent = playing ? 'Pause' : 'Play'; this.MarkDirty (); };
 
         const keys = Element ('div', 'timeline_keyframes', undefined, native);
@@ -781,7 +843,7 @@ export class SessionEditor
         const embedded = Element ('div', 'embedded_animation', undefined, this.animationPanel);
         Element ('strong', null, 'Embedded animation', embedded);
         if (!player) {
-            if (this.selected) { Element ('p', 'section_hint', this.selected.animationError || 'No embedded animation in this model. Auto3D keyframes above are available for every model.', embedded); }
+            if (this.selected) { Element ('p', 'section_hint', this.selected.animationError || 'No embedded animation in this model. Use Advance animation to animate scene and camera positions.', embedded); }
             else { Element ('p', 'section_hint', 'Select a model to inspect any embedded GLB/glTF animation clips.', embedded); }
             return;
         }
@@ -886,9 +948,19 @@ export class SessionEditor
     async Undo () { await this.history.Undo (); this.RefreshUI (); }
     async Redo () { await this.history.Redo (); this.RefreshUI (); }
 
+    CaptureView ()
+    {
+        return { camera : this.website.viewer.GetCamera (), cameraState : CaptureCameraState (this.website.viewer), timeline : this.timeline.Serialize (), backgroundPreset : this.website.settings.backgroundPreset, horizonGradient : this.website.settings.horizonGradient, showGroundGrid : this.website.settings.showGroundGrid, lighting : this.website.lightingPanel.Capture () };
+    }
+    async ArchiveAsync (objects, kind, name)
+    {
+        const writer = new RecoveryWriter ();
+        try { return await writer.Create ({ ...this.document, objects }, this.CaptureView (), kind, name); }
+        finally { writer.Cancel (); }
+    }
     Archive (objects, kind, name)
     {
-        const data = PackSession (this.document, { camera : this.website.viewer.GetCamera (), cameraState : CaptureCameraState (this.website.viewer), timeline : this.timeline.Serialize (), backgroundPreset : this.website.settings.backgroundPreset, horizonGradient : this.website.settings.horizonGradient, showGroundGrid : this.website.settings.showGroundGrid, lighting : this.website.lightingPanel.Capture () }, objects, kind); data.name = name; return CreateSessionArchive (data);
+        const data = PackSession (this.document, this.CaptureView (), objects, kind); data.name = name; return CreateSessionArchive (data);
     }
     async OpenArchive (buffer, append, recovered = false)
     {

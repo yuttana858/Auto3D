@@ -646,6 +646,416 @@
       "example": {}
     },
     {
+      "id": "knowledge.paper_packaging",
+      "title": "Search corrugated packaging knowledge",
+      "category": "Knowledge",
+      "description": "Search Auto3D's curated corrugated-paper packaging knowledge base for FEFCO styles, board/flute specifications, material properties, strength metrics and design guidance.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "query": "FEFCO 0201 C flute 32 ECT stacking"
+      }
+    },
+    {
+      "id": "knowledge.paper_packaging_section",
+      "title": "Read corrugated packaging section",
+      "category": "Knowledge",
+      "description": "Read one complete section from Auto3D's corrugated packaging knowledge base.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "section": {
+            "type": "string",
+            "enum": [
+              "terminology",
+              "fefco",
+              "papers",
+              "flutes",
+              "multiwall",
+              "performance",
+              "referenceGrades",
+              "cadReferences",
+              "selectionGuidance",
+              "agentRules",
+              "sources"
+            ]
+          }
+        },
+        "required": [
+          "section"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "section": "flutes"
+      }
+    },
+    {
+      "id": "animation.timeline.inspect",
+      "title": "Inspect keyframe timeline",
+      "category": "Animation",
+      "description": "Return native Auto3D timeline duration, playhead, interpolation mode, camera keyframes and per-object keyframe counts.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "animation.timeline.seek",
+      "title": "Seek keyframe timeline",
+      "category": "Animation",
+      "description": "Move the native Auto3D timeline playhead and evaluate object/camera tweening.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "time"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "time": 1
+      }
+    },
+    {
+      "id": "animation.panel",
+      "title": "Show Advance animation",
+      "category": "Animation",
+      "description": "Reveal or close the bottom scene and camera timeline panel.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "visible": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "visible"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "visible": true
+      }
+    },
+    {
+      "id": "animation.timeline.range",
+      "title": "Set animation range",
+      "category": "Animation",
+      "description": "Set beginning and end markers in seconds within the timeline duration.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "number",
+            "minimum": 0
+          },
+          "end": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "start": 0,
+        "end": 5
+      }
+    },
+    {
+      "id": "animation.timeline.configure",
+      "title": "Configure Advance animation",
+      "category": "Animation",
+      "description": "Set duration, looping and tween interpolation for new keyframes.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "duration": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 3600
+          },
+          "loop": {
+            "type": "boolean"
+          },
+          "interpolation": {
+            "type": "string",
+            "enum": [
+              "smooth",
+              "linear",
+              "step"
+            ]
+          }
+        },
+        "required": [
+          "duration",
+          "loop",
+          "interpolation"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "duration": 5,
+        "loop": false,
+        "interpolation": "smooth"
+      }
+    },
+    {
+      "id": "animation.timeline.playback",
+      "title": "Control Advance animation playback",
+      "category": "Animation",
+      "description": "Play, pause or reset the scene and camera sequence.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "play",
+              "pause",
+              "reset"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "action": "play"
+      }
+    },
+    {
+      "id": "animation.keyframe.scene",
+      "title": "Save scene state keyframe",
+      "category": "Animation",
+      "description": "Capture every scene object placement at the current playhead.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "animation.keyframe.delete",
+      "title": "Delete animation keyframe",
+      "category": "Animation",
+      "description": "Delete an existing camera or object keyframe by ID.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "camera",
+              "object"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "objectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "animation.embedded.inspect",
+      "title": "Inspect embedded animation",
+      "category": "Animation",
+      "description": "Read imported animation clips, durations, playback state and any load error.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "objectId"
+        ],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "animation.embedded.playback",
+      "title": "Control embedded animation",
+      "category": "Animation",
+      "description": "Play, pause, reset or seek an imported GLB/glTF clip.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "play",
+              "pause",
+              "reset",
+              "seek"
+            ]
+          },
+          "time": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "objectId",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "animation.embedded.configure",
+      "title": "Configure embedded animation",
+      "category": "Animation",
+      "description": "Select a clip and set playback speed and looping.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          },
+          "clip": {
+            "type": "number",
+            "minimum": 0
+          },
+          "speed": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 10
+          },
+          "loop": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "objectId",
+          "clip",
+          "speed",
+          "loop"
+        ],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "animation.keyframe.object",
+      "title": "Save object keyframe",
+      "category": "Animation",
+      "description": "Capture an object position, rotation and scale on the native timeline.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          },
+          "time": {
+            "type": "number",
+            "minimum": 0
+          },
+          "interpolation": {
+            "type": "string",
+            "enum": [
+              "smooth",
+              "linear",
+              "step"
+            ]
+          }
+        },
+        "required": [
+          "objectId"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "time": 0,
+        "interpolation": "smooth"
+      }
+    },
+    {
+      "id": "animation.keyframe.camera",
+      "title": "Save camera keyframe",
+      "category": "Animation",
+      "description": "Capture the current viewer camera position, target, orientation, FOV, azimuth and elevation on the native timeline.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "number",
+            "minimum": 0
+          },
+          "interpolation": {
+            "type": "string",
+            "enum": [
+              "smooth",
+              "linear",
+              "step"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "time": 0,
+        "interpolation": "smooth"
+      }
+    },
+    {
       "id": "macro.list",
       "title": "List saved macros",
       "category": "Macros",

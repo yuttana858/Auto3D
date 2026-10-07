@@ -4,7 +4,7 @@ Auto3D is a branded, self-hostable browser 3D viewer based on [Online3DViewer](h
 
 ## Run locally
 
-Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.26.0**.
+Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.27.0**.
 
 ## Hosting
 
@@ -99,3 +99,13 @@ Ctrl/Cmd+Z uses the session-wide history stack for object operations plus the ne
 - A compact interactive model preview sits above Model Data when the panel is expanded.
 - GLB/glTF animation source bytes remain embedded in portable `.auto3d` files. Animation clip, timeline position, speed and loop preference persist with the session; playback reopens paused.
 - Session regression coverage verifies model textures, physical reflection properties, HDRI/background/light/reflection/shadow view settings and embedded animation resources survive a portable session round trip.
+
+### Advance animation
+
+The left Animation section contains embedded GLB/glTF clip controls and an **Advance animation** button. The button opens a bottom panel with separate **Scene state** (object placement) and **Camera positioning** tracks. Both tracks share a draggable red playhead. Capture scene state or camera keyframes at the current time, choose Smooth, Linear or Step tweening, and use the beginning/end markers to select the playback range. Markers can be dragged, adjusted with arrow keys, or entered in seconds. Play and Loop use that range; Reset returns to its beginning.
+
+Scene and camera keyframes, interpolation, playhead, range markers and original embedded animation resources are retained in portable `.auto3d` sessions and Device Library saves. Reopened sequences start paused. Shared publication remains an explicit user action. The bottom material editor and Advance animation panel open separately to keep the viewer usable.
+
+Development and production viewer builds include `o3dv.recovery.js` and local Draco decoder files. Keep these beside the viewer bundle when hosting the site. Recovery and library/file saves pack and compress in a worker; recovery waits for dragging or playback to stop. Subsequent transform-only recovery checkpoints reuse the worker's geometry snapshot. Initial snapshot cloning and model import still have CPU/memory costs on very large assets.
+
+Run `npm test` for session, animation, range, command-validation and interaction regressions. For the browser smoke test, start `npm start` in another terminal and run `npm run test_browser_animation`. It uses a fresh Chromium profile and an original skeletal/morph fixture to check playback, both tracks, worker recovery and Device Library save/reopen. Set `BROWSER_EXECUTABLE` if Chromium is installed elsewhere; `AUTO3D_TEST_URL` selects another local site build.

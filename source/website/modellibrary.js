@@ -347,7 +347,7 @@ export class ModelLibrary
                     fileHandle = await window.showSaveFilePicker ({ suggestedName : name.value.trim () + '.auto3d', types : [{ description : 'Auto3D session', accept : { 'application/octet-stream' : ['.auto3d'] } }] });
                 }
                 const objects = kind.value === 'model' ? [this.editor.selected] : this.editor.document.objects;
-                const saved = this.editor.Archive (objects, kind.value, name.value.trim ());
+                const saved = await this.editor.ArchiveAsync (objects, kind.value, name.value.trim ());
                 if (destination.value === 'file') {
                     if (fileHandle) {
                         const writable = await fileHandle.createWritable ();

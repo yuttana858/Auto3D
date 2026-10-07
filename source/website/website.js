@@ -152,7 +152,8 @@ class WebsiteLayouter
 
         let contentWidth = windowWidth - leftWidth - rightWidth;
         const drawer = document.getElementById ('material_drawer');
-        const drawerHeight = drawer && drawer.classList.contains ('open') ? drawer.offsetHeight : 0;
+        const animationDrawer = document.getElementById ('advance_animation_panel');
+        const drawerHeight = (drawer && drawer.classList.contains ('open') ? drawer.offsetHeight : 0) + (animationDrawer && !animationDrawer.hidden ? animationDrawer.offsetHeight : 0);
         let contentHeight = Math.max (120, windowHeight - headerHeight - drawerHeight);
 
         const panelHeaderHeight = document.getElementById ('upload_panel_toggle').offsetHeight;
@@ -287,6 +288,7 @@ export class Website
                     }
                 }
                 apply (collapsed);
+                if (side === 'right' && !collapsed) { this.sessionEditor?.UpdateDetails (); }
                 this.layouter.Resize ();
             });
         }
@@ -477,7 +479,7 @@ export class Website
             HandleEvent ('model_load_started', 'hash');
             this.LoadModelFromUrlList (urls, importSettings);
         } else {
-            if (this.sessionEditor) { this.sessionEditor.document.objects.forEach ((object) => object.player?.Dispose ()); this.sessionEditor.document = new (this.sessionEditor.document.constructor) (); this.sessionEditor.history = new (this.sessionEditor.history.constructor) (); this.sessionEditor.selected = null; this.sessionEditor.controls.detach (); this.sessionEditor.RefreshUI (); }
+            if (this.sessionEditor) { this.sessionEditor.document.objects.forEach ((object) => object.player?.Dispose ()); this.sessionEditor.document = new (this.sessionEditor.document.constructor) (); this.sessionEditor.history = new (this.sessionEditor.history.constructor) (() => this.sessionEditor.MarkDirty ()); this.sessionEditor.selected = null; this.sessionEditor.controls.detach (); this.sessionEditor.RefreshUI (); }
             this.ClearModel ();
             this.SetUIState (WebsiteUIState.Intro);
         }

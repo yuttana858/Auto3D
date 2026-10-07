@@ -80,6 +80,7 @@ export function CreateAgentCommands (website)
     }, { section : 'flutes' });
     add ('animation.timeline.inspect', 'Inspect keyframe timeline', 'Animation', 'Return native Auto3D timeline duration, playhead, interpolation mode, camera keyframes and per-object keyframe counts.', {}, [], false, () => ({
         duration : editor.timeline.duration,
+        rangeStart : editor.timeline.rangeStart, rangeEnd : editor.timeline.rangeEnd,
         time : editor.timeline.time,
         loop : editor.timeline.loop,
         interpolation : editor.timeline.interpolation,
@@ -87,6 +88,31 @@ export function CreateAgentCommands (website)
         objects : editor.document.objects.map ((item) => ({ objectId : item.id, name : item.name, keyframes : (item.keyframes || []).map ((keyframe) => ({ ...keyframe })) }))
     }));
     add ('animation.timeline.seek', 'Seek keyframe timeline', 'Animation', 'Move the native Auto3D timeline playhead and evaluate object/camera tweening.', { time : { ...number, minimum : 0 } }, ['time'], false, ({ time }) => { editor.timeline.Seek (Math.min (time, editor.timeline.duration)); return { time : editor.timeline.time }; }, { time : 1 });
+    add ('animation.panel', 'Show Advance animation', 'Animation', 'Reveal or close the bottom scene and camera timeline panel.', { visible : boolean }, ['visible'], false, ({ visible }) => { editor.ShowAdvanceAnimation (visible); return { visible }; }, { visible : true });
+    add ('animation.timeline.range', 'Set animation range', 'Animation', 'Set beginning and end markers in seconds within the timeline duration.', { start : { ...number, minimum : 0 }, end : { ...number, minimum : 0 } }, ['start', 'end'], true, ({ start, end }) => { const result = editor.timeline.SetRange (start, end); editor.MarkDirty (); editor.AnimationUI (); return result; }, { start : 0, end : 5 });
+    add ('animation.timeline.configure', 'Configure Advance animation', 'Animation', 'Set duration, looping and tween interpolation for new keyframes.', { duration : { ...number, minimum : 0.1, maximum : 3600 }, loop : boolean, interpolation : enumOf ('smooth', 'linear', 'step') }, ['duration', 'loop', 'interpolation'], true, ({ duration, loop, interpolation }) => { editor.timeline.SetDuration (duration); editor.timeline.loop = loop; editor.timeline.interpolation = interpolation; editor.MarkDirty (); editor.AnimationUI (); return editor.timeline.Serialize (); }, { duration : 5, loop : false, interpolation : 'smooth' });
+    add ('animation.timeline.playback', 'Control Advance animation playback', 'Animation', 'Play, pause or reset the scene and camera sequence.', { action : enumOf ('play', 'pause', 'reset') }, ['action'], false, ({ action }) => { if (action === 'reset') { editor.timeline.Reset (); } else if ((action === 'play') !== editor.timeline.playing) { editor.timeline.Toggle (); } return { playing : editor.timeline.playing, time : editor.timeline.time }; }, { action : 'play' });
+    add ('animation.keyframe.scene', 'Save scene state keyframe', 'Animation', 'Capture every scene object placement at the current playhead.', {}, [], true, () => { const keys = editor.timeline.CaptureScene (); editor.MarkDirty (); editor.AnimationUI (); return { keyframes : keys }; });
+    add ('animation.keyframe.delete', 'Delete animation keyframe', 'Animation', 'Delete an existing camera or object keyframe by ID.', { type : enumOf ('camera', 'object'), id : text, objectId : text }, ['type', 'id'], true, ({ type, id, objectId }) => {
+        const item = type === 'object' ? object (objectId) : null;
+        const keys = item ? item.keyframes || [] : editor.timeline.cameraKeyframes;
+        if (!keys.some ((key) => key.id === id)) { throw new Error ('Keyframe is unavailable.'); }
+        editor.timeline.DeleteKeyframe (type, id, item); editor.MarkDirty (); editor.AnimationUI (); return { deleted : id };
+    });
+    add ('animation.embedded.inspect', 'Inspect embedded animation', 'Animation', 'Read imported animation clips, durations, playback state and any load error.', { objectId : text }, ['objectId'], false, ({ objectId }) => {
+        const item = object (objectId); return { clips : (item.player?.clips || []).map ((clip) => ({ name : clip.name, duration : clip.duration })), state : item.player ? { ...item.player.state } : null, error : item.animationError || null };
+    });
+    add ('animation.embedded.playback', 'Control embedded animation', 'Animation', 'Play, pause, reset or seek an imported GLB/glTF clip.', { objectId : text, action : enumOf ('play', 'pause', 'reset', 'seek'), time : { ...number, minimum : 0 } }, ['objectId', 'action'], false, ({ objectId, action, time }) => {
+        const player = object (objectId).player; if (!player) { throw new Error ('Embedded animation is unavailable.'); }
+        if (action === 'seek' && !Number.isFinite (time)) { throw new Error ('Seek requires a time.'); }
+        if (action === 'reset' || action === 'seek') { player.Seek (action === 'reset' ? 0 : time); } else { player.SetPlaying (action === 'play'); }
+        return { ...player.state };
+    });
+    add ('animation.embedded.configure', 'Configure embedded animation', 'Animation', 'Select a clip and set playback speed and looping.', { objectId : text, clip : { ...number, minimum : 0 }, speed : { ...number, minimum : 0.01, maximum : 10 }, loop : boolean }, ['objectId', 'clip', 'speed', 'loop'], true, ({ objectId, clip, speed, loop }) => {
+        const player = object (objectId).player; if (!player) { throw new Error ('Embedded animation is unavailable.'); }
+        if (!Number.isInteger (clip) || !player.clips[clip]) { throw new Error ('Clip is unavailable.'); }
+        player.Choose (clip); player.state.speed = speed; player.SetLoop (loop); editor.MarkDirty (); editor.AnimationUI (); return { ...player.state };
+    });
     add ('animation.keyframe.object', 'Save object keyframe', 'Animation', 'Capture an object position, rotation and scale on the native timeline.', { objectId : text, time : { ...number, minimum : 0 }, interpolation : enumOf ('smooth', 'linear', 'step') }, ['objectId'], true, ({ objectId, time, interpolation }) => {
         const item = object (objectId); if (Number.isFinite (time)) { editor.timeline.time = Math.min (time, editor.timeline.duration); } if (interpolation) { editor.timeline.interpolation = interpolation; }
         const keyframe = editor.timeline.CaptureObject (item); editor.MarkDirty (); editor.AnimationUI (); return keyframe;

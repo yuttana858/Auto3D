@@ -108,7 +108,7 @@ export class SceneEffects
     {
         const box = new THREE.Box3 ();
         const root = this.viewer.mainModel?.mainModel?.GetRootObject?.();
-        if (root) { box.setFromObject (root, true); }
+        if (root) { box.setFromObject (root, false); }
         return box.isEmpty () ? null : box;
     }
 

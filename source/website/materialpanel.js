@@ -321,6 +321,7 @@ export class MaterialPanel
     Open ()
     {
         if (!this.entries.length) { return; }
+        this.website.sessionEditor?.ShowAdvanceAnimation (false);
         this.open = true;
         this.drawer.inert = false;
         this.drawer.classList.add ('open');
