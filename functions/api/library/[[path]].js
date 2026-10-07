@@ -1,6 +1,6 @@
 const DefaultSupabaseUrl = 'https://iesepcoxqochycckbwoh.supabase.co';
 const DefaultPublishableKey = 'sb_publishable_CmRJpuYE32OBF9rIV1jwqQ_diMF7OXh';
-const Bucket = 'auto3d-library';
+const LegacyBucket = 'auto3d-library';
 const Table = 'auto3d_library';
 const Uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -46,7 +46,9 @@ function item (row)
         createdAt : row.created_at,
         version : row.version || 1,
         supersedesId : row.supersedes_id || null,
-        status : row.status || 'published'
+        status : row.status || 'published',
+        fileSize : Number (row.file_size_bytes || 0),
+        storageProvider : row.storage_provider || 'supabase'
     };
 }
 
@@ -69,20 +71,53 @@ async function getItem (env, id)
     return row ? json (item (row)) : json ({ error : 'Library item not found.' }, 404);
 }
 
-async function getFile (env, id, type)
+function responseHeaders (type, sourceHeaders = null)
 {
-    const field = type === 'archive' ? 'archive_path' : 'thumbnail_path';
-    const row = await getRow (env, id, field);
-    if (!row) { return json ({ error : 'Library item not found.' }, 404); }
-    const { url, key } = config (env);
-    const path = String (row[field]).split ('/').map (encodeURIComponent).join ('/');
-    const response = await fetch (url + '/storage/v1/object/authenticated/' + Bucket + '/' + path, { headers : { apikey : key } });
-    if (!response.ok) { return json ({ error : 'Library file unavailable.' }, response.status === 404 ? 404 : 502); }
-    const headers = new Headers (response.headers);
-    headers.set ('Content-Type', type === 'archive' ? 'application/octet-stream' : 'image/png');
+    const headers = sourceHeaders ? new Headers (sourceHeaders) : new Headers ();
+    if (!headers.has ('Content-Type')) {
+        headers.set ('Content-Type', type === 'archive' ? 'application/octet-stream' : 'image/png');
+    }
     headers.set ('Cache-Control', 'public, max-age=300');
     headers.set ('X-Content-Type-Options', 'nosniff');
-    return new Response (response.body, { status : 200, headers });
+    return headers;
+}
+
+async function getR2File (env, key, type)
+{
+    if (!env.AUTO3D_LIBRARY_R2) {
+        throw Object.assign (new Error ('R2 Library storage is not configured.'), { status : 503 });
+    }
+    const object = await env.AUTO3D_LIBRARY_R2.get (key);
+    if (!object) { return json ({ error : 'Library file unavailable.' }, 404); }
+    const headers = responseHeaders (type);
+    object.writeHttpMetadata?.(headers);
+    return new Response (object.body, { status : 200, headers });
+}
+
+async function getLegacyFile (env, pathValue, type)
+{
+    const { url, key } = config (env);
+    const path = String (pathValue).split ('/').map (encodeURIComponent).join ('/');
+    const response = await fetch (url + '/storage/v1/object/authenticated/' + LegacyBucket + '/' + path, { headers : { apikey : key } });
+    if (!response.ok) { return json ({ error : 'Library file unavailable.' }, response.status === 404 ? 404 : 502); }
+    return new Response (response.body, { status : 200, headers : responseHeaders (type, response.headers) });
+}
+
+async function getFile (env, id, type)
+{
+    const objectField = type === 'archive' ? 'archive_object_key' : 'thumbnail_object_key';
+    const legacyField = type === 'archive' ? 'archive_path' : 'thumbnail_path';
+    const row = await getRow (env, id, 'storage_provider,' + objectField + ',' + legacyField);
+    if (!row) { return json ({ error : 'Library item not found.' }, 404); }
+
+    if (row.storage_provider === 'r2') {
+        const key = row[objectField] || row[legacyField];
+        if (!key) { return json ({ error : 'Library file unavailable.' }, 404); }
+        return getR2File (env, key, type);
+    }
+
+    if (!row[legacyField]) { return json ({ error : 'Library file unavailable.' }, 404); }
+    return getLegacyFile (env, row[legacyField], type);
 }
 
 export async function onRequest (context)
