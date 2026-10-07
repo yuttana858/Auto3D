@@ -1,6 +1,6 @@
 const DefaultSupabaseUrl = 'https://iesepcoxqochycckbwoh.supabase.co';
 const DefaultPublishableKey = 'sb_publishable_CmRJpuYE32OBF9rIV1jwqQ_diMF7OXh';
-const Bucket = 'auto3d-library';
+const LegacyBucket = 'auto3d-library';
 const LinkTable = 'auto3d_share_links';
 const LibraryTable = 'auto3d_library';
 const Uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -120,6 +120,28 @@ async function verifyShare (env, token, code)
     return rows[0] || null;
 }
 
+async function archiveResponse (env, row)
+{
+    if (row.storage_provider === 'r2') {
+        if (!env.AUTO3D_LIBRARY_R2) {
+            throw Object.assign (new Error ('R2 Library storage is not configured.'), { status : 503 });
+        }
+        const key = row.archive_object_key || row.archive_path;
+        const object = key ? await env.AUTO3D_LIBRARY_R2.get (key) : null;
+        if (!object) { return null; }
+        return new Response (object.body, {
+            status : 200,
+            headers : { 'Content-Type' : 'application/octet-stream' }
+        });
+    }
+
+    const { url, key } = config (env);
+    const path = String (row.archive_path || '').split ('/').map (encodeURIComponent).join ('/');
+    if (!path) { return null; }
+    const response = await fetch (url + '/storage/v1/object/authenticated/' + LegacyBucket + '/' + path, { headers : { apikey : key } });
+    return response.ok ? response : null;
+}
+
 async function shareArchive (context, token, asDownload)
 {
     let body = {};
@@ -130,18 +152,16 @@ async function shareArchive (context, token, asDownload)
     if (!grant) { return json ({ error : 'Incorrect access code or unavailable share link.' }, 401); }
     if (asDownload && !grant.allow_download) { return json ({ error : 'Downloads are disabled for this share link.' }, 403); }
 
-    const response = await request (context.env, '/rest/v1/' + LibraryTable + '?select=name,archive_path&id=eq.' + encodeURIComponent (grant.item_id) + '&status=eq.published&limit=1');
+    const response = await request (context.env, '/rest/v1/' + LibraryTable + '?select=name,storage_provider,archive_object_key,archive_path&id=eq.' + encodeURIComponent (grant.item_id) + '&status=eq.published&limit=1');
     const rows = await response.json ();
     if (!rows.length) { return json ({ error : 'Library item not found.' }, 404); }
-    const { url, key } = config (context.env);
-    const path = String (rows[0].archive_path).split ('/').map (encodeURIComponent).join ('/');
-    const file = await fetch (url + '/storage/v1/object/authenticated/' + Bucket + '/' + path, { headers : { apikey : key } });
-    if (!file.ok) { return json ({ error : 'Shared model data is unavailable.' }, file.status === 404 ? 404 : 502); }
-    const headers = new Headers ({
-        'Content-Type' : 'application/octet-stream',
-        'Cache-Control' : 'private, no-store',
-        'X-Content-Type-Options' : 'nosniff'
-    });
+    const file = await archiveResponse (context.env, rows[0]);
+    if (!file) { return json ({ error : 'Shared model data is unavailable.' }, 404); }
+
+    const headers = new Headers (file.headers);
+    headers.set ('Content-Type', 'application/octet-stream');
+    headers.set ('Cache-Control', 'private, no-store');
+    headers.set ('X-Content-Type-Options', 'nosniff');
     if (asDownload) {
         const safe = String (rows[0].name || 'Auto3D-share').replace (/[^a-z0-9._-]+/gi, '_');
         headers.set ('Content-Disposition', 'attachment; filename="' + safe + '.auto3d"');
