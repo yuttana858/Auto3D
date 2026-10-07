@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { clone as CloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { SceneDocument, SceneHistory } from './scenedocument.js';
 import { PackSession, CreateSessionArchive, OpenSessionArchive } from './sessionarchive.js';
 import { ModelLibrary, WorkspaceDialog, RecoveryArchiveBuffer } from './modellibrary.js';
@@ -493,7 +494,7 @@ export class SessionEditor
     GetObjectBaseSize (object)
     {
         if (!object?.threeObject) { return [0, 0, 0]; }
-        const clone = THREE.SkeletonUtils ? THREE.SkeletonUtils.clone (object.threeObject) : object.threeObject.clone (true);
+        const clone = CloneSkeleton (object.threeObject);
         clone.position.set (0, 0, 0); clone.rotation.set (0, 0, 0); clone.scale.set (1, 1, 1); clone.updateMatrixWorld (true);
         const size = new THREE.Box3 ().setFromObject (clone, true).getSize (new THREE.Vector3 ());
         return size.toArray ();
