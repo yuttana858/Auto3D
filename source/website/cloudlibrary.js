@@ -29,6 +29,8 @@ export class CloudLibrary
             kind : row.kind,
             objects : row.objectCount,
             updatedAt : row.createdAt,
+            fileSize : Number (row.fileSize || 0),
+            storageProvider : row.storageProvider || null,
             shared : true
         };
     }
