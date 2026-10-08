@@ -22,6 +22,10 @@ Command results use `{ok, command, result}` or `{ok:false, command, error:{code,
 Coordinates use source model units, rotations use degrees, and scale is dimensionless. Object IDs come from `scene.inspect`. Material indices come from `material.list`. Commands opening save/library/editor dialogs report that the panel opened; they do not mean the user saved or published anything. Shared viewers reject scene mutations. Macro storage is local to the browser and origin; downloaded macros are portable JSON.
 
 
+## Account commands
+
+`auth.inspect` reports the signed-in identity without session tokens. `auth.open` opens the interactive account dialog; it does not complete sign-in. `auth.sign_out` signs out and is marked as a mutation, so shared read-only contexts reject it. Commands/macros never accept email/password credentials. Temporary Supabase email/password setup is documented in `temporary-auth.md`.
+
 ## Knowledge access
 
 Connected agents can query Auto3D's curated corrugated-paper packaging knowledge without loading the full dataset into every prompt:

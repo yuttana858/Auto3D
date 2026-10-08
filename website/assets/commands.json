@@ -2,6 +2,48 @@
   "apiVersion": 1,
   "commands": [
     {
+      "id": "auth.inspect",
+      "title": "Inspect account",
+      "category": "Account",
+      "description": "Return the current account identity without credentials or session tokens.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "auth.open",
+      "title": "Open account sign-in",
+      "category": "Account",
+      "description": "Open the account dialog for interactive sign-in. Does not complete sign-in; credentials must be entered by the user.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "auth.sign_out",
+      "title": "Sign out",
+      "category": "Account",
+      "description": "Sign out of the current account and revoke its refresh session. Device files remain local.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
       "id": "scene.inspect",
       "title": "Inspect scene",
       "category": "Scene",

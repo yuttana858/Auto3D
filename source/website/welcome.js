@@ -139,7 +139,7 @@ function StartTour ()
     document.body.appendChild (dialog); dialog.showModal (); show ();
 }
 
-export function StartWelcomeSequence ()
+export function StartWelcomeSequence (authPanel)
 {
     const splash = document.getElementById ('startup_splash');
     if (!splash) { return; }
@@ -148,11 +148,12 @@ export function StartWelcomeSequence ()
     const main = document.getElementById ('main'); const header = document.getElementById ('header');
     main.inert = true; header.inert = true;
     let finished = false;
+    let loginPanel = null;
     const finish = async (tour = false, greetUser = true) => {
         if (finished) { return; } finished = true;
         splash.style.pointerEvents = 'none';
         await FadeOut (splash, 500);
-        dispose (); splash.remove (); main.inert = false; header.inert = false;
+        loginPanel?.dispose (); dispose (); splash.remove (); main.inert = false; header.inert = false;
         if (tour) { StartTour (); return; }
         if (!greetUser) { return; }
         const greet = () => {
@@ -166,6 +167,10 @@ export function StartWelcomeSequence ()
     splash.addEventListener ('click', (event) => { if (event.target === splash || event.target.tagName === 'CANVAS') { finish (false, false); } });
     window.setTimeout (() => {
         if (finished) { return; }
-        finish ();
+        loginPanel = authPanel.Create (() => finish (false, false));
+        splash.querySelector ('.splash_identity').appendChild (loginPanel);
+        splash.setAttribute ('role', 'region'); splash.setAttribute ('aria-label', 'Welcome to Auto3D');
+        loginPanel.querySelector ('input')?.focus ();
     }, 3000);
+    authPanel.auth.Restore ().catch (() => { /* Login remains available for retry. */ });
 }

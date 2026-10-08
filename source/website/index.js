@@ -8,6 +8,8 @@ import { ButtonDialog, ProgressDialog } from './dialog.js';
 import { ShowMessageDialog } from './dialogs.js';
 import { StartWelcomeSequence } from './welcome.js';
 import { CreateAgentCommands } from './agentcommands.js';
+import { AuthService } from './authservice.js';
+import { AuthPanel } from './authpanel.js';
 
 import * as Engine from '../engine/main.js';
 export { Engine };
@@ -27,6 +29,7 @@ import './css/workspace.css';
 import './css/session.css';
 import './css/welcome.css';
 import './css/commands.css';
+import './css/auth.css';
 
 export const UI = {
     ButtonDialog,
@@ -83,9 +86,14 @@ export function StartWebsite ()
             fileInput : document.getElementById ('open_file')
         });
         website.Load ();
+        website.auth = new AuthService ();
+        website.authPanel = new AuthPanel (website.auth);
+        const refreshAccount = () => { if (document.visibilityState === 'visible') { website.auth.Restore ().catch (() => {}); } };
+        document.addEventListener ('visibilitychange', refreshAccount);
+        window.setInterval (refreshAccount, 240000);
         website.commands = CreateAgentCommands (website);
         window.Auto3D = Object.freeze ({ apiVersion : 1, catalog : (query) => website.commands.Catalog (query), execute : (id, args) => website.commands.Execute (id, args), runMacro : (macro) => website.commands.RunMacro (macro), cancelMacro : () => website.commands.Cancel () });
-        StartWelcomeSequence ();
+        StartWelcomeSequence (website.authPanel);
     });
 }
 

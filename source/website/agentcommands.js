@@ -18,6 +18,9 @@ export function CreateAgentCommands (website)
     };
     const describe = (item) => ({ id : item.id, name : item.name, visible : item.visible, position : [...item.position], rotation : [...item.rotation], scale : [...item.scale], userData : { ...(item.userData || {}) } });
     const add = (id, title, category, description, properties, required, mutates, handler, example = {}) => registry.Register ({ id, title, category, description, mutates, inputSchema : { type : 'object', properties, required, additionalProperties : false }, example }, handler);
+    add ('auth.inspect', 'Inspect account', 'Account', 'Return the current account identity without credentials or session tokens.', {}, [], false, () => website.auth.Inspect ());
+    add ('auth.open', 'Open account sign-in', 'Account', 'Open the account dialog for interactive sign-in. Does not complete sign-in; credentials must be entered by the user.', {}, [], false, () => website.authPanel.Open ());
+    add ('auth.sign_out', 'Sign out', 'Account', 'Sign out of the current account and revoke its refresh session. Device files remain local.', {}, [], true, async () => website.auth.SignOut ());
     add ('scene.inspect', 'Inspect scene', 'Scene', 'Return all objects, selected object ID and loading state.', {}, [], false, () => ({ name : editor.document.name, objects : editor.document.objects.map (describe), selectedObjectId : editor.selected?.id || null }));
     add ('object.select', 'Select object', 'Objects', 'Select an object by its stable ID.', { objectId : text }, ['objectId'], false, ({ objectId }) => { const item = object (objectId); editor.Select (item); return describe (item); });
     add ('object.transform', 'Transform object', 'Objects', 'Set position in model units, rotation in degrees, and scale. Omitted vectors stay unchanged. Undo supported.', { objectId : text, position : vector, rotation : vector, scale : vector }, [], true, (args) => {
