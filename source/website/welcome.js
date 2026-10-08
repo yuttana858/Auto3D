@@ -139,7 +139,7 @@ function StartTour ()
     document.body.appendChild (dialog); dialog.showModal (); show ();
 }
 
-export function StartWelcomeSequence ()
+export function StartWelcomeSequence (authService)
 {
     const splash = document.getElementById ('startup_splash');
     if (!splash) { return; }
@@ -147,6 +147,16 @@ export function StartWelcomeSequence ()
     const dispose = CreateScene (splash.querySelector ('canvas'), true);
     const main = document.getElementById ('main'); const header = document.getElementById ('header');
     main.inert = true; header.inert = true;
+
+    const identity = splash.querySelector ('.splash_identity');
+    const login = document.createElement ('div'); login.className = 'splash_login'; login.setAttribute ('aria-label', 'Auto3D sign in');
+    const message = document.createElement ('p'); message.className = 'splash_login_message'; message.textContent = 'Sign in to access your Library, saved sessions and shared models.';
+    const actions = document.createElement ('div'); actions.className = 'splash_login_actions';
+    const signIn = document.createElement ('button'); signIn.className = 'splash_signin'; signIn.textContent = 'Sign in';
+    const guest = document.createElement ('button'); guest.className = 'splash_guest'; guest.textContent = 'Continue as guest';
+    const status = document.createElement ('span'); status.className = 'splash_login_status'; status.setAttribute ('role', 'status');
+    actions.append (signIn, guest); login.append (message, actions, status); identity.appendChild (login);
+
     let finished = false;
     const finish = async (tour = false, greetUser = true) => {
         if (finished) { return; } finished = true;
@@ -161,11 +171,28 @@ export function StartWelcomeSequence ()
         };
         greet ();
     };
+
+    signIn.addEventListener ('click', () => {
+        status.textContent = 'Opening secure sign in…';
+        signIn.disabled = true; guest.disabled = true;
+        authService?.SignIn (window.location.href);
+    });
+    guest.addEventListener ('click', () => finish (false, false));
+
     const tour = document.createElement ('button'); tour.className = 'splash_tour'; tour.textContent = 'Take a tour →';
     tour.addEventListener ('click', () => finish (true)); splash.appendChild (tour);
-    splash.addEventListener ('click', (event) => { if (event.target === splash || event.target.tagName === 'CANVAS') { finish (false, false); } });
-    window.setTimeout (() => {
-        if (finished) { return; }
-        finish ();
-    }, 3000);
+
+    window.setTimeout (() => login.classList.add ('visible'), 450);
+
+    Promise.resolve (authService?.Initialize?.()).then ((user) => {
+        if (!user || finished) { return; }
+        const name = user.displayName || user.name || user.email || 'your account';
+        message.textContent = 'Signed in as ' + name + '.';
+        signIn.textContent = 'Continue';
+        signIn.disabled = false; guest.hidden = true;
+        signIn.onclick = null;
+        signIn.addEventListener ('click', () => finish (false, false), { once : true });
+    }).catch (() => {
+        status.textContent = '';
+    });
 }
