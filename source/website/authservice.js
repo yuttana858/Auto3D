@@ -35,18 +35,39 @@ export class AuthService
         return this.user;
     }
 
-    SignIn (returnTo = window.location.href)
+    async SignIn (email, password)
     {
-        const url = new URL (this.Endpoint ('/api/auth/login'), window.location.origin);
-        url.searchParams.set ('returnTo', returnTo);
-        window.location.assign (url.href);
+        const response = await fetch (this.Endpoint ('/api/auth/login'), {
+            method : 'POST',
+            credentials : 'same-origin',
+            headers : { 'Content-Type' : 'application/json', Accept : 'application/json' },
+            body : JSON.stringify ({ email, password })
+        });
+        const data = await response.json ().catch (() => ({}));
+        if (!response.ok) { throw new Error (data.error || 'Unable to sign in.'); }
+        this.user = data.user || null;
+        this.organization = data.organization || null;
+        this.permissions = Array.isArray (data.permissions) ? data.permissions : [];
+        return this.user;
     }
 
-    SignOut (returnTo = window.location.origin + window.location.pathname)
+    async RequestAccess (details)
     {
-        const url = new URL (this.Endpoint ('/api/auth/logout'), window.location.origin);
-        url.searchParams.set ('returnTo', returnTo);
-        window.location.assign (url.href);
+        const response = await fetch (this.Endpoint ('/api/auth/request'), {
+            method : 'POST',
+            credentials : 'same-origin',
+            headers : { 'Content-Type' : 'application/json', Accept : 'application/json' },
+            body : JSON.stringify (details)
+        });
+        const data = await response.json ().catch (() => ({}));
+        if (!response.ok) { throw new Error (data.error || 'Unable to submit request.'); }
+        return data;
+    }
+
+    async SignOut ()
+    {
+        await fetch (this.Endpoint ('/api/auth/logout'), { method : 'POST', credentials : 'same-origin' });
+        this.user = null; this.organization = null; this.permissions = [];
     }
 
     GetUser ()
