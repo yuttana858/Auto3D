@@ -20,10 +20,8 @@ try {
     });
     await page.goto ('http://127.0.0.1:8080/website/index.html', { waitUntil : 'domcontentloaded' });
     await page.waitForFunction (() => window.Auto3D);
-    await page.locator ('#startup_splash canvas').click ({ position : { x : 50, y : 50 } });
-    await page.waitForFunction (() => !document.querySelector ('#startup_splash'));
     const call = async (id) => { const result = await page.evaluate ((id) => Auto3D.execute (id, {}), id); assert.equal (result.ok, true, JSON.stringify (result)); };
-    await call ('auth.open'); await page.getByRole ('button', { name : 'Request an account', exact : true }).click ();
+    await call ('auth.open'); await page.getByRole ('dialog', { name : 'Auto3D account', exact : true }).getByRole ('button', { name : 'Request an account', exact : true }).click ();
     const requestDialog = page.getByRole ('dialog').last ();
     await requestDialog.getByLabel ('Name', { exact : true }).fill ('New User');
     await requestDialog.getByLabel ('Email', { exact : true }).fill ('new@example.com');

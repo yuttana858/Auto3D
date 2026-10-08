@@ -1,6 +1,8 @@
+import { VerifyActiveSession } from './session.js';
 import { SupabaseConfig, SupabaseHeaders } from './supabase.js';
 
 export const AccessCookie = '__Host-auto3d-access';
+export const LoggedOutCookie = '__Host-auto3d-logged-out';
 export const RefreshCookie = '__Host-auto3d-refresh';
 
 export function AuthCookies (request)
@@ -14,9 +16,10 @@ export function AuthCookies (request)
     return result;
 }
 
-export function AuthResponse (body, status = 200, tokens = null, clear = false)
+export function AuthResponse (body, status = 200, tokens = null, clear = false, intent = null)
 {
     const headers = new Headers ({ 'Content-Type' : 'application/json', 'Cache-Control' : 'private, no-store', 'X-Content-Type-Options' : 'nosniff' });
+    if (intent) { headers.append ('Set-Cookie', LoggedOutCookie + '=' + (intent === 'logout' ? '1' : '') + '; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=' + (intent === 'logout' ? 604800 : 0)); }
     if (tokens || clear) {
         for (const [name, value] of [[AccessCookie, tokens?.access_token], [RefreshCookie, tokens?.refresh_token]]) {
             headers.append ('Set-Cookie', name + '=' + encodeURIComponent (clear ? '' : value) + '; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=' + (clear ? 0 : 604800));
@@ -48,5 +51,8 @@ export async function VerifiedUser (env, token)
     if (!response.ok) {
         throw Object.assign (new Error (response.status >= 500 ? 'Sign-in service is unavailable. Try again.' : 'Your session has expired. Sign in again.'), { status : response.status >= 500 ? 503 : 401 });
     }
-    return PublicUser (await response.json ());
+    const user = await response.json ();
+    PublicUser (user);
+    await VerifyActiveSession (env, token, user);
+    return PublicUser (user);
 }

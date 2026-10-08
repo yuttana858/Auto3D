@@ -120,7 +120,7 @@
       "title": "Sign out",
       "category": "Account",
       "description": "Sign out of the current account and revoke its refresh session. Device files remain local.",
-      "mutates": true,
+      "mutates": false,
       "inputSchema": {
         "type": "object",
         "properties": {},

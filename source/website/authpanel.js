@@ -59,8 +59,8 @@ export class AuthPanel
         form.append (emailLabel, passwordLabel, submit); panel.append (heading, form, status, hint, requestAccount, signOut);
         if (onContinue) {
             const proceed = document.createElement ('button'); proceed.type = 'button'; proceed.className = 'auth_continue';
-            const update = () => { proceed.textContent = this.auth.user ? 'Continue to workspace' : 'Continue without signing in'; }; update ();
-            proceed.addEventListener ('click', onContinue); panel.appendChild (proceed);
+            const update = () => { proceed.textContent = 'Continue to workspace'; proceed.hidden = !this.auth.user; }; update ();
+            proceed.addEventListener ('click', () => { if (this.auth.user) { onContinue (); } }); panel.appendChild (proceed);
             const unsubscribeContinue = this.auth.Subscribe (update); panel.dispose = () => unsubscribeContinue ();
         }
         const unsubscribe = this.auth.Subscribe (render); const dispose = panel.dispose;

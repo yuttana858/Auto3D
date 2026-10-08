@@ -5,13 +5,14 @@ try {
     const page = await browser.newPage ({ viewport : { width : 1440, height : 1000 } });
     page.setDefaultTimeout (20000);
     const errors = []; page.on ('pageerror', (error) => errors.push (error.stack));
-    await page.goto ('http://127.0.0.1:8080/website/index.html', { waitUntil : 'domcontentloaded' });
+    await page.route ('**/api/auth/session', (route) => route.fulfill ({ json : { user : { id : 'browser-user', email : 'browser@example.com' } } }));
+await page.goto ('http://127.0.0.1:8080/website/index.html', { waitUntil : 'domcontentloaded' });
     await page.waitForFunction (() => window.Auto3D);
-    await page.locator ('#startup_splash canvas').click ({ position : { x : 50, y : 50 } });
     await page.waitForFunction (() => !document.querySelector ('#startup_splash'));
     assert.equal (await page.getByText ('Open model URL', { exact : true }).count (), 0);
     assert.equal (await page.getByText ('Load sample model', { exact : true }).count (), 0);
-    await page.locator ('#open_file').setInputFiles ('test/testfiles/animation/animated.glb');
+    await page.waitForFunction (() => !document.body.classList.contains ('auth_locked'));
+await page.locator ('#open_file').setInputFiles ('test/testfiles/animation/animated.glb');
     await page.waitForFunction (() => document.querySelector ('.scene_status')?.textContent.startsWith ('Added '));
     const call = async (id, args = {}) => {
         const result = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args });

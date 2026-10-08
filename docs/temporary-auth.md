@@ -52,3 +52,13 @@ Authorization verifies the provider identity and confirmed email on each admin r
 Agent commands: `auth.request_account`, `admin.open`, `admin.requests`, `admin.approve` (interactive), and `admin.reject`. Approval passwords are kept out of command arguments and saved macros. Existing `auth.inspect/open/sign_out` remain available.
 
 Server configuration must use a secret (`sb_secret_…`) or legacy `service_role` key. An anon/publishable key can permit email/password sign-in but cannot read the protected admin tables. Account database requests now reject that misconfiguration explicitly, and Preferences shows the service error instead of silently hiding administration.
+
+## Mandatory login and persistent sessions
+
+The workspace now requires login. There is no guest Continue button or splash/backdrop/Escape bypass. Saved Secure/HttpOnly/SameSite cookies are restored through `/api/auth/session` (and refresh if needed), so closing a tab retains sign-in while the server session remains valid. Cookie persistence is seven days; expired or revoked sessions require signing in again.
+
+`InstallAuthGate` locks all workspace controls and closes active dialogs on logout/session rejection. Reauthentication reloads the workspace before exposing it again. Agent commands also enforce the gate. `functions/api/_middleware.js` protects Library, shares, AI, environment and knowledge APIs, admin routes, and readiness; only Auth routes and submitting account requests are public. Shared views require login. The root middleware protects static model/archive files and embedded viewers; login assets remain accessible.
+
+Every verified access token is checked against its still-active Supabase `auth.sessions` row via the service-only, SECURITY INVOKER `auto3d_session_active` RPC. The migration `database/session-gate.sql` grants the server only the session ID/user ID columns and grants no public RPC execution. This prevents a signed access token from remaining usable after its session is revoked.
+
+Logout locks immediately, notifies other tabs using a non-secret local logout marker, and calls provider logout to revoke the current session and clear token cookies. A persistent HttpOnly logout cookie also blocks protected routes and refresh if an earlier refresh response writes stale tokens. Only an explicit successful password login clears that cookie; refresh responses cannot clear it. Browser restoration cannot override logout, including a logout request that fails offline. The local marker contains no tokens or credentials. `test/browser/login-gate.mjs` covers saved-cookie reopening, cross-tab logout, click/Escape bypass attempts, failed logout, and explicit reauthentication.

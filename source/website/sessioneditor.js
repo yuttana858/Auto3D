@@ -118,7 +118,7 @@ export class SessionEditor
             if (!this.dirty || this.readOnly) { return; }
             event.preventDefault (); event.returnValue = '';
         });
-        if (!this.readOnly && !this.website.hashHandler.HasHash ()) { setTimeout (() => this.OfferRecovery (), 0); }
+
     }
 
     async LoadShared ()
@@ -1056,7 +1056,7 @@ export class SessionEditor
     }
     KeyDown (event)
     {
-        if (this.readOnly || typeof event.key !== 'string') { return; }
+        if ((this.website?.auth && !this.website.auth.user) || this.readOnly || typeof event.key !== 'string') { return; }
         const modified = event.ctrlKey || event.metaKey; const key = event.key.toLowerCase ();
         const target = event.target;
         const textEditing = target.closest?.('textarea, [contenteditable="true"]') || (target.matches?.('input') && ['text', 'search', 'email', 'url', 'password', 'number'].includes (target.type));

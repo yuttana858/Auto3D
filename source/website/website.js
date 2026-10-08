@@ -225,7 +225,7 @@ export class Website
         this.SetUIState (WebsiteUIState.Intro);
 
         this.hashHandler.SetEventListener (this.OnHashChange.bind (this));
-        if (this.sessionEditor.readOnly) { this.sessionEditor.LoadShared (); } else { this.OnHashChange (); }
+
 
         window.addEventListener ('resize', () => {
 			this.layouter.Resize ();
@@ -445,6 +445,7 @@ export class Website
 
     OnHashChange ()
     {
+        if (this.auth && !this.auth.user) { return; }
         if (this.sessionEditor.readOnly) { return; }
         if (this.hashHandler.HasHash ()) {
             let urls = this.hashHandler.GetModelFilesFromHash ();

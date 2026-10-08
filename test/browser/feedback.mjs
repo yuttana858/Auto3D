@@ -4,10 +4,11 @@ const browser = await chromium.launch ({ executablePath : '/usr/bin/chromium', a
 try {
     const page = await browser.newPage ({ viewport : { width : 1440, height : 1000 } }); page.setDefaultTimeout (20000);
     const errors = []; page.on ('pageerror', (error) => errors.push (error.message));
-    await page.goto ('http://127.0.0.1:8080/website/index.html', { waitUntil : 'domcontentloaded' }); await page.waitForFunction (() => window.Auto3D);
-    await page.locator ('#startup_splash canvas').click ({ position : { x : 50, y : 50 } }); await page.waitForFunction (() => !document.querySelector ('#startup_splash'));
+    await page.route ('**/api/auth/session', (route) => route.fulfill ({ json : { user : { id : 'browser-user', email : 'browser@example.com' } } }));
+await page.goto ('http://127.0.0.1:8080/website/index.html', { waitUntil : 'domcontentloaded' }); await page.waitForFunction (() => window.Auto3D);
     await page.evaluate (() => { window.feedback = []; new MutationObserver (() => { const text = Array.from (document.querySelectorAll ('.ov_progress_text,.scene_status'), (element) => element.textContent).join (' '); if (text) { window.feedback.push (text); } }).observe (document.body, { subtree : true, childList : true, characterData : true }); });
-    await page.locator ('#open_file').setInputFiles ({ name : 'unsupported.txt', mimeType : 'text/plain', buffer : Buffer.from ('not a model') });
+    await page.waitForFunction (() => !document.body.classList.contains ('auth_locked'));
+await page.locator ('#open_file').setInputFiles ({ name : 'unsupported.txt', mimeType : 'text/plain', buffer : Buffer.from ('not a model') });
     await page.waitForFunction (() => document.body.textContent.includes ('Cannot open file'));
     assert.ok ((await page.locator ('body').textContent ()).includes ('Supported formats:'));
     assert.ok ((await page.locator ('body').textContent ()).includes ('STEP'));

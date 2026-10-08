@@ -1,3 +1,4 @@
+import { InstallAuthGate } from './authgate.js';
 import { AccountAdmin } from './accountadmin.js';
 import { Loc } from '../engine/core/localization.js';
 import { AddDiv, AddDomElement } from '../engine/viewer/domutils.js';
@@ -7,7 +8,6 @@ import { SetEventHandler, HandleEvent } from './eventhandler.js';
 import { PluginType, RegisterPlugin } from './pluginregistry.js';
 import { ButtonDialog, ProgressDialog } from './dialog.js';
 import { ShowMessageDialog } from './dialogs.js';
-import { StartWelcomeSequence } from './welcome.js';
 import { CreateAgentCommands } from './agentcommands.js';
 import { AuthService } from './authservice.js';
 import { AuthPanel } from './authpanel.js';
@@ -86,8 +86,8 @@ export function StartWebsite ()
             viewerDiv : document.getElementById ('main_viewer'),
             fileInput : document.getElementById ('open_file')
         });
-        website.Load ();
         website.auth = new AuthService ();
+        website.Load ();
         website.accountAdmin = new AccountAdmin (website.auth);
         website.authPanel = new AuthPanel (website.auth, website.accountAdmin);
         let adminLinkOpened = false;
@@ -97,7 +97,7 @@ export function StartWebsite ()
         window.setInterval (refreshAccount, 240000);
         website.commands = CreateAgentCommands (website);
         window.Auto3D = Object.freeze ({ apiVersion : 1, catalog : (query) => website.commands.Catalog (query), execute : (id, args) => website.commands.Execute (id, args), runMacro : (macro) => website.commands.RunMacro (macro), cancelMacro : () => website.commands.Cancel () });
-        StartWelcomeSequence (website.authPanel);
+        InstallAuthGate (website);
     });
 }
 
@@ -108,6 +108,11 @@ export function StartEmbed ()
             viewerDiv : document.getElementById ('embed_viewer'),
             websiteLinkDiv : document.getElementById ('website_link')
         });
-        embed.Load ();
+        const auth = new AuthService ();
+        const lockEmbed = () => { document.getElementById ('embed_viewer').inert = true; document.getElementById ('embed_viewer').hidden = true; window.location.replace ('/'); };
+        auth.Subscribe ((user) => { if (!user) { lockEmbed (); } });
+        auth.Restore ().then ((user) => { if (user) { embed.Load (); } }).catch (lockEmbed);
+        document.addEventListener ('visibilitychange', () => { if (document.visibilityState === 'visible') { auth.Restore ().catch (lockEmbed); } });
+        window.setInterval (() => auth.Restore ().catch (lockEmbed), 240000);
     });
 }

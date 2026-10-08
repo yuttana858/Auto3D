@@ -1,4 +1,4 @@
-import { AccessCookie, RefreshCookie, AuthCookies, AuthRequest, AuthResponse, VerifiedUser } from '../../_lib/auth.js';
+import { AccessCookie, RefreshCookie, LoggedOutCookie, AuthCookies, AuthRequest, AuthResponse, VerifiedUser } from '../../_lib/auth.js';
 
 export async function ReadBody (request)
 {
@@ -21,6 +21,7 @@ export async function ReadBody (request)
 async function Session (context)
 {
     const cookies = AuthCookies (context.request);
+    if (cookies[LoggedOutCookie]) { return AuthResponse ({ user : null }); }
     if (!cookies[AccessCookie]) {
         return AuthResponse ({ user : null }, cookies[RefreshCookie] ? 401 : 200);
     }
@@ -47,7 +48,7 @@ async function Exchange (context, grant, body)
     const tokens = await response.json ();
     if (typeof tokens.access_token !== 'string' || !tokens.access_token || typeof tokens.refresh_token !== 'string' || !tokens.refresh_token) { return AuthResponse ({ error : 'Sign-in service returned an incomplete session.' }, 503); }
     const user = await VerifiedUser (context.env, tokens.access_token);
-    return AuthResponse ({ user }, 200, tokens);
+    return AuthResponse ({ user }, 200, tokens, false, grant === 'password' ? 'login' : null);
 }
 
 async function Logout (context)
@@ -59,18 +60,18 @@ async function Logout (context)
         const refreshed = await AuthRequest (context.env, 'token?grant_type=refresh_token', { method : 'POST', body : JSON.stringify ({ refresh_token : cookies[RefreshCookie] }) });
         if (refreshed.ok) {
             token = (await refreshed.json ()).access_token;
-            if (!token) { return AuthResponse ({ error : 'Could not revoke the session. Please try again.' }, 503, null, true); }
+            if (!token) { return AuthResponse ({ error : 'Could not revoke the session. Please try again.' }, 503, null, true, 'logout'); }
             response = await AuthRequest (context.env, 'logout?scope=local', { method : 'POST', headers : { Authorization : 'Bearer ' + token } });
         } else if (![400, 401, 403].includes (refreshed.status)) {
-            return AuthResponse ({ error : 'Could not revoke the session. Please try again.' }, 503, null, true);
+            return AuthResponse ({ error : 'Could not revoke the session. Please try again.' }, 503, null, true, 'logout');
         }
     }
     if (response) {
         if (!response.ok && ![401, 403, 404].includes (response.status)) {
-            return AuthResponse ({ error : 'Could not revoke the session. Please try signing out again.' }, 503, null, true);
+            return AuthResponse ({ error : 'Could not revoke the session. Please try signing out again.' }, 503, null, true, 'logout');
         }
     }
-    return AuthResponse ({ user : null }, 200, null, true);
+    return AuthResponse ({ user : null }, 200, null, true, 'logout');
 }
 
 export async function onRequest (context)
@@ -83,11 +84,13 @@ export async function onRequest (context)
         if (path[0] === 'session') { return await Session (context); }
         if (path[0] === 'login') { return await Login (context); }
         if (path[0] === 'logout') { return await Logout (context); }
-        const token = AuthCookies (context.request)[RefreshCookie];
+        const cookies = AuthCookies (context.request);
+        if (cookies[LoggedOutCookie]) { return AuthResponse ({ error : 'Sign in again.' }, 401, null, true); }
+        const token = cookies[RefreshCookie];
         if (!token) { return AuthResponse ({ error : 'Sign in again.' }, 401, null, true); }
         return await Exchange (context, 'refresh_token', { refresh_token : token });
     } catch (error) {
         const message = [400, 413].includes (error.status) ? error.message : error.status === 401 ? 'Your session has expired. Sign in again.' : 'Sign-in service is unavailable. Try again.';
-        return AuthResponse ({ error : message }, error.status || 503, null, path[0] === 'logout');
+        return AuthResponse ({ error : message }, error.status || 503, null, path[0] === 'logout', path[0] === 'logout' ? 'logout' : null);
     }
 }

@@ -5,6 +5,7 @@ import { AuthService } from '../source/website/authservice.js';
 import { CreateAgentCommands } from '../source/website/agentcommands.js';
 
 const env = { SUPABASE_URL : 'https://configured.supabase.co', SUPABASE_SECRET_KEY : 'sb_secret_test_only' };
+const access = 'header.' + Buffer.from (JSON.stringify ({ session_id : '12345678-1234-1234-1234-123456789abc' })).toString ('base64url') + '.signature';
 const user = { id : 'verified-user', email : 'member@example.com' };
 function context (action, options = {})
 {
@@ -33,13 +34,14 @@ describe ('Temporary account authentication', () => {
         global.fetch = async (url, options) => {
             calls.push ({ url, options });
             assert.equal (options.headers.apikey, env.SUPABASE_SECRET_KEY);
-            return url.endsWith ('/user') ? Response.json ({ ...user, user_metadata : { role : 'admin' } }) : Response.json ({ access_token : 'user-access', refresh_token : 'user-refresh' });
+            if (url.includes ('auto3d_session_active')) { return Response.json (true); }
+            return url.endsWith ('/user') ? Response.json ({ ...user, user_metadata : { role : 'admin' } }) : Response.json ({ access_token : access, refresh_token : 'user-refresh' });
         };
         const response = await onRequest (context ('login', { body : JSON.stringify ({ email : user.email, password : 'provided-password' }) }));
         assert.equal (response.status, 200);
         assert.deepEqual (await response.json (), { user });
         assert.equal (calls[0].url, env.SUPABASE_URL + '/auth/v1/token?grant_type=password');
-        assert.equal (calls[1].options.headers.Authorization, 'Bearer user-access');
+        assert.equal (calls[1].options.headers.Authorization, 'Bearer ' + access);
         for (const cookie of response.headers.getSetCookie ()) { assert.match (cookie, /HttpOnly; Secure; SameSite=Strict/); assert.match (cookie, /Path=\//); }
         assert.equal (response.headers.get ('Cache-Control'), 'private, no-store');
     });
@@ -62,8 +64,9 @@ describe ('Temporary account authentication', () => {
         global.fetch = async (url, options) => {
             if (url.includes ('grant_type=refresh_token')) {
                 assert.deepEqual (JSON.parse (options.body), { refresh_token : 'old-refresh' });
-                return Response.json ({ access_token : 'new-access', refresh_token : 'new-refresh' });
+                return Response.json ({ access_token : access, refresh_token : 'new-refresh' });
             }
+            if (url.includes ('auto3d_session_active')) { return Response.json (true); }
             return Response.json (user);
         };
         const response = await onRequest (context ('refresh', { headers : { Cookie : RefreshCookie + '=old-refresh' } }));
@@ -75,8 +78,8 @@ describe ('Temporary account authentication', () => {
         global.fetch = async () => new Response ('', { status : 401 });
         for (const action of ['refresh', 'logout']) {
             const response = await onRequest (context (action, { headers : { Cookie : AccessCookie + '=old; ' + RefreshCookie + '=expired' } }));
-            assert.equal (response.headers.getSetCookie ().length, 2);
-            response.headers.getSetCookie ().forEach ((cookie) => assert.match (cookie, /Max-Age=0/));
+            assert.equal (response.headers.getSetCookie ().length, action === 'logout' ? 3 : 2);
+            response.headers.getSetCookie ().filter ((cookie) => !cookie.startsWith ('__Host-auto3d-logged-out')).forEach ((cookie) => assert.match (cookie, /Max-Age=0/));
         }
     });
 
@@ -85,7 +88,7 @@ describe ('Temporary account authentication', () => {
         const response = await onRequest (context ('logout', { headers : { Cookie : AccessCookie + '=old' } }));
         assert.equal (response.status, 503);
         assert.equal ((await response.text ()).includes (env.SUPABASE_SECRET_KEY), false);
-        assert.equal (response.headers.getSetCookie ().length, 2);
+        assert.equal (response.headers.getSetCookie ().length, 3);
     });
 
     it ('revokes a refresh session even when its access token has expired', async () => {
@@ -99,7 +102,7 @@ describe ('Temporary account authentication', () => {
         assert.equal (response.status, 200);
         assert.equal (paths.length, 3);
         assert.ok (paths[1].includes ('grant_type=refresh_token'));
-        assert.equal (response.headers.getSetCookie ().length, 2);
+        assert.equal (response.headers.getSetCookie ().length, 3);
     });
 
     it ('restores a session through refresh without storing tokens in AuthService', async () => {
@@ -125,7 +128,7 @@ describe ('Temporary account authentication', () => {
         assert.equal ((await registry.Execute ('auth.sign_out', {})).ok, true);
         assert.equal (auth.user, null);
         const readOnly = CreateAgentCommands ({ sessionEditor : { readOnly : true }, auth });
-        assert.equal ((await readOnly.Execute ('auth.sign_out', {})).ok, false);
+        assert.equal ((await readOnly.Execute ('auth.sign_out', {})).ok, true);
     });
 
     it ('serializes startup restore before a new sign-in so stale identity cannot replace it', async () => {

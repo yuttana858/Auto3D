@@ -16,8 +16,8 @@ try {
             if (path.endsWith ('logout')) { user = null; }
             await route.fulfill ({ json : { user } });
         });
-        await page.goto (process.env.AUTO3D_TEST_URL || 'http://127.0.0.1:8080/website/index.html');
-        const splash = page.locator ('#startup_splash'); const form = splash.locator ('form');
+        await page.goto (process.env.AUTO3D_TEST_URL || 'http://127.0.0.1:8080/website/index.html', { waitUntil : 'domcontentloaded' });
+        const splash = page.locator ('#auth_gate'); const form = splash.locator ('form');
         await form.waitFor ({ state : 'visible' });
         await form.getByLabel ('Email', { exact : true }).fill ('member@example.com');
         await form.getByLabel ('Password', { exact : true }).fill ('browser-test-password');
@@ -26,16 +26,15 @@ try {
         assert.equal (await form.getByLabel ('Password', { exact : true }).inputValue (), '');
         await form.getByLabel ('Password', { exact : true }).fill ('browser-test-password');
         await form.getByRole ('button', { name : 'Sign in', exact : true }).click ();
-        await splash.getByRole ('button', { name : 'Continue to workspace', exact : true }).click ();
-        await splash.waitFor ({ state : 'detached' });
+        await splash.waitFor ({ state : 'hidden' });
         assert.equal ((await page.evaluate (() => window.Auto3D.execute ('auth.inspect', {}))).result.signedIn, true);
         assert.equal (await page.evaluate (() => JSON.stringify ({ ...localStorage }).includes ('browser-test-password')), false);
         await page.getByRole ('button', { name : 'Account', exact : true }).click ();
         const dialog = page.getByRole ('dialog', { name : 'Auto3D account' });
         await dialog.getByRole ('button', { name : 'Sign out', exact : true }).click ();
-        await dialog.getByRole ('button', { name : 'Sign in', exact : true }).waitFor ();
+        await splash.waitFor ({ state : 'visible' });
         assert.equal ((await page.evaluate (() => window.Auto3D.execute ('auth.inspect', {}))).result.signedIn, false);
-        await dialog.getByRole ('button', { name : 'Continue without signing in', exact : true }).click ();
+        assert.equal (await page.getByRole ('button', { name : 'Continue without signing in', exact : true }).count (), 0);
         assert.deepEqual (errors, []);
         await page.close ();
         console.log ('Account UI passed at ' + viewport.width + 'px');
