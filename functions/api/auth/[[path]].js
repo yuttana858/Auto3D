@@ -200,8 +200,64 @@ async function requestAccess (context)
     return json ({ ok : true }, 201);
 }
 
-function logout ()
+async function changePassword (context)
 {
+    const cookies = cookieMap (context.request);
+    const access = cookies[AccessCookie] || '';
+    const authUser = await userFromToken (context.env, access);
+    if (!authUser) { return json ({ error : 'Sign in required.' }, 401); }
+
+    let body;
+    try { body = await context.request.json (); } catch { return json ({ error : 'Invalid password request.' }, 400); }
+    const password = String (body.password || '');
+    if (password.length < 12) { return json ({ error : 'Password must be at least 12 characters.' }, 400); }
+
+    const response = await authFetch (context.env, '/auth/v1/user', {
+        method : 'PUT',
+        headers : { Authorization : 'Bearer ' + access },
+        body : JSON.stringify ({ password })
+    });
+    if (!response.ok) {
+        const detail = await response.json ().catch (() => ({}));
+        return json ({ error : detail.msg || detail.message || 'Unable to change password.' }, response.status);
+    }
+
+    const { url, secret } = config (context.env);
+    if (secret) {
+        const profileResponse = await fetch (url + '/rest/v1/auto3d_users?select=id&auth_user_id=eq.' + encodeURIComponent (authUser.id) + '&limit=1', {
+            headers : { apikey : secret, Authorization : 'Bearer ' + secret }
+        });
+        if (profileResponse.ok) {
+            const rows = await profileResponse.json ();
+            if (rows[0]) {
+                await fetch (url + '/rest/v1/auto3d_audit_events', {
+                    method : 'POST',
+                    headers : { apikey : secret, Authorization : 'Bearer ' + secret, 'Content-Type' : 'application/json', Prefer : 'return=minimal' },
+                    body : JSON.stringify ({
+                        actor_user_id : rows[0].id,
+                        action : 'USER_PASSWORD_CHANGE',
+                        resource_type : 'user',
+                        resource_id : rows[0].id,
+                        metadata : {}
+                    })
+                });
+            }
+        }
+    }
+    return json ({ ok : true });
+}
+
+async function logout (context)
+{
+    const cookies = cookieMap (context.request);
+    const access = cookies[AccessCookie] || '';
+    if (access) {
+        await authFetch (context.env, '/auth/v1/logout', {
+            method : 'POST',
+            headers : { Authorization : 'Bearer ' + access },
+            body : '{}'
+        }).catch (() => {});
+    }
     const headers = new Headers ();
     headers.append ('Set-Cookie', cookie (AccessCookie, '', 0));
     headers.append ('Set-Cookie', cookie (RefreshCookie, '', 0));
@@ -214,7 +270,8 @@ export async function onRequest (context)
     const action = String (path[0] || '');
     if (context.request.method === 'GET' && action === 'session') { return session (context); }
     if (context.request.method === 'POST' && action === 'login') { return login (context); }
-    if (context.request.method === 'POST' && action === 'logout') { return logout (); }
+    if (context.request.method === 'POST' && action === 'logout') { return logout (context); }
+    if (context.request.method === 'POST' && action === 'change-password') { return changePassword (context); }
     if (context.request.method === 'POST' && action === 'request') { return requestAccess (context); }
     return json ({ error : 'Not found.' }, 404);
 }
