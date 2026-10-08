@@ -149,13 +149,28 @@ export function StartWelcomeSequence (authService)
     main.inert = true; header.inert = true;
 
     const identity = splash.querySelector ('.splash_identity');
-    const login = document.createElement ('div'); login.className = 'splash_login'; login.setAttribute ('aria-label', 'Auto3D sign in');
+    const login = document.createElement ('form'); login.className = 'splash_login'; login.setAttribute ('aria-label', 'Auto3D sign in');
     const message = document.createElement ('p'); message.className = 'splash_login_message'; message.textContent = 'Sign in to access your Library, saved sessions and shared models.';
+    const email = document.createElement ('input'); email.type = 'email'; email.autocomplete = 'username'; email.placeholder = 'Email'; email.required = true; email.setAttribute ('aria-label', 'Email');
+    const password = document.createElement ('input'); password.type = 'password'; password.autocomplete = 'current-password'; password.placeholder = 'Password'; password.required = true; password.setAttribute ('aria-label', 'Password');
+    const fields = document.createElement ('div'); fields.className = 'splash_login_fields'; fields.append (email, password);
     const actions = document.createElement ('div'); actions.className = 'splash_login_actions';
-    const signIn = document.createElement ('button'); signIn.className = 'splash_signin'; signIn.textContent = 'Sign in';
-    const guest = document.createElement ('button'); guest.className = 'splash_guest'; guest.textContent = 'Continue as guest';
+    const signIn = document.createElement ('button'); signIn.className = 'splash_signin'; signIn.type = 'submit'; signIn.textContent = 'Sign in';
+    const request = document.createElement ('button'); request.className = 'splash_request'; request.type = 'button'; request.textContent = 'Request access';
+    const guest = document.createElement ('button'); guest.className = 'splash_guest'; guest.type = 'button'; guest.textContent = 'Continue as guest';
     const status = document.createElement ('span'); status.className = 'splash_login_status'; status.setAttribute ('role', 'status');
-    actions.append (signIn, guest); login.append (message, actions, status); identity.appendChild (login);
+    actions.append (signIn, request, guest); login.append (message, fields, actions, status); identity.appendChild (login);
+
+    const requestPanel = document.createElement ('div'); requestPanel.className = 'splash_request_panel';
+    const requestName = document.createElement ('input'); requestName.placeholder = 'Name'; requestName.autocomplete = 'name';
+    const requestEmail = document.createElement ('input'); requestEmail.type = 'email'; requestEmail.placeholder = 'Work email'; requestEmail.autocomplete = 'email';
+    const requestOrg = document.createElement ('input'); requestOrg.placeholder = 'Organization / team';
+    const requestMessage = document.createElement ('textarea'); requestMessage.placeholder = 'Optional note'; requestMessage.rows = 2;
+    const submitRequest = document.createElement ('button'); submitRequest.type = 'button'; submitRequest.className = 'splash_signin'; submitRequest.textContent = 'Submit request';
+    const cancelRequest = document.createElement ('button'); cancelRequest.type = 'button'; cancelRequest.className = 'splash_guest'; cancelRequest.textContent = 'Back';
+    const requestActions = document.createElement ('div'); requestActions.className = 'splash_login_actions'; requestActions.append (submitRequest, cancelRequest);
+    requestPanel.append (requestName, requestEmail, requestOrg, requestMessage, requestActions);
+    login.appendChild (requestPanel);
 
     let finished = false;
     const finish = async (tour = false, greetUser = true) => {
@@ -172,12 +187,45 @@ export function StartWelcomeSequence (authService)
         greet ();
     };
 
-    const beginSignIn = () => {
-        status.textContent = 'Opening secure sign in…';
-        signIn.disabled = true; guest.disabled = true;
-        authService?.SignIn (window.location.href);
-    };
-    signIn.addEventListener ('click', beginSignIn);
+    login.addEventListener ('submit', async (event) => {
+        event.preventDefault ();
+        status.textContent = 'Signing in…'; signIn.disabled = true;
+        try {
+            const user = await authService.SignIn (email.value.trim (), password.value);
+            message.textContent = 'Signed in as ' + (user.displayName || user.email) + '.';
+            status.textContent = ''; fields.hidden = true; request.hidden = true; guest.hidden = true;
+            signIn.textContent = 'Continue'; signIn.disabled = false;
+            login.onsubmit = null;
+            login.addEventListener ('submit', (continueEvent) => { continueEvent.preventDefault (); finish (false, false); }, { once : true });
+        } catch (error) {
+            status.textContent = error.message; signIn.disabled = false;
+        }
+    });
+
+    request.addEventListener ('click', () => {
+        requestPanel.classList.add ('visible'); fields.hidden = true; actions.hidden = true; status.textContent = '';
+        requestEmail.value = email.value.trim ();
+    });
+    cancelRequest.addEventListener ('click', () => {
+        requestPanel.classList.remove ('visible'); fields.hidden = false; actions.hidden = false; status.textContent = '';
+    });
+    submitRequest.addEventListener ('click', async () => {
+        submitRequest.disabled = true; status.textContent = 'Submitting request…';
+        try {
+            await authService.RequestAccess ({
+                displayName : requestName.value.trim (),
+                email : requestEmail.value.trim (),
+                organizationName : requestOrg.value.trim (),
+                message : requestMessage.value.trim ()
+            });
+            requestPanel.classList.remove ('visible'); message.textContent = 'Request submitted. An administrator will review your access request.';
+            status.textContent = ''; fields.hidden = true; actions.hidden = false; signIn.hidden = true; request.hidden = true;
+        } catch (error) {
+            status.textContent = error.message;
+        } finally {
+            submitRequest.disabled = false;
+        }
+    });
     guest.addEventListener ('click', () => finish (false, false));
 
     const tour = document.createElement ('button'); tour.className = 'splash_tour'; tour.textContent = 'Take a tour →';
@@ -187,13 +235,9 @@ export function StartWelcomeSequence (authService)
 
     Promise.resolve (authService?.Initialize?.()).then ((user) => {
         if (!user || finished) { return; }
-        const name = user.displayName || user.name || user.email || 'your account';
-        message.textContent = 'Signed in as ' + name + '.';
+        message.textContent = 'Signed in as ' + (user.displayName || user.email || 'your account') + '.';
+        fields.hidden = true; request.hidden = true; guest.hidden = true;
         signIn.textContent = 'Continue';
-        signIn.disabled = false; guest.hidden = true;
-        signIn.removeEventListener ('click', beginSignIn);
-        signIn.addEventListener ('click', () => finish (false, false), { once : true });
-    }).catch (() => {
-        status.textContent = '';
-    });
+        login.addEventListener ('submit', (event) => { event.preventDefault (); finish (false, false); }, { once : true });
+    }).catch (() => { status.textContent = ''; });
 }
