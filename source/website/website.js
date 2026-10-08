@@ -359,7 +359,7 @@ export class Website
 
     OnModelClicked (button, mouseCoordinates)
     {
-        if (this.sessionEditor.controls.axis !== null || this.sessionEditor.controls.dragging) { return; }
+        if (this.sessionEditor.busy || this.sessionEditor.controls.axis !== null || this.sessionEditor.controls.dragging) { return; }
         if (button !== 1) {
             return;
         }
@@ -1113,7 +1113,8 @@ export class Website
                 this.sidebar.AddObject3DProperties (this.model, this.model);
             },
             onMeshSelected : (meshInstanceId) => {
-                let meshInstance = this.model.GetMeshInstance (meshInstanceId);
+                const meshInstance = this.model?.GetMeshInstance (meshInstanceId);
+                if (!meshInstance) { return; }
                 this.sidebar.AddObject3DProperties (this.model, meshInstance);
             },
             onMaterialSelected : (materialIndex) => {

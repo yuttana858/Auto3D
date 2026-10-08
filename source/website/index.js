@@ -91,7 +91,7 @@ export function StartWebsite ()
         website.accountAdmin = new AccountAdmin (website.auth);
         website.authPanel = new AuthPanel (website.auth, website.accountAdmin);
         let adminLinkOpened = false;
-        website.auth.Subscribe ((user) => { if (user && !adminLinkOpened && new URLSearchParams (window.location.search).get ('admin') === 'accounts') { adminLinkOpened = true; website.accountAdmin.Open ().catch (() => {}); } });
+        website.auth.Subscribe ((user) => { if (user && !adminLinkOpened && new URLSearchParams (window.location.search).get ('admin') === 'accounts') { adminLinkOpened = true; website.accountAdmin.Open ().catch ((error) => website.sessionEditor.Status (error.message)); } });
         const refreshAccount = () => { if (document.visibilityState === 'visible') { website.auth.Restore ().catch (() => {}); } };
         document.addEventListener ('visibilitychange', refreshAccount);
         window.setInterval (refreshAccount, 240000);

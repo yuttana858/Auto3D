@@ -35,6 +35,7 @@ export class SidebarDetailsPanel extends SidebarPanel
     AddObject3DProperties (model, object3D)
     {
         this.Clear ();
+        if (!model || !object3D) { return; }
         let table = AddDiv (this.contentDiv, 'ov_property_table');
         if (this.modelFormat !== null) {
             this.AddProperty (table, new Property (PropertyType.Text, Loc ('Format'), this.modelFormat));

@@ -22,3 +22,17 @@ export function SupabaseHeaders (key)
     if (!key.startsWith ('sb_secret_')) { headers.Authorization = 'Bearer ' + key; }
     return headers;
 }
+
+export function RequireServerKey (key)
+{
+    let privileged = key.startsWith ('sb_secret_');
+    if (!privileged) {
+        try {
+            const payload = key.split ('.')[1].replace (/-/g, '+').replace (/_/g, '/');
+            privileged = JSON.parse (atob (payload)).role === 'service_role';
+        } catch { /* Not a service-role JWT. */ }
+    }
+    if (!privileged) {
+        throw Object.assign (new Error ('Account administration requires a Supabase secret or service_role key in the server configuration.'), { status : 503, code : 'SUPABASE_SERVER_KEY_REQUIRED' });
+    }
+}

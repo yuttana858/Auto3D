@@ -1056,12 +1056,12 @@ export class SessionEditor
     }
     KeyDown (event)
     {
-        if (this.readOnly) { return; }
+        if (this.readOnly || typeof event.key !== 'string') { return; }
         const modified = event.ctrlKey || event.metaKey; const key = event.key.toLowerCase ();
         const target = event.target;
-        const textEditing = target.closest ('textarea, [contenteditable="true"]') || (target.matches?.('input') && ['text', 'search', 'email', 'url', 'password', 'number'].includes (target.type));
+        const textEditing = target.closest?.('textarea, [contenteditable="true"]') || (target.matches?.('input') && ['text', 'search', 'email', 'url', 'password', 'number'].includes (target.type));
         if (this.busy || (textEditing && !(modified && key === 'z' && !target.matches?.(':focus')))) { return; }
-        if (target.closest ('dialog') && !(modified && key === 'z')) { return; }
+        if (target.closest?.('dialog') && !(modified && key === 'z')) { return; }
         let action = null;
         if (modified && key === 's') { action = () => this.library.SaveDialog (true); } else if (modified && key === 'd') { action = () => this.Duplicate (); } else if (modified && key === 'z') { action = () => event.shiftKey ? this.Redo () : this.Undo (); }
         else if (!modified && !event.altKey) { action = ({ v : () => this.SetMode ('select'), w : () => this.SetMode ('translate'), e : () => this.SetMode ('rotate'), r : () => this.SetMode ('scale'), f : () => this.Focus (), h : () => this.ToggleVisibility (), delete : () => this.Delete () })[key]; }

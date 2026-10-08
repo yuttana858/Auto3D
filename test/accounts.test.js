@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { onRequest } from '../functions/api/accounts/[[path]].js';
+import { RequireServerKey } from '../functions/_lib/supabase.js';
 import { AccessCookie } from '../functions/_lib/auth.js';
 import { CreateAgentCommands } from '../source/website/agentcommands.js';
 const env = { SUPABASE_URL : 'https://configured.supabase.co', SUPABASE_SECRET_KEY : 'sb_secret_test_only' };
@@ -10,6 +11,13 @@ const context = (action, body, headers = {}) => ({ env, params : { path : [actio
 describe ('Account requests and administration', () => {
     let originalFetch;
     beforeEach (() => { originalFetch = global.fetch; }); afterEach (() => { global.fetch = originalFetch; });
+    it ('rejects anon/publishable server keys without weakening database permissions', () => {
+        const token = (role) => 'header.' + Buffer.from (JSON.stringify ({ role })).toString ('base64url') + '.signature';
+        assert.throws (() => RequireServerKey (token ('anon')), /secret or service_role/);
+        assert.throws (() => RequireServerKey ('sb_publishable_example'), /secret or service_role/);
+        assert.doesNotThrow (() => RequireServerKey (token ('service_role')));
+        assert.doesNotThrow (() => RequireServerKey ('sb_secret_example'));
+    });
     it ('rejects foreign origins and password-bearing account requests without provider calls', async () => {
         global.fetch = async () => { throw new Error ('unexpected'); };
         assert.equal ((await onRequest (context ('request', {}, { Origin : 'https://evil.example' }))).status, 403);

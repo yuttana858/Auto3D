@@ -1,9 +1,10 @@
-import { SupabaseConfig, SupabaseHeaders } from './supabase.js';
+import { SupabaseConfig, SupabaseHeaders, RequireServerKey } from './supabase.js';
 import { AccessCookie, AuthCookies, AuthRequest } from './auth.js';
 
 export async function DatabaseRequest (env, path, options = {})
 {
     const { url, key } = SupabaseConfig (env);
+    RequireServerKey (key);
     let response;
     try { response = await fetch (url + '/rest/v1/' + path, { ...options, headers : { ...SupabaseHeaders (key), 'Content-Type' : 'application/json', ...options.headers }, signal : AbortSignal.timeout (10000) }); }
     catch { throw Object.assign (new Error ('Account service unavailable.'), { status : 503 }); }

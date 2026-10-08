@@ -1,3 +1,4 @@
+import { SidebarDetailsPanel } from '../source/website/sidebardetailspanel.js';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { SessionEditor } from '../source/website/sessioneditor.js';
@@ -32,6 +33,18 @@ describe ('Workspace operation feedback', () => {
         const { instance, messages } = editor (); instance.readOnly = true;
         await assert.rejects (() => instance.CreateArray (2, 1, 1), /cannot be edited/); instance.readOnly = false; instance.busy = true;
         await assert.rejects (() => instance.CreateArray (2, 1, 1), /cannot be edited/); assert.equal (messages.length, 0);
+    });
+    it ('ignores keyboard events without a key and handles a non-element target', () => {
+        const { instance } = editor ();
+        assert.doesNotThrow (() => instance.KeyDown ({ target : {} }));
+        assert.doesNotThrow (() => instance.KeyDown ({ key : 'Alt', target : {} }));
+    });
+    it ('clears stale details without enumerating a missing model or mesh', () => {
+        let cleared = 0;
+        const panel = { Clear : () => { cleared++; } };
+        assert.doesNotThrow (() => SidebarDetailsPanel.prototype.AddObject3DProperties.call (panel, {}, null));
+        assert.doesNotThrow (() => SidebarDetailsPanel.prototype.AddObject3DProperties.call (panel, null, {}));
+        assert.equal (cleared, 2);
     });
     it ('lists model formats plus archive/session formats in error guidance', () => {
         for (const extension of [...ModelExtensions, 'zip', 'auto3d']) { assert.ok (SupportedFormatsText.includes (extension.toUpperCase ())); }

@@ -39,5 +39,5 @@ export async function onRequest (context)
         if (!user?.id) { throw Object.assign (new Error ('Account service unavailable.'), { status : 503 }); }
         const updated = await DatabaseRequest (context.env, path + '&status=eq.processing&select=' + columns, { method : 'PATCH', headers : { Prefer : 'return=representation' }, body : JSON.stringify ({ status : 'approved', user_id : user.id }) });
         return AuthResponse ({ request : updated[0], message : 'Account created. Share the initial password through your secure process.' });
-    } catch (error) { return AuthResponse ({ error : [400, 401, 403, 413].includes (error.status) ? error.message : 'Account service unavailable. Refresh before retrying; administrators can reconcile processing requests in Supabase.' }, error.status || 503); }
+    } catch (error) { return AuthResponse ({ error : ([400, 401, 403, 413].includes (error.status) || error.code === 'SUPABASE_SERVER_KEY_REQUIRED') ? error.message : 'Account service unavailable. Refresh before retrying; administrators can reconcile processing requests in Supabase.' }, error.status || 503); }
 }
