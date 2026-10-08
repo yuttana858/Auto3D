@@ -194,6 +194,9 @@ async function createUser (context, actor, fromRequest = false)
     const organizationId = String (body.organizationId || '').trim ();
     const role = String (body.role || 'viewer');
     if (!/^\S+@\S+\.\S+$/.test (email)) { throw Object.assign (new Error ('Enter a valid email.'), { status : 400 }); }
+    if (!organizationId && (fromRequest || body.platformAdmin !== true)) {
+        throw Object.assign (new Error ('Select an organization and role for this user.'), { status : 400 });
+    }
 
     const password = String (body.password || '') || temporaryPassword ();
     if (password.length < 12) { throw Object.assign (new Error ('Temporary password must be at least 12 characters.'), { status : 400 }); }
