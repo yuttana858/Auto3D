@@ -1,12 +1,19 @@
 const DefaultSupabaseUrl = 'https://iesepcoxqochycckbwoh.supabase.co';
 const DefaultPublishableKey = 'sb_publishable_CmRJpuYE32OBF9rIV1jwqQ_diMF7OXh';
 const AccessCookie = 'auto3d_access';
+const Roles = new Set (['owner', 'admin', 'editor', 'viewer']);
+const UserStatuses = new Set (['active', 'disabled']);
 
 function json (data, status = 200)
 {
     return new Response (JSON.stringify (data), {
         status,
-        headers : { 'Content-Type' : 'application/json', 'Cache-Control' : 'no-store', 'X-Content-Type-Options' : 'nosniff', 'X-Robots-Tag' : 'noindex, nofollow, noarchive' }
+        headers : {
+            'Content-Type' : 'application/json',
+            'Cache-Control' : 'no-store',
+            'X-Content-Type-Options' : 'nosniff',
+            'X-Robots-Tag' : 'noindex, nofollow, noarchive'
+        }
     });
 }
 
@@ -53,7 +60,9 @@ async function requireAdmin (context)
     const response = await request (context.env, '/rest/v1/auto3d_users?select=id,email,display_name,status,is_platform_admin&auth_user_id=eq.' + encodeURIComponent (authUser.id) + '&limit=1');
     const rows = await response.json ();
     const admin = rows[0];
-    if (!admin || admin.status !== 'active' || admin.is_platform_admin !== true) { throw Object.assign (new Error ('Administrator access required.'), { status : 403 }); }
+    if (!admin || admin.status !== 'active' || admin.is_platform_admin !== true) {
+        throw Object.assign (new Error ('Administrator access required.'), { status : 403 });
+    }
     return admin;
 }
 
@@ -64,22 +73,43 @@ function temporaryPassword ()
     return Array.from (bytes, (value) => alphabet[value % alphabet.length]).join ('');
 }
 
+function slugify (value)
+{
+    const base = String (value || '').trim ().toLowerCase ()
+        .normalize ('NFKD').replace (/[^a-z0-9]+/g, '-').replace (/^-+|-+$/g, '').slice (0, 60);
+    return base.length >= 3 ? base : 'org-' + crypto.randomUUID ().slice (0, 8);
+}
+
 async function audit (env, actor, action, resourceType, resourceId, metadata = {})
 {
     await request (env, '/rest/v1/auto3d_audit_events', {
         method : 'POST',
         headers : { Prefer : 'return=minimal' },
-        body : JSON.stringify ({ actor_user_id : actor.id, action, resource_type : resourceType, resource_id : resourceId, metadata })
+        body : JSON.stringify ({
+            actor_user_id : actor.id,
+            action,
+            resource_type : resourceType,
+            resource_id : resourceId,
+            metadata
+        })
     });
 }
 
 async function list (context, actor)
 {
-    const [requestsResponse, usersResponse] = await Promise.all ([
+    const [requestsResponse, usersResponse, orgsResponse, membersResponse] = await Promise.all ([
         request (context.env, '/rest/v1/auto3d_account_requests?select=*&order=created_at.desc&limit=250'),
-        request (context.env, '/rest/v1/auto3d_users?select=id,email,display_name,status,is_platform_admin,created_at,updated_at&order=created_at.desc&limit=500')
+        request (context.env, '/rest/v1/auto3d_users?select=id,email,display_name,status,is_platform_admin,created_at,updated_at&order=created_at.desc&limit=500'),
+        request (context.env, '/rest/v1/auto3d_organizations?select=id,name,slug,status,storage_quota_bytes,created_at&order=name.asc&limit=250'),
+        request (context.env, '/rest/v1/auto3d_organization_members?select=organization_id,user_id,role,status,joined_at&limit=2000')
     ]);
-    return json ({ admin : actor, requests : await requestsResponse.json (), users : await usersResponse.json () });
+    return json ({
+        admin : actor,
+        requests : await requestsResponse.json (),
+        users : await usersResponse.json (),
+        organizations : await orgsResponse.json (),
+        memberships : await membersResponse.json ()
+    });
 }
 
 async function createAuthUser (env, email, displayName, password)
@@ -88,11 +118,18 @@ async function createAuthUser (env, email, displayName, password)
     const response = await fetch (url + '/auth/v1/admin/users', {
         method : 'POST',
         headers : { apikey : secret, Authorization : 'Bearer ' + secret, 'Content-Type' : 'application/json' },
-        body : JSON.stringify ({ email, password, email_confirm : true, user_metadata : { display_name : displayName || email } })
+        body : JSON.stringify ({
+            email,
+            password,
+            email_confirm : true,
+            user_metadata : { display_name : displayName || email }
+        })
     });
     const data = await response.json ().catch (() => ({}));
-    if (!response.ok) { throw Object.assign (new Error (data.msg || data.message || 'Unable to create authentication user.'), { status : response.status }); }
-    return data;
+    if (!response.ok) {
+        throw Object.assign (new Error (data.msg || data.message || 'Unable to create authentication user.'), { status : response.status });
+    }
+    return data.user || data;
 }
 
 async function createUserRecord (env, authUser, displayName, isAdmin = false)
@@ -100,7 +137,48 @@ async function createUserRecord (env, authUser, displayName, isAdmin = false)
     const response = await request (env, '/rest/v1/auto3d_users', {
         method : 'POST',
         headers : { Prefer : 'return=representation' },
-        body : JSON.stringify ({ auth_user_id : authUser.id, email : authUser.email, display_name : displayName || authUser.email, status : 'active', is_platform_admin : isAdmin })
+        body : JSON.stringify ({
+            auth_user_id : authUser.id,
+            email : String (authUser.email || '').toLowerCase (),
+            display_name : displayName || authUser.email,
+            status : 'active',
+            is_platform_admin : isAdmin
+        })
+    });
+    const user = (await response.json ())[0];
+    await request (env, '/rest/v1/auto3d_user_identities', {
+        method : 'POST',
+        headers : { Prefer : 'return=minimal' },
+        body : JSON.stringify ({
+            user_id : user.id,
+            provider : 'supabase',
+            provider_tenant_id : '',
+            provider_subject_id : authUser.id,
+            provider_email : authUser.email
+        })
+    });
+    return user;
+}
+
+async function setMembership (env, userId, organizationId, role)
+{
+    if (!organizationId) { return null; }
+    if (!Roles.has (role)) { throw Object.assign (new Error ('Invalid organization role.'), { status : 400 }); }
+    const orgResponse = await request (env, '/rest/v1/auto3d_organizations?select=id,name,status&id=eq.' + encodeURIComponent (organizationId) + '&limit=1');
+    const orgs = await orgResponse.json ();
+    const organization = orgs[0];
+    if (!organization || organization.status !== 'active') {
+        throw Object.assign (new Error ('Organization is unavailable.'), { status : 400 });
+    }
+    const response = await request (env, '/rest/v1/auto3d_organization_members?on_conflict=organization_id,user_id', {
+        method : 'POST',
+        headers : { Prefer : 'resolution=merge-duplicates,return=representation' },
+        body : JSON.stringify ({
+            organization_id : organizationId,
+            user_id : userId,
+            role,
+            status : 'active'
+        })
     });
     return (await response.json ())[0];
 }
@@ -108,24 +186,50 @@ async function createUserRecord (env, authUser, displayName, isAdmin = false)
 async function createUser (context, actor, fromRequest = false)
 {
     let body;
-    try { body = await context.request.json (); } catch { throw Object.assign (new Error ('Invalid user request.'), { status : 400 }); }
+    try { body = await context.request.json (); } catch {
+        throw Object.assign (new Error ('Invalid user request.'), { status : 400 });
+    }
     const email = String (body.email || '').trim ().toLowerCase ();
     const displayName = String (body.displayName || '').trim ().slice (0, 120);
+    const organizationId = String (body.organizationId || '').trim ();
+    const role = String (body.role || 'viewer');
     if (!/^\S+@\S+\.\S+$/.test (email)) { throw Object.assign (new Error ('Enter a valid email.'), { status : 400 }); }
 
     const password = String (body.password || '') || temporaryPassword ();
     if (password.length < 12) { throw Object.assign (new Error ('Temporary password must be at least 12 characters.'), { status : 400 }); }
+
     const authUser = await createAuthUser (context.env, email, displayName, password);
-    const user = await createUserRecord (context.env, authUser, displayName, body.platformAdmin === true);
+    let user;
+    try {
+        user = await createUserRecord (context.env, authUser, displayName, body.platformAdmin === true);
+        await setMembership (context.env, user.id, organizationId, role);
+    } catch (error) {
+        const { url, secret } = config (context.env);
+        await fetch (url + '/auth/v1/admin/users/' + encodeURIComponent (authUser.id), {
+            method : 'DELETE',
+            headers : { apikey : secret, Authorization : 'Bearer ' + secret }
+        }).catch (() => {});
+        throw error;
+    }
 
     if (fromRequest && body.requestId) {
         await request (context.env, '/rest/v1/auto3d_account_requests?id=eq.' + encodeURIComponent (body.requestId), {
             method : 'PATCH',
             headers : { Prefer : 'return=minimal' },
-            body : JSON.stringify ({ status : 'approved', reviewed_by : actor.id, reviewed_at : new Date ().toISOString (), created_user_id : user.id })
+            body : JSON.stringify ({
+                status : 'approved',
+                reviewed_by : actor.id,
+                reviewed_at : new Date ().toISOString (),
+                created_user_id : user.id
+            })
         });
     }
-    await audit (context.env, actor, fromRequest ? 'USER_REQUEST_APPROVE' : 'USER_CREATE', 'user', user.id, { email : user.email });
+    await audit (context.env, actor, fromRequest ? 'USER_REQUEST_APPROVE' : 'USER_CREATE', 'user', user.id, {
+        email : user.email,
+        organizationId : organizationId || null,
+        role : organizationId ? role : null,
+        platformAdmin : body.platformAdmin === true
+    });
     return json ({ user, temporaryPassword : password }, 201);
 }
 
@@ -142,11 +246,85 @@ async function decline (context, actor)
     return json ({ ok : true });
 }
 
+async function createOrganization (context, actor)
+{
+    const body = await context.request.json ();
+    const name = String (body.name || '').trim ().slice (0, 120);
+    const slug = slugify (body.slug || name);
+    if (!name) { throw Object.assign (new Error ('Organization name is required.'), { status : 400 }); }
+    const response = await request (context.env, '/rest/v1/auto3d_organizations', {
+        method : 'POST',
+        headers : { Prefer : 'return=representation' },
+        body : JSON.stringify ({ name, slug })
+    });
+    const organization = (await response.json ())[0];
+    await audit (context.env, actor, 'ORGANIZATION_CREATE', 'organization', organization.id, { name, slug });
+    return json ({ organization }, 201);
+}
+
+async function updateUser (context, actor, id)
+{
+    const body = await context.request.json ();
+    const currentResponse = await request (context.env, '/rest/v1/auto3d_users?select=id,email,status,is_platform_admin&id=eq.' + encodeURIComponent (id) + '&limit=1');
+    const current = (await currentResponse.json ())[0];
+    if (!current) { throw Object.assign (new Error ('User not found.'), { status : 404 }); }
+
+    const patch = { updated_at : new Date ().toISOString () };
+    if (body.status !== undefined) {
+        const status = String (body.status);
+        if (!UserStatuses.has (status)) { throw Object.assign (new Error ('Invalid user status.'), { status : 400 }); }
+        if (id === actor.id && status !== 'active') { throw Object.assign (new Error ('You cannot disable your own administrator account.'), { status : 400 }); }
+        patch.status = status;
+    }
+    if (body.platformAdmin !== undefined) {
+        if (id === actor.id && body.platformAdmin !== true) { throw Object.assign (new Error ('You cannot remove your own platform-admin access.'), { status : 400 }); }
+        patch.is_platform_admin = body.platformAdmin === true;
+    }
+
+    await request (context.env, '/rest/v1/auto3d_users?id=eq.' + encodeURIComponent (id), {
+        method : 'PATCH',
+        headers : { Prefer : 'return=minimal' },
+        body : JSON.stringify (patch)
+    });
+    if (body.organizationId !== undefined) {
+        const organizationId = String (body.organizationId || '');
+        if (organizationId) {
+            await setMembership (context.env, id, organizationId, String (body.role || 'viewer'));
+        } else {
+            await request (context.env, '/rest/v1/auto3d_organization_members?user_id=eq.' + encodeURIComponent (id), {
+                method : 'DELETE',
+                headers : { Prefer : 'return=minimal' }
+            });
+        }
+    }
+    await audit (context.env, actor, 'USER_UPDATE', 'user', id, patch);
+    return json ({ ok : true });
+}
+
+async function resetPassword (context, actor, id)
+{
+    const response = await request (context.env, '/rest/v1/auto3d_users?select=id,auth_user_id,email&id=eq.' + encodeURIComponent (id) + '&limit=1');
+    const target = (await response.json ())[0];
+    if (!target || !target.auth_user_id) { throw Object.assign (new Error ('Authentication user not found.'), { status : 404 }); }
+    const password = temporaryPassword ();
+    const { url, secret } = config (context.env);
+    const authResponse = await fetch (url + '/auth/v1/admin/users/' + encodeURIComponent (target.auth_user_id), {
+        method : 'PUT',
+        headers : { apikey : secret, Authorization : 'Bearer ' + secret, 'Content-Type' : 'application/json' },
+        body : JSON.stringify ({ password })
+    });
+    if (!authResponse.ok) {
+        const detail = await authResponse.json ().catch (() => ({}));
+        throw Object.assign (new Error (detail.msg || detail.message || 'Unable to reset password.'), { status : authResponse.status });
+    }
+    await audit (context.env, actor, 'USER_PASSWORD_RESET', 'user', id, { email : target.email });
+    return json ({ temporaryPassword : password });
+}
+
 async function deleteUser (context, actor, id)
 {
-    const response = await request (context.env, '/rest/v1/auto3d_users?select=id,auth_user_id,email,is_platform_admin&id=eq.' + encodeURIComponent (id) + '&limit=1');
-    const rows = await response.json ();
-    const target = rows[0];
+    const response = await request (context.env, '/rest/v1/auto3d_users?select=id,auth_user_id,email&id=eq.' + encodeURIComponent (id) + '&limit=1');
+    const target = (await response.json ())[0];
     if (!target) { throw Object.assign (new Error ('User not found.'), { status : 404 }); }
     if (target.id === actor.id) { throw Object.assign (new Error ('You cannot delete your own administrator account.'), { status : 400 }); }
 
@@ -156,8 +334,14 @@ async function deleteUser (context, actor, id)
             method : 'DELETE',
             headers : { apikey : secret, Authorization : 'Bearer ' + secret }
         });
-        if (!authDelete.ok && authDelete.status !== 404) { throw Object.assign (new Error ('Unable to delete authentication user.'), { status : authDelete.status }); }
+        if (!authDelete.ok && authDelete.status !== 404) {
+            throw Object.assign (new Error ('Unable to delete authentication user.'), { status : authDelete.status });
+        }
     }
+    await request (context.env, '/rest/v1/auto3d_organization_members?user_id=eq.' + encodeURIComponent (id), {
+        method : 'DELETE',
+        headers : { Prefer : 'return=minimal' }
+    });
     await request (context.env, '/rest/v1/auto3d_users?id=eq.' + encodeURIComponent (id), {
         method : 'PATCH',
         headers : { Prefer : 'return=minimal' },
@@ -173,11 +357,16 @@ export async function onRequest (context)
         const actor = await requireAdmin (context);
         const path = context.params.path || [];
         const action = String (path[0] || '');
+        const id = String (path[1] || '');
+
         if (context.request.method === 'GET' && !action) { return list (context, actor); }
         if (context.request.method === 'POST' && action === 'approve') { return createUser (context, actor, true); }
         if (context.request.method === 'POST' && action === 'decline') { return decline (context, actor); }
-        if (context.request.method === 'POST' && action === 'users') { return createUser (context, actor, false); }
-        if (context.request.method === 'DELETE' && action === 'users' && path[1]) { return deleteUser (context, actor, String (path[1])); }
+        if (context.request.method === 'POST' && action === 'organizations') { return createOrganization (context, actor); }
+        if (context.request.method === 'POST' && action === 'users' && !id) { return createUser (context, actor, false); }
+        if (context.request.method === 'PATCH' && action === 'users' && id) { return updateUser (context, actor, id); }
+        if (context.request.method === 'POST' && action === 'users' && id && path[2] === 'reset-password') { return resetPassword (context, actor, id); }
+        if (context.request.method === 'DELETE' && action === 'users' && id) { return deleteUser (context, actor, id); }
         return json ({ error : 'Not found.' }, 404);
     } catch (error) {
         console.error (error);
