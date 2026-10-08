@@ -192,3 +192,7 @@ Before starting auth/R2 development, verify the latest feature branch, locate/co
 ## Model dimensions and context menu
 
 The viewer navigation dispatches right-clicks to one session menu; right-drag orbit suppresses the menu. Model Data W/L/H map to X/Z/Y and resize the selected object through `SessionEditor.SetObjectDisplayDimension`, shared with `object.dimension` and transform Size inputs. Declared source units convert to the global mm/inches preference; undeclared units remain explicit model units. Dimensions are positive lengths, preserve mirrored scale signs, support undo, and cannot expand a zero-width axis by scaling.
+
+Account requests and administrator approvals now use `AccountAdmin`, `/api/accounts/{request,admin,review}`, and the server-only `auto3d_access_requests`/`auto3d_admin_emails` tables. See `docs/temporary-auth.md` for first-admin setup, the applied schema, approval reconciliation, and agent commands. The compact seven-action model context menu is retained through the single navigation dispatch.
+
+Model imports display upload/opening/preparation progress, with a shared supported-format list in `importformats.js` used by upload hints and failure dialogs. Array creation announces work before geometry processing, reports completed copy counts, yields between copies, and rolls back partial duplication on failure. The UI and `object.array` use the same `CreateArray` implementation.

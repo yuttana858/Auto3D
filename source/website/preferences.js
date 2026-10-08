@@ -59,6 +59,10 @@ export class Preferences
     {
         const dialog = WorkspaceDialog ('Preferences');
         const form = document.createElement ('div'); form.className = 'workspace_save_form';
+        const adminArea = document.createElement ('section'); form.appendChild (adminArea);
+        const adminLink = document.createElement ('a'); adminLink.href = '?admin=accounts'; adminLink.textContent = 'Account administration — requests and approvals';
+        adminLink.addEventListener ('click', async (event) => { event.preventDefault (); try { await this.website.accountAdmin.Open (); dialog.close (); } catch (error) { adminLink.textContent = error.message; } });
+        this.website.accountAdmin?.Refresh ().then ((data) => { if (data.isAdmin && dialog.isConnected) { const title = document.createElement ('strong'); title.textContent = 'Administrator'; adminArea.append (title, document.createElement ('br'), adminLink); } }).catch (() => {});
         const appearance = document.createElement ('label'); appearance.textContent = 'Appearance';
         const theme = document.createElement ('select'); theme.setAttribute ('aria-label', 'Appearance'); theme.add (new Option ('Light', String (Theme.Light))); theme.add (new Option ('Dark', String (Theme.Dark))); theme.value = String (this.website.settings.themeId);
         theme.addEventListener ('change', () => this.website.SwitchTheme (Number (theme.value), true)); appearance.appendChild (theme);

@@ -14,3 +14,7 @@
 .startup_splash .splash_identity { box-sizing: border-box; max-height: 100%; }
 .startup_splash .splash_tour { z-index: 1; }
 @media (max-height: 650px) { .startup_splash { display: block; } .splash_identity { padding: 18px; } .splash_logo { width: min(280px, 65vw); } .splash_identity p { margin: 12px 0; } .startup_splash .splash_tour { position: relative; left: auto; bottom: auto; margin: 12px 18px; } }
+.account_request_row { border-bottom: 1px solid var(--ov_border_color); padding: 14px 0; display: grid; gap: 8px; }
+.account_request_row label { display: grid; gap: 6px; }
+.account_request_row p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.account_request_list { max-height: 60vh; overflow: auto; }

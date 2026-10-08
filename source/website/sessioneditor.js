@@ -896,13 +896,14 @@ export class SessionEditor
             if (counts.some ((value) => !Number.isInteger (value) || value < 1 || value > 20)) { status.textContent = 'Each count must be an integer from 1 to 20.'; return; }
             const total = counts[0] * counts[1] * counts[2];
             if (this.document.objects.length + total - 1 > 1000) { status.textContent = 'This array would exceed the 1,000-object session limit.'; return; }
-            create.disabled = true;
+            create.disabled = true; status.textContent = 'Creating an array…';
             try { await this.CreateArray (...counts); dialog.close (); } catch (error) { status.textContent = error.message; create.disabled = false; }
         });
     }
 
     async CreateArray (widthCount, lengthCount, heightCount)
     {
+        if (this.readOnly || this.busy) { throw new Error ('The session cannot be edited right now.'); }
         const source = this.selected;
         if (!source?.threeObject) { throw new Error ('Select a model first.'); }
         const counts = [widthCount, lengthCount, heightCount];
@@ -911,31 +912,44 @@ export class SessionEditor
         if (this.document.objects.length + total - 1 > 1000) { throw new Error ('Array exceeds the 1,000-object session limit.'); }
         if (total === 1) { this.Status ('Array is 1 × 1 × 1; no copies created.'); return []; }
 
-        const box = new THREE.Box3 ().setFromObject (source.threeObject, true);
-        const size = box.getSize (new THREE.Vector3 ());
         const added = [];
         const firstIndex = this.document.objects.length;
-        for (let h = 0; h < heightCount; h++) {
-            for (let l = 0; l < lengthCount; l++) {
-                for (let w = 0; w < widthCount; w++) {
-                    if (w === 0 && l === 0 && h === 0) { continue; }
-                    const copy = this.document.Duplicate (source);
-                    copy.name = source.name + ' [' + (w + 1) + ',' + (l + 1) + ',' + (h + 1) + ']';
-                    const offset = ArrayOffset (size, w, l, h);
-                    copy.position = source.position.map ((value, axis) => value + offset[axis]);
-                    this.document.ApplyTransform (copy);
-                    added.push (copy);
+        this.busy = true; this.RefreshButtons ();
+        this.Status ('Creating an array… 0 / ' + (total - 1) + ' copies');
+        try {
+            await new Promise ((resolve) => setTimeout (resolve, 20));
+            const box = new THREE.Box3 ().setFromObject (source.threeObject, true);
+            const size = box.getSize (new THREE.Vector3 ());
+            for (let h = 0; h < heightCount; h++) {
+                for (let l = 0; l < lengthCount; l++) {
+                    for (let w = 0; w < widthCount; w++) {
+                        if (w === 0 && l === 0 && h === 0) { continue; }
+                        const copy = this.document.Duplicate (source);
+                        added.push (copy);
+                        copy.name = source.name + ' [' + (w + 1) + ',' + (l + 1) + ',' + (h + 1) + ']';
+                        const offset = ArrayOffset (size, w, l, h);
+                        copy.position = source.position.map ((value, axis) => value + offset[axis]);
+                        this.document.ApplyTransform (copy);
+                        this.Status ('Creating an array… ' + added.length + ' / ' + (total - 1) + ' copies');
+                        await new Promise ((resolve) => setTimeout (resolve, 0));
+                    }
                 }
             }
-        }
-        this.history.Push ({
-            undo : async () => { added.forEach ((object) => this.document.Remove (object)); this.selected = source; await this.Render (); },
-            redo : async () => { added.forEach ((object, index) => this.document.Restore (object, firstIndex + index)); this.selected = source; await this.Render (); }
-        });
-        this.selected = source;
-        await this.Render ();
-        this.Status ('Created ' + widthCount + ' × ' + lengthCount + ' × ' + heightCount + ' array · ' + total + ' objects');
-        return added;
+            this.selected = source;
+            await this.Render ();
+            this.history.Push ({
+                undo : async () => { added.forEach ((object) => this.document.Remove (object)); this.selected = source; await this.Render (); },
+                redo : async () => { added.forEach ((object, index) => this.document.Restore (object, firstIndex + index)); this.selected = source; await this.Render (); }
+            });
+            this.Status ('Created ' + widthCount + ' × ' + lengthCount + ' × ' + heightCount + ' array · ' + total + ' objects');
+            return added;
+        } catch (error) {
+            added.forEach ((object) => this.document.Remove (object));
+            this.selected = source;
+            try { await this.Render (); } catch { /* Preserve the original failure. */ }
+            this.Status ('Could not create the array. ' + error.message);
+            throw error;
+        } finally { this.busy = false; this.RefreshButtons (); }
     }
 
     async Duplicate () { if (!this.selected) { return; } const object = this.document.Duplicate (this.selected); const index = this.document.objects.indexOf (object); this.history.Push ({ undo : async () => { this.document.Remove (object); this.selected = null; await this.Render (); }, redo : async () => { this.document.Restore (object, index); this.selected = object; await this.Render (); } }); this.selected = object; await this.Render (); this.Status ('Duplicated ' + object.name); }

@@ -2,9 +2,9 @@ import { WorkspaceDialog } from './modellibrary.js';
 
 export class AuthPanel
 {
-    constructor (auth)
+    constructor (auth, admin)
     {
-        this.auth = auth; this.dialog = null;
+        this.auth = auth; this.admin = admin; this.dialog = null;
         const header = document.getElementById ('header_buttons');
         this.button = document.createElement ('button'); this.button.className = 'auth_header_button';
         this.button.addEventListener ('click', () => this.Open ()); header.appendChild (this.button);
@@ -33,11 +33,13 @@ export class AuthPanel
         const password = document.createElement ('input'); password.type = 'password'; password.autocomplete = 'current-password'; password.required = true; password.maxLength = 1024; passwordLabel.appendChild (password);
         const submit = document.createElement ('button'); submit.type = 'submit'; submit.textContent = 'Sign in';
         const status = document.createElement ('p'); status.className = 'auth_status'; status.setAttribute ('role', 'status'); status.setAttribute ('aria-live', 'polite');
-        const hint = document.createElement ('p'); hint.className = 'auth_hint'; hint.textContent = 'Use the account provided by your administrator. Need an account or password reset? Contact your administrator.';
+        const hint = document.createElement ('p'); hint.className = 'auth_hint'; hint.textContent = 'Use the account provided by your administrator. Request an account below. Contact your administrator for password resets.';
         const signOut = document.createElement ('button'); signOut.type = 'button'; signOut.textContent = 'Sign out';
+        const requestAccount = document.createElement ('button'); requestAccount.type = 'button'; requestAccount.textContent = 'Request an account';
+        requestAccount.addEventListener ('click', () => this.admin.OpenRequest ());
         let busy = false;
         const render = () => {
-            const user = this.auth.user; form.hidden = Boolean (user); hint.hidden = Boolean (user); signOut.hidden = !user;
+            const user = this.auth.user; form.hidden = Boolean (user); hint.hidden = Boolean (user); signOut.hidden = !user; requestAccount.hidden = Boolean (user);
             heading.textContent = user ? 'Welcome back' : 'Sign in to Auto3D';
             if (!busy) { status.textContent = user ? 'Signed in as ' + (user.email || 'Auto3D user') : ''; }
             email.disabled = password.disabled = submit.disabled = signOut.disabled = busy;
@@ -54,7 +56,7 @@ export class AuthPanel
             try { await this.auth.SignOut (); } catch (error) { message = error.message; }
             finally { busy = false; render (); status.textContent = message || 'Signed out.'; }
         });
-        form.append (emailLabel, passwordLabel, submit); panel.append (heading, form, status, hint, signOut);
+        form.append (emailLabel, passwordLabel, submit); panel.append (heading, form, status, hint, requestAccount, signOut);
         if (onContinue) {
             const proceed = document.createElement ('button'); proceed.type = 'button'; proceed.className = 'auth_continue';
             const update = () => { proceed.textContent = this.auth.user ? 'Continue to workspace' : 'Continue without signing in'; }; update ();

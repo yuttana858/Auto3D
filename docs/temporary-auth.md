@@ -38,3 +38,15 @@ Supabase logout invalidates refresh sessions; already-issued access tokens may r
 ## Validation
 
 Run `npm test`, `npm run lint`, and `npm run build_website`. With `npm start` running, `node test/browser/auth.mjs` checks desktop/mobile UI, bad-credential handling, password clearing, sign-in, account inspection and sign-out using intercepted auth responses. It is a UI smoke test, not a real-user Supabase login test. A live sign-in requires an administrator-created account. `npm start` serves static files and does not execute Pages Functions; use a deployed preview or a configured Cloudflare local runtime for actual auth.
+
+## Account requests and administrator setup
+
+Sign-in now includes **Request an account** (name, email, reason). Requests require approval; the endpoint does not create an Auth user or accept passwords. Approved accounts are created through the server-side Supabase admin API. No email is sent automatically. The reviewer enters an initial password (at least 12 characters) and supplies it through the organization’s secure process.
+
+The first administrator allowlist entry is `yuttana.chiaravalloti@smurfitwestrock.com`. Create that account in [Supabase Authentication → Users](https://supabase.com/dashboard/project/iesepcoxqochycckbwoh/auth/users), set its password, and confirm its email. Then sign into Auto3D and open **Preferences → Administrator → Account administration — requests and approvals**. The direct application link is `https://auto3d-5av.pages.dev/?admin=accounts`. The interface also links to Supabase user administration.
+
+Authorization verifies the provider identity and confirmed email on each admin request, then checks the server-only `auto3d_admin_emails` allowlist. Browser metadata and user-editable provider metadata cannot grant admin access. Additional admin emails must be explicitly added through the trusted database administration process. The user cannot grant themselves admin privileges in the application.
+
+`database/account-requests.sql` documents the applied `auto3d_access_request_review` migration. The new `auto3d_access_requests` table intentionally preserves the feature foundation’s existing `auto3d_account_requests` table and its organization-user foreign keys. Both new tables have RLS enabled with no browser privileges. The submission RPC is service-role-only and deduplicates email submissions; rate checks allow up to three stored requests per IP hash per hour. Account approvals atomically claim pending requests before calling the provider. A definitive provider rejection resets pending; ambiguous failures remain `processing`. Reconcile processing rows against Supabase Auth Users before manually completing/resetting them, to avoid duplicate creation attempts.
+
+Agent commands: `auth.request_account`, `admin.open`, `admin.requests`, `admin.approve` (interactive), and `admin.reject`. Approval passwords are kept out of command arguments and saved macros. Existing `auth.inspect/open/sign_out` remain available.

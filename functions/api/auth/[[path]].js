@@ -1,6 +1,6 @@
 import { AccessCookie, RefreshCookie, AuthCookies, AuthRequest, AuthResponse, VerifiedUser } from '../../_lib/auth.js';
 
-async function ReadBody (request)
+export async function ReadBody (request)
 {
     if (!request.headers.get ('Content-Type')?.startsWith ('application/json')) { throw Object.assign (new Error ('Use a JSON request.'), { status : 400 }); }
     // Bound credential requests even when Content-Length is absent.

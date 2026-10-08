@@ -1,3 +1,4 @@
+import { ModelExtensions, SupportedFormatsText } from './importformats.js';
 import { GetFileExtension, TransformFileHostUrls } from '../engine/io/fileutils.js';
 import { InputFilesFromFileObjects, InputFilesFromUrls } from '../engine/import/importerfiles.js';
 import { ImportErrorCode, ImportSettings } from '../engine/import/importer.js';
@@ -36,7 +37,7 @@ import { Preferences } from './preferences.js';
 import { AIWorkspace } from './aiworkspace.js';
 import { SceneEffects } from '../engine/viewer/sceneeffects.js';
 
-const MultiModelExtensions = new Set (['3dm', '3ds', '3mf', 'amf', 'bim', 'brep', 'dae', 'fbx', 'fcstd', 'gltf', 'glb', 'ifc', 'iges', 'igs', 'step', 'stp', 'stl', 'obj', 'off', 'ply', 'wrl', 'zae']);
+const MultiModelExtensions = new Set (ModelExtensions);
 
 const WebsiteUIState =
 {
@@ -260,6 +261,8 @@ export class Website
             });
         }
         this.UpdateViewport ();
+        const formats = document.getElementById ('supported_formats');
+        if (formats) { formats.textContent = SupportedFormatsText; }
         document.getElementById ('workspace_upload').addEventListener ('click', () => this.OpenFileBrowserDialog ());
         for (const [side, toggleId] of [['left', 'upload_panel_toggle'], ['right', 'data_panel_toggle']]) {
             const container = side === 'left' ? this.parameters.leftContainerDiv : this.parameters.rightContainerDiv;
@@ -384,6 +387,24 @@ export class Website
     OnModelContextMenu (globalMouseCoordinates, mouseCoordinates)
     {
         const meshUserData = this.viewer.GetMeshUserDataUnderMouse (IntersectionMode.MeshAndLine, mouseCoordinates);
+        if (meshUserData) {
+            const owner = this.sessionEditor.document.Owner (meshUserData.originalMeshInstance);
+            if (owner) { this.sessionEditor.Select (owner); }
+        }
+        const selected = this.sessionEditor.selected;
+        if (selected && !this.sessionEditor.readOnly) {
+            const actions = [
+                ['Move', () => this.sessionEditor.SetMode ('translate')],
+                ['Rotate', () => this.sessionEditor.SetMode ('rotate')],
+                ['Scale', () => this.sessionEditor.SetMode ('scale')],
+                ['Focus', () => this.sessionEditor.Focus ()],
+                ['Duplicate', () => this.sessionEditor.Duplicate ()],
+                [selected.visible ? 'Hide' : 'Show', () => this.sessionEditor.ToggleVisibility ()],
+                ['Delete', () => this.sessionEditor.Delete ()]
+            ].map (([name, onClick]) => ({ name, onClick }));
+            this.sessionEditor.OpenContextMenu (globalMouseCoordinates, actions);
+            return;
+        }
         const items = [];
         if (meshUserData === null) {
             items.push ({
@@ -407,33 +428,6 @@ export class Website
                 icon : 'fit',
                 onClick : () => this.sessionEditor.Focus ()
             });
-            if (!this.sessionEditor.readOnly && object) {
-                items.push ({
-                    name : 'Array selected model…',
-                    icon : 'files',
-                    onClick : () => this.sessionEditor.ArrayDialog ()
-                });
-                items.push ({
-                    name : 'Drop selected model to floor',
-                    icon : 'up_y',
-                    onClick : () => this.sessionEditor.DropToFloor ()
-                });
-                items.push ({
-                    name : 'Duplicate selected model',
-                    icon : 'files',
-                    onClick : () => this.sessionEditor.Run (() => this.sessionEditor.Duplicate ())
-                });
-                items.push ({
-                    name : object.visible ? 'Hide selected model' : 'Show selected model',
-                    icon : object.visible ? 'hidden' : 'visible',
-                    onClick : () => this.sessionEditor.ToggleVisibility ()
-                });
-                items.push ({
-                    name : 'Delete selected model',
-                    icon : 'close',
-                    onClick : () => this.sessionEditor.Run (() => this.sessionEditor.Delete ())
-                });
-            }
             if (this.navigator.MeshItemCount () > 1) {
                 const isMeshIsolated = this.navigator.IsMeshIsolated (instance.id);
                 items.push ({
@@ -445,9 +439,6 @@ export class Website
                     }
                 });
             }
-        }
-        if (meshUserData !== null && !this.sessionEditor.readOnly && this.sessionEditor.selected) {
-            items.unshift (...[['Move', 'translate'], ['Rotate', 'rotate'], ['Scale', 'scale']].map (([name, mode]) => ({ name, onClick : () => this.sessionEditor.SetMode (mode) })));
         }
         this.sessionEditor.OpenContextMenu (globalMouseCoordinates, items);
     }
@@ -539,14 +530,14 @@ export class Website
 
     async LoadModelFromFileList (files)
     {
-        if (this.sessionEditor.readOnly) { return; }
+        if (this.sessionEditor.readOnly || this.sessionEditor.busy || this.modelLoaderUI.GetModelLoader ().InProgress ()) { return; }
         const selected = Array.from (files);
         const session = selected.find ((file) => file.name.toLowerCase ().endsWith ('.auto3d'));
         if (session) { await this.sessionEditor.Run (() => this.sessionEditor.OpenArchiveFile (session)); return; }
 
         const candidates = selected.filter ((file) => MultiModelExtensions.has (GetFileExtension (file.name).toLowerCase ()));
         if (!this.sessionEditor.replaceTarget && candidates.length > 1) {
-            this.sessionEditor.Status ('Importing ' + candidates.length + ' models into this session…');
+            this.sessionEditor.Status ('Uploading models… ' + candidates.length + ' selected');
             let imported = 0;
             for (const candidate of candidates) {
                 const importSettings = new ImportSettings ();
@@ -575,7 +566,7 @@ export class Website
             onStart : () =>
             {
                 if (!this.sessionEditor.document.objects.length) { this.SetUIState (WebsiteUIState.Loading); }
-                this.sessionEditor.Status ('Loading model…');
+                this.sessionEditor.Status ('Uploading models…');
             },
             onFinish : (importResult, threeObject) =>
             {
@@ -592,7 +583,7 @@ export class Website
             {
                 this.SetUIState (this.sessionEditor.document.objects.length ? WebsiteUIState.Model : WebsiteUIState.Intro);
                 this.sessionEditor.replaceTarget = null;
-                this.sessionEditor.Status ('Model could not be loaded. Existing objects are retained.');
+                this.sessionEditor.Status ('Cannot open file. ' + SupportedFormatsText);
                 let extensionStr = null;
                 if (importError.mainFile !== null) {
                     extensionStr = GetFileExtension (importError.mainFile);

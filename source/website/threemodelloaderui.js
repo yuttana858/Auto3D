@@ -1,3 +1,4 @@
+import { SupportedFormatsText } from './importformats.js';
 import { AddDiv } from '../engine/viewer/domutils.js';
 import { ThreeModelLoader } from '../engine/threejs/threemodelloader.js';
 import { ShowMessageDialog } from './dialogs.js';
@@ -26,12 +27,13 @@ export class ThreeModelLoaderUI
                 this.CloseDialogIfOpen ();
                 callbacks.onStart ();
                 progressDialog = new ProgressDialog ();
-                progressDialog.Init (Loc ('Loading Model'));
+                progressDialog.Init ('Uploading models…');
                 progressDialog.Open ();
             },
             onFileListProgress : (current, total) => {
             },
             onFileLoadProgress : (current, total) => {
+                progressDialog.SetText ('Uploading models… ' + current + ' / ' + total + ' files');
             },
             onSelectMainFile : (fileNames, selectFile) => {
                 progressDialog.Close ();
@@ -41,10 +43,10 @@ export class ThreeModelLoaderUI
                 });
             },
             onImportStart : () => {
-                progressDialog.SetText (Loc ('Importing Model'));
+                progressDialog.SetText ('Opening models…');
             },
             onVisualizationStart : () => {
-                progressDialog.SetText (Loc ('Visualizing Model'));
+                progressDialog.SetText ('Preparing model display…');
             },
             onModelFinished : (importResult, threeObject) => {
                 progressDialog.Close ();
@@ -73,31 +75,10 @@ export class ThreeModelLoaderUI
 
     ShowErrorDialog (importError)
     {
-        if (importError.code === ImportErrorCode.NoImportableFile) {
-            return ShowMessageDialog (
-                Loc ('Something went wrong'),
-                Loc ('No importable file found.'),
-                null
-            );
-        } else if (importError.code === ImportErrorCode.FailedToLoadFile) {
-            return ShowMessageDialog (
-                Loc ('Something went wrong'),
-                Loc ('Failed to load file for import.'),
-                Loc ('The remote server refused to fulfill the request. Check if the url is correct, and make sure that CORS requests are allowed on the remote server.')
-            );
-        } else if (importError.code === ImportErrorCode.ImportFailed) {
-            return ShowMessageDialog (
-                Loc ('Something went wrong'),
-                Loc ('Failed to import model.'),
-                importError.message
-            );
-        } else {
-            return ShowMessageDialog (
-                Loc ('Something went wrong'),
-                Loc ('Unknown error.'),
-                null
-            );
-        }
+        let detail = 'Check that the file is complete and includes any required companion files. ';
+        if (importError.code === ImportErrorCode.FailedToLoadFile) { detail = 'The file could not be read or downloaded. '; }
+        return ShowMessageDialog ('Cannot open file', detail, SupportedFormatsText);
+
     }
 
     ShowFileSelectorDialog (fileNames, onSelect)

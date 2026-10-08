@@ -30,6 +30,92 @@
       "example": {}
     },
     {
+      "id": "auth.request_account",
+      "title": "Request an account",
+      "category": "Account",
+      "description": "Open an interactive account request form. Submitting requires user confirmation in the form.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "admin.open",
+      "title": "Open account administration",
+      "category": "Account",
+      "description": "Open administrator requests and approvals. Approval passwords are entered interactively.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "admin.approve",
+      "title": "Review account approval",
+      "category": "Account",
+      "description": "Open one account request for interactive approval. The administrator enters the initial password and confirms in the dialog.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "00000000-0000-0000-0000-000000000000"
+      }
+    },
+    {
+      "id": "admin.requests",
+      "title": "List account requests",
+      "category": "Account",
+      "description": "List account requests for a verified administrator.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "admin.reject",
+      "title": "Reject account request",
+      "category": "Account",
+      "description": "Reject one pending account request. Administrator authorization is checked on the server.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "00000000-0000-0000-0000-000000000000"
+      }
+    },
+    {
       "id": "auth.sign_out",
       "title": "Sign out",
       "category": "Account",

@@ -1,3 +1,4 @@
+import { AccountAdmin } from './accountadmin.js';
 import { Loc } from '../engine/core/localization.js';
 import { AddDiv, AddDomElement } from '../engine/viewer/domutils.js';
 import { Embed } from './embed.js';
@@ -87,7 +88,10 @@ export function StartWebsite ()
         });
         website.Load ();
         website.auth = new AuthService ();
-        website.authPanel = new AuthPanel (website.auth);
+        website.accountAdmin = new AccountAdmin (website.auth);
+        website.authPanel = new AuthPanel (website.auth, website.accountAdmin);
+        let adminLinkOpened = false;
+        website.auth.Subscribe ((user) => { if (user && !adminLinkOpened && new URLSearchParams (window.location.search).get ('admin') === 'accounts') { adminLinkOpened = true; website.accountAdmin.Open ().catch (() => {}); } });
         const refreshAccount = () => { if (document.visibilityState === 'visible') { website.auth.Restore ().catch (() => {}); } };
         document.addEventListener ('visibilitychange', refreshAccount);
         window.setInterval (refreshAccount, 240000);

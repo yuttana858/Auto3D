@@ -36,6 +36,7 @@ try {
     const canvas = page.locator ('#main_viewer canvas').first (); const box = await canvas.boundingBox (); assert.ok (box);
     await page.mouse.click (box.x + box.width / 2, box.y + box.height / 2, { button : 'right' });
     assert.equal (await page.locator ('.auto3d_context_menu').count (), 1);
+    assert.deepEqual (await page.locator ('.auto3d_context_menu button').allTextContents (), ['Move', 'Rotate', 'Scale', 'Focus', 'Duplicate', 'Hide', 'Delete']);
     assert.equal (await page.locator ('.ov_popup').count (), 0);
     await page.keyboard.press ('Escape');
     assert.equal (await page.locator ('.auto3d_context_menu').count (), 0);

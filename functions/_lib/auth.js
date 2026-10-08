@@ -1,4 +1,4 @@
-import { SupabaseConfig } from './supabase.js';
+import { SupabaseConfig, SupabaseHeaders } from './supabase.js';
 
 export const AccessCookie = '__Host-auto3d-access';
 export const RefreshCookie = '__Host-auto3d-refresh';
@@ -30,7 +30,7 @@ export async function AuthRequest (env, path, options = {})
     const { url, key } = SupabaseConfig (env);
     try {
         return await fetch (url + '/auth/v1/' + path, {
-            ...options, headers : { 'Content-Type' : 'application/json', apikey : key, ...options.headers }, signal : AbortSignal.timeout (10000)
+            ...options, headers : { 'Content-Type' : 'application/json', apikey : key, ...(path.startsWith ('admin/') ? SupabaseHeaders (key) : {}), ...options.headers }, signal : AbortSignal.timeout (10000)
         });
     } catch { throw Object.assign (new Error ('Sign-in service is unavailable. Try again.'), { status : 503 }); }
 }
