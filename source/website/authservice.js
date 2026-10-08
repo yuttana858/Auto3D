@@ -64,6 +64,20 @@ export class AuthService
         return data;
     }
 
+    async ChangePassword (password)
+    {
+        const response = await fetch (this.Endpoint ('/api/auth/change-password'), {
+            method : 'POST',
+            credentials : 'same-origin',
+            headers : { 'Content-Type' : 'application/json', Accept : 'application/json' },
+            body : JSON.stringify ({ password })
+        });
+        const data = await response.json ().catch (() => ({}));
+        if (!response.ok) { throw new Error (data.error || 'Unable to change password.'); }
+        if (this.user) { this.user.requiresPasswordChange = false; }
+        return data;
+    }
+
     async SignOut ()
     {
         await fetch (this.Endpoint ('/api/auth/logout'), { method : 'POST', credentials : 'same-origin' });
