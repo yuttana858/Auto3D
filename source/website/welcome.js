@@ -172,11 +172,12 @@ export function StartWelcomeSequence (authService)
         greet ();
     };
 
-    signIn.addEventListener ('click', () => {
+    const beginSignIn = () => {
         status.textContent = 'Opening secure sign in…';
         signIn.disabled = true; guest.disabled = true;
         authService?.SignIn (window.location.href);
-    });
+    };
+    signIn.addEventListener ('click', beginSignIn);
     guest.addEventListener ('click', () => finish (false, false));
 
     const tour = document.createElement ('button'); tour.className = 'splash_tour'; tour.textContent = 'Take a tour →';
@@ -190,7 +191,7 @@ export function StartWelcomeSequence (authService)
         message.textContent = 'Signed in as ' + name + '.';
         signIn.textContent = 'Continue';
         signIn.disabled = false; guest.hidden = true;
-        signIn.onclick = null;
+        signIn.removeEventListener ('click', beginSignIn);
         signIn.addEventListener ('click', () => finish (false, false), { once : true });
     }).catch (() => {
         status.textContent = '';
