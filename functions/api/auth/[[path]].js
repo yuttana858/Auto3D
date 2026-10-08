@@ -58,7 +58,7 @@ async function appProfile (env, authUser)
         return { user : authUser ? { id : authUser.id, email : authUser.email, displayName : authUser.user_metadata?.display_name || authUser.user_metadata?.name || null } : null, organization : null, permissions : [] };
     }
     const headers = { apikey : secret, Authorization : 'Bearer ' + secret };
-    const query = '/rest/v1/auto3d_users?select=id,email,display_name,status,is_platform_admin&auth_user_id=eq.' + encodeURIComponent (authUser.id) + '&limit=1';
+    const query = '/rest/v1/auto3d_users?select=id,email,display_name,status,is_platform_admin,requires_password_change&auth_user_id=eq.' + encodeURIComponent (authUser.id) + '&limit=1';
     const response = await fetch (url + query, { headers });
     const rows = response.ok ? await response.json () : [];
     let profile = rows[0];
@@ -112,7 +112,7 @@ async function appProfile (env, authUser)
     }
 
     return {
-        user : { id : profile.id, authUserId : authUser.id, email : profile.email, displayName : profile.display_name, platformAdmin : profile.is_platform_admin },
+        user : { id : profile.id, authUserId : authUser.id, email : profile.email, displayName : profile.display_name, platformAdmin : profile.is_platform_admin, requiresPasswordChange : profile.requires_password_change === true },
         organization,
         permissions
     };
@@ -230,6 +230,11 @@ async function changePassword (context)
         if (profileResponse.ok) {
             const rows = await profileResponse.json ();
             if (rows[0]) {
+                await fetch (url + '/rest/v1/auto3d_users?id=eq.' + encodeURIComponent (rows[0].id), {
+                    method : 'PATCH',
+                    headers : { apikey : secret, Authorization : 'Bearer ' + secret, 'Content-Type' : 'application/json', Prefer : 'return=minimal' },
+                    body : JSON.stringify ({ requires_password_change : false, updated_at : new Date ().toISOString () })
+                });
                 await fetch (url + '/rest/v1/auto3d_audit_events', {
                     method : 'POST',
                     headers : { apikey : secret, Authorization : 'Bearer ' + secret, 'Content-Type' : 'application/json', Prefer : 'return=minimal' },
