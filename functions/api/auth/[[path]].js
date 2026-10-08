@@ -75,7 +75,20 @@ async function appProfile (env, authUser)
                 is_platform_admin : true
             })
         });
-        if (createResponse.ok) { profile = (await createResponse.json ())[0]; }
+        if (createResponse.ok) {
+            profile = (await createResponse.json ())[0];
+            await fetch (url + '/rest/v1/auto3d_user_identities', {
+                method : 'POST',
+                headers : { apikey : secret, Authorization : 'Bearer ' + secret, 'Content-Type' : 'application/json', Prefer : 'return=minimal' },
+                body : JSON.stringify ({
+                    user_id : profile.id,
+                    provider : 'supabase',
+                    provider_tenant_id : '',
+                    provider_subject_id : authUser.id,
+                    provider_email : authUser.email
+                })
+            });
+        }
     }
     if (!profile || profile.status !== 'active') { return { user : null, organization : null, permissions : [] }; }
 
