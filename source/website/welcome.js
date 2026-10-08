@@ -173,6 +173,7 @@ export function StartWelcomeSequence (authService)
     login.appendChild (requestPanel);
 
     let finished = false;
+    let signedInUser = null;
     const finish = async (tour = false, greetUser = true) => {
         if (finished) { return; } finished = true;
         splash.style.pointerEvents = 'none';
@@ -189,14 +190,13 @@ export function StartWelcomeSequence (authService)
 
     login.addEventListener ('submit', async (event) => {
         event.preventDefault ();
+        if (signedInUser) { finish (false, false); return; }
         status.textContent = 'Signing in…'; signIn.disabled = true;
         try {
-            const user = await authService.SignIn (email.value.trim (), password.value);
-            message.textContent = 'Signed in as ' + (user.displayName || user.email) + '.';
+            signedInUser = await authService.SignIn (email.value.trim (), password.value);
+            message.textContent = 'Signed in as ' + (signedInUser.displayName || signedInUser.email) + '.';
             status.textContent = ''; fields.hidden = true; request.hidden = true; guest.hidden = true;
             signIn.textContent = 'Continue'; signIn.disabled = false;
-            login.onsubmit = null;
-            login.addEventListener ('submit', (continueEvent) => { continueEvent.preventDefault (); finish (false, false); }, { once : true });
         } catch (error) {
             status.textContent = error.message; signIn.disabled = false;
         }
@@ -235,9 +235,9 @@ export function StartWelcomeSequence (authService)
 
     Promise.resolve (authService?.Initialize?.()).then ((user) => {
         if (!user || finished) { return; }
+        signedInUser = user;
         message.textContent = 'Signed in as ' + (user.displayName || user.email || 'your account') + '.';
         fields.hidden = true; request.hidden = true; guest.hidden = true;
         signIn.textContent = 'Continue';
-        login.addEventListener ('submit', (event) => { event.preventDefault (); finish (false, false); }, { once : true });
     }).catch (() => { status.textContent = ''; });
 }
