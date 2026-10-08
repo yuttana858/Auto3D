@@ -99,7 +99,7 @@ async function list (context, actor)
 {
     const [requestsResponse, usersResponse, orgsResponse, membersResponse] = await Promise.all ([
         request (context.env, '/rest/v1/auto3d_account_requests?select=*&order=created_at.desc&limit=250'),
-        request (context.env, '/rest/v1/auto3d_users?select=id,email,display_name,status,is_platform_admin,created_at,updated_at&order=created_at.desc&limit=500'),
+        request (context.env, '/rest/v1/auto3d_users?select=id,email,display_name,status,is_platform_admin,requires_password_change,created_at,updated_at&order=created_at.desc&limit=500'),
         request (context.env, '/rest/v1/auto3d_organizations?select=id,name,slug,status,storage_quota_bytes,created_at&order=name.asc&limit=250'),
         request (context.env, '/rest/v1/auto3d_organization_members?select=organization_id,user_id,role,status,joined_at&limit=2000')
     ]);
@@ -142,7 +142,8 @@ async function createUserRecord (env, authUser, displayName, isAdmin = false)
             email : String (authUser.email || '').toLowerCase (),
             display_name : displayName || authUser.email,
             status : 'active',
-            is_platform_admin : isAdmin
+            is_platform_admin : isAdmin,
+            requires_password_change : true
         })
     });
     const user = (await response.json ())[0];
@@ -320,6 +321,11 @@ async function resetPassword (context, actor, id)
         const detail = await authResponse.json ().catch (() => ({}));
         throw Object.assign (new Error (detail.msg || detail.message || 'Unable to reset password.'), { status : authResponse.status });
     }
+    await request (context.env, '/rest/v1/auto3d_users?id=eq.' + encodeURIComponent (id), {
+        method : 'PATCH',
+        headers : { Prefer : 'return=minimal' },
+        body : JSON.stringify ({ requires_password_change : true, updated_at : new Date ().toISOString () })
+    });
     await audit (context.env, actor, 'USER_PASSWORD_RESET', 'user', id, { email : target.email });
     return json ({ temporaryPassword : password });
 }
