@@ -1,5 +1,4 @@
-const DefaultSupabaseUrl = 'https://iesepcoxqochycckbwoh.supabase.co';
-const DefaultPublishableKey = 'sb_publishable_CmRJpuYE32OBF9rIV1jwqQ_diMF7OXh';
+import { SupabaseConfig, SupabaseHeaders } from '../../_lib/supabase.js';
 const Bucket = 'auto3d-library';
 const Table = 'auto3d_library';
 const Uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -16,18 +15,10 @@ function json (data, status = 200)
     });
 }
 
-function config (env)
-{
-    return {
-        url : String (env.SUPABASE_URL || DefaultSupabaseUrl).replace (/\/$/, ''),
-        key : String (env.SUPABASE_PUBLISHABLE_KEY || DefaultPublishableKey)
-    };
-}
-
 async function supabase (env, path)
 {
-    const { url, key } = config (env);
-    const response = await fetch (url + path, { headers : { apikey : key } });
+    const { url, key } = SupabaseConfig (env);
+    const response = await fetch (url + path, { headers : SupabaseHeaders (key), signal : AbortSignal.timeout (10000) });
     if (!response.ok) {
         console.error ('Auto3D library upstream error', response.status, path);
         throw Object.assign (new Error ('Shared library backend is unavailable.'), { status : 502 });
@@ -74,11 +65,11 @@ async function getFile (env, id, type)
     const field = type === 'archive' ? 'archive_path' : 'thumbnail_path';
     const row = await getRow (env, id, field);
     if (!row) { return json ({ error : 'Library item not found.' }, 404); }
-    const { url, key } = config (env);
+    const { url, key } = SupabaseConfig (env);
     const path = String (row[field]).split ('/').map (encodeURIComponent).join ('/');
-    const response = await fetch (url + '/storage/v1/object/authenticated/' + Bucket + '/' + path, { headers : { apikey : key } });
+    const response = await fetch (url + '/storage/v1/object/authenticated/' + Bucket + '/' + path, { headers : SupabaseHeaders (key) });
     if (!response.ok) { return json ({ error : 'Library file unavailable.' }, response.status === 404 ? 404 : 502); }
-    const headers = new Headers (response.headers);
+    const headers = new Headers ();
     headers.set ('Content-Type', type === 'archive' ? 'application/octet-stream' : 'image/png');
     headers.set ('Cache-Control', 'public, max-age=300');
     headers.set ('X-Content-Type-Options', 'nosniff');
@@ -94,14 +85,14 @@ export async function onRequest (context)
 
     try {
         const path = context.params.path || [];
-        if (!path.length || path[0] === 'items' && path.length === 1) { return list (context.env); }
+        if (!path.length || path[0] === 'items' && path.length === 1) { return await list (context.env); }
         if (path[0] !== 'items' || !Uuid.test (String (path[1] || ''))) { return json ({ error : 'Invalid library request.' }, 400); }
         const id = path[1];
-        if (path.length === 2) { return getItem (context.env, id); }
-        if (path.length === 3 && (path[2] === 'archive' || path[2] === 'thumbnail')) { return getFile (context.env, id, path[2]); }
+        if (path.length === 2) { return await getItem (context.env, id); }
+        if (path.length === 3 && (path[2] === 'archive' || path[2] === 'thumbnail')) { return await getFile (context.env, id, path[2]); }
         return json ({ error : 'Not found.' }, 404);
     } catch (error) {
-        console.error (error);
+        console.error ('Auto3D Library request failed');
         return json ({ error : error.status ? error.message : 'Library API unavailable.' }, error.status || 500);
     }
 }

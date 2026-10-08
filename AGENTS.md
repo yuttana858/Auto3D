@@ -1,3 +1,7 @@
+# Project orientation
+
+Read `docs/agent-project-overview.md` for the architecture, Library data flows, development checks, and active `feat/multi-user-auth-foundation` / PR #16 work. Current direction: Cloudflare R2, PostgreSQL metadata, temporary per-user sign-in, then Microsoft Entra ID. Verify the temporary auth design and latest feature-branch state before development.
+
 # Agent-accessible features
 
 Every new user-facing action must have a stable command in `source/website/agentcommands.js` using the shared `CommandRegistry`. Include category, description, strict input schema, example, mutation flag and structured result. Keep UI actions and agent commands on shared underlying functions. Do not make agents depend on DOM selectors, arbitrary evaluation, or simulated clicks.
