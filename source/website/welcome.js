@@ -174,6 +174,7 @@ export function StartWelcomeSequence (authService)
 
     let finished = false;
     let signedInUser = null;
+    let changingPassword = false;
     const finish = async (tour = false, greetUser = true) => {
         if (finished) { return; } finished = true;
         splash.style.pointerEvents = 'none';
@@ -190,10 +191,36 @@ export function StartWelcomeSequence (authService)
 
     login.addEventListener ('submit', async (event) => {
         event.preventDefault ();
-        if (signedInUser) { finish (false, false); return; }
+        if (signedInUser && !changingPassword) { finish (false, false); return; }
+        if (signedInUser && changingPassword) {
+            const newPassword = password.value;
+            status.textContent = 'Updating password…'; signIn.disabled = true;
+            try {
+                await authService.ChangePassword (newPassword);
+                changingPassword = false;
+                message.textContent = 'Password updated. You are signed in as ' + (signedInUser.displayName || signedInUser.email) + '.';
+                status.textContent = ''; fields.hidden = true; request.hidden = true; guest.hidden = true;
+                signIn.textContent = 'Continue'; signIn.disabled = false;
+            } catch (error) {
+                status.textContent = error.message; signIn.disabled = false;
+            }
+            return;
+        }
         status.textContent = 'Signing in…'; signIn.disabled = true;
         try {
             signedInUser = await authService.SignIn (email.value.trim (), password.value);
+            if (signedInUser.requiresPasswordChange) {
+                changingPassword = true;
+                message.textContent = 'Set a new password before entering Auto3D.';
+                email.hidden = true;
+                password.value = '';
+                password.placeholder = 'New password (12+ characters)';
+                password.autocomplete = 'new-password';
+                request.hidden = true; guest.hidden = true;
+                signIn.textContent = 'Update password'; signIn.disabled = false; status.textContent = '';
+                password.focus ();
+                return;
+            }
             message.textContent = 'Signed in as ' + (signedInUser.displayName || signedInUser.email) + '.';
             status.textContent = ''; fields.hidden = true; request.hidden = true; guest.hidden = true;
             signIn.textContent = 'Continue'; signIn.disabled = false;
@@ -236,6 +263,18 @@ export function StartWelcomeSequence (authService)
     Promise.resolve (authService?.Initialize?.()).then ((user) => {
         if (!user || finished) { return; }
         signedInUser = user;
+        if (user.requiresPasswordChange) {
+            changingPassword = true;
+            message.textContent = 'Set a new password before entering Auto3D.';
+            email.hidden = true;
+            password.value = '';
+            password.placeholder = 'New password (12+ characters)';
+            password.autocomplete = 'new-password';
+            request.hidden = true; guest.hidden = true;
+            signIn.textContent = 'Update password';
+            password.focus ();
+            return;
+        }
         message.textContent = 'Signed in as ' + (user.displayName || user.email || 'your account') + '.';
         fields.hidden = true; request.hidden = true; guest.hidden = true;
         signIn.textContent = 'Continue';
