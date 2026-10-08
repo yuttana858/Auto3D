@@ -37,3 +37,15 @@
 .welcome_dialog .workspace_primary { background: #65c4ee; border-color: #65c4ee; color: #071421; font-weight: 700; padding: 11px 22px; white-space: nowrap; }
 @media (max-width: 600px) { .welcome_banner { height: 190px; } .welcome_banner_title { left: 20px; top: 42px; } .welcome_banner_title h3 { font-size: 26.33px; } .welcome_copy { padding: 18px 20px; } .welcome_features { grid-template-columns: 1fr; gap: 16px; } .welcome_footer { align-items: flex-start; } }
 @media (prefers-reduced-motion: reduce) { .startup_splash { transition: none; } }
+
+.splash_login { width: min(360px, 78vw); margin: 18px auto 0; opacity: 0; transform: translateY(8px); transition: opacity .35s ease, transform .35s ease; }
+.splash_login.visible { opacity: 1; transform: translateY(0); }
+.splash_login_message { margin: 0 0 14px !important; color: #9fb2c7 !important; font-size: 10.33px !important; line-height: 1.5; letter-spacing: 0 !important; }
+.splash_login_actions { display: flex; justify-content: center; gap: 10px; }
+.splash_login_actions button { min-width: 145px; padding: 11px 18px; border-radius: 6px; font: inherit; font-weight: 700; cursor: pointer; }
+.splash_signin { border: 1px solid #65c4ee; background: #65c4ee; color: #071421; }
+.splash_guest { border: 1px solid #35546d; background: #0a1622cc; color: #b9cee2; }
+.splash_login_actions button:disabled { opacity: .55; cursor: progress; }
+.splash_login_status { display: block; min-height: 16px; margin-top: 10px; color: #6eaed0; font-size: 8.33px; letter-spacing: .03em; }
+@media (max-width: 480px) { .splash_login_actions { flex-direction: column; } .splash_login_actions button { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .splash_login { transition: none; } }
