@@ -150,14 +150,18 @@ export default function suite ()
             const history = new SceneHistory (); let value = 1; history.Push ({ undo : () => { value = 0; }, redo : () => { value = 1; } }); await history.Undo (); assert.equal (value, 0); await history.Redo (); assert.equal (value, 1); await history.Undo (); history.Push ({ undo : () => {}, redo : () => {} }); assert.equal (history.redo.length, 0);
         });
         it ('Converts declared units and unit-aware scaling while leaving unspecified units explicit', () => {
-            assert.equal (DisplayLength (0.0254, Unit.Meter, 'standard'), '1 in');
+            assert.equal (DisplayLength (0.0254, Unit.Meter, 'standard'), '1 inches');
             assert.equal (DisplayLength (1, Unit.Inch, 'metric'), '25.4 mm');
             assert.equal (DisplayLength (7, Unit.Unknown, 'metric'), '7 model units');
             assert.equal (UnitFactor (Unit.Meter, 'metric'), 1000);
             assert.equal (DisplaySizeFromScale (2, 0.5, Unit.Meter, 'metric'), 1000);
             assert.equal (ScaleFromDisplaySize (2, 1000, Unit.Meter, 'metric'), 0.5);
-            assert.equal (DisplaySizeFromScale (2, 3, Unit.Unknown, 'metric'), 3);
-            assert.equal (ScaleFromDisplaySize (2, 3, Unit.Unknown, 'metric'), 3);
+            assert.equal (DisplaySizeFromScale (2, 3, Unit.Unknown, 'metric'), 6);
+            assert.equal (ScaleFromDisplaySize (2, 3, Unit.Unknown, 'metric'), 1.5);
+            assert.equal (ScaleFromDisplaySize (0, 2, Unit.Meter, 'standard'), null);
+            assert.equal (ScaleFromDisplaySize (2, NaN, Unit.Meter, 'standard'), null);
+            assert.equal (ScaleFromDisplaySize (2, 10, Unit.Inch, 'standard'), 5);
+            assert.equal (DisplaySizeFromScale (2, -5, Unit.Inch, 'standard'), 10);
         });
         it ('Seeks skeletal/morph-compatible tracks and exports distinct UUID targets', () => {
             const root = new THREE.Group (); const target = new THREE.Object3D (); target.name = 'part'; root.add (target);

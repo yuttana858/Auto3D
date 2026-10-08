@@ -11,24 +11,7 @@ import { MaterialSource, MaterialType } from '../engine/model/material.js';
 import { RGBColorToHexString } from '../engine/model/color.js';
 import { Unit } from '../engine/model/unit.js';
 import { Loc } from '../engine/core/localization.js';
-import { DisplayLength } from './preferences.js';
-
-function UnitToString (unit)
-{
-    switch (unit) {
-        case Unit.Millimeter:
-            return Loc ('Millimeter');
-        case Unit.Centimeter:
-            return Loc ('Centimeter');
-        case Unit.Meter:
-            return Loc ('Meter');
-        case Unit.Inch:
-            return Loc ('Inch');
-        case Unit.Foot:
-            return Loc ('Foot');
-    }
-    return Loc ('Unknown');
-}
+import { DisplayLength, DisplayUnitLabel } from './preferences.js';
 
 export class SidebarDetailsPanel extends SidebarPanel
 {
@@ -69,7 +52,7 @@ export class SidebarDetailsPanel extends SidebarPanel
             this.AddProperty (table, new Property (PropertyType.Integer, Loc ('Triangles'), triangleCount));
         }
         if (unit !== Unit.Unknown) {
-            this.AddProperty (table, new Property (PropertyType.Text, Loc ('Unit'), UnitToString (unit)));
+            this.AddProperty (table, new Property (PropertyType.Text, Loc ('Unit'), DisplayUnitLabel (this.unitSystem)));
         }
         this.AddProperty (table, new Property (PropertyType.Text, 'Width (X)', DisplayLength (size.x, unit, this.unitSystem)));
         this.AddProperty (table, new Property (PropertyType.Text, 'Height (Y)', DisplayLength (size.y, unit, this.unitSystem)));

@@ -88,11 +88,6 @@ export class SessionEditor
         viewer.renderer.domElement.addEventListener ('lostpointercapture', cancelDrag);
         window.addEventListener ('blur', cancelDrag);
         this.CreateUI ();
-        viewer.renderer.domElement.addEventListener ('contextmenu', (event) => {
-            if (this.readOnly || !this.selected) { return; }
-            event.preventDefault ();
-            this.OpenContextMenu (event);
-        });
         const headerLibrary = Element ('button', 'header_library_button', undefined, document.getElementById ('header_buttons'));
         headerLibrary.title = 'Saved models and sessions'; headerLibrary.setAttribute ('aria-label', 'Library');
         headerLibrary.innerHTML = '<svg viewBox="0 0 26 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6">' + Icons.library + '</svg><span>Library</span>';
@@ -214,17 +209,8 @@ export class SessionEditor
                     if (!this.selected || !Number.isFinite (input.valueAsNumber)) { return; }
                     const before = TransformState (this.selected);
                     if (key === 'scale') {
-                        const factor = UnitFactor (this.selected.unit, this.website.preferences.units);
-                        const base = this.GetObjectBaseSize (this.selected);
-                        if (factor !== null && base[axis] > 1e-12) {
-                            if (input.valueAsNumber <= 0) { return; }
-                            const nextScale = ScaleFromDisplaySize (base[axis], input.valueAsNumber, this.selected.unit, this.website.preferences.units);
-                            if (nextScale === null) { return; }
-                            this.selected.scale[axis] = nextScale;
-                        } else {
-                            if (Math.abs (input.valueAsNumber) < 1e-6) { return; }
-                            this.selected.scale[axis] = input.valueAsNumber;
-                        }
+                        this.SetObjectDisplayDimension (this.selected, axis, input.valueAsNumber);
+                        return;
                     } else {
                         this.selected[key][axis] = input.valueAsNumber;
                     }
@@ -249,31 +235,36 @@ export class SessionEditor
         this.RefreshUI ();
     }
 
-    OpenContextMenu (event)
+    OpenContextMenu (coordinates, actions)
     {
-        document.querySelectorAll ('.auto3d_context_menu').forEach ((menu) => menu.remove ());
+        this.closeContextMenu?. ();
         const menu = Element ('div', 'auto3d_context_menu', undefined, document.body);
-        Object.assign (menu.style, { position : 'fixed', zIndex : '100000', left : event.clientX + 'px', top : event.clientY + 'px', minWidth : '170px', padding : '6px', borderRadius : '8px', background : 'var(--ov_background_color, #242424)', boxShadow : '0 8px 28px rgba(0,0,0,.35)' });
-        const actions = [
-            ['Move', () => this.SetMode ('translate')],
-            ['Rotate', () => this.SetMode ('rotate')],
-            ['Scale', () => this.SetMode ('scale')],
-            ['Focus', () => this.Focus ()],
-            ['Duplicate', () => this.Duplicate ()],
-            [this.selected.visible ? 'Hide' : 'Show', () => this.ToggleVisibility ()],
-            ['Delete', () => this.Delete ()]
-        ];
-        const close = () => menu.remove ();
-        for (const [label, action] of actions) {
-            const button = Element ('button', 'scene_context_action', label, menu);
+        menu.setAttribute ('role', 'menu');
+        Object.assign (menu.style, { position : 'fixed', zIndex : '100000', minWidth : '170px', padding : '6px', borderRadius : '8px', background : 'var(--ov_background_color, #242424)', boxShadow : '0 8px 28px rgba(0,0,0,.35)' });
+        const dismiss = (event) => { if (!menu.contains (event.target)) { close (); } };
+        const drag = (event) => { if ((event.buttons & 2) && Math.hypot (event.clientX - coordinates.x, event.clientY - coordinates.y) > 5) { close (); } };
+        const escape = (event) => { if (event.key === 'Escape') { close (); } };
+        const close = () => {
+            window.removeEventListener ('pointerdown', dismiss);
+            window.removeEventListener ('keydown', escape);
+            window.removeEventListener ('pointermove', drag);
+            window.removeEventListener ('blur', close);
+            this.closeContextMenu = null;
+            menu.remove ();
+        };
+        this.closeContextMenu = close;
+        for (const { name, onClick } of actions) {
+            const button = Element ('button', 'scene_context_action', name, menu);
+            button.setAttribute ('role', 'menuitem');
             Object.assign (button.style, { display : 'block', width : '100%', padding : '7px 10px', textAlign : 'left' });
-            button.addEventListener ('click', async () => { close (); await this.Run (action); });
+            button.addEventListener ('click', () => { close (); this.Run (onClick); });
         }
-        const dismiss = (dismissEvent) => { if (!menu.contains (dismissEvent.target)) { close (); } };
-        setTimeout (() => {
-            window.addEventListener ('pointerdown', dismiss, { once : true });
-            window.addEventListener ('blur', close, { once : true });
-        }, 0);
+        menu.style.left = Math.max (0, Math.min (coordinates.x, window.innerWidth - menu.offsetWidth)) + 'px';
+        menu.style.top = Math.max (0, Math.min (coordinates.y, window.innerHeight - menu.offsetHeight)) + 'px';
+        window.addEventListener ('pointerdown', dismiss);
+        window.addEventListener ('keydown', escape);
+        window.addEventListener ('pointermove', drag);
+        window.addEventListener ('blur', close);
     }
 
     async Run (action) { if (this.busy) { return; } try { await action (); } catch (error) { this.Status (error.message); } }
@@ -553,10 +544,10 @@ export class SessionEditor
         const factor = this.selected ? UnitFactor (this.selected.unit, units) : null;
         const base = this.selected ? this.GetObjectBaseSize (this.selected) : [0, 0, 0];
         if (this.scaleHeading) {
-            this.scaleHeading.textContent = factor === null ? 'Scale (×)' : 'Size (' + DisplayUnitLabel (units) + ')';
+            this.scaleHeading.textContent = 'Size (' + (factor === null ? 'model units' : DisplayUnitLabel (units)) + ')';
         }
         if (this.transformHint) {
-            this.transformHint.textContent = factor === null ? 'Position uses source coordinates; scale is a multiplier because this model has no declared unit.' : 'Position uses source coordinates. Size follows the global ' + DisplayUnitLabel (units) + ' preference.';
+            this.transformHint.textContent = factor === null ? 'Position uses source coordinates; size uses model units because this model has no declared unit.' : 'Position uses source coordinates. Size follows the global ' + DisplayUnitLabel (units) + ' preference.';
         }
         for (const { input, key, axis } of this.inputs) {
             if (!this.selected) { input.value = ''; continue; }
@@ -634,11 +625,16 @@ export class SessionEditor
             const field = Element ('label', null, label, dimensionGrid);
             const input = Element ('input', null, undefined, field);
             input.type = 'number'; input.step = 'any'; input.min = '0.000001'; input.value = Number (value.toFixed (5));
-            input.disabled = this.readOnly;
+            input.disabled = this.readOnly || base[axis] <= 1e-12;
             input.setAttribute ('aria-label', label + ' dimension in ' + unitLabel);
+            let committing = false;
             input.addEventListener ('change', () => {
-                if (!Number.isFinite (input.valueAsNumber) || input.valueAsNumber <= 0) { this.UpdateDetails (); return; }
-                this.SetObjectDisplayDimension (object, axis, input.valueAsNumber);
+                if (committing) { return; }
+                committing = true;
+                try {
+                    if (!Number.isFinite (input.valueAsNumber) || input.valueAsNumber <= 0) { this.UpdateDetails (); return; }
+                    this.SetObjectDisplayDimension (object, axis, input.valueAsNumber);
+                } finally { committing = false; }
             });
         }
 
@@ -753,11 +749,12 @@ export class SessionEditor
 
     SetObjectDisplayDimension (object, axis, value)
     {
+        if (this.readOnly || !object || !Number.isInteger (axis) || axis < 0 || axis > 2 || !Number.isFinite (value)) { return; }
         const base = this.GetObjectBaseSize (object);
         const next = ScaleFromDisplaySize (base[axis], value, object.unit, this.website.preferences.units);
         if (next === null || !Number.isFinite (next) || Math.abs (next) < 1e-6) { return; }
         const before = TransformState (object);
-        object.scale[axis] = next;
+        object.scale[axis] = next * Math.sign (object.scale[axis] || 1);
         this.ApplyTransform (object);
         this.RecordTransform (object, before);
         this.UpdateDetails ();

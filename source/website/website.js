@@ -5,7 +5,6 @@ import { NavigationMode, ProjectionMode } from '../engine/viewer/camera.js';
 import { RGBColor, HexStringToRGBAColor } from '../engine/model/color.js';
 import { Viewer } from '../engine/viewer/viewer.js';
 import { AddDomElement, ShowDomElement, SetDomElementOuterHeight, CreateDomElement, GetDomElementOuterWidth } from '../engine/viewer/domutils.js';
-import { CalculatePopupPositionToScreen, ShowListPopup } from './dialogs.js';
 import { HandleEvent } from './eventhandler.js';
 import { HashHandler } from './hashhandler.js';
 import { Navigator, Selection, SelectionType } from './navigator.js';
@@ -262,13 +261,6 @@ export class Website
         }
         this.UpdateViewport ();
         document.getElementById ('workspace_upload').addEventListener ('click', () => this.OpenFileBrowserDialog ());
-        document.getElementById ('workspace_open_url').addEventListener ('click', () => {
-            ShowOpenUrlDialog ((urls) => {
-                if (urls.length > 0) {
-                    this.hashHandler.SetModelFilesToHash (urls);
-                }
-            });
-        });
         for (const [side, toggleId] of [['left', 'upload_panel_toggle'], ['right', 'data_panel_toggle']]) {
             const container = side === 'left' ? this.parameters.leftContainerDiv : this.parameters.rightContainerDiv;
             const toggle = document.getElementById (toggleId);
@@ -454,10 +446,10 @@ export class Website
                 });
             }
         }
-        ShowListPopup (items, {
-            calculatePosition : (contentDiv) => CalculatePopupPositionToScreen (globalMouseCoordinates, contentDiv),
-            onClick : (index) => items[index].onClick ()
-        });
+        if (meshUserData !== null && !this.sessionEditor.readOnly && this.sessionEditor.selected) {
+            items.unshift (...[['Move', 'translate'], ['Rotate', 'rotate'], ['Scale', 'scale']].map (([name, mode]) => ({ name, onClick : () => this.sessionEditor.SetMode (mode) })));
+        }
+        this.sessionEditor.OpenContextMenu (globalMouseCoordinates, items);
     }
 
     OnHashChange ()

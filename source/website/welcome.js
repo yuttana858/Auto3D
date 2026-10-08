@@ -99,7 +99,7 @@ function ShowWelcome ()
 function StartTour ()
 {
     const steps = [
-        ['#upload_panel_content', 'Bring your models in', 'Upload or drop a model here. Include its textures, or use a bundled ZAE file. Try the sample model to get started.'],
+        ['#upload_panel_content', 'Bring your models in', 'Upload or drop a model here. Include its textures, or use a bundled ZAE file.'],
         ['#session_objects', 'Build your scene', 'Add multiple models, select an object, and manage its visibility or replace it while keeping its placement.'],
         ['#materials_section', 'Give every surface a look', 'Select a model to see its materials. The advanced editor lets you replace textures, inspect UVs, and adjust surface properties.'],
         ['#lighting_section', 'Set the atmosphere', 'Choose backgrounds, studio lighting or HDRI environments. Toggle the horizon and ground grid to frame your scene.'],

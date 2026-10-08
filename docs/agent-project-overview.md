@@ -188,3 +188,7 @@ Deployment pushes to `main` trigger Pages upload using GitHub secrets; manual wo
 | `docs/ai-generative.md` | Meshy proxy/key boundary, relevant if account auth later protects AI spending |
 
 Before starting auth/R2 development, verify the latest feature branch, locate/confirm the temporary login provider and session design, and establish permitted users, organization ownership, private/public Library UX, legacy migration requirements, share access expectations, and upload/storage quota policy. PostgreSQL metadata and future Entra identity are already documented directions. Inspect non-secret binding/configuration information; never print or commit credentials.
+
+## Model dimensions and context menu
+
+The viewer navigation dispatches right-clicks to one session menu; right-drag orbit suppresses the menu. Model Data W/L/H map to X/Z/Y and resize the selected object through `SessionEditor.SetObjectDisplayDimension`, shared with `object.dimension` and transform Size inputs. Declared source units convert to the global mm/inches preference; undeclared units remain explicit model units. Dimensions are positive lengths, preserve mirrored scale signs, support undo, and cannot expand a zero-width axis by scaling.
