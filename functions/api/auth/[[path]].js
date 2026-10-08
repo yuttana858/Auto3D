@@ -61,7 +61,22 @@ async function appProfile (env, authUser)
     const query = '/rest/v1/auto3d_users?select=id,email,display_name,status,is_platform_admin&auth_user_id=eq.' + encodeURIComponent (authUser.id) + '&limit=1';
     const response = await fetch (url + query, { headers });
     const rows = response.ok ? await response.json () : [];
-    const profile = rows[0];
+    let profile = rows[0];
+    const bootstrapEmail = String (env.AUTO3D_BOOTSTRAP_ADMIN_EMAIL || '').trim ().toLowerCase ();
+    if (!profile && bootstrapEmail && String (authUser.email || '').toLowerCase () === bootstrapEmail) {
+        const createResponse = await fetch (url + '/rest/v1/auto3d_users', {
+            method : 'POST',
+            headers : { apikey : secret, Authorization : 'Bearer ' + secret, 'Content-Type' : 'application/json', Prefer : 'return=representation' },
+            body : JSON.stringify ({
+                auth_user_id : authUser.id,
+                email : String (authUser.email || '').toLowerCase (),
+                display_name : authUser.user_metadata?.display_name || authUser.user_metadata?.name || authUser.email,
+                status : 'active',
+                is_platform_admin : true
+            })
+        });
+        if (createResponse.ok) { profile = (await createResponse.json ())[0]; }
+    }
     if (!profile || profile.status !== 'active') { return { user : null, organization : null, permissions : [] }; }
 
     let organization = null;
