@@ -1,86 +1,95 @@
-# Auto3D Migration Goal
+# Auto3D Multi-User Authentication Goal
 
-## Goal
+## Active milestone
 
-Complete the Auto3D backend transition so the browser no longer owns database credentials or publisher authentication, shared publishing is authorized by corporate identity, and large 3D assets are stored economically without coupling the 3D workspace to any single identity, database, or object-storage vendor.
+Complete the multi-user database and login system before resuming broader Library/R2 feature work.
 
-## Target architecture
-
-```
-Auto3D browser
-    |
-    | HTTPS / JSON + direct authorized binary transfer
-    v
-Auto3D Library API
-    |
-    +-- Identity / authorization
-    |      Target: Microsoft Entra ID
-    |
-    +-- Metadata repository
-    |      Current: Supabase PostgreSQL
-    |      Future: provider-neutral PostgreSQL-compatible service
-    |
-    +-- Object storage
-           Primary: Cloudflare R2
-           Legacy fallback during migration: Supabase Storage
-```
-
-The browser must depend on the Auto3D Library API contract, not Supabase, Cloudflare, Azure, or AWS-specific SDKs. Object storage stores bytes only; Auto3D remains the authority for users, organizations, permissions, quotas, shares, and audit events.
+This milestone is complete only when Auto3D has a coherent user lifecycle from access request through authenticated use, with organization membership and administrative controls enforced server-side.
 
 ## Required outcomes
 
-- Remove the Supabase email/password publisher login from Auto3D.
-- Add a provider-neutral AuthService and multi-user organization model.
-- Place the login experience below the Auto3D logo after the landing animation loads.
-- Use Microsoft Entra ID for corporate authentication and group/role authorization.
-- Prevent anonymous publishing and enforce authorization server-side.
-- Move large `.auto3d`, GLB/GLTF, texture, HDRI, thumbnail and future artifact payloads to Cloudflare R2.
-- Keep Library metadata, ownership, ACLs, quotas, share records and audit events in PostgreSQL.
-- Use direct authorized R2 transfers for large files; use multipart uploads for large/resumable saves.
-- Preserve read-only shared-library browsing and view-only share links during the transition.
-- Preserve Device library and portable `.auto3d` file workflows.
-- Add explicit per-user/organization storage accounting using persisted file sizes.
-- Keep the persistence contract provider-neutral enough to migrate storage/database implementations later without rewriting the workspace.
-- Add CI release gates for lint, tests and production build before v1.0.
-- Establish versioned `.auto3d` schema migration and backward-compatibility rules.
-- Complete dependency-license, security, privacy and representative format-fidelity validation.
+- Animated startup screen contains working email/password sign-in.
+- Startup screen supports guest access and account-request submission.
+- Supabase Auth stores temporary email/password credentials; Auto3D never stores readable passwords.
+- Auto3D owns provider-neutral internal user IDs independent of the authentication provider.
+- Users may later link Microsoft Entra identities without changing their Auto3D user ID.
+- Organizations are first-class records.
+- Users may belong to organizations with Owner, Admin, Editor, or Viewer roles.
+- Platform admin is distinct from organization roles.
+- An administrator can approve or decline account requests.
+- An administrator can manually create a user.
+- Approval/manual creation can assign an organization and role.
+- An administrator can create organizations.
+- An administrator can deactivate/reactivate users without deleting their historical identity record.
+- An administrator can reset a temporary password without ever reading an existing password.
+- An administrator can delete an authentication account while retaining an auditable tombstone in Auto3D metadata.
+- Admin actions are written to an audit log.
+- The administrator console is unlinked, noindex/no-store, and protected by authenticated platform-admin authorization. Its random URL is defense-in-depth only.
+- Session access and refresh tokens are held in HttpOnly Secure SameSite cookies.
+- Browser code never receives the Supabase secret/service credential.
+- Direct table access remains blocked; privileged user-management operations go through the same-origin backend API.
+- The design remains compatible with replacing temporary password authentication with Microsoft Entra ID.
 
-## Cloud direction
+## Identity model
 
-### Active implementation
+```
+Authentication provider
+    |
+    | provider subject / auth user id
+    v
+auto3d_user_identities
+    |
+    v
+auto3d_users (immutable internal user id)
+    |
+    +-- platform admin flag
+    |
+    +-- auto3d_organization_members
+            |
+            +-- owner
+            +-- admin
+            +-- editor
+            +-- viewer
+```
 
-- Cloudflare Pages/Workers: Auto3D application and same-origin Library API.
-- Cloudflare R2: large binary model/session assets with zero public bucket access.
-- Supabase PostgreSQL: metadata and transitional authorization data.
-- Microsoft Entra ID: target workforce identity provider.
-- Short-lived server-authorized object access; no R2 credentials in browser code.
+Email is a contact/login attribute, not the permanent identity key. Future Entra accounts must be linked by verified provider/tenant/subject identity, not automatically merged only because an email matches.
 
-### Storage rules
+## Temporary authentication implementation
 
-- R2 buckets remain private.
-- The API verifies identity, organization membership, permission and quota before upload/download authorization.
-- New Library records store a provider plus opaque object keys; they do not expose storage implementation details to the workspace.
-- Uploads should bypass the API data plane when possible: Browser -> authorized temporary R2 URL.
-- Use multipart uploads once payload size/reliability makes single PUT undesirable.
-- Persist `file_size_bytes` in metadata rather than scanning object storage for quota calculations.
-- Keep legacy Supabase Storage reads only during the migration window.
-
-### Future Microsoft hosting option
-
-If corporate policy later requires an all-Microsoft data plane, the provider-neutral Library API may map the same object contract to Azure Blob Storage. Entra integration must not depend on the selected object store.
+- Supabase Auth: temporary email/password authentication.
+- Cloudflare Pages Functions: same-origin authentication and administration API.
+- Supabase PostgreSQL: Auto3D users, identities, organizations, memberships, account requests, and audit events.
+- Microsoft Entra ID: target replacement authentication provider.
 
 ## Security invariants
 
-- No database secret/service key or R2 secret in browser code.
-- No anonymous publishing.
-- Remote publication is always an explicit user action.
-- Authorization is enforced server-side, never from browser claims alone.
-- Shared view links are read-only.
-- Presigned/object access URLs are short-lived bearer capabilities.
-- Production secrets come from managed secret stores.
-- Backend APIs use least-privilege identities and auditable operations.
-- Storage provider choice never grants authorization by itself.
+- No Supabase secret/service key in browser code.
+- No password hashes or plaintext passwords in Auto3D tables.
+- Existing passwords can never be viewed by administrators.
+- Generated/reset temporary passwords are returned only at creation/reset time.
+- Disabled/deleted Auto3D accounts cannot obtain an active Auto3D session even if an upstream credential exists.
+- Platform-admin operations require a validated authenticated session and server-side platform-admin check.
+- Organization permissions are server-side authorization data, not trusted browser claims.
+- Account-request input is validated and rate-limit-ready.
+- Authentication/session responses are no-store.
+- Admin page and API are noindex/no-store.
+- Audit events record privileged account-management actions.
 
-## Exit criteria
+## Milestone exit criteria
 
-The migration is complete when authenticated Auto3D users can save, reopen and share organization-owned Library assets, large payloads are stored in private R2, quotas and permissions are enforced server-side, Entra can become the identity provider without changing Library ownership semantics, and automated tests/build/deployment pass.
+The multi-user authentication milestone is complete when:
+
+1. The first platform admin can be safely bootstrapped.
+2. A guest can request access.
+3. The admin can review and approve/decline the request.
+4. Approval creates the temporary authentication credential, Auto3D user, organization membership, and role.
+5. The approved user can sign in from the startup screen and receive the correct Auto3D identity, organization, and permissions.
+6. The admin can manually create, deactivate/reactivate, reset password, change organization role, and delete users.
+7. Organization creation and membership management work from the admin console.
+8. Auth/session/admin APIs fail closed when server secrets or authorization are unavailable.
+9. Database security advisors and CI/build checks are reviewed.
+10. PR #16 contains the full tested milestone and is ready for review before merge.
+
+## Next milestone after authentication
+
+Resume authenticated Library Save/Open ownership, per-organization quotas, direct/multipart R2 uploads, and share authorization using the completed identity/organization model.
