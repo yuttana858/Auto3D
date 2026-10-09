@@ -113,7 +113,7 @@ export class SceneEffects
         });
         const renderer = this.viewer.renderer;
         const shaderErrors = (renderer.info?.programs || []).filter ((program) => program.diagnostics?.runnable === false).map ((program) => ({ name : program.name, log : program.diagnostics.programLog, vertex : program.diagnostics.vertexShader?.log, fragment : program.diagnostics.fragmentShader?.log }));
-        return { enabled : this.settings.shadows, intensity : this.settings.shadowIntensity, mapType : renderer.shadowMap.type, mapEnabled : renderer.shadowMap.enabled, contextLost : renderer.getContext?.().isContextLost () ?? false, rootVisible : root?.visible ?? null, ...counts, floor : this.shadowFloor ? { visible : this.shadowFloor.visible, depthWrite : this.shadowFloor.material.depthWrite, opacity : this.shadowFloor.material.opacity } : null, shaderErrors };
+        return { enabled : this.settings.shadows, intensity : this.settings.shadowIntensity, mapType : renderer.shadowMap.type, mapEnabled : renderer.shadowMap.enabled, contextLost : renderer.getContext?.().isContextLost () ?? false, rootVisible : root?.visible ?? null, ...counts, floor : this.shadowFloor ? { visible : this.shadowFloor.visible, depthWrite : this.shadowFloor.material.depthWrite, depthTest : this.shadowFloor.material.depthTest, transparent : this.shadowFloor.material.transparent, renderOrder : this.shadowFloor.renderOrder, opacity : this.shadowFloor.material.opacity } : null, shaderErrors };
     }
 
     ApplyObjectSettings (objects)
@@ -347,7 +347,22 @@ export class SceneEffects
         if (!bounds) { return; }
         this.UpdateShadowCamera (bounds);
         if (!this.shadowFloor) {
-            this.shadowFloor = new THREE.Mesh (new THREE.PlaneGeometry (1, 1), new THREE.ShadowMaterial ({ opacity : this.settings.shadowIntensity }));
+            // Blend onto the background before models, rather than compositing a
+            // transparent floor over models in the later transparent render queue.
+            // Custom blending retains shadow alpha while using the opaque queue.
+            const material = new THREE.ShadowMaterial ({
+                opacity : this.settings.shadowIntensity,
+                transparent : false,
+                blending : THREE.CustomBlending,
+                blendEquation : THREE.AddEquation,
+                blendSrc : THREE.SrcAlphaFactor,
+                blendDst : THREE.OneMinusSrcAlphaFactor,
+                blendSrcAlpha : THREE.OneFactor,
+                blendDstAlpha : THREE.OneMinusSrcAlphaFactor,
+                depthWrite : false,
+                depthTest : true
+            });
+            this.shadowFloor = new THREE.Mesh (new THREE.PlaneGeometry (1, 1), material);
             this.shadowFloor.userData.auto3dSceneEffect = true;
             this.shadowFloor.receiveShadow = true;
             this.shadowFloor.material.depthWrite = false;

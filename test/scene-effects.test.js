@@ -51,6 +51,20 @@ describe ('Scene effects render state', () => {
     it ('Prevents transparent shadow/reflection floors from writing depth over the model', () => {
         const { effects, root } = fixture (); effects.Set ('shadows', true); effects.Set ('floorReflection', true); assert.equal (effects.shadowFloor.material.depthWrite, false); assert.equal (effects.floorReflector.material.depthWrite, false); assert.equal (root.visible, true); effects.Set ('shadows', false); assert.equal (effects.shadowFloor, null); effects.Dispose ();
     });
+    it ('Blends floor shadows before model rendering without changing model alpha', () => {
+        const { effects, root, material } = fixture ();
+        material.transparent = true; material.opacity = 0.6; material.depthWrite = false;
+        effects.Set ('shadows', true); effects.Set ('shadowIntensity', 1);
+        const floor = effects.shadowFloor;
+        assert.equal (floor.material.transparent, false);
+        assert.equal (floor.material.blending, THREE.CustomBlending);
+        assert.equal (floor.material.blendSrc, THREE.SrcAlphaFactor);
+        assert.equal (floor.material.blendDst, THREE.OneMinusSrcAlphaFactor);
+        assert.equal (floor.material.depthWrite, false); assert.equal (floor.material.depthTest, true);
+        assert.ok (floor.renderOrder < root.children[0].renderOrder);
+        assert.equal (material.transparent, true); assert.equal (material.opacity, 0.6); assert.equal (material.depthWrite, false);
+        effects.Dispose ();
+    });
     it ('Keeps the shadow light outside translated bounds and resets the standard light target on disable', () => {
         const { effects, viewer, root } = fixture (); root.position.set (10000, 5000, -2000); effects.Set ('shadows', true);
         const light = viewer.shadingModel.directionalLight; ShadingModel.prototype.UpdateByCamera.call (viewer.shadingModel, { eye : { x : 10100, y : 5100, z : -1900 }, center : { x : 10000, y : 5000, z : -2000 } });
