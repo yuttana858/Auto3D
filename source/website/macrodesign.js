@@ -11,7 +11,7 @@ export function CommandGroup (command)
 
 export function StepSummary (command, args)
 {
-    if (command.id === 'object.array') { return `Array (${args.width} W × ${args.length} L × ${args.height} H)`; }
+    if (command.id === 'object.array') { return `Array (${args.width} W × ${args.length} L × ${args.height} H)` + (args.layerRotation ? ` · alternate layers ${args.layerRotation}°` : ''); }
     if (command.id === 'object.transform') { return ['position', 'rotation', 'scale'].filter ((key) => args[key]).map ((key) => `${key === 'position' ? 'Move' : key === 'rotation' ? 'Rotate' : 'Scale'} (${Array.isArray (args[key]) ? args[key].join (', ') : 'previous result'})`).join (' · ') || command.title; }
     if (command.id === 'library.account.open') { return args.append ? 'Add saved model to scene' : 'Open saved model'; }
     return command.title;

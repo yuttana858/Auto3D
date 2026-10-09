@@ -1,3 +1,4 @@
+import { ArrayPlacement } from './arraylayout.js';
 import { SessionCameras } from './sessioncameras.js';
 import { CalculateVolume, CalculateSurfaceArea } from '../engine/model/quantities.js';
 import { IsTwoManifold } from '../engine/model/modelutils.js';
@@ -494,6 +495,7 @@ export class SessionEditor
     }
     RecordTransform (object, before)
     {
+        if (this.liveDetailsEditing) { return; }
         const after = TransformState (object); if (JSON.stringify (before) === JSON.stringify (after)) { return; }
         const apply = (state) => { Object.assign (object, { position : [...state.position], rotation : [...state.rotation], scale : [...state.scale] }); this.ApplyTransform (object); this.UpdateDetails (); };
         this.history.Push ({ undo : () => apply (before), redo : () => apply (after) }); this.RefreshButtons ();
@@ -631,6 +633,7 @@ export class SessionEditor
     }
     RenderDetails ()
     {
+        if (this.liveDetailsEditing) { this.SyncLiveDimensions (); return; }
         const object = this.selected;
         if (!object?.threeObject || !this.website.model) { this.DisposeModelPreview (); return; }
         const panel = this.website.sidebar.detailsPanel;
@@ -667,14 +670,15 @@ export class SessionEditor
             const cell = row.querySelector ('.ov_property_table_value');
             const input = Element ('input', 'scene_dimension_input', undefined, cell); input.type = 'number'; input.step = 'any'; input.min = '0.000001'; input.value = Number (value.toFixed (5)); input.disabled = this.readOnly || base[axis] <= 1e-12;
             input.setAttribute ('aria-label', label + ' dimension in ' + unitLabel); Element ('span', 'scene_dimension_unit', ' ' + unitLabel, cell);
-            input.addEventListener ('change', () => { if (this.updatingDetails) { return; } if (Number.isFinite (input.valueAsNumber) && input.valueAsNumber > 0) { this.SetObjectDisplayDimension (object, axis, input.valueAsNumber, this.proportionalScaling); } else { this.UpdateDetails (); } });
+            input.dataset.dimensionAxis = String (axis);
+            this.BindLiveDimension (input, object, value => this.SetObjectDisplayDimension (object, axis, value, this.proportionalScaling));
         }
         panel.contentDiv.querySelectorAll ('.scene_object_details').forEach ((item) => item.remove ());
         const details = Element ('div', 'scene_object_details', undefined, panel.contentDiv);
         const proportional = Element ('button', 'scene_proportion_button', 'Proportional scaling', details); proportional.setAttribute ('aria-pressed', String (this.proportionalScaling)); proportional.disabled = this.readOnly;
         proportional.onclick = () => { this.SetProportionalScaling (!this.proportionalScaling); };
         const percentLabel = Element ('label', 'scene_scale_percent', 'Scale (%)', details); const percent = Element ('input', null, undefined, percentLabel); percent.type = 'number'; percent.step = 'any'; percent.min = '0.0001'; percent.value = '100'; percent.disabled = this.readOnly; percent.setAttribute ('aria-label', 'Scale percentage');
-        const applyPercent = Element ('button', null, 'Apply scale', details); applyPercent.disabled = this.readOnly; applyPercent.onclick = () => this.Run (() => this.ScaleByPercentage (object, percent.valueAsNumber));
+        this.BindLiveDimension (percent, object, (value, before) => this.ScaleByPercentage (object, value, before.scale));
         Element ('p', 'section_hint', 'Percentage multiplies the current size on all axes. W = X · L = Z · H = Y.', details);
 
         Element ('strong', null, 'Shadows', details);
@@ -690,7 +694,6 @@ export class SessionEditor
                 this.PushHistory (() => apply (before), () => apply (after));
             });
         }
-        Element ('p', 'section_hint', 'Cast + Receive enables self-shadowing. Cast affects other receiving models; Receive accepts shadows from other casters.', details);
 
         Element ('strong', null, 'User data', details);
         const userDataList = Element ('div', 'scene_user_data', undefined, details);
@@ -786,6 +789,28 @@ export class SessionEditor
         this.modelPreview = { object, root : object.threeObject, element, renderer, scene, camera, pivot };
     }
 
+    SyncLiveDimensions ()
+    {
+        const object = this.selected; if (!object) { return; } const base = this.GetObjectBaseSize (object);
+        for (const input of this.website.sidebar.detailsPanel.contentDiv.querySelectorAll ('[data-dimension-axis]')) {
+            if (input === document.activeElement) { continue; } const axis = Number (input.dataset.dimensionAxis);
+            input.value = Number (DisplaySizeFromScale (base[axis], object.scale[axis], object.unit, this.website.preferences.units).toFixed (5));
+        }
+    }
+    BindLiveDimension (input, object, apply)
+    {
+        let before = null;
+        input.addEventListener ('focus', () => { before = TransformState (object); });
+        input.addEventListener ('input', () => {
+            if (this.readOnly || this.busy || !Number.isFinite (input.valueAsNumber) || input.valueAsNumber <= 0) { return; }
+            before ||= TransformState (object); this.liveDetailsEditing = true;
+            try { apply (input.valueAsNumber, before); this.MarkDirty (); } catch (error) { this.Status (error.message); }
+            finally { this.liveDetailsEditing = false; }
+        });
+        const finish = () => { if (!before) { return; } const previous = before; before = null; this.RecordTransform (object, previous); this.UpdateDetails (); };
+        input.addEventListener ('change', finish); input.addEventListener ('blur', finish);
+    }
+
     SetObjectDisplayDimension (object, axis, value, proportional = false)
     {
         if (this.readOnly || !object || !Number.isInteger (axis) || axis < 0 || axis > 2 || !Number.isFinite (value)) { return; }
@@ -801,10 +826,10 @@ export class SessionEditor
     }
 
     SetProportionalScaling (enabled) { this.proportionalScaling = Boolean (enabled); this.UpdateDetails (); return { proportional : this.proportionalScaling }; }
-    ScaleByPercentage (object, percent)
+    ScaleByPercentage (object, percent, baseline = object.scale)
     {
-        if (this.readOnly || this.busy || !object || !Number.isFinite (percent) || percent <= 0 || percent > 100000 || object.scale.some ((value) => Math.abs (value * percent / 100) < 1e-6)) { throw new Error ('Enter a positive scale percentage with nonzero resulting dimensions.'); }
-        const before = TransformState (object); object.scale = object.scale.map ((value) => value * percent / 100); this.ApplyTransform (object); this.RecordTransform (object, before); this.UpdateDetails (); return { id : object.id, scale : [...object.scale] };
+        if (this.readOnly || this.busy || !object || !Number.isFinite (percent) || percent <= 0 || percent > 100000 || baseline.some ((value) => !Number.isFinite (value) || Math.abs (value * percent / 100) < 1e-6)) { throw new Error ('Enter a positive scale percentage with nonzero resulting dimensions.'); }
+        const before = TransformState (object); object.scale = baseline.map ((value) => value * percent / 100); this.ApplyTransform (object); this.RecordTransform (object, before); this.UpdateDetails (); return { id : object.id, scale : [...object.scale] };
     }
 
     ShowAdvanceAnimation (visible) { ShowAdvanceAnimation (this, visible); }
@@ -932,27 +957,30 @@ export class SessionEditor
     {
         if (!this.selected) { return; }
         const dialog = WorkspaceDialog ('Array selected model');
+        dialog.classList.add ('array_dialog');
         const form = Element ('form', 'workspace_save_form', undefined, dialog);
+        const countRow = Element ('div', 'array_counts', undefined, form);
         Element ('p', 'section_hint', 'Create touching copies using the selected model bounding box. W = X · L = Z · H = Y.', form);
         const fields = {};
-        for (const [key, title] of [['w', 'Width count (W)'], ['l', 'Length count (L)'], ['h', 'Height count (H)']]) {
-            const label = Element ('label', null, title, form);
-            const input = Element ('input', null, undefined, label); input.type = 'number'; input.min = '1'; input.max = '20'; input.step = '1'; input.value = '1'; input.required = true;
+        for (const [key, title] of [['w', 'W'], ['l', 'L'], ['h', 'H']]) {
+            const label = Element ('label', null, title, countRow);
+            const input = Element ('input', null, undefined, label); input.type = 'number'; input.setAttribute ('aria-label', { w : 'Width count (W)', l : 'Length count (L)', h : 'Height count (H)' }[key]); input.min = '1'; input.max = '20'; input.step = '1'; input.value = '1'; input.required = true;
             fields[key] = input;
         }
+        const layerLabel = Element ('label', null, 'Rotate every other layer', form); const layerRotation = Element ('select', null, undefined, layerLabel); layerRotation.setAttribute ('aria-label', 'Alternate layer rotation'); [0, 45, 90, 180].forEach (angle => layerRotation.add (new Option (angle ? angle + '°' : 'None', String (angle))));
         const groupLabel = Element ('label', null, 'Automatically group array', form); const group = Element ('input', null, undefined, groupLabel); group.type = 'checkbox'; group.checked = true; group.setAttribute ('aria-label', 'Automatically group array');
         const optimizeLabel = Element ('label', null, 'Retain triangles (%)', form); const retain = Element ('input', null, undefined, optimizeLabel); retain.type = 'number'; retain.min = '5'; retain.max = '100'; retain.value = '100'; retain.setAttribute ('aria-label', 'Array retained triangles percentage');
-        Element ('p', 'section_hint', 'For large polygon models, lower retained triangles and preview quality before creating the array. Copies share mesh data. Original placement and bounds determine spacing.', form);
+        Element ('p', 'section_hint', 'Optional polygon reduction: preview quality before creating.', form);
         const host = Element ('div', 'array_polygon_preview', undefined, form); let dispose = null; let previewKey = null; const source = this.selected; const originalSize = new THREE.Box3 ().setFromObject (source.threeObject, true).getSize (new THREE.Vector3 ());
         const preview = Element ('button', null, 'Preview optimized array', form); preview.type = 'button';
-        const key = () => [fields.w.value, fields.l.value, fields.h.value, retain.value].join (':');
+        const key = () => [fields.w.value, fields.l.value, fields.h.value, retain.value, layerRotation.value].join (':');
         const invalidate = () => { previewKey = null; this.polygonOptimizer.Cancel (); dispose?.(); dispose = null; };
-        Object.values (fields).forEach ((input) => input.addEventListener ('input', invalidate)); retain.addEventListener ('input', invalidate);
+        Object.values (fields).forEach ((input) => input.addEventListener ('input', invalidate)); retain.addEventListener ('input', invalidate); layerRotation.addEventListener ('change', invalidate);
         preview.onclick = async () => {
             const counts = ['w', 'l', 'h'].map ((axis) => Number (fields[axis].value)); const ratio = Number (retain.value) / 100;
             if (counts.some ((value) => !Number.isInteger (value) || value < 1 || value > 20) || counts.reduce ((a, b) => a * b, 1) + this.document.objects.length - 1 > 1000 || !Number.isFinite (ratio) || ratio < 0.05 || ratio > 1) { status.textContent = 'Use valid counts within the 1,000-object limit and 5–100% retained triangles.'; return; }
             preview.disabled = true; create.disabled = true; status.textContent = 'Preparing array decimation preview…'; dispose?.();
-            try { const result = await this.polygonOptimizer.PreviewArray (counts, ratio); dispose = await this.polygonOptimizer.ShowPreview (host, counts); previewKey = key (); status.textContent = 'Array preview: ' + (result.before * counts.reduce ((a, b) => a * b, 1)).toLocaleString () + ' → ' + (result.after * counts.reduce ((a, b) => a * b, 1)).toLocaleString () + ' triangles. Inspect quality before creating.'; }
+            try { const result = await this.polygonOptimizer.PreviewArray (counts, ratio); dispose = await this.polygonOptimizer.ShowPreview (host, counts, Number (layerRotation.value)); previewKey = key (); status.textContent = 'Array preview: ' + (result.before * counts.reduce ((a, b) => a * b, 1)).toLocaleString () + ' → ' + (result.after * counts.reduce ((a, b) => a * b, 1)).toLocaleString () + ' triangles. Inspect quality before creating.'; }
             catch (error) { status.textContent = error.message; } finally { preview.disabled = false; create.disabled = false; }
         };
         dialog.addEventListener ('close', () => { this.polygonOptimizer.Cancel (); dispose?.(); }, { once : true });
@@ -969,7 +997,7 @@ export class SessionEditor
             if (ratio < 1 && previewKey !== key ()) { status.textContent = 'Preview optimized array before creating it.'; return; }
             if (this.selected !== source) { status.textContent = 'Selection changed. Close this dialog and reopen it.'; return; }
             create.disabled = true; status.textContent = 'Creating an array…';
-            try { if (ratio < 1) { await this.polygonOptimizer.Apply (); } await this.CreateArray (...counts, { autoGroup : group.checked, spacing : originalSize }); dialog.close (); } catch (error) { status.textContent = error.message; create.disabled = false; }
+            try { if (ratio < 1) { await this.polygonOptimizer.Apply (); } await this.CreateArray (...counts, { autoGroup : group.checked, spacing : originalSize, layerRotation : Number (layerRotation.value) }); dialog.close (); } catch (error) { status.textContent = error.message; create.disabled = false; }
         });
     }
 
@@ -980,6 +1008,7 @@ export class SessionEditor
         if (!source?.threeObject) { throw new Error ('Select a model first.'); }
         const counts = [widthCount, lengthCount, heightCount];
         if (counts.some ((value) => !Number.isInteger (value) || value < 1 || value > 20)) { throw new Error ('Array counts must be integers from 1 to 20.'); }
+        const layerRotation = options.layerRotation ?? 0; if (![0, 45, 90, 180].includes (layerRotation)) { throw new Error ('Use 0, 45, 90 or 180 degree layer rotation.'); }
         const total = widthCount * lengthCount * heightCount;
         if (this.document.objects.length + total - 1 > 1000) { throw new Error ('Array exceeds the 1,000-object session limit.'); }
         if (total === 1) { this.Status ('Array is 1 × 1 × 1; no copies created.'); return []; }
@@ -1000,8 +1029,7 @@ export class SessionEditor
                         const copy = this.document.Instance (source);
                         added.push (copy);
                         copy.name = source.name + ' [' + (w + 1) + ',' + (l + 1) + ',' + (h + 1) + ']';
-                        const offset = ArrayOffset (size, w, l, h);
-                        copy.position = source.position.map ((value, axis) => value + offset[axis]);
+                        Object.assign (copy, ArrayPlacement (source, box, size, w, l, h, layerRotation));
                         this.document.ApplyTransform (copy);
                         this.Status ('Creating an array… ' + added.length + ' / ' + (total - 1) + ' copies');
                         await new Promise ((resolve) => setTimeout (resolve, 0));

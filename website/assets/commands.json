@@ -1028,6 +1028,15 @@
           },
           "autoGroup": {
             "type": "boolean"
+          },
+          "layerRotation": {
+            "type": "number",
+            "enum": [
+              0,
+              45,
+              90,
+              180
+            ]
           }
         },
         "required": [
@@ -1584,6 +1593,14 @@
       "inputSchema": {
         "type": "object",
         "properties": {
+          "ambientIntensity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "ambientColor": {
+            "type": "string"
+          },
           "environmentIntensity": {
             "type": "number",
             "minimum": 0,
@@ -1932,6 +1949,179 @@
       },
       "example": {
         "section": "flutes"
+      }
+    },
+    {
+      "id": "render.open",
+      "title": "Open rendering",
+      "category": "Rendering",
+      "description": "Open PNG rendering controls in the left panel.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "render.queue.enqueue",
+      "title": "Queue PNG renders",
+      "category": "Rendering",
+      "description": "Queue the current screen, one saved camera or all saved cameras. Alpha exports only models. No remote upload or automatic download.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "screen",
+              "hd",
+              "4k",
+              "16k"
+            ]
+          },
+          "alpha": {
+            "type": "boolean"
+          },
+          "cameraId": {
+            "type": "string"
+          },
+          "allCameras": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "resolution": "4k",
+        "alpha": true,
+        "allCameras": true
+      }
+    },
+    {
+      "id": "render.queue.inspect",
+      "title": "Inspect render queue",
+      "category": "Rendering",
+      "description": "Read render job status, resolution and progress without image bytes.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "render.queue.start",
+      "title": "Start render queue",
+      "category": "Rendering",
+      "description": "Start sequential local PNG rendering. Returns immediately; inspect progress or cancel through queue commands.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "render.queue.stop",
+      "title": "Stop rendering",
+      "category": "Rendering",
+      "description": "Cancel the active job at the next tile and leave pending jobs queued.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "render.queue.cancel",
+      "title": "Cancel render job",
+      "category": "Rendering",
+      "description": "Cancel one pending or active render job.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "render-job-id"
+      }
+    },
+    {
+      "id": "render.queue.clear",
+      "title": "Clear finished renders",
+      "category": "Rendering",
+      "description": "Release completed/failed/cancelled image jobs from browser memory.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "render.queue.download",
+      "title": "Download rendered PNG",
+      "category": "Rendering",
+      "description": "Explicitly download one completed PNG to the local device. No remote upload.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "render-job-id"
+      }
+    },
+    {
+      "id": "sidebar.details.collapse",
+      "title": "Minimize Details",
+      "category": "Panels",
+      "description": "Collapse Details while keeping the render queue available underneath.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "collapsed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "collapsed"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "collapsed": true
       }
     },
     {

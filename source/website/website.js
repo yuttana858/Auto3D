@@ -1,3 +1,5 @@
+import { RenderQueue } from './renderqueue.js';
+import { RenderingPanel } from './renderingpanel.js';
 import { CameraPanel } from './camerapanel.js';
 import { ModelExtensions, SupportedFormatsText } from './importformats.js';
 import { GetFileExtension, TransformFileHostUrls } from '../engine/io/fileutils.js';
@@ -247,6 +249,7 @@ export class Website
         this.axisIndicator = new AxisIndicator (this.viewer, document.getElementById ('world_axis'));
         this.sessionEditor = new SessionEditor (this);
         this.cameraPanel = new CameraPanel (this);
+        this.rendering = new RenderQueue (this); this.renderingPanel = new RenderingPanel (this);
         this.preferences = new Preferences (this);
         this.aiWorkspace = new AIWorkspace (this);
         for (const [id, setting] of [['horizon_gradient', 'horizonGradient'], ['ground_grid', 'showGroundGrid']]) {
