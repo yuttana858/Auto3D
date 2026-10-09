@@ -1,14 +1,14 @@
 # Auto3D: agent project overview
 
-Analyzed 2026-10-07 against branch `work`, commit `238a93f` (v0.27.0). This is a source-code analysis, not verification of deployed cloud resources. Update this document as implementation changes.
+Updated October 9, 2026. Current production uses Cloudflare Pages Functions, private R2 Library storage, Supabase account metadata and temporary email/password sign-in. Historical branch notes below describe earlier research; the current implementation sections and linked runtime documents take precedence.
 
 ## Current development direction
 
 The user's current goal is **Cloudflare R2 storage and temporary sign-in for per-user Library files**, followed by transition to **Microsoft Entra ID (Azure identity)**. R2 is the active storage direction; Entra remains the identity destination. Earlier all-Azure storage/runtime recommendations are historical rather than the immediate implementation plan.
 
-This checkout now implements temporary Supabase email/password sign-in for administrator-created accounts: same-origin auth routes, secure HTTP-only cookies, provider verification/refresh/logout, AuthService and login under the startup logo. See `docs/temporary-auth.md`. Private Library ownership/upload authorization is still pending. The R2 read/storage metadata work exists remotely on `feat/multi-user-auth-foundation`, PR #16; it is not merged into this checkout. R2 is file storage; choosing it does not select an identity provider.
+This checkout implements mandatory Supabase email/password sign-in for administrator-created accounts, private per-account R2 Library files, synchronized preferences, and administrator requests/approvals/revoke/reset. Read `docs/temporary-auth.md`, `docs/account-storage.md`, and `docs/polygon-optimization.md` for current runtime behavior. Entra remains the future identity destination. Legacy published sharing is separate from private account storage.
 
-### Active remote branch: reviewed evidence
+### Historical feature branch: reviewed evidence
 
 Reviewed [PR #16](https://github.com/yuttana858/Auto3D/pull/16), its full diff and discussion, and [branch GOAL.md](https://github.com/yuttana858/Auto3D/blob/feat/multi-user-auth-foundation/GOAL.md). These changes are not present in the local checkout and were not tested here.
 
@@ -18,7 +18,7 @@ Reviewed [PR #16](https://github.com/yuttana858/Auto3D/pull/16), its full diff a
 - Infrastructure evidence: the PR body says R2 was not activated, but a later [PR comment](https://github.com/yuttana858/Auto3D/pull/16#issuecomment-6040448024) reports activation completed and bucket listing succeeded. It reports bucket creation blocked by Cloudflare authentication error 10000 and calls for private `auto3d-library`, Standard/ENAM, bound as `AUTO3D_LIBRARY_R2`. This is a historical report, not a fresh live-resource check.
 - Security gap still present in that diff: published Library reads remain anonymous and publicly cached for five minutes. A private R2 bucket does not make these API reads private. Ownership/session authorization must be added before personal files become available through these paths.
 
-Begin development from the active feature branch after reviewing its latest state. Preserve these overview changes when moving branches; do not overwrite existing feature work. Keep internal user/organization IDs independent of the temporary identity provider, with explicit identity mappings for later Entra linking.
+The current deployed main branch includes the implemented runtime. Historical feature-branch observations above are not instructions to switch away from main. Preserve these overview changes when moving branches; do not overwrite existing feature work. Keep internal user/organization IDs independent of the temporary identity provider, with explicit identity mappings for later Entra linking.
 
 ## Product and stack
 
@@ -200,3 +200,5 @@ Model imports display upload/opening/preparation progress, with a shared support
 Mandatory login is enforced by `authgate.js`, command invocation, API middleware, and protected-file middleware. Read `docs/temporary-auth.md` before changing restoration/logout. Preserve both the explicit logout tombstone and server-side session checks; a provider-verified access JWT alone is insufficient after logout.
 
 Account storage is now implemented; `docs/account-storage.md` supersedes the personal-library recommendations above for the current Pages runtime. Preferences and private R2 files initialize automatically for each authenticated account. Legacy published sharing remains separate. Read the recovery/SMTP status and new administrator route in `docs/temporary-auth.md` before changing account UI.
+
+The October 9 workspace update adds administrator revoke/restore/password reset with server session cutoffs (`docs/temporary-auth.md`), unit-aware position/distance/area/volume display, top-row W/L/H editing and proportional/percentage scaling, persistent object groups, Ctrl-click additive selection, shared array mesh buffers, and worker-based polygon previews (`docs/polygon-optimization.md`). Preserve original geometry until polygon.apply, reject stale previews, and keep animated rig/morph topology intact. New commands and worker build entry points are documented in those files.

@@ -66,3 +66,15 @@ describe ('Mandatory login and logout protection', () => {
         auth.user = user; assert.equal ((await commands.Execute ('scene.edit')).ok, true); assert.equal (calls, 1);
     });
 });
+
+describe ('Background administrator revocation checks', () => {
+    it ('does not notify listeners for the same verified account, and locks revoked/reset sessions', async () => {
+        let revoked = false; const auth = new AuthService (async () => revoked ? Response.json ({ error : 'Session revoked.' }, { status : 401 }) : Response.json ({ user })); auth.Update (user); let notifications = 0; auth.Subscribe (() => notifications++);
+        assert.equal ((await auth.VerifyCurrentSession ()).signedIn, true); assert.equal (notifications, 0);
+        revoked = true; assert.equal ((await auth.VerifyCurrentSession ()).signedIn, false); assert.equal (notifications, 1);
+    });
+    it ('does not restore a user after explicit logout during a recheck', async () => {
+        let release; const auth = new AuthService (async (url) => { if (url.endsWith ('session')) { await new Promise ((resolve) => { release = resolve; }); } return Response.json ({ user }); }); auth.Update (user);
+        const checking = auth.VerifyCurrentSession (); await new Promise ((resolve) => setTimeout (resolve, 0)); const logout = auth.SignOut (); release (); await Promise.all ([checking, logout]); assert.equal (auth.user, null);
+    });
+});

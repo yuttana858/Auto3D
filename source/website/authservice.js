@@ -50,6 +50,15 @@ export class AuthService
         return this.restoring;
     }
 
+    async VerifyCurrentSession ()
+    {
+        if (!this.user || this.loggedOut) { return this.Inspect (); }
+        const generation = this.generation; const id = this.user.id;
+        try { const data = await this.Request ('session'); if (generation === this.generation && (!data.user || data.user.id !== id)) { this.Update (null); } }
+        catch (error) { if (error.status !== 401) { throw error; } if (generation === this.generation) { await this.Restore (); } }
+        return this.Inspect ();
+    }
+
     Recover (email) { return this.Request ('recover', { email }); }
     ResetPassword (accessToken, password) { return this.Request ('reset-password', { accessToken, password }); }
     SignIn (email, password)

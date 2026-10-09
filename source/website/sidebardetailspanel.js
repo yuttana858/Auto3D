@@ -11,7 +11,7 @@ import { MaterialSource, MaterialType } from '../engine/model/material.js';
 import { RGBColorToHexString } from '../engine/model/color.js';
 import { Unit } from '../engine/model/unit.js';
 import { Loc } from '../engine/core/localization.js';
-import { DisplayLength, DisplayUnitLabel } from './preferences.js';
+import { DisplayLength, DisplayUnitLabel, DisplayQuantity } from './preferences.js';
 
 export class SidebarDetailsPanel extends SidebarPanel
 {
@@ -63,11 +63,11 @@ export class SidebarDetailsPanel extends SidebarPanel
                 return null;
             }
             const volume = CalculateVolume (object3D);
-            return new Property (PropertyType.Number, null, volume);
+            return new Property (PropertyType.Text, null, DisplayQuantity (Math.abs (volume), unit, this.unitSystem, 3));
         });
         this.AddCalculatedProperty (table, Loc ('Surface'), () => {
             const surfaceArea = CalculateSurfaceArea (object3D);
-            return new Property (PropertyType.Number, null, surfaceArea);
+            return new Property (PropertyType.Text, null, DisplayQuantity (surfaceArea, unit, this.unitSystem, 2));
         });
         if (object3D.PropertyGroupCount () > 0) {
             let customTable = AddDiv (this.contentDiv, 'ov_property_table ov_property_table_custom');

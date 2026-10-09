@@ -146,6 +146,14 @@ export class SceneDocument
         return result;
     }
 
+    Instance (object)
+    {
+        const meshMap = new Map (); object.node.EnumerateMeshIndices ((index) => meshMap.set (index, index));
+        const node = CopyNodeTree (object.node, this.model.root, meshMap);
+        const copy = { ...object, id : crypto.randomUUID (), node, name : object.name + ' copy', threeObject : null, position : [...object.position], rotation : [...object.rotation], scale : [...object.scale], userData : { ...(object.userData || {}) }, hiddenParts : [...(object.hiddenParts || [])], keyframes : [] };
+        delete copy.player; this.objects.push (copy); this.ApplyTransform (copy); return copy;
+    }
+
     Duplicate (object)
     {
         const asset = this.CompactModel ([object], true);

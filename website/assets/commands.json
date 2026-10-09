@@ -16,6 +16,20 @@
       "example": {}
     },
     {
+      "id": "auth.verify",
+      "title": "Verify active account session",
+      "category": "Account",
+      "description": "Recheck the signed-in account against the server. Revoked/reset sessions return to the login gate; unchanged verified identity does not interrupt the workspace.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
       "id": "auth.recover",
       "title": "Request password recovery",
       "category": "Account",
@@ -140,6 +154,94 @@
       }
     },
     {
+      "id": "admin.users",
+      "title": "List user accounts",
+      "category": "Account",
+      "description": "List verified administrator account management entries, without credentials.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10000
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "page": 1
+      }
+    },
+    {
+      "id": "admin.revoke",
+      "title": "Revoke user access",
+      "category": "Account",
+      "description": "Explicitly revoke a non-administrator account and block old app sessions. Saved files remain owned by the user.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "id": "admin.restore",
+      "title": "Restore user access",
+      "category": "Account",
+      "description": "Explicitly restore a revoked account. Old app sessions stay invalid.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "id": "admin.reset_password",
+      "title": "Open password reset",
+      "category": "Account",
+      "description": "Open a verified administrator password reset form for a user. The administrator enters and confirms the password interactively; no password is accepted by commands or macros.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
       "id": "auth.sign_out",
       "title": "Sign out",
       "category": "Account",
@@ -178,6 +280,12 @@
         "properties": {
           "objectId": {
             "type": "string"
+          },
+          "additive": {
+            "type": "boolean"
+          },
+          "single": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -191,7 +299,7 @@
       "id": "object.transform",
       "title": "Transform object",
       "category": "Objects",
-      "description": "Set position in model units, rotation in degrees, and scale. Omitted vectors stay unchanged. Undo supported.",
+      "description": "Set position in model units (or global display units when units=display), rotation in degrees, and scale. Omitted vectors stay unchanged. Undo supported.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -222,6 +330,13 @@
             "items": {
               "type": "number"
             }
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "model",
+              "display"
+            ]
           }
         },
         "required": [],
@@ -232,7 +347,8 @@
           0,
           0,
           0
-        ]
+        ],
+        "units": "display"
       }
     },
     {
@@ -279,6 +395,9 @@
             "type": "number",
             "minimum": 1,
             "maximum": 20
+          },
+          "autoGroup": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -335,6 +454,9 @@
           "value": {
             "type": "number",
             "minimum": 0.000001
+          },
+          "proportional": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -347,6 +469,273 @@
         "dimension": "width",
         "value": 100
       }
+    },
+    {
+      "id": "object.scaling.proportional",
+      "title": "Set proportional scaling",
+      "category": "Objects",
+      "description": "Choose whether manual W/L/H edits preserve object proportions.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "enabled": true
+      }
+    },
+    {
+      "id": "object.scaling.percent",
+      "title": "Scale by percentage",
+      "category": "Objects",
+      "description": "Multiply current object dimensions uniformly by a positive percentage. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          },
+          "percent": {
+            "type": "number",
+            "minimum": 0.0001,
+            "maximum": 100000
+          }
+        },
+        "required": [
+          "percent"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "percent": 75
+      }
+    },
+    {
+      "id": "selection.transform",
+      "title": "Transform selected group",
+      "category": "Objects",
+      "description": "Set the active object transform and apply its transform delta to all selected objects. Position is in current global display units by default. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "position": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number"
+            }
+          },
+          "rotation": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number"
+            }
+          },
+          "scale": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number"
+            }
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "model",
+              "display"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "position": [
+          10,
+          0,
+          0
+        ],
+        "units": "display"
+      }
+    },
+    {
+      "id": "object.group",
+      "title": "Group selected objects",
+      "category": "Objects",
+      "description": "Group the selected objects for selection and transform controls. Group membership is saved in portable sessions. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "name": "Pallet load"
+      }
+    },
+    {
+      "id": "object.ungroup",
+      "title": "Ungroup selected objects",
+      "category": "Objects",
+      "description": "Remove group membership while preserving placement. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "polygon.preview",
+      "title": "Preview polygon optimization",
+      "category": "Objects",
+      "description": "Prepare seam-aware decimation for selected static objects without changing original geometry. Retained triangle percentage and relative error percentage are limits, not guaranteed reduction. Run polygon.apply explicitly to commit.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "retain": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 100
+          },
+          "error": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 5
+          }
+        },
+        "required": [
+          "retain"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "retain": 50,
+        "error": 0.1
+      }
+    },
+    {
+      "id": "polygon.preview_array",
+      "title": "Preview array decimation",
+      "category": "Objects",
+      "description": "Prepare selected source decimation and return the projected array triangle counts without creating copies. Apply and array creation remain explicit.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "width": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "length": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "height": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "retain": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "width",
+          "length",
+          "height",
+          "retain"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "width": 2,
+        "length": 3,
+        "height": 6,
+        "retain": 50
+      }
+    },
+    {
+      "id": "ui.array",
+      "title": "Open array preview tool",
+      "category": "Panels",
+      "description": "Open the interactive array and decimation preview dialog. Does not create copies or change geometry.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "polygon.apply",
+      "title": "Apply polygon optimization",
+      "category": "Objects",
+      "description": "Explicitly apply the prepared preview if the scene has not changed. Original geometry remains available through Undo.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "polygon.cancel",
+      "title": "Cancel polygon preview",
+      "category": "Objects",
+      "description": "Cancel background optimization and discard the staged preview.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ui.polygons",
+      "title": "Open polygon optimizer",
+      "category": "Panels",
+      "description": "Open interactive polygon preview and quality inspection. Opening the dialog does not change geometry.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
     },
     {
       "id": "object.user_data",

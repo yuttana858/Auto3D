@@ -911,3 +911,13 @@ div.main_viewer
 #main_right_container { position: relative; }
 #main_right_container:not(.collapsed) #data_panel_content { margin-right: 40px; }
 .header_fullscreen_button { order: 100; }
+.scene_dimension_input { width: 72px; max-width: 70%; box-sizing: border-box; background: var(--ov_background_color); color: var(--ov_foreground_color); border: 1px solid var(--ov_border_color); border-radius: 4px; padding: 4px; }
+.scene_dimension_unit { font-size: 10px; }
+.scene_proportion_button[aria-pressed="true"] { border-color: var(--ov_button_color); background: var(--ov_hover_color); }
+.scene_scale_percent { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+.scene_scale_percent input { width: 75px; }
+.auto3d_context_menu { border: 1px solid var(--ov_border_color); background: var(--ov_background_color); color: var(--ov_foreground_color); }
+.auto3d_context_menu .scene_context_action { background: transparent; color: var(--ov_foreground_color); border: 0; border-radius: 4px; font: inherit; cursor: pointer; }
+.auto3d_context_menu .scene_context_action:hover, .auto3d_context_menu .scene_context_action:focus-visible { background: var(--ov_hover_color); outline: 1px solid var(--ov_border_color); }
+.scene_polygon_tool { padding: 5px 0 10px; }
+.polygon_preview_canvas { display: block; width: 100%; max-width: 550px; height: 300px; border-radius: 6px; touch-action: none; margin: 12px 0; }

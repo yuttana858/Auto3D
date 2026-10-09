@@ -181,6 +181,7 @@ export class Website
         this.cameraSettings = new CameraSettings ();
         this.viewer = new Viewer ();
         this.measureTool = new MeasureTool (this.viewer, this.settings);
+        this.measureTool.sourceUnit = () => this.model?.GetUnit (); this.measureTool.unitSystem = () => this.preferences?.units || 'metric';
         this.hashHandler = new HashHandler ();
         this.toolbar = new Toolbar (this.parameters.toolbarDiv);
         this.navigator = new Navigator (this.parameters.navigatorDiv);
@@ -357,7 +358,7 @@ export class Website
         if (fit) { this.FitModelToWindow (true); }
     }
 
-    OnModelClicked (button, mouseCoordinates)
+    OnModelClicked (button, mouseCoordinates, modifiers = {})
     {
         if (this.sessionEditor.busy || this.sessionEditor.controls.axis !== null || this.sessionEditor.controls.dragging) { return; }
         if (button !== 1) {
@@ -369,12 +370,12 @@ export class Website
             return;
         }
 
-        let meshUserData = this.viewer.GetMeshUserDataUnderMouse (IntersectionMode.MeshAndLine, mouseCoordinates);
-        if (meshUserData === null) {
-            this.navigator.SetSelection (null);
-        } else {
-            this.navigator.SetSelection (new Selection (SelectionType.Mesh, meshUserData.originalMeshInstance.id));
-        }
+        const meshUserData = this.viewer.GetMeshUserDataUnderMouse (IntersectionMode.MeshAndLine, mouseCoordinates);
+        const additive = Boolean (modifiers.ctrlKey || modifiers.metaKey);
+        if (!meshUserData) { if (!additive) { this.sessionEditor.Select (null); } return; }
+        const owner = this.sessionEditor.document.Owner (meshUserData.originalMeshInstance);
+        if (owner) { this.sessionEditor.Select (owner, false, additive); }
+        else { this.navigator.SetSelection (new Selection (SelectionType.Mesh, meshUserData.originalMeshInstance.id)); }
     }
 
     OnModelMouseMoved (mouseCoordinates)
@@ -389,7 +390,7 @@ export class Website
         const meshUserData = this.viewer.GetMeshUserDataUnderMouse (IntersectionMode.MeshAndLine, mouseCoordinates);
         if (meshUserData) {
             const owner = this.sessionEditor.document.Owner (meshUserData.originalMeshInstance);
-            if (owner) { this.sessionEditor.Select (owner); }
+            if (owner && !this.sessionEditor.SelectedObjects ().includes (owner)) { this.sessionEditor.Select (owner); }
         }
         const selected = this.sessionEditor.selected;
         if (selected && !this.sessionEditor.readOnly) {

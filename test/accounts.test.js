@@ -7,7 +7,7 @@ const env = { SUPABASE_URL : 'https://configured.supabase.co', SUPABASE_SECRET_K
 const id = '12345678-1234-1234-1234-123456789abc';
 const admin = { id : 'admin-id', email : 'admin@example.com', email_confirmed_at : '2026-10-08' };
 const pending = { id, email : 'request@example.com', name : 'Requester', status : 'pending' };
-const context = (action, body, headers = {}) => ({ env, params : { path : [action] }, request : new Request ('https://app.example/api/accounts/' + action, { method : action === 'desk-8b4f2d71c6' ? 'GET' : 'POST', headers : { Origin : 'https://app.example', 'Content-Type' : 'application/json', Cookie : AccessCookie + '=verified', ...headers }, ...(body ? { body : JSON.stringify (body) } : {}) }) });
+const context = (action, body, headers = {}) => ({ env, params : { path : [action] }, request : new Request ('https://app.example/api/accounts/' + action, { method : action === 'desk-8b4f2d71c6' ? 'GET' : 'POST', headers : { Origin : 'https://app.example', 'Content-Type' : 'application/json', Cookie : AccessCookie + '=head.' + Buffer.from (JSON.stringify ({ session_id : id })).toString ('base64url') + '.signature', ...headers }, ...(body ? { body : JSON.stringify (body) } : {}) }) });
 describe ('Account requests and administration', () => {
     let originalFetch;
     beforeEach (() => { originalFetch = global.fetch; }); afterEach (() => { global.fetch = originalFetch; });
@@ -34,7 +34,7 @@ describe ('Account requests and administration', () => {
     });
     it ('requires authentication and ignores user-editable admin metadata', async () => {
         assert.equal ((await onRequest (context ('desk-8b4f2d71c6', null, { Cookie : '' }))).status, 401);
-        global.fetch = async (url) => url.endsWith ('/user') ? Response.json ({ ...admin, user_metadata : { role : 'admin' } }) : Response.json ([]);
+        global.fetch = async (url) => url.endsWith ('/user') ? Response.json ({ ...admin, user_metadata : { role : 'admin' } }) : url.endsWith ('auto3d_session_active') ? Response.json (true) : Response.json ([]);
         assert.equal ((await onRequest (context ('desk-8b4f2d71c6'))).status, 403);
     });
     it ('does not grant admin access to an unconfirmed allowlisted email', async () => {
@@ -46,6 +46,7 @@ describe ('Account requests and administration', () => {
         global.fetch = async (url, options) => {
             calls.push ({ url, options });
             if (url.endsWith ('/user')) { return Response.json (admin); }
+            if (url.endsWith ('auto3d_session_active')) { return Response.json (true); }
             if (url.includes ('auto3d_admin_emails')) { return Response.json ([{ email : admin.email }]); }
             if (url.endsWith ('admin/users')) { return Response.json ({ id : 'created-id' }, { status : createStatus }); }
             if (options.method === 'PATCH' && options.headers.Prefer) { return Response.json (JSON.parse (options.body).status === 'approved' ? [{ ...pending, status : 'approved', user_id : 'created-id' }] : claim); }
@@ -55,7 +56,7 @@ describe ('Account requests and administration', () => {
     }
     it ('lists requests only after provider identity and allowlist checks', async () => {
         const calls = provider (); const response = await onRequest (context ('desk-8b4f2d71c6')); assert.equal (response.status, 200);
-        assert.equal ((await response.json ()).isAdmin, true); assert.equal (calls.length, 3);
+        assert.equal ((await response.json ()).isAdmin, true); assert.equal (calls.length, 4);
     });
     it ('claims approval once and creates a confirmed non-admin account, without returning credentials', async () => {
         const calls = provider (); const password = 'initial-private-password';

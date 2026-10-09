@@ -27,3 +27,6 @@
 .auth_panel .password_input input { width: 100%; padding-right: 44px; box-sizing: border-box; }
 .auth_panel .password_eye { position: absolute; right: 4px; width: 34px; min-height: 30px; padding: 5px; margin: 0; border: 0; background: transparent; color: inherit; }
 .auth_header_button { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.auth_header_button { background: transparent; border: 0; color: #249dcf; box-shadow: none; }
+.auth_header_button:hover { background: var(--ov_hover_color); }

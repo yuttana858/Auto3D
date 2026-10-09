@@ -1,3 +1,6 @@
+import { CalculateVolume, CalculateSurfaceArea } from '../engine/model/quantities.js';
+import { IsTwoManifold } from '../engine/model/modelutils.js';
+import { PolygonOptimizer } from './polygonoptimizer.js';
 import * as THREE from 'three';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { clone as CloneRig } from 'three/addons/utils/SkeletonUtils.js';
@@ -10,7 +13,7 @@ import { ConvertModelToThreeObject, ModelToThreeConversionParams, ModelToThreeCo
 import { Direction } from '../engine/geometry/geometry.js';
 import { Unit } from '../engine/model/unit.js';
 import { Property, PropertyType } from '../engine/model/property.js';
-import { DisplayLength, DisplayUnitLabel, UnitFactor, DisplaySizeFromScale, ScaleFromDisplaySize } from './preferences.js';
+import { DisplayLength, DisplayUnitLabel, DisplayQuantity, UnitFactor, DisplaySizeFromScale, ScaleFromDisplaySize } from './preferences.js';
 import { LoadAnimationScene } from './sessionanimation.js';
 import { ShowAdvanceAnimation, CreateTimelineTracks, UpdatePlayheads } from './advanceanimation.js';
 import { RecoveryWriter } from './sessionrecovery.js';
@@ -52,8 +55,8 @@ export class SessionEditor
 {
     constructor (website)
     {
-        this.website = website; this.document = new SceneDocument (); this.history = new SceneHistory (() => this.MarkDirty ()); this.selected = null; this.mode = 'select'; this.busy = false; this.players = []; this.modelPreview = null;
-        this.timeline = new SessionTimeline (this);
+        this.website = website; this.document = new SceneDocument (); this.history = new SceneHistory (() => this.MarkDirty ()); this.selected = null; this.selectedIds = new Set (); this.selectionPivot = new THREE.Group (); website.viewer.scene.add (this.selectionPivot); this.mode = 'select'; this.busy = false; this.players = []; this.proportionalScaling = false; this.modelPreview = null;
+        this.timeline = new SessionTimeline (this); this.polygonOptimizer = new PolygonOptimizer (this);
         this.baseSizes = new WeakMap (); this.recoveryWriter = new RecoveryWriter (); this.recoveryRevision = 0;
         this.library = new ModelLibrary (this); this.buttons = new Map (); this.dirty = false; this.recoveryTimer = null; this.recoveryPromptOpen = false; this.recoveryPromptHandled = false;
         const viewer = website.viewer;
@@ -75,11 +78,16 @@ export class SessionEditor
         this.controls.addEventListener ('change', () => this.RequestInteractionRender ());
         this.controls.addEventListener ('dragging-changed', (event) => {
             viewer.navigation.enabled = !event.value; viewer.navigation.clickDetector.Cancel ();
-            if (event.value && this.selected) { this.dragStart = TransformState (this.selected); }
+            if (event.value && this.selected) { this.dragStart = TransformState (this.selected); this.dragObjects = this.SelectedObjects ().map ((object) => ({ object, before : TransformState (object), matrix : object.threeObject.matrix.clone () })); this.dragPivot = this.selectionPivot.matrix.clone (); }
             if (!event.value) { this.FinishDrag (); }
         });
         this.controls.addEventListener ('objectChange', () => {
             if (!this.selected?.threeObject) { return; }
+            if (this.dragObjects?.length > 1) {
+                this.selectionPivot.updateMatrix (); const delta = this.selectionPivot.matrix.clone ().multiply (this.dragPivot.clone ().invert ());
+                for (const item of this.dragObjects) { const matrix = delta.clone ().multiply (item.matrix); const position = new THREE.Vector3 (); const rotation = new THREE.Quaternion (); const scale = new THREE.Vector3 (); matrix.decompose (position, rotation, scale); item.object.position = position.toArray (); const euler = new THREE.Euler ().setFromQuaternion (rotation); item.object.rotation = [euler.x, euler.y, euler.z].map (THREE.MathUtils.radToDeg); item.object.scale = scale.toArray (); this.document.ApplyTransform (item.object); this.ApplyTransform (item.object); }
+                this.RequestInteractionRender (); return;
+            }
             const object = this.selected; object.position = object.threeObject.position.toArray (); object.rotation = [object.threeObject.rotation.x, object.threeObject.rotation.y, object.threeObject.rotation.z].map (THREE.MathUtils.radToDeg); object.scale = object.threeObject.scale.toArray ();
             object.scale = object.scale.map ((value) => Math.abs (value) < 1e-6 ? 1e-6 : value); this.document.ApplyTransform (object); this.RequestInteractionRender ();
         });
@@ -207,14 +215,12 @@ export class SessionEditor
                 const label = Element ('label', null, 'XYZ'[axis], group); const input = Element ('input', null, undefined, label); input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', title + ' ' + 'XYZ'[axis]); this.inputs.push ({ input, key, axis });
                 input.addEventListener ('input', () => {
                     if (!this.selected || !Number.isFinite (input.valueAsNumber)) { return; }
-                    const before = TransformState (this.selected);
                     if (key === 'scale') {
                         this.SetObjectDisplayDimension (this.selected, axis, input.valueAsNumber);
                         return;
                     } else {
-                        this.selected[key][axis] = input.valueAsNumber;
+                        const vector = [...this.selected[key]]; vector[axis] = key === 'position' ? input.valueAsNumber / (UnitFactor (this.selected.unit, this.website.preferences.units) ?? 1) : input.valueAsNumber; this.TransformSelection ({ [key] : vector }); return;
                     }
-                    this.ApplyTransform (this.selected); this.RecordTransform (this.selected, before); this.UpdateDetails ();
                 });
             }
         }
@@ -324,8 +330,9 @@ export class SessionEditor
     {
         this.website.viewer.navigation.enabled = true;
         const before = this.dragStart; this.dragStart = null;
-        if (before && this.selected) { this.RecordTransform (this.selected, before); this.UpdateDetails (); this.website.viewer.UpdateGroundGrid (); this.website.sceneEffects?.Refresh (); }
-        this.RequestInteractionRender ();
+        if (this.dragObjects?.length > 1) { const records = this.dragObjects.map ((item) => ({ ...item, after : TransformState (item.object) })); const apply = (key) => { records.forEach ((item) => { Object.assign (item.object, JSON.parse (JSON.stringify (item[key]))); this.ApplyTransform (item.object); }); this.Select (this.selected, false, true); }; this.history.Push ({ undo : () => apply ('before'), redo : () => apply ('after') }); this.dragStart = null; }
+        else if (before && this.selected) { this.RecordTransform (this.selected, before); this.UpdateDetails (); this.website.viewer.UpdateGroundGrid (); this.website.sceneEffects?.Refresh (); }
+        this.dragObjects = null; this.RequestInteractionRender ();
     }
 
     MarkDirty ()
@@ -488,22 +495,42 @@ export class SessionEditor
         this.history.Push ({ undo : () => apply (before), redo : () => apply (after) }); this.RefreshButtons ();
     }
 
-    SetMode (mode) { if (this.readOnly && mode !== 'select') { return; } this.mode = mode; this.Select (this.selected); }
-    Select (object, fromNavigator = false)
+    TransformSelection (args, primary = this.selected)
+    {
+        if (this.readOnly || this.busy || !primary) { throw new Error ('Select editable objects.'); }
+        const objects = this.SelectedObjects ().includes (primary) ? this.SelectedObjects () : [primary];
+        const records = objects.map ((object) => ({ object, before : TransformState (object) }));
+        const matrix = (state) => new THREE.Matrix4 ().compose (new THREE.Vector3 (...state.position), new THREE.Quaternion ().setFromEuler (new THREE.Euler (...state.rotation.map (THREE.MathUtils.degToRad))), new THREE.Vector3 (...state.scale));
+        const next = { ...TransformState (primary), ...args }; if (next.scale.some ((value) => !Number.isFinite (value) || Math.abs (value) < 1e-6)) { throw new Error ('Scale components must be nonzero.'); }
+        const delta = matrix (next).multiply (matrix (TransformState (primary)).invert ());
+        records.forEach ((item) => { const position = new THREE.Vector3 (); const rotation = new THREE.Quaternion (); const scale = new THREE.Vector3 (); delta.clone ().multiply (matrix (item.before)).decompose (position, rotation, scale); const euler = new THREE.Euler ().setFromQuaternion (rotation); item.after = { position : position.toArray (), rotation : [euler.x, euler.y, euler.z].map (THREE.MathUtils.radToDeg), scale : scale.toArray () }; });
+        const apply = (key) => { records.forEach ((item) => { Object.assign (item.object, JSON.parse (JSON.stringify (item[key]))); this.document.ApplyTransform (item.object); const root = item.object.threeObject; if (root) { root.position.fromArray (item.object.position); root.rotation.set (...item.object.rotation.map (THREE.MathUtils.degToRad)); root.scale.fromArray (item.object.scale); root.updateMatrixWorld (true); } }); this.UpdateSelectionBox (); this.SyncInputs (); this.UpdateDetails (); this.website.viewer.UpdateGroundGrid (); this.website.sceneEffects?.Refresh (); this.website.viewer.Render (); };
+        apply ('after'); this.history.Push ({ undo : () => apply ('before'), redo : () => apply ('after') }); return { objectIds : objects.map ((object) => object.id) };
+    }
+
+    SetMode (mode) { if (this.readOnly && mode !== 'select') { return; } this.mode = mode; this.Select (this.selected, false, true); }
+    SelectedObjects () { return this.document.objects.filter ((object) => this.selectedIds?.has (object.id)); }
+    Select (object, fromNavigator = false, additive = false, single = false)
     {
         this.selected = object && this.document.objects.includes (object) ? object : null;
+        if (!this.selectedIds) { this.selectedIds = new Set (); }
+        if (!additive) { this.selectedIds.clear (); }
+        if (this.selected) { const group = !single && this.selected.userData?._auto3dGroup; this.document.objects.filter ((item) => item === this.selected || (group && item.userData?._auto3dGroup === group)).forEach ((item) => this.selectedIds.add (item.id)); }
         this.controls.detach ();
-        if (this.selected?.threeObject && this.selected.visible && this.mode !== 'select') { this.controls.setMode (this.mode); this.controls.attach (this.selected.threeObject); }
+        const selection = this.SelectedObjects ();
+        if (selection.length > 1 && this.mode !== 'select' && !this.readOnly) { const bounds = new THREE.Box3 (); selection.forEach ((item) => { if (item.threeObject) { bounds.union (new THREE.Box3 ().setFromObject (item.threeObject)); } }); this.selectionPivot.position.copy (bounds.getCenter (new THREE.Vector3 ())); this.selectionPivot.rotation.set (0, 0, 0); this.selectionPivot.scale.set (1, 1, 1); this.selectionPivot.updateMatrix (); this.controls.setMode (this.mode); this.controls.attach (this.selectionPivot); }
+        else if (this.selected?.threeObject && this.selected.visible && this.mode !== 'select') { this.controls.setMode (this.mode); this.controls.attach (this.selected.threeObject); }
         this.transformPanel.hidden = !this.selected || this.mode === 'select';
         if (!fromNavigator && this.selected) {
             let first = null; this.document.model.EnumerateMeshInstances ((instance) => { if (!first && this.document.Owner (instance) === this.selected) { first = instance.id; } });
-            const current = this.website.navigator.GetSelectedMeshId (); if (first && (!current || !current.IsEqual (first))) { this.website.navigator.SetSelection (new Selection (SelectionType.Mesh, first)); }
+            const current = this.website.navigator.GetSelectedMeshId (); if (first && (!current || !current.IsEqual (first))) { this.selecting = true; try { this.website.navigator.SetSelection (new Selection (SelectionType.Mesh, first)); } finally { this.selecting = false; } }
         }
         if (!this.selected && !fromNavigator && this.website.navigator.GetSelectedMeshId ()) { this.website.navigator.SetSelection (null); }
         this.UpdateSelectionBox (); this.SyncInputs (); this.RefreshUI (); this.UpdateDetails (); this.website.viewer.Render ();
     }
     SelectionChanged ()
     {
+        if (this.selecting) { return; }
         const id = this.website.navigator.GetSelectedMeshId (); const instance = id && this.website.model ? this.website.model.GetMeshInstance (id) : null;
         this.Select (this.document.Owner (instance), true);
     }
@@ -533,7 +560,7 @@ export class SessionEditor
             this.selectionBox.visible = false;
             return;
         }
-        this.selectionBounds.setFromObject (this.selected.threeObject, false);
+        this.selectionBounds.makeEmpty (); (this.SelectedObjects ().length ? this.SelectedObjects () : [this.selected]).forEach ((object) => { if (object.threeObject && object.visible) { this.selectionBounds.union (new THREE.Box3 ().setFromObject (object.threeObject)); } });
         this.selectionBox.visible = !this.selectionBounds.isEmpty ();
         this.selectionBox.updateMatrixWorld (true);
     }
@@ -547,11 +574,11 @@ export class SessionEditor
             this.scaleHeading.textContent = 'Size (' + (factor === null ? 'model units' : DisplayUnitLabel (units)) + ')';
         }
         if (this.transformHint) {
-            this.transformHint.textContent = factor === null ? 'Position uses source coordinates; size uses model units because this model has no declared unit.' : 'Position uses source coordinates. Size follows the global ' + DisplayUnitLabel (units) + ' preference.';
+            this.transformHint.textContent = factor === null ? 'Position and size use model units because this model has no declared unit.' : 'Position and size follow the global ' + DisplayUnitLabel (units) + ' preference.';
         }
         for (const { input, key, axis } of this.inputs) {
             if (!this.selected) { input.value = ''; continue; }
-            const value = key === 'scale' ? DisplaySizeFromScale (base[axis], this.selected.scale[axis], this.selected.unit, units) : this.selected[key][axis];
+            const value = key === 'scale' ? DisplaySizeFromScale (base[axis], this.selected.scale[axis], this.selected.unit, units) : key === 'position' ? this.selected.position[axis] * (factor ?? 1) : this.selected[key][axis];
             input.value = Number (value.toFixed (5));
         }
     }
@@ -567,6 +594,8 @@ export class SessionEditor
             button.disabled = this.busy || (this.readOnly && !['select', 'focus', 'fit'].includes (key)) || (['move', 'rotate', 'scale', 'duplicate', 'array', 'floor', 'visible', 'remove', 'focus', 'update'].includes (key) && !this.selected) || (key === 'export' && !this.document.objects.length) || (key === 'undo' && !this.history.undo.length) || (key === 'redo' && !this.history.redo.length);
             if (['select', 'move', 'rotate', 'scale'].includes (key)) { button.setAttribute ('aria-pressed', String ((key === 'move' ? 'translate' : key) === this.mode)); }
         }
+        const groupButtons = this.objectList?.querySelectorAll ('.selection_group_tools button');
+        if (groupButtons?.length === 2) { groupButtons[0].disabled = this.readOnly || this.busy || this.SelectedObjects ().length < 2; groupButtons[1].disabled = this.readOnly || this.busy || !this.SelectedObjects ().some ((object) => object.userData?._auto3dGroup); }
         if (this.headerExport) { this.headerExport.disabled = this.busy || this.readOnly || !this.document.objects.length; }
     }
     RefreshUI ()
@@ -574,19 +603,29 @@ export class SessionEditor
         this.RefreshButtons (); this.objectList.replaceChildren ();
         if (!this.document.objects.length) { Element ('p', 'section_hint', 'Add multiple models and select an object to edit its placement.', this.objectList); }
         for (const object of this.document.objects) {
-            const row = Element ('div', 'session_object_row', undefined, this.objectList); row.classList.toggle ('selected', object === this.selected);
+            const row = Element ('div', 'session_object_row', undefined, this.objectList); row.classList.toggle ('selected', this.selectedIds.has (object.id));
             const select = Element ('button', 'object_name editable_name', object.name, row);
             select.title = object === this.selected ? 'Click again to rename · ' + object.source : 'Select ' + object.name + ' · ' + object.source;
             select.setAttribute ('aria-label', (object === this.selected ? 'Rename ' : 'Select ') + object.name);
             select.addEventListener ('mouseenter', () => object.threeObject?.traverse ((item) => { if (item.isMesh) { item.userData.auto3dNameHover = true; } }));
             select.addEventListener ('mouseleave', () => object.threeObject?.traverse ((item) => { if (item.isMesh) { delete item.userData.auto3dNameHover; } }));
-            select.addEventListener ('click', () => { if (object === this.selected) { this.RenameObject (object); } else { this.Select (object); } });
+            select.addEventListener ('click', (event) => { if (event.ctrlKey || event.metaKey) { this.Select (object, false, true); } else if (object === this.selected) { this.RenameObject (object); } else { this.Select (object); } });
             const visible = Element ('button', null, object.visible ? '◉' : '○', row); visible.title = object.visible ? 'Hide object' : 'Show object'; visible.setAttribute ('aria-label', visible.title + ' ' + object.name); visible.addEventListener ('click', () => { this.Select (object); this.ToggleVisibility (); });
             const update = Element ('button', null, '↻', row); update.title = 'Replace model, keep placement'; update.setAttribute ('aria-label', 'Update ' + object.name); update.addEventListener ('click', () => this.UpdateModel (object));
         }
+        const selectionTools = Element ('div', 'selection_group_tools', undefined, this.objectList);
+        Element ('p', 'section_hint', this.SelectedObjects ().length + ' selected · Ctrl + click adds to selection.', selectionTools);
+        const group = Element ('button', null, 'Group selection', selectionTools); group.disabled = this.readOnly || this.busy || this.SelectedObjects ().length < 2; group.onclick = () => this.Run (() => this.GroupObjects ());
+        const ungroup = Element ('button', null, 'Ungroup selection', selectionTools); ungroup.disabled = this.readOnly || this.busy || !this.SelectedObjects ().some ((object) => object.userData?._auto3dGroup); ungroup.onclick = () => this.Run (() => this.UngroupObjects ());
         this.AnimationUI ();
     }
     UpdateDetails ()
+    {
+        if (this.updatingDetails) { return; }
+        this.updatingDetails = true;
+        try { this.RenderDetails (); } finally { this.updatingDetails = false; }
+    }
+    RenderDetails ()
     {
         const object = this.selected;
         if (!object?.threeObject || !this.website.model) { this.DisposeModelPreview (); return; }
@@ -599,6 +638,17 @@ export class SessionEditor
         table.querySelectorAll ('.ov_property_table_row').forEach ((row) => {
             if (['Width (X):', 'Height (Y):', 'Depth (Z):', 'Unit:', 'Object:'].includes (row.querySelector ('.ov_property_table_name')?.textContent)) { row.remove (); }
         });
+        const instances = []; this.document.model.EnumerateMeshInstances ((instance) => { if (this.document.Owner (instance) === object) { instances.push (instance); } });
+        table.querySelectorAll ('.ov_property_table_row').forEach ((row) => { if (['Volume:', 'Surface:'].includes (row.querySelector ('.ov_property_table_name')?.textContent)) { row.remove (); } });
+        panel.AddCalculatedProperty (table, 'Volume', () => instances.every (IsTwoManifold) ? new Property (PropertyType.Text, null, DisplayQuantity (instances.reduce ((value, instance) => value + Math.abs (CalculateVolume (instance)), 0), object.unit, this.website.preferences.units, 3)) : null);
+        panel.AddCalculatedProperty (table, 'Surface', () => new Property (PropertyType.Text, null, DisplayQuantity (instances.reduce ((value, instance) => value + CalculateSurfaceArea (instance), 0), object.unit, this.website.preferences.units, 2)));
+        const counts = { vertices : 0, triangles : 0 }; object.node.EnumerateMeshIndices ((index) => { const mesh = this.document.model.GetMesh (index); counts.vertices += mesh.VertexCount (); counts.triangles += mesh.TriangleCount (); });
+        table.querySelectorAll ('.scene_polygon_tool').forEach ((row) => row.remove ());
+        for (const row of table.querySelectorAll ('.ov_property_table_row')) {
+            const label = row.querySelector ('.ov_property_table_name')?.textContent;
+            if (label === 'Vertices:' || label === 'Triangles:') { row.querySelector ('.ov_property_table_value').textContent = (label === 'Triangles:' ? counts.triangles : counts.vertices).toLocaleString (); }
+            if (label === 'Triangles:') { const tool = Element ('div', 'scene_polygon_tool'); const button = Element ('button', null, 'Optimize polygons…', tool); button.disabled = this.readOnly; button.onclick = () => this.OpenPolygonTool (); row.after (tool); }
+        }
         const base = this.GetObjectBaseSize (object);
         const units = this.website.preferences.units;
         const unitLabel = UnitFactor (object.unit, units) === null ? 'model units' : DisplayUnitLabel (units);
@@ -607,36 +657,21 @@ export class SessionEditor
             DisplaySizeFromScale (base[2], object.scale[2], object.unit, units),
             DisplaySizeFromScale (base[1], object.scale[1], object.unit, units)
         ];
-        for (const [title, value] of [
-            ['Object', object.name],
-            ['Width (W / X)', DisplayLength (base[0] * Math.abs (object.scale[0]), object.unit, units)],
-            ['Length (L / Z)', DisplayLength (base[2] * Math.abs (object.scale[2]), object.unit, units)],
-            ['Height (H / Y)', DisplayLength (base[1] * Math.abs (object.scale[1]), object.unit, units)]
-        ]) {
-            panel.AddProperty (table, new Property (PropertyType.Text, title, value)).classList.add ('scene_dimension');
+        panel.AddProperty (table, new Property (PropertyType.Text, 'Object', object.name)).classList.add ('scene_dimension');
+        for (const [title, label, axis, value] of [['Width (W / X)', 'W', 0, sizes[0]], ['Length (L / Z)', 'L', 2, sizes[1]], ['Height (H / Y)', 'H', 1, sizes[2]]]) {
+            const row = panel.AddProperty (table, new Property (PropertyType.Text, title, '')); row.classList.add ('scene_dimension');
+            const cell = row.querySelector ('.ov_property_table_value');
+            const input = Element ('input', 'scene_dimension_input', undefined, cell); input.type = 'number'; input.step = 'any'; input.min = '0.000001'; input.value = Number (value.toFixed (5)); input.disabled = this.readOnly || base[axis] <= 1e-12;
+            input.setAttribute ('aria-label', label + ' dimension in ' + unitLabel); Element ('span', 'scene_dimension_unit', ' ' + unitLabel, cell);
+            input.addEventListener ('change', () => { if (this.updatingDetails) { return; } if (Number.isFinite (input.valueAsNumber) && input.valueAsNumber > 0) { this.SetObjectDisplayDimension (object, axis, input.valueAsNumber, this.proportionalScaling); } else { this.UpdateDetails (); } });
         }
-
         panel.contentDiv.querySelectorAll ('.scene_object_details').forEach ((item) => item.remove ());
         const details = Element ('div', 'scene_object_details', undefined, panel.contentDiv);
-        Element ('strong', null, 'Model size', details);
-        Element ('p', 'section_hint', 'W = X · L = Z · H = Y · ' + unitLabel, details);
-        const dimensionGrid = Element ('div', 'scene_dimension_editor', undefined, details);
-        for (const [label, axis, value] of [['W', 0, sizes[0]], ['L', 2, sizes[1]], ['H', 1, sizes[2]]]) {
-            const field = Element ('label', null, label, dimensionGrid);
-            const input = Element ('input', null, undefined, field);
-            input.type = 'number'; input.step = 'any'; input.min = '0.000001'; input.value = Number (value.toFixed (5));
-            input.disabled = this.readOnly || base[axis] <= 1e-12;
-            input.setAttribute ('aria-label', label + ' dimension in ' + unitLabel);
-            let committing = false;
-            input.addEventListener ('change', () => {
-                if (committing) { return; }
-                committing = true;
-                try {
-                    if (!Number.isFinite (input.valueAsNumber) || input.valueAsNumber <= 0) { this.UpdateDetails (); return; }
-                    this.SetObjectDisplayDimension (object, axis, input.valueAsNumber);
-                } finally { committing = false; }
-            });
-        }
+        const proportional = Element ('button', 'scene_proportion_button', 'Proportional scaling', details); proportional.setAttribute ('aria-pressed', String (this.proportionalScaling)); proportional.disabled = this.readOnly;
+        proportional.onclick = () => { this.SetProportionalScaling (!this.proportionalScaling); };
+        const percentLabel = Element ('label', 'scene_scale_percent', 'Scale (%)', details); const percent = Element ('input', null, undefined, percentLabel); percent.type = 'number'; percent.step = 'any'; percent.min = '0.0001'; percent.value = '100'; percent.disabled = this.readOnly; percent.setAttribute ('aria-label', 'Scale percentage');
+        const applyPercent = Element ('button', null, 'Apply scale', details); applyPercent.disabled = this.readOnly; applyPercent.onclick = () => this.Run (() => this.ScaleByPercentage (object, percent.valueAsNumber));
+        Element ('p', 'section_hint', 'Percentage multiplies the current size on all axes. W = X · L = Z · H = Y.', details);
 
         Element ('strong', null, 'Shadows', details);
         const shadowOptions = Element ('div', 'scene_shadow_options', undefined, details);
@@ -657,7 +692,7 @@ export class SessionEditor
         const userDataList = Element ('div', 'scene_user_data', undefined, details);
         const renderUserData = () => {
             userDataList.replaceChildren ();
-            const entries = Object.entries (object.userData || {});
+            const entries = Object.entries (object.userData || {}).filter (([key]) => !key.startsWith ('_auto3d'));
             if (!entries.length) { Element ('p', 'section_hint', 'No user data entered.', userDataList); }
             entries.forEach (([key, value]) => {
                 const row = Element ('div', 'scene_user_data_row', undefined, userDataList);
@@ -747,17 +782,25 @@ export class SessionEditor
         this.modelPreview = { object, root : object.threeObject, element, renderer, scene, camera, pivot };
     }
 
-    SetObjectDisplayDimension (object, axis, value)
+    SetObjectDisplayDimension (object, axis, value, proportional = false)
     {
         if (this.readOnly || !object || !Number.isInteger (axis) || axis < 0 || axis > 2 || !Number.isFinite (value)) { return; }
         const base = this.GetObjectBaseSize (object);
         const next = ScaleFromDisplaySize (base[axis], value, object.unit, this.website.preferences.units);
         if (next === null || !Number.isFinite (next) || Math.abs (next) < 1e-6) { return; }
         const before = TransformState (object);
-        object.scale[axis] = next * Math.sign (object.scale[axis] || 1);
+        if (proportional) { const ratio = next / Math.abs (object.scale[axis]); object.scale = object.scale.map ((scale) => scale * ratio); }
+        else { object.scale[axis] = next * Math.sign (object.scale[axis] || 1); }
         this.ApplyTransform (object);
         this.RecordTransform (object, before);
         this.UpdateDetails ();
+    }
+
+    SetProportionalScaling (enabled) { this.proportionalScaling = Boolean (enabled); this.UpdateDetails (); return { proportional : this.proportionalScaling }; }
+    ScaleByPercentage (object, percent)
+    {
+        if (this.readOnly || this.busy || !object || !Number.isFinite (percent) || percent <= 0 || percent > 100000 || object.scale.some ((value) => Math.abs (value * percent / 100) < 1e-6)) { throw new Error ('Enter a positive scale percentage with nonzero resulting dimensions.'); }
+        const before = TransformState (object); object.scale = object.scale.map ((value) => value * percent / 100); this.ApplyTransform (object); this.RecordTransform (object, before); this.UpdateDetails (); return { id : object.id, scale : [...object.scale] };
     }
 
     ShowAdvanceAnimation (visible) { ShowAdvanceAnimation (this, visible); }
@@ -825,7 +868,7 @@ export class SessionEditor
                 const row = Element ('div', 'timeline_keyframe_row', undefined, keys);
                 const seek = Element ('button', 'timeline_keyframe_seek', entry.keyframe.time.toFixed (2) + 's · ' + entry.label, row);
                 seek.title = entry.type === 'camera'
-                    ? 'Camera · ' + entry.keyframe.azimuth.toFixed (1) + '° az · ' + entry.keyframe.elevation.toFixed (1) + '° el · ' + entry.keyframe.distance.toFixed (2) + ' distance'
+                    ? 'Camera · ' + entry.keyframe.azimuth.toFixed (1) + '° az · ' + entry.keyframe.elevation.toFixed (1) + '° el · ' + DisplayLength (entry.keyframe.distance, this.document.model.GetUnit (), this.website.preferences.units) + ' distance'
                     : entry.label + ' · ' + entry.keyframe.interpolation + ' tween';
                 seek.addEventListener ('click', () => { timeline.Seek (entry.keyframe.time); this.AnimationUI (); });
                 Element ('span', 'timeline_keyframe_mode', entry.keyframe.interpolation, row);
@@ -876,6 +919,8 @@ export class SessionEditor
         this.Status ('Dropped ' + object.name + ' to floor');
     }
 
+    OpenPolygonTool () { return this.polygonOptimizer.Open (); }
+
     ArrayDialog ()
     {
         if (!this.selected) { return; }
@@ -888,6 +933,22 @@ export class SessionEditor
             const input = Element ('input', null, undefined, label); input.type = 'number'; input.min = '1'; input.max = '20'; input.step = '1'; input.value = '1'; input.required = true;
             fields[key] = input;
         }
+        const groupLabel = Element ('label', null, 'Automatically group array', form); const group = Element ('input', null, undefined, groupLabel); group.type = 'checkbox'; group.checked = true; group.setAttribute ('aria-label', 'Automatically group array');
+        const optimizeLabel = Element ('label', null, 'Retain triangles (%)', form); const retain = Element ('input', null, undefined, optimizeLabel); retain.type = 'number'; retain.min = '5'; retain.max = '100'; retain.value = '100'; retain.setAttribute ('aria-label', 'Array retained triangles percentage');
+        Element ('p', 'section_hint', 'For large polygon models, lower retained triangles and preview quality before creating the array. Copies share mesh data. Original placement and bounds determine spacing.', form);
+        const host = Element ('div', 'array_polygon_preview', undefined, form); let dispose = null; let previewKey = null; const source = this.selected; const originalSize = new THREE.Box3 ().setFromObject (source.threeObject, true).getSize (new THREE.Vector3 ());
+        const preview = Element ('button', null, 'Preview optimized array', form); preview.type = 'button';
+        const key = () => [fields.w.value, fields.l.value, fields.h.value, retain.value].join (':');
+        const invalidate = () => { previewKey = null; this.polygonOptimizer.Cancel (); dispose?.(); dispose = null; };
+        Object.values (fields).forEach ((input) => input.addEventListener ('input', invalidate)); retain.addEventListener ('input', invalidate);
+        preview.onclick = async () => {
+            const counts = ['w', 'l', 'h'].map ((axis) => Number (fields[axis].value)); const ratio = Number (retain.value) / 100;
+            if (counts.some ((value) => !Number.isInteger (value) || value < 1 || value > 20) || counts.reduce ((a, b) => a * b, 1) + this.document.objects.length - 1 > 1000 || !Number.isFinite (ratio) || ratio < 0.05 || ratio > 1) { status.textContent = 'Use valid counts within the 1,000-object limit and 5–100% retained triangles.'; return; }
+            preview.disabled = true; create.disabled = true; status.textContent = 'Preparing array decimation preview…'; dispose?.();
+            try { const result = await this.polygonOptimizer.PreviewArray (counts, ratio); dispose = await this.polygonOptimizer.ShowPreview (host, counts); previewKey = key (); status.textContent = 'Array preview: ' + (result.before * counts.reduce ((a, b) => a * b, 1)).toLocaleString () + ' → ' + (result.after * counts.reduce ((a, b) => a * b, 1)).toLocaleString () + ' triangles. Inspect quality before creating.'; }
+            catch (error) { status.textContent = error.message; } finally { preview.disabled = false; create.disabled = false; }
+        };
+        dialog.addEventListener ('close', () => { this.polygonOptimizer.Cancel (); dispose?.(); }, { once : true });
         const status = Element ('p', 'section_hint', 'The selected model is position 1,1,1.', form);
         const create = Element ('button', 'workspace_primary', 'Create array', form); create.type = 'submit';
         form.addEventListener ('submit', async (event) => {
@@ -896,12 +957,16 @@ export class SessionEditor
             if (counts.some ((value) => !Number.isInteger (value) || value < 1 || value > 20)) { status.textContent = 'Each count must be an integer from 1 to 20.'; return; }
             const total = counts[0] * counts[1] * counts[2];
             if (this.document.objects.length + total - 1 > 1000) { status.textContent = 'This array would exceed the 1,000-object session limit.'; return; }
+            const ratio = Number (retain.value) / 100;
+            if (!Number.isFinite (ratio) || ratio < 0.05 || ratio > 1) { status.textContent = 'Retain 5–100% of triangles.'; return; }
+            if (ratio < 1 && previewKey !== key ()) { status.textContent = 'Preview optimized array before creating it.'; return; }
+            if (this.selected !== source) { status.textContent = 'Selection changed. Close this dialog and reopen it.'; return; }
             create.disabled = true; status.textContent = 'Creating an array…';
-            try { await this.CreateArray (...counts); dialog.close (); } catch (error) { status.textContent = error.message; create.disabled = false; }
+            try { if (ratio < 1) { await this.polygonOptimizer.Apply (); } await this.CreateArray (...counts, { autoGroup : group.checked, spacing : originalSize }); dialog.close (); } catch (error) { status.textContent = error.message; create.disabled = false; }
         });
     }
 
-    async CreateArray (widthCount, lengthCount, heightCount)
+    async CreateArray (widthCount, lengthCount, heightCount, options = {})
     {
         if (this.readOnly || this.busy) { throw new Error ('The session cannot be edited right now.'); }
         const source = this.selected;
@@ -914,17 +979,18 @@ export class SessionEditor
 
         const added = [];
         const firstIndex = this.document.objects.length;
+        const sourceData = { ...(source.userData || {}) }; const groupId = options.autoGroup === false ? null : crypto.randomUUID ();
         this.busy = true; this.RefreshButtons ();
         this.Status ('Creating an array… 0 / ' + (total - 1) + ' copies');
         try {
             await new Promise ((resolve) => setTimeout (resolve, 20));
             const box = new THREE.Box3 ().setFromObject (source.threeObject, true);
-            const size = box.getSize (new THREE.Vector3 ());
+            const size = options.spacing || box.getSize (new THREE.Vector3 ());
             for (let h = 0; h < heightCount; h++) {
                 for (let l = 0; l < lengthCount; l++) {
                     for (let w = 0; w < widthCount; w++) {
                         if (w === 0 && l === 0 && h === 0) { continue; }
-                        const copy = this.document.Duplicate (source);
+                        const copy = this.document.Instance (source);
                         added.push (copy);
                         copy.name = source.name + ' [' + (w + 1) + ',' + (l + 1) + ',' + (h + 1) + ']';
                         const offset = ArrayOffset (size, w, l, h);
@@ -935,16 +1001,17 @@ export class SessionEditor
                     }
                 }
             }
+            const groupData = () => { if (groupId) { [source, ...added].forEach ((object) => { object.userData = { ...(object.userData || {}), _auto3dGroup : groupId, _auto3dGroupName : source.name + ' array' }; }); } }; groupData ();
             this.selected = source;
             await this.Render ();
             this.history.Push ({
-                undo : async () => { added.forEach ((object) => this.document.Remove (object)); this.selected = source; await this.Render (); },
-                redo : async () => { added.forEach ((object, index) => this.document.Restore (object, firstIndex + index)); this.selected = source; await this.Render (); }
+                undo : async () => { source.userData = { ...sourceData }; added.forEach ((object) => this.document.Remove (object)); this.selected = source; await this.Render (); },
+                redo : async () => { groupData (); added.forEach ((object, index) => this.document.Restore (object, firstIndex + index)); this.selected = source; await this.Render (); }
             });
             this.Status ('Created ' + widthCount + ' × ' + lengthCount + ' × ' + heightCount + ' array · ' + total + ' objects');
             return added;
         } catch (error) {
-            added.forEach ((object) => this.document.Remove (object));
+            source.userData = { ...sourceData }; added.forEach ((object) => this.document.Remove (object));
             this.selected = source;
             try { await this.Render (); } catch { /* Preserve the original failure. */ }
             this.Status ('Could not create the array. ' + error.message);
@@ -952,10 +1019,42 @@ export class SessionEditor
         } finally { this.busy = false; this.RefreshButtons (); }
     }
 
-    async Duplicate () { if (!this.selected) { return; } const object = this.document.Duplicate (this.selected); const index = this.document.objects.indexOf (object); this.history.Push ({ undo : async () => { this.document.Remove (object); this.selected = null; await this.Render (); }, redo : async () => { this.document.Restore (object, index); this.selected = object; await this.Render (); } }); this.selected = object; await this.Render (); this.Status ('Duplicated ' + object.name); }
-    async Delete () { const object = this.selected; if (!object) { return; } const index = this.document.objects.indexOf (object); this.document.Remove (object); this.history.Push ({ undo : async () => { this.document.Restore (object, index); this.selected = object; await this.Render (); }, redo : async () => { this.document.Remove (object); this.selected = null; await this.Render (); } }); this.selected = null; await this.Render (); this.Status ('Deleted ' + object.name + ' · Undo is available'); }
-    ToggleVisibility () { const object = this.selected; if (!object) { return; } const before = object.visible; const apply = (visible) => { object.visible = visible; object.threeObject.visible = visible; this.website.UpdateMeshesVisibility (); this.Select (object); this.UpdateSelectionBox (); }; apply (!before); this.history.Push ({ undo : () => apply (before), redo : () => apply (!before) }); this.RefreshButtons (); }
-    Focus () { if (!this.selected) { return; } const box = new THREE.Box3 ().setFromObject (this.selected.threeObject, true); if (!box.isEmpty ()) { this.website.viewer.FitSphereToWindow (box.getBoundingSphere (new THREE.Sphere ()), true); } }
+    GroupObjects (objects = this.SelectedObjects (), name = 'Group')
+    {
+        if (this.readOnly || this.busy || objects.length < 2 || objects.some ((object) => !this.document.objects.includes (object))) { throw new Error ('Select at least two editable objects.'); }
+        const id = crypto.randomUUID (); const records = objects.map ((object) => ({ object, before : { ...(object.userData || {}) } }));
+        const apply = (grouped) => { records.forEach ((item) => { item.object.userData = grouped ? { ...item.before, _auto3dGroup : id, _auto3dGroupName : name.slice (0, 100) } : { ...item.before }; }); this.Select (objects[0]); this.MarkDirty (); };
+        apply (true); this.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); return { groupId : id, objectIds : objects.map ((object) => object.id) };
+    }
+    UngroupObjects ()
+    {
+        if (this.readOnly || this.busy) { throw new Error ('The session cannot be edited right now.'); }
+        const records = this.SelectedObjects ().map ((object) => ({ object, before : { ...(object.userData || {}) } }));
+        const apply = (restore) => { records.forEach ((item) => { item.object.userData = { ...item.before }; if (!restore) { delete item.object.userData._auto3dGroup; delete item.object.userData._auto3dGroupName; } }); this.Select (this.selected, false, true, true); this.MarkDirty (); };
+        apply (false); this.history.Push ({ undo : () => apply (true), redo : () => apply (false) }); return { ungrouped : records.length };
+    }
+    async Duplicate ()
+    {
+        if (this.readOnly || this.busy) { return; }
+        const originals = this.SelectedObjects ().length ? this.SelectedObjects () : [this.selected].filter (Boolean); if (!originals.length) { return; }
+        const start = this.document.objects.length; const groupId = originals.length > 1 ? crypto.randomUUID () : null;
+        const added = originals.map ((source) => { const copy = this.document.Duplicate (source); copy.position = [...source.position]; copy.position[0] += 1.1 * Math.max (...this.GetObjectBaseSize (source).map ((size, axis) => size * Math.abs (source.scale[axis])), 0.01); if (groupId) { copy.userData._auto3dGroup = groupId; } else { delete copy.userData._auto3dGroup; delete copy.userData._auto3dGroupName; } this.document.ApplyTransform (copy); return copy; });
+        this.history.Push ({ undo : async () => { added.forEach ((object) => this.document.Remove (object)); this.selected = originals[0]; await this.Render (); }, redo : async () => { added.forEach ((object, index) => this.document.Restore (object, start + index)); this.selected = added[0]; await this.Render (); } }); this.selected = added[0]; await this.Render (); this.Status ('Duplicated ' + added.length + ' object(s)');
+    }
+    async Delete ()
+    {
+        if (this.readOnly || this.busy) { return; }
+        const objects = this.SelectedObjects ().length ? this.SelectedObjects () : [this.selected].filter (Boolean); if (!objects.length) { return; }
+        const records = objects.map ((object) => ({ object, index : this.document.objects.indexOf (object) })); objects.forEach ((object) => this.document.Remove (object));
+        this.history.Push ({ undo : async () => { records.forEach ((item) => this.document.Restore (item.object, item.index)); this.selected = objects[0]; await this.Render (); }, redo : async () => { objects.forEach ((object) => this.document.Remove (object)); this.selected = null; await this.Render (); } }); this.selected = null; this.selectedIds.clear (); await this.Render (); this.Status ('Deleted ' + objects.length + ' object(s) · Undo is available');
+    }
+    ToggleVisibility ()
+    {
+        if (this.readOnly || this.busy || !this.selected) { return; }
+        const objects = this.SelectedObjects ().length ? this.SelectedObjects () : [this.selected]; const records = objects.map ((object) => ({ object, before : object.visible })); const after = !this.selected.visible;
+        const apply = (restore) => { records.forEach ((item) => { item.object.visible = restore ? item.before : after; item.object.threeObject.visible = item.object.visible; }); this.website.UpdateMeshesVisibility (); this.Select (this.selected, false, true); }; apply (false); this.history.Push ({ undo : () => apply (true), redo : () => apply (false) }); this.RefreshButtons ();
+    }
+    Focus () { if (!this.selected) { return; } this.UpdateSelectionBox (); if (!this.selectionBounds.isEmpty ()) { this.website.viewer.FitSphereToWindow (this.selectionBounds.getBoundingSphere (new THREE.Sphere ()), true); } }
     async Undo () { await this.history.Undo (); this.RefreshUI (); }
     async Redo () { await this.history.Redo (); this.RefreshUI (); }
 

@@ -1,3 +1,4 @@
+import { DisplayLength } from './preferences.js';
 import { BigEps, IsEqualEps, RadDeg } from '../engine/geometry/geometry.js';
 import { AddDiv, ClearDomElement } from '../engine/viewer/domutils.js';
 import { AddSvgIconElement, IsDarkTextNeededForColor } from './utils.js';
@@ -96,6 +97,8 @@ function CalculateMarkerValues (aMarker, bMarker)
 
 export class MeasureTool
 {
+    FormatLength (value) { return DisplayLength (value, this.sourceUnit?.(), this.unitSystem?.() || 'metric'); }
+
     constructor (viewer, settings)
     {
         this.viewer = viewer;
@@ -196,6 +199,7 @@ export class MeasureTool
 
     UpdatePanel ()
     {
+        if (!this.isActive || !this.panel) { return; }
         function BlendBackgroundWithPageBackground (backgroundColor)
         {
             let bodyStyle = window.getComputedStyle (document.body, null);
@@ -239,10 +243,10 @@ export class MeasureTool
             let calcResult = CalculateMarkerValues (this.markers[0], this.markers[1]);
 
             if (calcResult.pointsDistance !== null) {
-                AddValue (this.panel, 'measure_distance', 'Distance of points', calcResult.pointsDistance.toFixed (3));
+                AddValue (this.panel, 'measure_distance', 'Distance of points', this.FormatLength (calcResult.pointsDistance));
             }
             if (calcResult.parallelFacesDistance !== null) {
-                AddValue (this.panel, 'measure_distance_parallel', 'Distance of parallel faces', calcResult.parallelFacesDistance.toFixed (3));
+                AddValue (this.panel, 'measure_distance_parallel', 'Distance of parallel faces', this.FormatLength (calcResult.parallelFacesDistance));
             }
             if (calcResult.facesAngle !== null) {
                 let degreeValue = calcResult.facesAngle * RadDeg;

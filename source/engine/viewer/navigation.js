@@ -426,7 +426,7 @@ export class Navigation
 
         if (wasDown && this.clickDetector.IsClick ()) {
 			let mouseCoords = this.mouse.GetPosition ();
-			this.Click (ev.which, mouseCoords);
+			this.Click (ev.which, mouseCoords, { ctrlKey : ev.ctrlKey, metaKey : ev.metaKey });
 		}
         this.clickDetector.Cancel ();
 	}
@@ -578,10 +578,10 @@ export class Navigation
 		this.callbacks.onUpdate ();
 	}
 
-	Click (button, mouseCoords)
+	Click (button, mouseCoords, modifiers = {})
 	{
 		if (this.onMouseClick) {
-			this.onMouseClick (button, mouseCoords);
+			this.onMouseClick (button, mouseCoords, modifiers);
 		}
 	}
 

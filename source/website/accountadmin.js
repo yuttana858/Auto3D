@@ -27,6 +27,8 @@ export class AccountAdmin
         try { const data = await this.Request (AccountConsole); if (this.auth.user?.id !== id) { return { isAdmin : false, requests : [] }; } this.isAdmin = data.isAdmin; return data; }
         catch (error) { this.isAdmin = false; if ([401, 403].includes (error.status)) { return { isAdmin : false, requests : [] }; } throw error; }
     }
+    ListUsers (page = 1, id = null) { return this.Request ('users?page=' + page + (id ? '&id=' + encodeURIComponent (id) : '')); }
+    Manage (id, action, password) { return this.Request ('manage', { id, action, ...(password ? { password } : {}) }); }
     Review (id, decision, password) { return this.Request ('review', { id, decision, ...(password ? { password } : {}) }); }
     OpenRequest ()
     {
@@ -47,7 +49,7 @@ export class AccountAdmin
         });
         return { opened : true };
     }
-    async Open (requestId = null)
+    async Open (requestId = null, resetUserId = null)
     {
         const data = await this.Refresh ();
         if (!data.isAdmin) { throw new Error ('Sign in with an approved administrator account.'); }
@@ -82,6 +84,25 @@ export class AccountAdmin
         };
         refresh.addEventListener ('click', async () => { refresh.disabled = true; try { render ((await this.Refresh ()).requests); } catch (error) { status.textContent = error.message; } finally { refresh.disabled = false; } });
         dialog.addEventListener ('close', () => { list.querySelectorAll ('input').forEach ((input) => { input.value = ''; }); this.dialog = null; }, { once : true });
+        const usersSection = Element ('details', null, dialog); usersSection.open = true; Element ('summary', 'User accounts — access and passwords', usersSection);
+        const usersList = Element ('div', null, usersSection); usersList.className = 'account_request_list';
+        let page = 1;
+        const loadUsers = async () => {
+            const data = await this.ListUsers (page, resetUserId); usersList.replaceChildren ();
+            for (const user of data.users) {
+                const row = Element ('section', null, usersList); row.className = 'account_request_row'; Element ('strong', (user.name || user.email) + ' · ' + user.email, row); Element ('p', user.disabled ? 'Access revoked' : user.isAdmin ? 'Administrator' : 'Active', row);
+                const access = Element ('button', user.disabled ? 'Restore access' : 'Revoke access', row); access.disabled = user.isAdmin || user.id === this.auth.user?.id;
+                access.onclick = async () => { if (!window.confirm ((user.disabled ? 'Restore' : 'Revoke') + ' access for ' + user.email + '?')) { return; } access.disabled = true; try { status.textContent = (await this.Manage (user.id, user.disabled ? 'restore' : 'revoke')).message; await loadUsers (); } catch (error) { status.textContent = error.message; access.disabled = false; } };
+                const reset = Element ('details', null, row); Element ('summary', 'Reset password', reset); reset.open = user.id === resetUserId;
+                const label = Element ('label', 'New password (at least 12 characters)', reset); const password = Element ('input', null, label); password.type = 'password'; password.autocomplete = 'new-password'; password.minLength = 12; password.maxLength = 1024; password.setAttribute ('aria-label', 'New password for ' + user.email);
+                const submit = Element ('button', 'Set new password', reset); submit.onclick = async () => { if (password.value.length < 12) { status.textContent = 'Enter a new password of at least 12 characters.'; return; } submit.disabled = true; try { status.textContent = (await this.Manage (user.id, 'reset_password', password.value)).message; password.value = ''; reset.open = false; } catch (error) { status.textContent = error.message; } finally { password.value = ''; submit.disabled = false; } };
+            }
+            const previous = Element ('button', 'Previous accounts', usersList); previous.disabled = page === 1; previous.onclick = () => { page--; loadUsers ().catch ((error) => { status.textContent = error.message; }); };
+            const next = Element ('button', 'Next accounts', usersList); next.disabled = !data.hasMore; next.onclick = () => { page++; loadUsers ().catch ((error) => { status.textContent = error.message; }); };
+        };
+        const reload = Element ('button', 'Refresh accounts', usersSection); reload.onclick = () => loadUsers ().catch ((error) => { status.textContent = error.message; });
+        loadUsers ().catch ((error) => { status.textContent = error.message; });
+        dialog.addEventListener ('close', () => usersList.querySelectorAll ('input').forEach ((input) => { input.value = ''; }));
         render (requestId ? data.requests.filter ((request) => request.id === requestId) : data.requests); return { opened : true };
     }
 }

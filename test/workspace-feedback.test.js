@@ -7,7 +7,7 @@ function editor () {
     const instance = Object.create (SessionEditor.prototype);
     const source = { name : 'Model', position : [0, 0, 0], threeObject : new THREE.Mesh (new THREE.BoxGeometry (2, 3, 4)) };
     instance.selected = source; instance.busy = false; instance.readOnly = false; const messages = [];
-    instance.document = { objects : [source], Duplicate () { const copy = { position : [...source.position] }; this.objects.push (copy); return copy; }, ApplyTransform () {}, Remove (object) { this.objects.splice (this.objects.indexOf (object), 1); }, Restore (object, index) { this.objects.splice (index, 0, object); } };
+    instance.document = { objects : [source], Instance () { const copy = { position : [...source.position] }; this.objects.push (copy); return copy; }, ApplyTransform () {}, Remove (object) { this.objects.splice (this.objects.indexOf (object), 1); }, Restore (object, index) { this.objects.splice (index, 0, object); } };
     instance.Status = (message) => messages.push (message); instance.RefreshButtons = () => {};
     instance.history = { entries : [], Push (entry) { this.entries.push (entry); } }; instance.Render = async () => {};
     return { instance, messages };
@@ -24,8 +24,8 @@ describe ('Workspace operation feedback', () => {
         await instance.history.entries[0].redo (); assert.equal (instance.document.objects.length, 3);
     });
     it ('restores the original scene and clears busy after a failed copy', async () => {
-        const { instance, messages } = editor (); let copies = 0; const duplicate = instance.document.Duplicate;
-        instance.document.Duplicate = function () { if (++copies === 2) { throw new Error ('copy failed'); } return duplicate.call (this); };
+        const { instance, messages } = editor (); let copies = 0; const duplicate = instance.document.Instance;
+        instance.document.Instance = function () { if (++copies === 2) { throw new Error ('copy failed'); } return duplicate.call (this); };
         await assert.rejects (() => instance.CreateArray (3, 1, 1), /copy failed/);
         assert.equal (instance.document.objects.length, 1); assert.equal (instance.busy, false); assert.equal (instance.history.entries.length, 0); assert.match (messages.at (-1), /Could not create the array/);
     });

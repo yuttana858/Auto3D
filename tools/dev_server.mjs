@@ -6,7 +6,7 @@ import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 
 const root = process.cwd ();
-const build = await context ({ entryPoints : { 'o3dv.website.min' : 'source/website/index.js', 'o3dv.recovery' : 'source/website/sessionrecoveryworker.js' }, define : { 'import.meta.url' : 'document.currentScript.src' }, bundle : true, minify : true, globalName : 'OV', sourcemap : true, loader : { '.ttf' : 'file', '.woff' : 'file', '.svg' : 'file' }, outdir : 'build/website_dev', logLevel : 'info' });
+const build = await context ({ entryPoints : { 'o3dv.website.min' : 'source/website/index.js', 'o3dv.recovery' : 'source/website/sessionrecoveryworker.js', 'o3dv.optimize' : 'source/website/polygonworker.js' }, define : { 'import.meta.url' : 'document.currentScript.src' }, bundle : true, minify : true, globalName : 'OV', sourcemap : true, loader : { '.ttf' : 'file', '.woff' : 'file', '.svg' : 'file' }, outdir : 'build/website_dev', logLevel : 'info' });
 await build.rebuild ();
 await build.watch ();
 const types = { '.html' : 'text/html', '.js' : 'text/javascript', '.css' : 'text/css', '.json' : 'application/json', '.svg' : 'image/svg+xml', '.png' : 'image/png', '.jpg' : 'image/jpeg', '.webp' : 'image/webp', '.woff' : 'font/woff', '.ttf' : 'font/ttf', '.wasm' : 'application/wasm', '.glb' : 'model/gltf-binary', '.gltf' : 'model/gltf+json' };

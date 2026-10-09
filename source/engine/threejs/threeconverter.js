@@ -495,21 +495,29 @@ export function ConvertModelToThreeObject (model, conversionParams, conversionOu
 		return threeLine;
 	}
 
+	const meshTemplates = new Map ();
 	function ConvertMesh (threeObject, meshInstance, materialHandler)
 	{
 		if (IsEmptyMesh (meshInstance.mesh)) {
 			return;
 		}
 
+        const cached = meshTemplates.get (meshInstance.mesh);
+        if (cached) {
+            cached.forEach ((template) => { const copy = new template.constructor (template.geometry, Array.isArray (template.material) ? [...template.material] : template.material); copy.position.copy (template.position); copy.quaternion.copy (template.quaternion); copy.scale.copy (template.scale); copy.userData = { ...template.userData, originalMeshInstance : meshInstance, originalMaterials : [...template.userData.originalMaterials], threeMaterials : null }; threeObject.add (copy); });
+            return;
+        }
+        const templates = [];
 		let triangleMesh = CreateThreeTriangleMesh (meshInstance, materialHandler);
 		if (triangleMesh !== null) {
-			threeObject.add (triangleMesh);
+			threeObject.add (triangleMesh); templates.push (triangleMesh);
 		}
 
 		let lineMesh = CreateThreeLineMesh (meshInstance, materialHandler);
 		if (lineMesh !== null) {
-			threeObject.add (lineMesh);
+			threeObject.add (lineMesh); templates.push (lineMesh);
 		}
+		meshTemplates.set (meshInstance.mesh, templates);
 	}
 
 	function ConvertNodeHierarchy (threeRootNode, model, materialHandler, stateHandler)

@@ -26,6 +26,12 @@ export function DisplayLength (value, sourceUnit, system)
     return (value * factor).toLocaleString (undefined, { maximumFractionDigits : 2 }) + ' ' + DisplayUnitLabel (system);
 }
 
+export function DisplayQuantity (value, sourceUnit, system, power = 1)
+{
+    const factor = UnitFactor (sourceUnit, system); const suffix = power === 2 ? '²' : power === 3 ? '³' : '';
+    return (value * Math.pow (factor ?? 1, power)).toLocaleString (undefined, { maximumFractionDigits : 3 }) + ' ' + (factor === null ? 'model units' : DisplayUnitLabel (system)) + suffix;
+}
+
 export function DisplaySizeFromScale (baseSize, scale, sourceUnit, system)
 {
     const factor = UnitFactor (sourceUnit, system);
@@ -112,6 +118,7 @@ export class Preferences
             this.website.sidebar.AddObject3DProperties (this.website.model, this.website.model);
             this.website.sessionEditor.UnitsChanged ();
         }
+        this.website.measureTool?.UpdatePanel ();
         return this.SaveAccount ();
     }
     async LoadAccount (id)

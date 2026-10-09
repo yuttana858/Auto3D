@@ -63,11 +63,12 @@ export class CommandRegistry
         if (!command) { throw new Error ('Unknown command: ' + id); }
         Validate (args, command.inputSchema);
         if (command.mutates && this.context.readOnly) { throw new Error ('This shared viewer is read-only.'); }
-        if (this.context.busy) { throw new Error ('The viewer is busy. Retry after loading completes.'); }
+        if (this.context.busy && id !== 'polygon.cancel') { throw new Error ('The viewer is busy. Retry after loading completes.'); }
         return await command.handler (args) ?? null;
     }
     Execute (id, args = {})
     {
+        if (id === 'polygon.cancel') { return this.Invoke (id, args).then ((result) => ({ ok : true, command : id, result })).catch ((error) => ({ ok : false, command : id, error : { code : 'COMMAND_FAILED', message : error.message } })); }
         return this.Queue (async () => {
             try { return { ok : true, command : id, result : await this.Invoke (id, args) }; }
             catch (error) { return { ok : false, command : id, error : { code : 'COMMAND_FAILED', message : error.message } }; }

@@ -28,7 +28,7 @@ export function InstallAuthGate (website)
             website.accountReady = false;
             if (unlocked) { website.sessionEditor.dirty = false; }
             document.querySelectorAll ('dialog[open]').forEach ((dialog) => dialog.close ());
-            website.sessionEditor.timeline?.Stop (); website.sessionEditor.controls.detach (); website.commands?.Cancel ();
+            website.sessionEditor.timeline?.Stop (); website.sessionEditor.controls.detach (); website.commands?.Cancel (); website.sessionEditor.polygonOptimizer?.Cancel ();
             website.sessionEditor.closeContextMenu?.();
         } else {
             unlocked = true;
@@ -41,5 +41,7 @@ export function InstallAuthGate (website)
     let wasSignedIn = false;
     auth.Subscribe (() => { const signedIn = Boolean (auth.user); if (signedIn !== wasSignedIn) { render (); } wasSignedIn = signedIn; });
     render (); if (website.authPanel.recovery) { retry.hidden = true; } else { check (); }
+    const verify = () => { if (auth.user && !document.hidden) { auth.VerifyCurrentSession ().catch (() => {}); } };
+    window.setInterval (verify, 30000); window.addEventListener ('focus', verify); document.addEventListener ('visibilitychange', verify);
     return { check };
 }
