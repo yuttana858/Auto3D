@@ -33,7 +33,9 @@ export class SceneEffects
         this.floorReflector = null;
         this.shadowFloor = null;
         this.viewer.renderer.shadowMap.enabled = false;
-        this.viewer.renderer.shadowMap.type = THREE.PCFShadowMap;
+        // Use ordinary depth sampling instead of hardware comparison samplers.
+        // This is the portable path on browsers/drivers with PCF draw failures.
+        this.viewer.renderer.shadowMap.type = THREE.BasicShadowMap;
         this.ConfigureShadowLight ();
     }
 
@@ -60,14 +62,56 @@ export class SceneEffects
             if (typeof this.settings[key] === 'boolean' && typeof data[key] === 'boolean') { this.settings[key] = data[key]; }
             if (typeof this.settings[key] === 'number' && Number.isFinite (data[key])) { this.settings[key] = Math.max (0, Math.min (3, data[key])); }
         }
+        this.settings.shadowIntensity = Math.min (1, this.settings.shadowIntensity);
+        if (Object.keys (data).every ((key) => key === 'shadows' || key === 'shadowIntensity')) {
+            this.UpdateShadows ();
+            this.viewer.Render ();
+            return;
+        }
         this.Update ();
     }
 
     Set (key, value)
     {
         if (!(key in this.settings)) { return; }
+        if (key === 'shadowIntensity') {
+            if (!Number.isFinite (Number (value))) { return; }
+            this.settings.shadowIntensity = Math.max (0, Math.min (1, Number (value)));
+            this.UpdateShadowFloor ();
+            this.viewer.Render ();
+            return;
+        }
         this.settings[key] = typeof this.settings[key] === 'boolean' ? Boolean (value) : Math.max (0, Math.min (3, Number (value)));
+        if (key === 'shadows') { this.UpdateShadows (); this.viewer.Render (); return; }
         this.Update ();
+    }
+
+    UpdateShadows ()
+    {
+        const shading = this.viewer.shadingModel;
+        shading.directionalLight.castShadow = this.settings.shadows;
+        if (shading.hdriEnvironment !== null) {
+            shading.directionalLight.intensity = this.settings.shadows ? 0.22 * Math.PI : 0;
+        }
+        this.viewer.renderer.shadowMap.enabled = this.settings.shadows;
+        this.viewer.renderer.shadowMap.needsUpdate = true;
+        this.UpdateShadowFloor ();
+    }
+
+    InspectShadows ()
+    {
+        const root = this.viewer.mainModel?.mainModel?.GetRootObject?.();
+        const counts = { meshes : 0, visibleMeshes : 0, hiddenMeshes : 0, casters : 0, receivers : 0 };
+        root?.traverse ((mesh) => {
+            if (!mesh.isMesh) { return; }
+            counts.meshes++;
+            let visible = true; for (let parent = mesh; parent; parent = parent.parent) { visible = visible && parent.visible; }
+            counts[visible ? 'visibleMeshes' : 'hiddenMeshes']++;
+            if (mesh.castShadow) { counts.casters++; } if (mesh.receiveShadow) { counts.receivers++; }
+        });
+        const renderer = this.viewer.renderer;
+        const shaderErrors = (renderer.info?.programs || []).filter ((program) => program.diagnostics?.runnable === false).map ((program) => ({ name : program.name, log : program.diagnostics.programLog, vertex : program.diagnostics.vertexShader?.log, fragment : program.diagnostics.fragmentShader?.log }));
+        return { enabled : this.settings.shadows, intensity : this.settings.shadowIntensity, mapType : renderer.shadowMap.type, mapEnabled : renderer.shadowMap.enabled, contextLost : renderer.getContext?.().isContextLost () ?? false, rootVisible : root?.visible ?? null, ...counts, floor : this.shadowFloor ? { visible : this.shadowFloor.visible, depthWrite : this.shadowFloor.material.depthWrite, opacity : this.shadowFloor.material.opacity } : null, shaderErrors };
     }
 
     ApplyObjectSettings (objects)
@@ -90,14 +134,7 @@ export class SceneEffects
         scene.userData.auto3dEnvironmentIntensity = this.settings.environmentIntensity;
         scene.environmentIntensity = this.settings.environmentIntensity;
         shading.UpdateShading ();
-        shading.directionalLight.castShadow = this.settings.shadows;
-        // HDRI normally disables direct lights. A subtle directional component
-        // is retained only while shadows are enabled so cast shadows have a
-        // physical light source without overpowering the environment.
-        if (this.settings.shadows && shading.hdriEnvironment !== null) {
-            shading.directionalLight.intensity = 0.22 * Math.PI;
-        }
-        this.viewer.renderer.shadowMap.enabled = this.settings.shadows;
+        this.UpdateShadows ();
         this.UpdateDynamicReflection ();
         this.UpdateFloorReflection ();
         this.UpdateShadowFloor ();
@@ -312,10 +349,10 @@ export class SceneEffects
             this.shadowFloor.userData.auto3dSceneEffect = true;
             this.shadowFloor.receiveShadow = true;
             this.shadowFloor.material.depthWrite = false;
-            this.shadowFloor.material.polygonOffset = true; this.shadowFloor.material.polygonOffsetFactor = -1; this.shadowFloor.material.polygonOffsetUnits = -1;
             this.shadowFloor.renderOrder = -9;
             this.viewer.scene.add (this.shadowFloor);
         }
+        this.settings.shadowIntensity = Math.max (0, Math.min (1, this.settings.shadowIntensity));
         this.shadowFloor.material.opacity = this.settings.shadowIntensity;
         this.FloorTransform (this.shadowFloor, bounds);
         this.shadowFloor.visible = true;

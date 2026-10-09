@@ -1,3 +1,4 @@
+import { CreateAgentCommands } from '../source/website/agentcommands.js';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { ShadingModel } from '../source/engine/viewer/shadingmodel.js';
@@ -11,6 +12,28 @@ function fixture () {
     return { viewer, effects, root, material, environment, overlay };
 }
 describe ('Scene effects render state', () => {
+    it ('Exposes read-only visibility/shader diagnostics through commands and macros', async () => {
+        const { effects, root, viewer } = fixture (); root.visible = false;
+        viewer.renderer.info = { programs : [{ name : 'failed shader', diagnostics : { runnable : false, programLog : 'link failed', vertexShader : { log : '' }, fragmentShader : { log : 'bad sampler' } } }] };
+        const registry = CreateAgentCommands ({ sessionEditor : { readOnly : true }, sceneEffects : effects });
+        const result = await registry.Execute ('lighting.shadow.inspect'); assert.equal (result.ok, true); assert.equal (result.result.hiddenMeshes, 1); assert.equal (result.result.shaderErrors[0].fragment, 'bad sampler');
+        assert.equal ((await registry.Execute ('lighting.shadow.inspect', { token : 'unexpected' })).ok, false);
+        const macro = await registry.RunMacro ({ version : 1, steps : [{ id : 'diagnosis', command : 'lighting.shadow.inspect', arguments : {} }] }); assert.equal (macro.ok, true); assert.equal (macro.completed[0].result.rootVisible, false); effects.Dispose ();
+    });
+    it ('Isolates shadow controls from reflection refresh and preserves mesh visibility/materials', () => {
+        const { effects, root, material, viewer } = fixture ();
+        effects.UpdateDynamicReflection = () => { throw new Error ('unrelated reflection capture'); };
+        root.add (new THREE.Mesh (root.children[0].geometry, material)); root.children[1].visible = false;
+        const shader = material.onBeforeCompile; const envMap = material.envMap;
+        effects.Set ('shadows', true); effects.Set ('shadowIntensity', 0.8); effects.Restore ({ shadows : true, shadowIntensity : 0.8 });
+        assert.equal (root.visible, true); assert.equal (root.children[0].visible, true); assert.equal (root.children[1].visible, false);
+        assert.equal (material.onBeforeCompile, shader); assert.equal (material.envMap, envMap);
+        assert.equal (viewer.renderer.shadowMap.type, THREE.BasicShadowMap);
+        const diagnosis = effects.InspectShadows (); assert.equal (diagnosis.visibleMeshes, 1); assert.equal (diagnosis.hiddenMeshes, 1); assert.equal (diagnosis.floor.depthWrite, false);
+        effects.Set ('shadowIntensity', 3); assert.equal (effects.shadowFloor.material.opacity, 1);
+        effects.Set ('shadowIntensity', NaN); assert.equal (effects.shadowFloor.material.opacity, 1);
+        effects.Set ('shadows', false); assert.equal (effects.shadowFloor, null); assert.equal (root.children[1].visible, false); effects.Dispose ();
+    });
     it ('Keeps HDRI diffuse intensity and rotation while adding model reflection; restores original shader', () => {
         const { effects, material, environment } = fixture (); const original = material.onBeforeCompile; const key = material.customProgramCacheKey; effects.settings.modelReflections = true; effects.UpdateDynamicReflection ();
         assert.equal (material.envMap, environment); assert.equal (material.envMapIntensity, 1.4); assert.equal (material.envMapRotation.y, 0.7); assert.notEqual (material.onBeforeCompile, original);
