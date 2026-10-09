@@ -1,0 +1,9 @@
+# Cameras and global shadow lighting
+
+Open Camera in the left panel, or Camera settings at the far right of the Advance animation timeline header. FOV accepts 10–120 degrees. Save camera view creates a named view of the current position, target, up vector, projection and FOV. Go to view restores it; Update replaces it with the current view; its name is editable; Delete removes it. Saved-view edits support Undo/Redo. Camera selection and FOV changes stop timeline playback so animation cannot immediately overwrite the view.
+
+Up to 50 named views are stored as `view.cameraViews` in `.auto3d` sessions, account/device Library saves and recovery archives. Older sessions without this optional field open with an empty list. Invalid saved camera lists are rejected before replacing the document. Adding models from another session preserves the current session's camera list. Read-only viewers can recall saved views and adjust framing, but cannot create/update/rename/delete saved views.
+
+Agent commands share the UI service: `camera.open`, `camera.inspect`, `camera.fov`, `camera.create`, `camera.activate`, `camera.update`, `camera.rename`, `camera.delete`. These commands also work in macros with saved IDs passed through result references. Camera views are independent of camera keyframes; recall a view, then use Keyframe camera to capture it on the timeline.
+
+Floor shadows use the global directional shadow light, not camera position. Its default direction is above the scene's up axis and rotates with the HDRI environment rotation/elevation. Camera orbit, switching named views and camera animation do not reposition this light. HDRI remains an environment light with a directional shadow proxy; this does not infer multiple physical lights or the exact sun position from an arbitrary HDR image.

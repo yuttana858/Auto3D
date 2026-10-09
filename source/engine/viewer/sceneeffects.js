@@ -113,7 +113,7 @@ export class SceneEffects
         });
         const renderer = this.viewer.renderer;
         const shaderErrors = (renderer.info?.programs || []).filter ((program) => program.diagnostics?.runnable === false).map ((program) => ({ name : program.name, log : program.diagnostics.programLog, vertex : program.diagnostics.vertexShader?.log, fragment : program.diagnostics.fragmentShader?.log }));
-        return { enabled : this.settings.shadows, intensity : this.settings.shadowIntensity, mapType : renderer.shadowMap.type, mapEnabled : renderer.shadowMap.enabled, contextLost : renderer.getContext?.().isContextLost () ?? false, rootVisible : root?.visible ?? null, ...counts, floor : this.shadowFloor ? { visible : this.shadowFloor.visible, depthWrite : this.shadowFloor.material.depthWrite, opacity : this.shadowFloor.material.opacity } : null, shaderErrors };
+        return { enabled : this.settings.shadows, intensity : this.settings.shadowIntensity, mapType : renderer.shadowMap.type, mapEnabled : renderer.shadowMap.enabled, contextLost : renderer.getContext?.().isContextLost () ?? false, rootVisible : root?.visible ?? null, ...counts, floor : this.shadowFloor ? { visible : this.shadowFloor.visible, depthWrite : this.shadowFloor.material.depthWrite, depthTest : this.shadowFloor.material.depthTest, transparent : this.shadowFloor.material.transparent, renderOrder : this.shadowFloor.renderOrder, opacity : this.shadowFloor.material.opacity } : null, shaderErrors };
     }
 
     ApplyObjectSettings (objects)
@@ -323,6 +323,10 @@ export class SceneEffects
         const size = bounds.getSize (new THREE.Vector3 ());
         const extent = Math.max (size.x, size.y, size.z, 1) * 1.5;
         light.userData.auto3dShadowExtent = extent;
+        const up = this.viewer.upVector;
+        const direction = [1, 1, 1];
+        direction[up.direction === Direction.X ? 0 : up.direction === Direction.Z ? 2 : 1] = up.isFlipped ? -2 : 2;
+        light.userData.auto3dShadowDirection = direction;
         light.shadow.camera.near = Math.max (0.000001, extent / 1000);
         light.shadow.normalBias = extent * 0.001;
         light.shadow.camera.left = -extent;
@@ -347,7 +351,22 @@ export class SceneEffects
         if (!bounds) { return; }
         this.UpdateShadowCamera (bounds);
         if (!this.shadowFloor) {
-            this.shadowFloor = new THREE.Mesh (new THREE.PlaneGeometry (1, 1), new THREE.ShadowMaterial ({ opacity : this.settings.shadowIntensity }));
+            // Blend onto the background before models, rather than compositing a
+            // transparent floor over models in the later transparent render queue.
+            // Custom blending retains shadow alpha while using the opaque queue.
+            const material = new THREE.ShadowMaterial ({
+                opacity : this.settings.shadowIntensity,
+                transparent : false,
+                blending : THREE.CustomBlending,
+                blendEquation : THREE.AddEquation,
+                blendSrc : THREE.SrcAlphaFactor,
+                blendDst : THREE.OneMinusSrcAlphaFactor,
+                blendSrcAlpha : THREE.OneFactor,
+                blendDstAlpha : THREE.OneMinusSrcAlphaFactor,
+                depthWrite : false,
+                depthTest : true
+            });
+            this.shadowFloor = new THREE.Mesh (new THREE.PlaneGeometry (1, 1), material);
             this.shadowFloor.userData.auto3dSceneEffect = true;
             this.shadowFloor.receiveShadow = true;
             this.shadowFloor.material.depthWrite = false;

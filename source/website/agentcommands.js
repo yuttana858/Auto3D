@@ -137,6 +137,14 @@ export function CreateAgentCommands (website)
         if (!response.ok) { throw new Error ('Paper packaging knowledge is unavailable.'); }
         return response.json ();
     }, { section : 'flutes' });
+    add ('camera.open', 'Open camera settings', 'Camera', 'Open the left Camera panel with FOV and named session views.', {}, [], false, () => website.cameraPanel.Open ());
+    add ('camera.inspect', 'Inspect saved cameras', 'Camera', 'List named camera views saved in the current session.', {}, [], false, () => editor.cameras.Inspect ());
+    add ('camera.fov', 'Set camera field of view', 'Camera', 'Set current camera FOV in degrees and update view framing. Stops camera playback.', { fov : { ...number, minimum : 10, maximum : 120 } }, ['fov'], false, ({ fov }) => editor.cameras.SetFov (fov), { fov : 45 });
+    add ('camera.create', 'Save camera view', 'Camera', 'Save current position, target, orientation, projection and FOV as a named session camera. Undo supported.', { name : { type : 'string', minLength : 1, maxLength : 100 } }, ['name'], true, ({ name }) => editor.cameras.Create (name), { name : 'Front view' });
+    add ('camera.activate', 'Go to saved camera', 'Camera', 'Restore a saved camera view and stop timeline playback. Works in read-only viewers.', { id : text }, ['id'], false, ({ id }) => editor.cameras.Activate (id), { id : 'camera-id' });
+    add ('camera.update', 'Update saved camera', 'Camera', 'Replace a named camera with the current view, retaining its name and ID. Undo supported.', { id : text }, ['id'], true, ({ id }) => editor.cameras.Update (id), { id : 'camera-id' });
+    add ('camera.rename', 'Rename saved camera', 'Camera', 'Rename a saved session camera. Undo supported.', { id : text, name : { type : 'string', minLength : 1, maxLength : 100 } }, ['id', 'name'], true, ({ id, name }) => editor.cameras.Rename (id, name), { id : 'camera-id', name : 'Overview' });
+    add ('camera.delete', 'Delete saved camera', 'Camera', 'Remove a saved camera from this session. Undo supported.', { id : text }, ['id'], true, ({ id }) => editor.cameras.Delete (id), { id : 'camera-id' });
     add ('animation.timeline.inspect', 'Inspect keyframe timeline', 'Animation', 'Return native Auto3D timeline duration, playhead, interpolation mode, camera keyframes and per-object keyframe counts.', {}, [], false, () => ({
         duration : editor.timeline.duration,
         rangeStart : editor.timeline.rangeStart, rangeEnd : editor.timeline.rangeEnd,

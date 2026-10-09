@@ -926,3 +926,15 @@ div.main_viewer
 .error_log_entries { max-height: 55vh; overflow: auto; margin-top: 12px; }
 .error_log_entries details { padding: 8px; border-bottom: 1px solid var(--ov_border_color); overflow-wrap: anywhere; }
 .error_log_entries pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.camera_content { display: flex; flex-direction: column; gap: 10px; }
+.camera_content input { max-width: 100%; box-sizing: border-box; }
+.camera_view { border-top: 1px solid var(--ov_border_color); padding-top: 10px; }
+.timeline_camera_settings { margin-left: auto; flex-shrink: 0; }
+.camera_content label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.camera_content label input { width: 70px; }
+.camera_content input, .camera_content button, .timeline_camera_settings { color: var(--ov_foreground_color); background: var(--ov_background_color); border: 1px solid var(--ov_border_color); border-radius: 4px; padding: 6px 8px; font: inherit; }
+.camera_content button, .timeline_camera_settings { cursor: pointer; }
+.camera_content button:hover, .timeline_camera_settings:hover { background: var(--ov_hover_color); }
+.camera_content button:disabled { opacity: 0.45; cursor: default; }
+.camera_view > input { width: 100%; margin-bottom: 6px; }

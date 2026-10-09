@@ -1,3 +1,4 @@
+import { CameraPanel } from './camerapanel.js';
 import { ModelExtensions, SupportedFormatsText } from './importformats.js';
 import { GetFileExtension, TransformFileHostUrls } from '../engine/io/fileutils.js';
 import { InputFilesFromFileObjects, InputFilesFromUrls } from '../engine/import/importerfiles.js';
@@ -245,6 +246,7 @@ export class Website
         this.materialPanel = new MaterialPanel (this);
         this.axisIndicator = new AxisIndicator (this.viewer, document.getElementById ('world_axis'));
         this.sessionEditor = new SessionEditor (this);
+        this.cameraPanel = new CameraPanel (this);
         this.preferences = new Preferences (this);
         this.aiWorkspace = new AIWorkspace (this);
         for (const [id, setting] of [['horizon_gradient', 'horizonGradient'], ['ground_grid', 'showGroundGrid']]) {
