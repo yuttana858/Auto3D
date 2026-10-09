@@ -4,11 +4,15 @@ execFileSync (process.execPath, ['tools/prepare_animation_decoders.mjs', 'build/
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
+import { ModuleRoot } from '../modules/packaging/tools/build.mjs';
+import { copyFile } from 'node:fs/promises';
 
 const root = process.cwd ();
 const build = await context ({ entryPoints : { 'o3dv.website.min' : 'source/website/index.js', 'o3dv.recovery' : 'source/website/sessionrecoveryworker.js', 'o3dv.optimize' : 'source/website/polygonworker.js' }, define : { 'import.meta.url' : 'document.currentScript.src' }, bundle : true, minify : true, globalName : 'OV', sourcemap : true, loader : { '.ttf' : 'file', '.woff' : 'file', '.svg' : 'file' }, outdir : 'build/website_dev', logLevel : 'info' });
 await build.rebuild ();
 await build.watch ();
+const packaging = await context ({ absWorkingDir : ModuleRoot, entryPoints : ['src/index.js'], bundle : true, format : 'esm', minify : true, outfile : path.join (root, 'build/website_dev/packaging/packaging.module.js'), plugins : [{ name : 'packaging-css', setup : bundler => { bundler.onLoad ({ filter : /index\.js$/ }, async args => { if (args.path !== path.join (ModuleRoot, 'src/index.js')) { return; } return { contents : await readFile (args.path, 'utf8'), loader : 'js', watchFiles : [path.join (ModuleRoot, 'src/packaging.css')] }; }); bundler.onEnd (async () => { await copyFile (path.join (ModuleRoot, 'src/packaging.css'), path.join (root, 'build/website_dev/packaging/packaging.module.css')); }); } }], logLevel : 'info' });
+await packaging.rebuild (); await packaging.watch ();
 const types = { '.html' : 'text/html', '.js' : 'text/javascript', '.css' : 'text/css', '.json' : 'application/json', '.svg' : 'image/svg+xml', '.png' : 'image/png', '.jpg' : 'image/jpeg', '.webp' : 'image/webp', '.woff' : 'font/woff', '.ttf' : 'font/ttf', '.wasm' : 'application/wasm', '.glb' : 'model/gltf-binary', '.gltf' : 'model/gltf+json' };
 const server = createServer (async (request, response) => {
     response.setHeader ('Cache-Control', 'no-store');
@@ -23,5 +27,5 @@ const server = createServer (async (request, response) => {
 });
 server.on ('error', async (error) => { console.error (error.message); await build.dispose (); process.exit (1); });
 server.listen (8080, '127.0.0.1', () => console.log ('SW Auto3D development server: http://localhost:8080/website/index.html — source watching, no browser cache. Refresh after a successful rebuild.'));
-async function stop () { server.close (); await build.dispose (); process.exit (0); }
+async function stop () { server.close (); await Promise.all ([build.dispose (), packaging.dispose ()]); process.exit (0); }
 process.on ('SIGINT', stop); process.on ('SIGTERM', stop);

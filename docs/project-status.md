@@ -2,13 +2,17 @@
 
 Updated 2026-10-09. This is the starting point for project status, completed work, open issues and the next release. Architecture: [agent-project-overview.md](agent-project-overview.md).
 
-## Current development release: v0.28.0
+## Current development release: Auto3D v0.29.0 / Packaging v1.0.0
 
-Remote main includes PR #24 (e373f8c). FEFCO work is prepared on feat/fefco-packaging, based on that merged workspace update. The app header, Preferences and npm metadata identify v0.28.0. Every new PR will report its application version and PR number. Production deployment for this release has not been performed.
+Remote main includes PR #25 (f810d84), the initial FEFCO catalog release v0.28.0. The next release is prepared on feat/packaging-module-unfold. Every PR reports the app version and PR number; Packaging now has its own module version as well. This branch has not deployed production.
 
-The Packaging mini panel now has categorized thumbnail buttons for 0201 RSC, 0200 HSC, 0202 OSC and 0203 FOL. Dimension/caliper controls generate folded kraft boxes with physical walls/flaps, visible seams and embedded grain/edge textures. Other families are listed as coming later. Generated concept profiles support SVG/DXF, archive/recovery, duplication/arrays and Undo/Redo. Shared strict commands and typed RSC/HSC generation phrases use the same service. See packaging-module.md for dimensions and manufacturing-preview limits. Validation: 472 unit tests, lint, website/Pages builds, and local Chromium checks for thumbnails, HSC/RSC open/closed geometry, generated-box arrays, archive textures, Undo/Redo, invalid overlap, display-unit conversion and mobile wrapping all pass.
+The generator, extrusion, material textures, catalog UI and styles now live in the independent modules/packaging package. Its neutral mesh/profile/material API has no Auto3D imports, and it has its own build, tests and standalone preview (localhost:8082). Auto3D retains a scene/history/auth adapter and lightweight archive validation, loading module geometry/UI on demand. Saved scenes use ordinary engine geometry/materials. Build cache identity and release verification include the separate module JS/CSS.
 
-## Where we are
+**Unfold selected box** / `unfold box` replaces a generated folded box with its saved flat concept dieline, preserving the current dominant board/edge materials and textures. Red cuts, dashed blue scores and physical caliper are visible. Undo/Redo restores object/order/selection and the previous drawing; archives/recovery preserve flat state, textures and guides. The action uses generator dimensions, refuses generic object scaling and arbitrary imported meshes, and does not claim manufacturing allowances or general hinge animation.
+
+Validation: 484 unit/module tests pass, including compilation checks for both dependency boundaries, material preservation, watertight flat-board volume, units, commands/macros, failure rollback and archive/recovery. Lint, website/Pages and standalone module builds pass; local Chromium verifies deferred module requests, RSC unfolding, textures/guides in file saves, Undo/Redo, typed commands, mobile layout, the standalone module without Auto3D/account APIs, and module-fetch failure/retry. The module browser suite also passes against the generated Pages artifact; deployment verification confirms app/module versions and served JS/CSS hashes locally. Backend tests (11) and production-license checks also pass. Production audit passes its high-severity threshold, with the existing moderate fflate 0.8.2 advisory still reported; dependency versions are unchanged. See packaging-module.md and modules/packaging/README.md.
+
+## Application overview and earlier production evidence
 
 Auto3D is an authenticated browser 3D workspace with private user Library storage, account preferences, administration, modeling/layout tools, packaging profiles, cameras and PNG rendering. The frontend uses plain JavaScript/DOM and Three.js. Production runs on Cloudflare Pages Functions with Supabase Auth/PostgreSQL and private Cloudflare R2 objects. Microsoft Entra ID remains the intended replacement for temporary email/password authentication.
 
@@ -16,7 +20,7 @@ Auto3D is an authenticated browser 3D workspace with private user Library storag
 | --- | --- | --- |
 | Confirmed production | App label **0.27.0**; main commit `c46bbf465ecf555f291431dc4a9bd07a71d281cc` | PR #21 merged; GitHub deployment and Cloudflare canonical deployment both successful |
 | Current production deployment | `0d73523a-cff9-4b17-a84e-e09156748715`, 2026-10-09 13:56 UTC | Pages project `auto3d`, production branch `main`, host `auto3d-5av.pages.dev` |
-| Consolidated local release | **0.27.1**, not deployed yet | Preference/recovery fixes and release verification described below |
+| Historical 0.27.1 release | Preference/recovery fixes, merged in PR #22 | Release verification described below; subsequent production identity has not been rechecked in this task |
 
 A successful merge and a visible app version are different checks. Earlier feature PRs retained 0.27.0, so the old label does not prove deployment failed. PR #21 did not contain the later recovery/preference work. The six most recent Cloudflare production deployments were successful and not skipped; there is no evidence that many small PRs broke those deployments. The user's unchanged fill appearance remains a production-browser issue until the loaded release and diagnostics are confirmed.
 
@@ -39,7 +43,7 @@ These features are present in the codebase with regression coverage. This invent
 | Cameras/rendering | FOV and saved cameras, session persistence, timeline camera entry; screen/HD/4K/16K tiled PNG, model-only alpha and queue/cancel | [session-cameras.md](session-cameras.md), [rendering.md](rendering.md) |
 | PR #21 rendering fixes | Metallic/clearcoat specular fill; independent floor-shadow projection, renderer state restoration; symmetric account-dialog buttons | [PR #21](https://github.com/yuttana858/Auto3D/pull/21) |
 
-## Current 0.27.1 changes
+## Historical 0.27.1 changes
 
 - Account preferences share one in-flight load per identity and apply the complete saved viewport before rendering. Cookie/previous-account defaults do not win a race against account settings. Logout invalidates stale reads and queued writes.
 - Appearance changes preserve an explicit custom background. Viewport updates render as a batch. Saved RGB/alpha components use integers accepted by the server.
@@ -85,7 +89,7 @@ New registry commands are documented in the generated catalog: commands.text, ob
 
 Validation: 464 unit tests, lint and website/Pages build; Chromium covers clean startup, context/strip parity, a real 96-object array with processing feedback and undo, saved macro execution, validation failures, and desktop/mobile AI/Packaging panels. Large real-world model performance still depends on geometry, textures and the user's GPU. These changes are prepared for review and are not deployed by this branch.
 
-## Immediate release checklist
+## Historical 0.27.1 release checklist
 
 - [x] Confirm PR #21 merge and production deployment identity directly in GitHub/Cloudflare.
 - [x] Consolidate preference, recovery, diagnostics and version/build fixes locally.
@@ -100,7 +104,7 @@ Validation: 464 unit tests, lint and website/Pages build; Chromium covers clean 
 
 1. **Recovery email delivery:** custom SMTP is not configured/verified. The requested corporate sender needs an approved mail service/domain setup. Do not assume an unapproved personal/corporate mailbox can provide SMTP. Production email/reset delivery needs an end-to-end test after configuration.
 2. **Identity migration:** design and implement Microsoft Entra sign-in behind the existing account/auth boundary, including approved-user mapping, admin roles, logout/revocation and Library ownership migration. Avoid a parallel login/admin system.
-3. **Packaging:** curves and vector import, measured board-grade catalog, folding/bend allowance, FEFCO generators and manufacturing validation are future work. Current score lines are metadata; extrusion creates flat solid board, not folded or fluted geometry.
+3. **Packaging:** 0200–0203 generators and unfolding are implemented in the separate module. Curves/vector import, additional FEFCO families, measured board grades, folding/bend allowances and manufacturing validation remain future work. Score guides do not animate hinges, and individual flute geometry is not modeled.
 4. **Packaging database readiness:** confirm the profile-only session metadata constraint from `database/packaging-profile-sessions.sql` is applied before relying on account saves of zero-object designs. This local release does not apply SQL.
 5. **Polygon quality:** validate real dense textured assets and representative devices; simplification is lossy and seam/topology dependent. Animated rigs/morphs are excluded. Keep preview and Undo; do not promise unchanged appearance or unlimited array performance.
 6. **Rendering limits:** 16K output is memory intensive; floor shadows are projected silhouettes, not physically accurate self-shadow/ray tracing. Test representative opaque, transparent and animated models in supported production browsers when rendering code changes.
@@ -108,6 +112,6 @@ Validation: 464 unit tests, lint and website/Pages build; Chromium covers clean 
 
 ## Working rules for the next agent
 
-Read `AGENTS.md`, this log and the architecture overview first. Treat the live deployment commit and tests as evidence; do not infer release success from a merged PR or the old version label. Keep the current batch in one release PR. Preserve unrelated local changes; this checkout contains uncommitted files matching earlier merged work. Publish only reviewed changes on the current main tree.
+Read `AGENTS.md`, this log and the architecture overview first. Treat the live deployment commit and tests as evidence; do not infer release success from a merged PR or the old version label. Keep the current batch in one release PR. Preserve unrelated local files and development screenshots under work/. Publish only reviewed changes on the current main tree.
 
 Use shared application services and strict registry commands for new user actions; synchronize the catalog. Respect login, account isolation and read-only sessions. Never put credentials in documents, browser code, screenshots or logs. Do not replay SQL from `database/history/pr16/`. Update this log after each release with version, commit, deployment result, meaningful tests and remaining issues.

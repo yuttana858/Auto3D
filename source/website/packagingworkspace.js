@@ -1,9 +1,10 @@
 import { WorkspaceDialog } from './modellibrary.js';
-import { BoardCalipers, NewPackagingDesign, ValidatePackaging, CreatePackagingModel, PackagingBounds, ExportPackagingSVG, ExportPackagingDXF } from './packagingcore.js';
+import { BoardCalipers, NewPackagingDesign, ValidatePackaging, PackagingBounds, ExportPackagingSVG, ExportPackagingDXF } from './packagingcore.js';
 import { Unit } from '../engine/model/unit.js';
 import { DisplayUnitLabel } from './preferences.js';
-import { DefaultFefco, ValidateFefco, FefcoProfile, CreateFefcoModel } from './fefcocore.js';
-import { FefcoCatalog } from './fefcocatalog.js';
+import { DefaultFefco, ValidateFefco, FefcoProfile } from '../../modules/packaging/src/fefco.js';
+import { LoadPackagingModule, PackagingModel, FefcoSurfaces } from './packagingadapter.js';
+
 
 function Element (tag, parent, text, className)
 {
@@ -13,8 +14,37 @@ export class PackagingWorkspace
 {
     constructor (editor) { this.editor = editor; this.dialog = null; this.refreshing = false; this.draft = []; this.active = null; this.draftType = 'cut'; this.gridSnapMM = 5; this.displayFactor = 1; this.view = { x : -20, y : -220, width : 340, height : 240 }; }
     Design () { return this.editor.document.packaging || NewPackagingDesign (); }
+    PanelHost () { return { inspect : () => this.FefcoInspect (), configure : changes => this.ConfigureFefco (changes), generate : () => this.GenerateFefco (), unfold : () => this.UnfoldSelected (), factor : () => this.Factor (), run : action => this.editor.Run (action), blocked : () => this.editor.busy || this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false, canUnfold : () => this.CanUnfold () }; }
+    CanUnfold () { return Boolean (this.editor.selected?.userData?._auto3dFefco) && this.editor.selected.userData._auto3dPackagingState !== 'flat'; }
+    async UnfoldSelected (objectId = null)
+    {
+        this.Editable (); const editor = this.editor; const target = editor.document;
+        const source = objectId ? target.objects.find (item => item.id === objectId) : editor.selected;
+        if (!source?.userData?._auto3dFefco || source.userData._auto3dPackagingState === 'flat') { throw new Error ('Select a generated folded FEFCO box to unfold.'); }
+        if (source.scale.some (value => Math.abs (value - 1) > 1e-6)) { throw new Error ('Unfold uses the saved design dimensions. Undo object scaling or generate a box with the desired dimensions first.'); }
+        const parameters = ValidateFefco (JSON.parse (source.userData._auto3dFefco));
+        const profile = ValidatePackaging (source.packagingProfile || FefcoProfile (parameters)); const before = target.packaging; const previous = editor.selected;
+        const module = await LoadPackagingModule (); this.Editable ();
+        if (editor.document !== target || !target.objects.includes (source)) { throw new Error ('The selected box changed before unfolding.'); }
+        const surfaces = FefcoSurfaces (target.CompactModel ([source], true)); const data = module.UnfoldFefco (parameters, profile); const model = PackagingModel (data, target.model.GetUnit (), surfaces);
+        const index = target.objects.indexOf (source); let flat;
+        editor.busy = true; editor.RefreshButtons?.(); editor.Status ('Unfolding FEFCO ' + parameters.code + '…');
+        try {
+            await new Promise (resolve => setTimeout (resolve, 20));
+            flat = target.AddImported (model, source.name + ' · Dieline'); flat.source = 'FEFCO ' + parameters.code + ' flat dieline'; flat.packagingProfile = profile;
+            flat.userData = { ...source.userData, _auto3dPackagingState : 'flat' }; flat.visible = source.visible; flat.position = [...source.position]; flat.castShadow = source.castShadow !== false; flat.receiveShadow = source.receiveShadow !== false;
+            target.ApplyTransform (flat); target.Remove (flat); target.Remove (source); target.Restore (flat, index); target.packaging = profile; editor.selected = flat;
+            await editor.Render (true);
+            const apply = async forward => { target.Remove (forward ? source : flat); target.Restore (forward ? flat : source, index); target.packaging = forward ? profile : before; editor.selected = forward ? flat : previous; await editor.Render (); this.Refresh (); editor.website.aiWorkspace?.RefreshPackaging (); };
+            editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) });
+            this.Refresh (); editor.Status ('Unfolded FEFCO ' + parameters.code + ' · kraft dieline · CUT red / SCORE blue');
+            return { objectId : flat.id, replacedObjectId : source.id, code : parameters.code, state : 'flat', units : 'mm', thicknessMM : profile.thickness, profilePaths : profile.paths.length, materialPreserved : true };
+        } catch (error) {
+            if (flat) { target.Remove (flat); if (!target.objects.includes (source)) { target.Restore (source, index); } target.packaging = before; editor.selected = previous; await editor.Render (); } throw error;
+        } finally { editor.busy = false; editor.RefreshButtons?.(); editor.website.aiWorkspace?.RefreshPackaging (); }
+    }
     FefcoInspect () { return { ...ValidateFefco (this.fefco || DefaultFefco), units : 'mm', dimensions : 'internal', axes : 'W=X, L=Z, H=Y' }; }
-    FefcoCatalog () { return FefcoCatalog (); }
+    async FefcoCatalog () { const module = await LoadPackagingModule (); return module.FefcoCatalog (); }
     ConfigureFefco (changes)
     {
         this.Editable (); this.fefco = ValidateFefco ({ ...(this.fefco || DefaultFefco), ...changes }); this.editor.website.aiWorkspace?.fefcoPanel?.Refresh (); return this.FefcoInspect ();
@@ -23,10 +53,13 @@ export class PackagingWorkspace
     {
         this.Editable (); const editor = this.editor; if (editor.document.objects.length >= 1000) { throw new Error ('Session has reached the 1000 object limit.'); }
         const data = ValidateFefco ({ ...(this.fefco || DefaultFefco), ...changes });
-        const unit = editor.document.objects.length ? editor.document.model.GetUnit () : Unit.Millimeter;
+        const target = editor.document; const module = await LoadPackagingModule (); this.Editable ();
+        if (editor.document !== target) { throw new Error ('The workspace changed before generating packaging.'); }
+        if (target.objects.length >= 1000) { throw new Error ('Session has reached the 1000 object limit.'); }
+        const unit = target.objects.length ? target.model.GetUnit () : Unit.Millimeter;
         // Validate geometry and units before changing the scene or profile.
-        const model = CreateFefcoModel (data, unit); const profile = FefcoProfile (data);
-        const target = editor.document; const before = target.packaging; const previous = editor.selected;
+        const model = PackagingModel (module.CreateFefcoBox (data), unit); const profile = FefcoProfile (data);
+        const before = target.packaging; const previous = editor.selected;
         editor.busy = true; editor.RefreshButtons?.(); editor.Status ('Generating FEFCO ' + data.code + '…');
         let object;
         try {
@@ -79,8 +112,11 @@ export class PackagingWorkspace
     }
     async Extrude ()
     {
-        this.Editable (); if (this.editor.document.objects.length >= 1000) { throw new Error ('Session has reached the 1000 object limit.'); } const design = ValidatePackaging (this.Design ()); const editor = this.editor; const model = CreatePackagingModel (design, editor.document.objects.length ? editor.document.model.GetUnit () : Unit.Millimeter);
-        const object = editor.document.AddImported (model, design.name); object.source = 'Packaging profile'; object.packagingProfile = design; const index = editor.document.objects.indexOf (object);
+        this.Editable (); const design = ValidatePackaging (this.Design ()); const editor = this.editor; const target = editor.document; const module = await LoadPackagingModule (); this.Editable ();
+        if (editor.document !== target) { throw new Error ('The workspace changed before extruding packaging.'); }
+        if (target.objects.length >= 1000) { throw new Error ('Session has reached the 1000 object limit.'); }
+        const model = PackagingModel (module.CreateBoard (design), target.objects.length ? target.model.GetUnit () : Unit.Millimeter);
+        const object = target.AddImported (model, design.name); object.source = 'Packaging profile'; object.packagingProfile = design; const index = target.objects.indexOf (object);
         const apply = async (add) => { if (add) { editor.document.Restore (object, index); editor.selected = object; } else { editor.document.Remove (object); editor.selected = null; } await editor.Render (); };
         try { editor.selected = object; await editor.Render (true); }
         catch (error) { editor.document.Remove (object); editor.selected = null; await editor.Render (); throw error; }

@@ -1,0 +1,35 @@
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright-core';
+import { OpenSessionArchive } from '../../source/website/sessionarchive.js';
+import { readFile } from 'node:fs/promises';
+const browser = await chromium.launch ({ executablePath : '/usr/bin/chromium', args : ['--no-sandbox', '--enable-unsafe-swiftshader'] });
+try {
+    const page = await browser.newPage ({ viewport : { width : 1440, height : 950 } }); page.setDefaultTimeout (30000); const errors = []; const requests = []; page.on ('pageerror', error => errors.push (error.message)); page.on ('request', request => requests.push (request.url ()));
+    await page.route ('**/api/auth/**', route => route.fulfill ({ json : { user : { id : 'module-test', email : 'test@example.com' } } }));
+    await page.route ('**/api/preferences', route => route.fulfill ({ json : { preferences : { theme : 1, units : 'metric' }, folders : [] } }));
+    for (const path of ['accounts/**', 'personal/items', 'environments']) { await page.route ('**/api/' + path, route => route.fulfill ({ json : path.startsWith ('accounts') ? { isAdmin : false } : [] })); }
+    await page.goto (process.env.AUTO3D_TEST_URL || 'http://127.0.0.1:8080/website/index.html'); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'), null, { timeout : 30000 });
+    const call = async (id, args = {}) => { const result = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (result.ok, true, JSON.stringify (result)); return result.result; };
+    assert.equal ((await call ('app.version.inspect')).version, '0.29.0'); await call ('ui.ai'); assert.equal (requests.some (url => url.includes ('packaging.module')), false); console.log ('Packaging is absent from startup and AI-only requests.');
+    await call ('ui.ai.packaging'); assert.equal (requests.filter (url => url.includes ('packaging.module.js')).length, 1); assert.equal (requests.filter (url => url.includes ('packaging.module.css')).length, 1); assert.equal (await page.locator ('.fefco_card').count (), 4);
+    const unfold = page.getByRole ('button', { name : 'Unfold selected box', exact : true }); assert.equal (await unfold.isDisabled (), true);
+    const generated = await call ('packaging.fefco.generate', { code : '0201', closure : 'closed' }); assert.equal (await unfold.isEnabled (), true); await page.screenshot ({ path : 'work/packaging-module-folded.png' });
+    const original = await call ('scene.inspect'); assert.equal (original.objects.length, 1); assert.equal (original.objects[0].id, generated.objectId);
+    await unfold.click (); await page.waitForFunction (() => document.querySelector ('.scene_status')?.textContent.startsWith ('Unfolded FEFCO'), null, { timeout : 30000 });
+    const flat = await call ('scene.inspect'); assert.equal (flat.objects.length, 1); assert.equal (flat.objects[0].userData._auto3dPackagingState, 'flat'); assert.equal (await unfold.isDisabled (), true); console.log ('Selected RSC unfolded with the current kraft material.');
+    await page.screenshot ({ path : 'work/packaging-module-flat.png' });
+    for (const format of ['svg', 'dxf']) { const output = await call ('packaging.export', { format }); assert.ok (output.text.includes ('CUT')); assert.ok (output.text.includes ('SCORE')); }
+    await page.evaluate (() => { window.showSaveFilePicker = undefined; }); await call ('ui.save'); await page.getByLabel ('Save name').fill ('RSC flat kraft dieline'); const pending = page.waitForEvent ('download'); await page.getByRole ('button', { name : 'Save session file', exact : true }).click (); const download = await pending; const saved = OpenSessionArchive (await readFile (await download.path ())).document;
+    assert.equal (saved.objects[0].userData._auto3dPackagingState, 'flat'); assert.ok (saved.model.LineCount () > 0); assert.ok (saved.model.materials.some (m => m.diffuseMap?.buffer)); await page.getByRole ('button', { name : 'Close Save session', exact : true }).click (); await page.locator ('dialog[open]').waitFor ({ state : 'detached' });
+    await call ('history.undo'); assert.equal ((await call ('scene.inspect')).objects[0].id, generated.objectId); assert.equal (await unfold.isEnabled (), true); await call ('history.redo'); assert.equal ((await call ('scene.inspect')).objects[0].id, flat.objects[0].id);
+    await call ('history.undo'); const command = page.getByRole ('textbox', { name : 'Command or macro' }); await command.fill ('unfold box'); await command.press ('Enter'); await page.waitForFunction (() => document.querySelector ('.scene_status')?.textContent === 'Completed · 1 command', null, { timeout : 30000 }); assert.equal ((await call ('scene.inspect')).objects[0].userData._auto3dPackagingState, 'flat');
+    await page.setViewportSize ({ width : 390, height : 844 }); await call ('ui.ai.packaging'); assert.equal (await page.locator ('.ai_workspace_panel').evaluate (node => node.scrollWidth <= node.clientWidth + 1), true); await page.screenshot ({ path : 'work/packaging-module-mobile.png' }); assert.deepEqual (errors, []); console.log ('Auto3D module lazy loading, unfold, archive material/guides, Undo/Redo, typed command and mobile passed.');
+    const standalone = await browser.newPage ({ viewport : { width : 1200, height : 850 } }); const standaloneRequests = []; standalone.on ('request', request => standaloneRequests.push (request.url ())); standalone.on ('pageerror', error => errors.push (error.message));
+    await standalone.goto ('http://127.0.0.1:8082/'); await standalone.getByRole ('button', { name : 'Generate RSC · 3D box', exact : true }).click (); await standalone.getByRole ('button', { name : 'Unfold selected box', exact : true }).click (); await standalone.waitForFunction (() => document.getElementById ('status').textContent.startsWith ('Flat kraft dieline'), null, { timeout : 30000 }); await standalone.screenshot ({ path : 'work/packaging-standalone-flat.png' });
+    assert.equal (standaloneRequests.some (url => url.includes ('/api/') || url.includes ('o3dv')), false); assert.deepEqual (errors, []); console.log ('Standalone Packaging 1.0.0 generates and unfolds independently, without Auto3D or account APIs.');
+    const retry = await browser.newPage (); let fail = true;
+    await retry.route ('**/packaging/packaging.module.js*', route => { if (fail) { fail = false; return route.fulfill ({ status : 503, body : 'Temporary test failure' }); } return route.continue (); });
+    await retry.goto ('http://127.0.0.1:8080/website/index.html'); await retry.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'), null, { timeout : 30000 });
+    assert.equal ((await retry.evaluate (() => Auto3D.execute ('ui.ai.packaging'))).ok, false);
+    assert.equal ((await retry.evaluate (() => Auto3D.execute ('ui.ai.packaging'))).ok, true); assert.equal (await retry.locator ('.fefco_card').count (), 4); console.log ('A failed module fetch reports the error and retries successfully.');
+} finally { await browser.close (); }

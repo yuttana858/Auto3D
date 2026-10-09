@@ -70,3 +70,24 @@ Shared commands: packaging.fefco.catalog, packaging.fefco.inspect, packaging.fef
 The bottom command bar accepts `generate rsc 400x300x250 mm` and `create hsc 400x300x250`. Explicit 0200–0203 codes are also accepted. Other generator settings use the currently configured draft values. The same generator runs from UI, commands and macros with authentication, busy, read-only and object-limit checks. No remote upload is triggered.
 
 Validation: test/fefco.test.js covers style identity, watertight panels, crease outlines, flap closure geometry, units, invalid parameters, command/macro access, rollback, archive/recovery textures and Undo/Redo. test/browser/fefco.mjs covers catalog thumbnails, HSC/RSC generation, open/closed flaps, saved archive data, input validation, inches and the mobile panel.
+
+## Independent module and unfolding — Auto3D v0.29.0 / Packaging v1.0.0
+
+The generator is now in **modules/packaging**, with its own package, source, geometry/material API, catalog UI/CSS, tests, build and standalone preview. It has no imports from Auto3D’s engine or website. Auto3D’s packagingadapter.js converts neutral canonical-mm meshes/materials to existing engine objects; PackagingWorkspace owns authentication, selection, history and saving. Lightweight profile validation remains shared for archives. Generator geometry, textures and catalog UI load on demand in separate packaging.module.js/CSS assets, keeping module growth outside the main startup bundle. The repository still contains both packages; no separate GitHub repository was created.
+
+Select a generated folded FEFCO box and choose **Unfold selected box**, or type `unfold box`. The action replaces that object with a connected flat board using its stored packagingProfile (not an unrelated current drawing), preserves its current dominant liner/edge materials and embedded textures, and adds red CUT and dashed blue SCORE lines. The sheet is flat on X/Z, with board thickness on Y. Position, visibility and shadow flags are retained; its orientation becomes the canonical flat layout. The box’s generator dimensions and caliper determine the concept drawing. Generic object scaling must be reset before unfolding, so a stretched mesh is not mistaken for a manufacturing-size design. Arbitrary imported models and already-flat sheets are rejected.
+
+Undo restores the original folded object, ordering, selection and the previously active profile. Redo restores the flat sheet. Flat state is stored as object.userData._auto3dPackagingState=flat; ordinary .auto3d/model/recovery archives retain metadata, current materials, textures and line guides. SVG/DXF remain physical-mm vector exports with CUT/SCORE layers. Dielines still require converter/tooling allowance verification; this action is a parameter/profile-based unfold, and does not animate a general panel-hinge simulation.
+
+The strict shared command `packaging.fefco.unfold` accepts an optional objectId, supports macros/result references and reports the new/replaced IDs, style, flat state, caliper and profile path count. UI and commands use the same service with auth/read-only/busy checks and failure rollback.
+
+Independent development commands:
+
+```bash
+npm run build_packaging
+npm run test_packaging
+npm run preview_packaging
+# http://localhost:8082 — standalone module preview
+```
+
+Root website/dev builds also build/watch the module. Pages artifacts contain separate module JS/CSS; both hashes participate in cache identity and deployment verification. The standalone preview is not deployed with Auto3D. Boundary regressions compile both packages to verify the app startup excludes module geometry/material/UI and the module excludes Auto3D imports.

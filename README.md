@@ -6,7 +6,7 @@ Auto3D is a branded, self-hostable browser 3D viewer based on [Online3DViewer](h
 
 Auto3D supports temporary email/password sign-in with administrator-created Supabase Auth accounts. The login appears below the logo after the startup animation and remains available through the header's Sign in / Account button. Device and file workflows can be used without signing in. Setup and security details are in [docs/temporary-auth.md](docs/temporary-auth.md). Cloud Library publishing remains disabled pending ownership/authorization implementation.
 
-Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.28.0**.
+Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.29.0**.
 
 ## Hosting
 
@@ -111,3 +111,7 @@ Scene and camera keyframes, interpolation, playhead, range markers and original 
 Development and production viewer builds include `o3dv.recovery.js` and local Draco decoder files. Keep these beside the viewer bundle when hosting the site. Recovery and library/file saves pack and compress in a worker; recovery waits for dragging or playback to stop. Subsequent transform-only recovery checkpoints reuse the worker's geometry snapshot. Initial snapshot cloning and model import still have CPU/memory costs on very large assets.
 
 Run `npm test` for session, animation, range, command-validation and interaction regressions. For the browser smoke test, start `npm start` in another terminal and run `npm run test_browser_animation`. It uses a fresh Chromium profile and an original skeletal/morph fixture to check playback, both tracks, worker recovery and Device Library save/reopen. Set `BROWSER_EXECUTABLE` if Chromium is installed elsewhere; `AUTO3D_TEST_URL` selects another local site build.
+
+## Packaging module
+
+Packaging v1.0.0 is an independent package in [modules/packaging](modules/packaging/README.md). Its generators, textures and catalog UI load on demand. Use `npm run preview_packaging` for the standalone preview at http://localhost:8082, `npm run build_packaging` for its own build, and `npm run test_packaging` for its independent tests. Select a generated box in Auto3D and choose **Packaging → Unfold selected box** to view the flat kraft dieline, or type `unfold box`.
