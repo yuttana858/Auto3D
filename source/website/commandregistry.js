@@ -77,28 +77,31 @@ export class CommandRegistry
     Cancel () { if (this.running) { this.running.cancelled = true; } return { requested : !!this.running }; }
     RunMacro (macro)
     {
-        return this.Queue (async () => {
-            const completed = []; const results = Object.create (null); const token = { cancelled : false }; this.running = token;
-            try {
-                if (macro?.version !== 1 || !Array.isArray (macro.steps) || !macro.steps.length || macro.steps.length > 100) { throw new Error ('Use a version 1 macro with 1–100 steps.'); }
-                const ids = new Set ();
-                for (const step of macro.steps) {
-                    if (typeof step?.id !== 'string' || !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test (step.id) || ids.has (step.id) || !this.commands.has (step.command)) { throw new Error ('Each step needs a unique ID and an existing command.'); }
-                    ids.add (step.id);
-                    // Validate every static input before any step changes the scene.
-                    const hasReference = JSON.stringify (step.arguments || {}).includes ('"$ref"');
-                    if (!hasReference) { Validate (step.arguments || {}, this.commands.get (step.command).inputSchema); }
-                }
-                for (const step of macro.steps) {
-                    if (token.cancelled) { return { ok : false, cancelled : true, completed }; }
-                    try {
-                        const result = await this.Invoke (step.command, Resolve (step.arguments || {}, results));
-                        results[step.id] = result; completed.push ({ id : step.id, command : step.command, result });
-                    } catch (error) { this.context?.website?.errorLogs?.Record ('error', 'macro', step.command + ': ' + error.message); return { ok : false, failedStep : step.id, error : { code : 'STEP_FAILED', message : error.message }, completed }; }
-                }
-                return { ok : true, completed };
-            } catch (error) { this.context?.website?.errorLogs?.Record ('error', 'macro', error.message); return { ok : false, error : { code : 'INVALID_MACRO', message : error.message }, completed }; }
-            finally { this.running = null; }
-        });
+        return this.Queue (() => this.InvokeMacro (macro));
+    }
+    async InvokeMacro (macro)
+    {
+        if (this.running) { return { ok : false, error : { code : 'NESTED_MACRO', message : 'A macro is already running. Nested macros are not supported.' }, completed : [] }; }
+        const completed = []; const results = Object.create (null); const token = { cancelled : false }; this.running = token;
+        try {
+            if (macro?.version !== 1 || !Array.isArray (macro.steps) || !macro.steps.length || macro.steps.length > 100) { throw new Error ('Use a version 1 macro with 1–100 steps.'); }
+            const ids = new Set ();
+            for (const step of macro.steps) {
+                if (typeof step?.id !== 'string' || !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test (step.id) || ids.has (step.id) || !this.commands.has (step.command)) { throw new Error ('Each step needs a unique ID and an existing command.'); }
+                ids.add (step.id);
+                // Validate every static input before any step changes the scene.
+                const hasReference = JSON.stringify (step.arguments || {}).includes ('"$ref"');
+                if (!hasReference) { Validate (step.arguments || {}, this.commands.get (step.command).inputSchema); }
+            }
+            for (const step of macro.steps) {
+                if (token.cancelled) { return { ok : false, cancelled : true, completed }; }
+                try {
+                    const result = await this.Invoke (step.command, Resolve (step.arguments || {}, results));
+                    results[step.id] = result; completed.push ({ id : step.id, command : step.command, result });
+                } catch (error) { this.context?.website?.errorLogs?.Record ('error', 'macro', step.command + ': ' + error.message); return { ok : false, failedStep : step.id, error : { code : 'STEP_FAILED', message : error.message }, completed }; }
+            }
+            return { ok : true, completed };
+        } catch (error) { this.context?.website?.errorLogs?.Record ('error', 'macro', error.message); return { ok : false, error : { code : 'INVALID_MACRO', message : error.message }, completed }; }
+        finally { this.running = null; }
     }
 }

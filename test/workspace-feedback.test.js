@@ -29,6 +29,15 @@ describe ('Workspace operation feedback', () => {
         await assert.rejects (() => instance.CreateArray (3, 1, 1), /copy failed/);
         assert.equal (instance.document.objects.length, 1); assert.equal (instance.busy, false); assert.equal (instance.history.entries.length, 0); assert.match (messages.at (-1), /Could not create the array/);
     });
+    it ('closes processing feedback through the shared busy refresh after a failed array', async () => {
+        const { instance } = editor (); const states = [];
+        instance.buttons = new Map (); instance.processing = { Sync : busy => states.push (Boolean (busy)) };
+        instance.RefreshButtons = SessionEditor.prototype.RefreshButtons;
+        instance.document.Instance = () => { throw new Error ('copy failed'); };
+        const operation = instance.CreateArray (2, 1, 1); assert.equal (states[0], true);
+        await assert.rejects (() => operation, /copy failed/); assert.equal (states.at (-1), false);
+        assert.equal (instance.busy, false); assert.equal (instance.document.objects.length, 1);
+    });
     it ('does not begin array work for read-only or busy sessions', async () => {
         const { instance, messages } = editor (); instance.readOnly = true;
         await assert.rejects (() => instance.CreateArray (2, 1, 1), /cannot be edited/); instance.readOnly = false; instance.busy = true;

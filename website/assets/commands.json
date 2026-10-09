@@ -926,6 +926,34 @@
       "example": {}
     },
     {
+      "id": "object.tool",
+      "title": "Activate model tool",
+      "category": "Objects",
+      "description": "Activate selection, move, rotate or scale controls. Transform tools require a selected editable object; activating a tool does not change its transform.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "select",
+              "translate",
+              "rotate",
+              "scale"
+            ]
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "mode": "translate"
+      }
+    },
+    {
       "id": "object.transform",
       "title": "Transform object",
       "category": "Objects",
@@ -3085,6 +3113,114 @@
       "title": "Open save dialog",
       "category": "Panels",
       "description": "Ask the user where to save. This command opens a dialog; it does not publish.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "commands.text",
+      "title": "Run typed commands",
+      "category": "Commands",
+      "description": "Run supported phrases such as array model 4x4x6, fit, undo, or run macro Name. Semicolons run a sequence through the strict registry. Each action retains authentication, read-only and busy checks; saved macros may partially complete before a runtime failure. Does not accept arbitrary code.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "text": "array model 4x4x6"
+      }
+    },
+    {
+      "id": "ui.commands",
+      "title": "Open commands and macros",
+      "category": "Panels",
+      "description": "Open the interactive command catalog and macro builder; does not execute commands.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ui.ai",
+      "title": "Open AI panel",
+      "category": "Panels",
+      "description": "Open AI generation controls. Does not send a generation request.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ui.ai.packaging",
+      "title": "Open Packaging tab",
+      "category": "Panels",
+      "description": "Open the Packaging tab within the AI panel. The designer opens separately through packaging.open.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ui.add_model",
+      "title": "Open model picker",
+      "category": "Panels",
+      "description": "Open a local file picker to add models. Requires interactive file selection.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ui.update_model",
+      "title": "Open replacement model picker",
+      "category": "Panels",
+      "description": "Open a local file picker to replace the selected model. Requires interactive file selection.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ui.export",
+      "title": "Open export dialog",
+      "category": "Panels",
+      "description": "Open the interactive export dialog. Does not export or publish until the user chooses a format.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
