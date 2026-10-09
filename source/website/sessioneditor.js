@@ -276,7 +276,7 @@ export class SessionEditor
         window.addEventListener ('blur', close);
     }
 
-    async Run (action) { if (this.busy) { return; } try { await action (); } catch (error) { this.Status (error.message); } }
+    async Run (action) { if (this.busy) { return; } try { await action (); } catch (error) { this.website.errorLogs?.Record ('error', 'operation', error.message, error.stack || ''); this.Status (error.message); } }
     Status (text) { this.status.textContent = text; }
 
     PushHistory (undo, redo)
@@ -1171,4 +1171,3 @@ export class SessionEditor
         if (action) { event.preventDefault (); this.Run (action); }
     }
 }
-

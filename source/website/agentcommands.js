@@ -1,3 +1,4 @@
+import { OpenErrorLog } from './errorlogpanel.js';
 import { CaptureApp } from './agentcapture.js';
 import { EditMacro } from './macrodesign.js';
 import { CommandRegistry } from './commandregistry.js';
@@ -22,6 +23,12 @@ export function CreateAgentCommands (website)
     const describe = (item) => ({ id : item.id, name : item.name, visible : item.visible, position : [...item.position], rotation : [...item.rotation], scale : [...item.scale], userData : { ...(item.userData || {}) } });
     const add = (id, title, category, description, properties, required, mutates, handler, example = {}) => registry.Register ({ id, title, category, description, mutates, inputSchema : { type : 'object', properties, required, additionalProperties : false }, example }, handler);
     add ('capture.image', 'Capture app screenshot', 'Capture', 'Capture PNG image content for an agent to attach in chat. Viewport captures the 3D scene; workspace captures the visible app with account dialogs and input fields omitted. No upload or chat message is sent automatically.', { scope : enumOf ('viewport', 'workspace'), maxSize : { ...number, minimum : 256, maximum : 2048 } }, [], false, (args) => CaptureApp (website, args), { scope : 'workspace', maxSize : 1600 });
+    add ('diagnostics.shadow', 'Record shadow state', 'Diagnostics', 'Append a sanitized visibility, floor and shader diagnostic snapshot to the browser-tab error log.', {}, [], false, () => website.errorLogs.RecordShadow (website.sceneEffects.InspectShadows ()));
+    add ('diagnostics.open', 'Open error logs', 'Diagnostics', 'Open recent error and rendering logs in Preferences.', {}, [], false, () => OpenErrorLog (website));
+    add ('diagnostics.list', 'Read error logs', 'Diagnostics', 'Read up to 200 sanitized browser-tab entries; no credentials or request bodies.', { level : enumOf ('all', 'error', 'warning', 'info') }, [], false, ({ level = 'all' }) => website.errorLogs.List (level), { level : 'error' });
+    add ('diagnostics.export', 'Export error logs', 'Diagnostics', 'Return sanitized error-log JSON for review. Does not upload or download.', {}, [], false, () => website.errorLogs.Export ());
+    add ('diagnostics.download', 'Download error logs', 'Diagnostics', 'Download sanitized error-log JSON locally; no remote upload.', {}, [], false, () => website.errorLogs.Download ());
+    add ('diagnostics.clear', 'Clear error logs', 'Diagnostics', 'Clear this account browser-tab error log.', {}, [], false, () => website.errorLogs.Clear ());
     add ('auth.inspect', 'Inspect account', 'Account', 'Return the current account identity without credentials or session tokens.', {}, [], false, () => website.auth.Inspect ());
     add ('auth.verify', 'Verify active account session', 'Account', 'Recheck the signed-in account against the server. Revoked/reset sessions return to the login gate; unchanged verified identity does not interrupt the workspace.', {}, [], false, () => website.auth.VerifyCurrentSession ());
     add ('auth.recover', 'Request password recovery', 'Account', 'Request a one-time recovery email for an approved account. Returns the same response for unapproved or unknown addresses.', { email : { type : 'string', minLength : 3, maxLength : 254 } }, ['email'], false, async ({ email }) => website.auth.Recover (email), { email : 'user@example.com' });

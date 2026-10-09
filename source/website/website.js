@@ -585,6 +585,7 @@ export class Website
             {
                 this.SetUIState (this.sessionEditor.document.objects.length ? WebsiteUIState.Model : WebsiteUIState.Intro);
                 this.sessionEditor.replaceTarget = null;
+                this.errorLogs?.Record ('error', 'model import', 'Cannot open file.', String (importError.code ?? 'unknown import error'));
                 this.sessionEditor.Status ('Cannot open file. ' + SupportedFormatsText);
                 let extensionStr = null;
                 if (importError.mainFile !== null) {

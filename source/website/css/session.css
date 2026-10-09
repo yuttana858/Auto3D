@@ -8,7 +8,7 @@
 .library_source_tabs { display: flex; gap: 8px; flex-wrap: wrap; }
 .library_source_tabs button[aria-pressed="true"] { border-color: var(--ov_button_color); background: var(--ov_hover_color); }
 .shared_view #toolbar, .shared_view .header_library_button:not(.header_fullscreen_button), .shared_view #upload_slot, .shared_view #intro, .shared_view #materials_section, .shared_view #material_drawer, .shared_view #session_objects > .section_content > .mode_buttons, .shared_view .session_object_row button:not(.object_name), .shared_view .scene_tool:not([aria-label="Select (V)"]):not([aria-label="Focus object (F)"]) { display: none !important; }
-.scene_tools { position: absolute; top: 49px; right: 0; bottom: 0; z-index: 5; display: flex; flex-direction: column; gap: 3px; width: 40px; padding: 5px; box-sizing: border-box; overflow: auto; max-height: none; background: var(--ov_background_color); border: 1px solid var(--ov_border_color); border-radius: 7px; box-shadow: 0 3px 14px #0002; }
+.scene_tools { position: absolute; top: 49px; left: 0; right: auto; bottom: 0; z-index: 5; display: flex; flex-direction: column; gap: 3px; width: 40px; padding: 5px; box-sizing: border-box; overflow: auto; max-height: none; background: var(--ov_background_color); border: 1px solid var(--ov_border_color); border-radius: 7px; box-shadow: 0 3px 14px #0002; }
 .scene_tool { flex: 0 0 29px; width: 25px; height: 29px; border: 0; background: transparent; color: var(--ov_foreground_color); padding: 3px; cursor: pointer; border-radius: 4px; }
 .scene_tool svg { width: 100%; height: 100%; }
 .scene_tool:hover, .scene_tool[aria-pressed="true"] { background: var(--ov_hover_color); }
@@ -909,7 +909,7 @@ div.main_viewer
 @media (max-width: 650px) { .advance_animation_panel { padding: 10px; } .advance_animation_track { grid-template-columns: 90px 1fr; gap: 8px; } }
 
 #main_right_container { position: relative; }
-#main_right_container:not(.collapsed) #data_panel_content { margin-right: 40px; }
+#main_right_container:not(.collapsed) #data_panel_content { margin-left: 40px; margin-right: 0; }
 .header_fullscreen_button { order: 100; }
 .scene_dimension_input { width: 72px; max-width: 70%; box-sizing: border-box; background: var(--ov_background_color); color: var(--ov_foreground_color); border: 1px solid var(--ov_border_color); border-radius: 4px; padding: 4px; }
 .scene_dimension_unit { font-size: 10px; }
@@ -921,3 +921,8 @@ div.main_viewer
 .auto3d_context_menu .scene_context_action:hover, .auto3d_context_menu .scene_context_action:focus-visible { background: var(--ov_hover_color); outline: 1px solid var(--ov_border_color); }
 .scene_polygon_tool { padding: 5px 0 10px; }
 .polygon_preview_canvas { display: block; width: 100%; max-width: 550px; height: 300px; border-radius: 6px; touch-action: none; margin: 12px 0; }
+
+.error_log_dialog { width: min(850px, 92vw); }
+.error_log_entries { max-height: 55vh; overflow: auto; margin-top: 12px; }
+.error_log_entries details { padding: 8px; border-bottom: 1px solid var(--ov_border_color); overflow-wrap: anywhere; }
+.error_log_entries pre { white-space: pre-wrap; overflow-wrap: anywhere; }
