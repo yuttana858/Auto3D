@@ -4,7 +4,7 @@ Updated 2026-10-09. Start with [project-status.md](project-status.md) for the de
 
 ## Product and stack
 
-Auto3D is a browser 3D viewer/editor derived from MIT-licensed Online3DViewer. It imports CAD/mesh files, assembles multi-object scenes, edits transforms/materials, controls environments/lighting, creates arrays, previews polygon reduction, plays embedded animation and authors scene/camera timelines. It saves portable `.auto3d` sessions, private account Library entries and device-local entries. Packaging adds cut/score vector profiles and solid board extrusion. Render queues produce screen/HD/4K/16K PNGs, including model-only alpha output.
+Auto3D is a browser 3D viewer/editor derived from MIT-licensed Online3DViewer. It imports CAD/mesh files, assembles multi-object scenes, edits transforms/materials, controls environments/lighting, creates arrays, previews polygon reduction, plays embedded animation and authors scene/camera timelines. It saves portable `.auto3d` sessions, private account Library entries and device-local entries. Packaging adds cut/score vector profiles, solid board extrusion, and the first FEFCO 02-series generators (0200–0203) for folded kraft boxes. Render queues produce screen/HD/4K/16K PNGs, including model-only alpha output.
 
 The frontend uses JavaScript ES modules, imperative DOM, Three.js, fflate, Pickr and CSS. There is no React app. esbuild bundles the website and two workers; rollup/TypeScript produce engine distribution artifacts. CI targets Node 22. The separate Node backend is an alternate implementation, not the deployed Pages API.
 
@@ -44,7 +44,7 @@ flowchart TD
 | Cameras/rendering | `sessioncameras.js`, `camerapanel.js`, `renderingpanel.js`, `renderqueue.js`, `rendercore.js` | Named views/FOV and tiled PNG queues |
 | Animation | `sessionanimation.js`, `sessiontimeline.js`, `advanceanimation.js` | Embedded clips and scene/camera keyframes |
 | Optimization | `polygonoptimizer.js`, `polygoncore.js`, `polygonworker.js`, `arraylayout.js` | Bounded static-mesh simplification and array layout |
-| Packaging | `packagingcore.js`, `packagingworkspace.js` | Canonical-mm profiles, SVG/DXF, board extrusion/history |
+| Packaging | `packagingcore.js`, `packagingworkspace.js`, `fefcocore.js`, `fefcocatalog.js`, `fefcopanel.js` | Canonical-mm profiles, SVG/DXF, board extrusion/history, categorized FEFCO thumbnails and folded box generation |
 | Commands/diagnostics | `agentcommands.js`, `commandregistry.js`, `macrodesign.js`, `agentcapture.js`, `errorlogs.js` | Shared agent actions, strict schemas/macros, bounded capture/logs |
 | Alternate backend | `backend/server.mjs`, `library-service.mjs`, `auth/entra-jwt.mjs`, `adapters/supabase.mjs` | Separate Node Library API; does not serve as Pages' internal service |
 | Release | `.github/workflows/cloudflare-pages.yml`, `tools/build_pages.mjs`, `verify_deployment.mjs` | Build, deploy and check production version/HTML/bundle |

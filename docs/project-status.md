@@ -2,6 +2,12 @@
 
 Updated 2026-10-09. This is the starting point for project status, completed work, open issues and the next release. Architecture: [agent-project-overview.md](agent-project-overview.md).
 
+## Current development release: v0.28.0
+
+Remote main includes PR #24 (e373f8c). FEFCO work is prepared on feat/fefco-packaging, based on that merged workspace update. The app header, Preferences and npm metadata identify v0.28.0. Every new PR will report its application version and PR number. Production deployment for this release has not been performed.
+
+The Packaging mini panel now has categorized thumbnail buttons for 0201 RSC, 0200 HSC, 0202 OSC and 0203 FOL. Dimension/caliper controls generate folded kraft boxes with physical walls/flaps, visible seams and embedded grain/edge textures. Other families are listed as coming later. Generated concept profiles support SVG/DXF, archive/recovery, duplication/arrays and Undo/Redo. Shared strict commands and typed RSC/HSC generation phrases use the same service. See packaging-module.md for dimensions and manufacturing-preview limits. Validation: 472 unit tests, lint, website/Pages builds, and local Chromium checks for thumbnails, HSC/RSC open/closed geometry, generated-box arrays, archive textures, Undo/Redo, invalid overlap, display-unit conversion and mobile wrapping all pass.
+
 ## Where we are
 
 Auto3D is an authenticated browser 3D workspace with private user Library storage, account preferences, administration, modeling/layout tools, packaging profiles, cameras and PNG rendering. The frontend uses plain JavaScript/DOM and Three.js. Production runs on Cloudflare Pages Functions with Supabase Auth/PostgreSQL and private Cloudflare R2 objects. Microsoft Entra ID remains the intended replacement for temporary email/password authentication.

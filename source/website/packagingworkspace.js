@@ -2,6 +2,8 @@ import { WorkspaceDialog } from './modellibrary.js';
 import { BoardCalipers, NewPackagingDesign, ValidatePackaging, CreatePackagingModel, PackagingBounds, ExportPackagingSVG, ExportPackagingDXF } from './packagingcore.js';
 import { Unit } from '../engine/model/unit.js';
 import { DisplayUnitLabel } from './preferences.js';
+import { DefaultFefco, ValidateFefco, FefcoProfile, CreateFefcoModel } from './fefcocore.js';
+import { FefcoCatalog } from './fefcocatalog.js';
 
 function Element (tag, parent, text, className)
 {
@@ -11,6 +13,35 @@ export class PackagingWorkspace
 {
     constructor (editor) { this.editor = editor; this.dialog = null; this.refreshing = false; this.draft = []; this.active = null; this.draftType = 'cut'; this.gridSnapMM = 5; this.displayFactor = 1; this.view = { x : -20, y : -220, width : 340, height : 240 }; }
     Design () { return this.editor.document.packaging || NewPackagingDesign (); }
+    FefcoInspect () { return { ...ValidateFefco (this.fefco || DefaultFefco), units : 'mm', dimensions : 'internal', axes : 'W=X, L=Z, H=Y' }; }
+    FefcoCatalog () { return FefcoCatalog (); }
+    ConfigureFefco (changes)
+    {
+        this.Editable (); this.fefco = ValidateFefco ({ ...(this.fefco || DefaultFefco), ...changes }); this.editor.website.aiWorkspace?.fefcoPanel?.Refresh (); return this.FefcoInspect ();
+    }
+    async GenerateFefco (changes = {})
+    {
+        this.Editable (); const editor = this.editor; if (editor.document.objects.length >= 1000) { throw new Error ('Session has reached the 1000 object limit.'); }
+        const data = ValidateFefco ({ ...(this.fefco || DefaultFefco), ...changes });
+        const unit = editor.document.objects.length ? editor.document.model.GetUnit () : Unit.Millimeter;
+        // Validate geometry and units before changing the scene or profile.
+        const model = CreateFefcoModel (data, unit); const profile = FefcoProfile (data);
+        const target = editor.document; const before = target.packaging; const previous = editor.selected;
+        editor.busy = true; editor.RefreshButtons?.(); editor.Status ('Generating FEFCO ' + data.code + '…');
+        let object;
+        try {
+            await new Promise (resolve => setTimeout (resolve, 20));
+            object = target.AddImported (model, profile.name); object.source = 'FEFCO ' + data.code; object.packagingProfile = profile; object.userData._auto3dFefco = JSON.stringify (data); target.packaging = profile;
+            const index = target.objects.indexOf (object); editor.selected = object;
+            await editor.Render (true);
+            const apply = async (add) => { if (add) { target.Restore (object, index); target.packaging = profile; editor.selected = object; } else { target.Remove (object); target.packaging = before; editor.selected = previous && target.objects.includes (previous) ? previous : null; } await editor.Render (); this.Refresh (); editor.website.aiWorkspace?.RefreshPackaging (); };
+            editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); this.fefco = data;
+            this.Refresh (); editor.website.aiWorkspace?.RefreshPackaging (); editor.Status ('Added FEFCO ' + data.code + ' · ' + data.length + ' × ' + data.width + ' × ' + data.height + ' mm');
+            return { objectId : object.id, ...data, units : 'mm', sceneUnit : unit, profilePaths : profile.paths.length };
+        } catch (error) {
+            if (object) { target.Remove (object); target.packaging = before; editor.selected = previous; await editor.Render (); } throw error;
+        } finally { editor.busy = false; editor.RefreshButtons?.(); editor.website.aiWorkspace?.RefreshPackaging (); }
+    }
     Factor () { return this.editor.website.preferences.units === 'standard' ? 25.4 : 1; }
     Editable () { if (this.editor.readOnly || this.editor.busy || !this.editor.website.auth?.user || this.editor.website.accountReady === false) { throw new Error ('Sign in to an editable, idle workspace.'); } }
     Inspect () { return { ...ValidatePackaging (this.Design ()), units : 'mm', displayUnits : DisplayUnitLabel (this.editor.website.preferences.units), selectedPathId : this.active, draftType : this.draftType, gridSnapMM : this.gridSnapMM, draftPoints : this.draft.map ((point) => [...point]) }; }
@@ -57,7 +88,9 @@ export class PackagingWorkspace
     }
     LoadSelected ()
     {
-        const profile = this.editor.selected?.packagingProfile; if (!profile) { throw new Error ('Select a board created from a packaging profile.'); } this.draft = []; return this.Change (profile);
+        const profile = this.editor.selected?.packagingProfile; if (!profile) { throw new Error ('Select a board created from a packaging profile.'); }
+        const saved = this.editor.selected.userData?._auto3dFefco; const fefco = saved ? ValidateFefco (JSON.parse (saved)) : null;
+        this.draft = []; const result = this.Change (profile); if (fefco) { this.fefco = fefco; this.Refresh (); } return result;
     }
     Run (action) { return Promise.resolve ().then (action).catch ((error) => this.Message (error.message)); }
     Message (message) { if (this.status) { this.status.textContent = message; } this.editor.Status (message); }
@@ -126,6 +159,7 @@ export class PackagingWorkspace
     }
     Refresh ()
     {
+        this.editor.website.aiWorkspace?.fefcoPanel?.Refresh ();
         if (!this.dialog?.isConnected || this.refreshing) { return; } this.refreshing = true; try { this.RenderControls (); } finally { this.refreshing = false; }
     }
     RenderControls ()

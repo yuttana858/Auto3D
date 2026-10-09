@@ -1,3 +1,5 @@
+import { FefcoPanel } from './fefcopanel.js';
+
 const AIStorageKey = 'auto3d-ai-connections-v1';
 
 function Element (tag, className, text, parent)
@@ -137,6 +139,7 @@ export class AIWorkspace
         this.recentGrid = Element ('div', 'ai_recent_grid', undefined, recentSection);
         this.RenderRecent (); this.RefreshConnection ();
         this.packagingPane = Element ('div', 'ai_workspace_pane ai_packaging_pane', undefined, panel); this.packagingPane.id = 'workspace_pane_packaging'; this.packagingPane.setAttribute ('role', 'tabpanel'); this.packagingPane.setAttribute ('aria-labelledby', 'workspace_tab_packaging');
+        this.fefcoPanel = new FefcoPanel (this.website.sessionEditor.packaging, this.packagingPane);
         Element ('strong', null, 'Packaging design', this.packagingPane);
         Element ('p', 'section_hint', 'Draw cut and score profiles, set board thickness, and export SVG or DXF patterns.', this.packagingPane);
         this.packagingSummary = Element ('p', 'ai_packaging_summary', '', this.packagingPane);
@@ -151,9 +154,11 @@ export class AIWorkspace
 
     RefreshPackaging ()
     {
+        if (!this.packagingSummary) { return; }
         const editor = this.website.sessionEditor; const design = editor.packaging.Design ();
         this.packagingSummary.textContent = design.name + ' · ' + design.paths.length + ' paths · ' + design.thickness + ' mm board';
         for (const button of this.packagingActions) { button.disabled = editor.busy || editor.readOnly; }
+        this.fefcoPanel?.Refresh ();
     }
 
     SetTab (tab)

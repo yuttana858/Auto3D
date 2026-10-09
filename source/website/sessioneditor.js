@@ -635,6 +635,7 @@ export class SessionEditor
     RefreshButtons ()
     {
         this.processing?.Sync (this.busy); this.commandBar?.SetBusy (this.busy);
+        this.website?.aiWorkspace?.fefcoPanel?.SetDisabled ();
         for (const [key, button] of this.buttons) {
             button.disabled = this.ToolDisabled (key);
             if (['select', 'move', 'rotate', 'scale'].includes (key)) { button.setAttribute ('aria-pressed', String ((key === 'move' ? 'translate' : key) === this.mode)); }
