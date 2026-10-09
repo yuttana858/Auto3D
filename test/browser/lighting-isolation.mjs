@@ -29,15 +29,26 @@ window.checkLighting = async () => {
  }
  mesh.material=material;effects.Update();effects.Set('shadows',true);pixels();const shadow=effects.floorShadow;const savedViewport=renderer.getViewport(new THREE.Vector4()).toArray();const render=renderer.render.bind(renderer);renderer.render=(s,c)=>{if(s===shadow.scene)throw Error('capture fault');return render(s,c);};pixels();
  if(shadow.lastError!=='capture fault'||renderer.getRenderTarget()!==target||JSON.stringify(renderer.getViewport(new THREE.Vector4()).toArray())!==JSON.stringify(savedViewport))throw Error('failed shadow capture corrupted renderer');renderer.render=render;
+ // Exercise a failed optional cube pass while floor shadows are enabled.
+ // Subsequent viewport draws must still reach the original output target.
+ const baselineMaterial=mesh.material; const baselineEnv=baselineMaterial.envMap;
+ effects.settings.modelReflections=true;
+ renderer.render=(s,c)=>{if(c.parent===effects.cubeCamera)throw Error('cube capture fault');return render(s,c);};
+ effects.UpdateDynamicReflection();
+ if(renderer.getRenderTarget()!==target||effects.lastReflectionError!=='cube capture fault'||effects.reflectionState.size!==0||baselineMaterial.envMap!==baselineEnv)throw Error('failed cube capture corrupted output');
+ renderer.render=render;const recovered=pixels();if(center(recovered)<20)throw Error('model missing after cube capture failure');
+ effects.Set('modelReflections',false);pixels();
+ effects.Set('modelReflections',true);pixels();if(effects.lastReflectionError!==null)throw Error('cube capture did not recover');
+ effects.Set('modelReflections',false);
  const decode=async blob=>{const image=await createImageBitmap(blob);const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;const context=canvas.getContext('2d');context.drawImage(image,0,0);const data=context.getImageData(0,0,image.width,image.height).data;image.close();return data;};
  const job={size:{width:317,height:211},camera:{eye:[4,4,6],center:[0,0.8,0],up:[0,1,0],fov:45,projectionMode:1},alpha:false};
  const tiled=await decode(await RenderPNG({viewer},job,{tileSize:64}));const single=await decode(await RenderPNG({viewer},job,{tileSize:512}));let tiledDifferences=0;for(let i=0;i<tiled.length;i+=4){if(Math.max(...[0,1,2,3].map(c=>Math.abs(tiled[i+c]-single[i+c])))>4)tiledDifferences++;}if(tiledDifferences>317*211*0.005)throw Error('floor shadow tiles disagree: '+tiledDifferences);
- effects.Dispose();target.dispose();renderer.dispose();return {fill,cases,failureRestored:true,tiledDifferences};
+ effects.Dispose();target.dispose();renderer.dispose();return {fill,cases,failureRestored:true,reflectionFailureRestored:true,tiledDifferences};
 };`, resolveDir : process.cwd () }, bundle : true, outfile : 'work/lighting-isolation.js' });
 await writeFile ('work/lighting-isolation.html', '<script src="/work/lighting-isolation.js"></script>');
 const browser = await chromium.launch ({ executablePath : '/usr/bin/chromium', args : ['--no-sandbox', '--enable-unsafe-swiftshader'] });
 try {
     const page = await browser.newPage (); const errors = []; page.on ('pageerror', error => errors.push (error.message));
-    await page.goto ('http://127.0.0.1:8080/work/lighting-isolation.html'); const result = await page.evaluate (() => window.checkLighting ());
+    await page.setContent ('<title>Lighting isolation regression</title>'); await page.addScriptTag ({ path : 'work/lighting-isolation.js' }); const result = await page.evaluate (() => window.checkLighting ());
     assert.deepEqual (errors, []); console.log ('Metallic fill, unchanged model pixels, visible floor shadows and capture-failure restoration:', result);
 } finally { await browser.close (); }
