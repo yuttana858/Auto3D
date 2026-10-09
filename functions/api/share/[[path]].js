@@ -1,5 +1,5 @@
 import { SupabaseConfig, SupabaseHeaders } from '../../_lib/supabase.js';
-const Bucket = 'auto3d-library';
+import { LibraryFile } from '../../_lib/libraryfiles.js';
 const LinkTable = 'auto3d_share_links';
 const LibraryTable = 'auto3d_library';
 const Uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -122,13 +122,10 @@ async function shareArchive (context, token, asDownload)
     if (!grant) { return json ({ error : 'Incorrect access code or unavailable share link.' }, 401); }
     if (asDownload && !grant.allow_download) { return json ({ error : 'Downloads are disabled for this share link.' }, 403); }
 
-    const response = await request (context.env, '/rest/v1/' + LibraryTable + '?select=name,archive_path&id=eq.' + encodeURIComponent (grant.item_id) + '&status=eq.published&limit=1');
+    const response = await request (context.env, '/rest/v1/' + LibraryTable + '?select=name,archive_path,storage_provider,archive_object_key&id=eq.' + encodeURIComponent (grant.item_id) + '&status=eq.published&limit=1');
     const rows = await response.json ();
     if (!rows.length) { return json ({ error : 'Library item not found.' }, 404); }
-    const { url, key } = SupabaseConfig (context.env);
-    const path = String (rows[0].archive_path).split ('/').map (encodeURIComponent).join ('/');
-    const file = await fetch (url + '/storage/v1/object/authenticated/' + Bucket + '/' + path, { headers : SupabaseHeaders (key) });
-    if (!file.ok) { return json ({ error : 'Shared model data is unavailable.' }, file.status === 404 ? 404 : 502); }
+    const fileBody = await LibraryFile (context.env, rows[0], 'archive');
     const headers = new Headers ({
         'Content-Type' : 'application/octet-stream',
         'Cache-Control' : 'private, no-store',
@@ -138,7 +135,7 @@ async function shareArchive (context, token, asDownload)
         const safe = String (rows[0].name || 'Auto3D-share').replace (/[^a-z0-9._-]+/gi, '_');
         headers.set ('Content-Disposition', 'attachment; filename="' + safe + '.auto3d"');
     }
-    return new Response (file.body, { status : 200, headers });
+    return new Response (fileBody, { status : 200, headers });
 }
 
 export async function onRequest (context)

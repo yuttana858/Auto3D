@@ -8,17 +8,9 @@ The user's current goal is **Cloudflare R2 storage and temporary sign-in for per
 
 This checkout implements mandatory Supabase email/password sign-in for administrator-created accounts, private per-account R2 Library files, synchronized preferences, and administrator requests/approvals/revoke/reset. Read `docs/temporary-auth.md`, `docs/account-storage.md`, and `docs/polygon-optimization.md` for current runtime behavior. Entra remains the future identity destination. Legacy published sharing is separate from private account storage.
 
-### Historical feature branch: reviewed evidence
+### PR #16 reconciliation
 
-Reviewed [PR #16](https://github.com/yuttana858/Auto3D/pull/16), its full diff and discussion, and [branch GOAL.md](https://github.com/yuttana858/Auto3D/blob/feat/multi-user-auth-foundation/GOAL.md). These changes are not present in the local checkout and were not tested here.
-
-- Implemented in the reviewed diff: Pages Library/archive/thumbnail R2 reads through `AUTO3D_LIBRARY_R2`; R2 share archive reads; legacy Supabase Storage fallback; client `fileSize`/`storageProvider` metadata; migration `20261007_r2_object_metadata.sql` adding `storage_provider`, `archive_object_key`, `thumbnail_object_key`, and nonnegative `file_size_bytes`.
-- Documented target: private R2 binaries, Supabase PostgreSQL metadata and transitional authorization data, provider-neutral AuthService, users/organizations/memberships/roles/permissions/audit, persistent file-size quota accounting, direct authorized uploads and multipart support, future Entra identity.
-- Login placement: below the Auto3D logo after the landing animation loads. The inspected PR diff did not implement login. Subsequently, the user explicitly selected Supabase email/password with admin-created accounts, implemented in this checkout behind AuthService. Admin bootstrap, authenticated Save/Open, named-user shares, quotas and end-to-end multi-user validation remain upcoming work.
-- Infrastructure evidence: the PR body says R2 was not activated, but a later [PR comment](https://github.com/yuttana858/Auto3D/pull/16#issuecomment-6040448024) reports activation completed and bucket listing succeeded. It reports bucket creation blocked by Cloudflare authentication error 10000 and calls for private `auto3d-library`, Standard/ENAM, bound as `AUTO3D_LIBRARY_R2`. This is a historical report, not a fresh live-resource check.
-- Security gap still present in that diff: published Library reads remain anonymous and publicly cached for five minutes. A private R2 bucket does not make these API reads private. Ownership/session authorization must be added before personal files become available through these paths.
-
-The current deployed main branch includes the implemented runtime. Historical feature-branch observations above are not instructions to switch away from main. Preserve these overview changes when moving branches; do not overwrite existing feature work. Keep internal user/organization IDs independent of the temporary identity provider, with explicit identity mappings for later Entra linking.
+Read `docs/pr16-reconciliation.md` for the resolved feature branch. Current main supplies mandatory login, account administration, personal R2 storage and preferences. PR #16 retains published Library/share R2 reads with legacy Storage compatibility and client file-size/provider metadata. API session gates remain intact and binary responses are private, no-store. The earlier parallel auth/admin implementation is superseded. Already-applied SQL is archived in `database/history/pr16/`; do not rerun it. Organization lifecycle administration and Entra integration remain future work.
 
 ## Product and stack
 
@@ -39,8 +31,8 @@ flowchart TD
     Alternate[Separate Node Library API] --> Service[LibraryService / Entra JWT verifier]
     Service --> Adapter[SupabaseLibraryAdapter]
     Adapter --> Existing
-    Target[Planned authenticated Library API] -.-> R2[Private R2 files]
-    Target -.-> Metadata[Metadata store: decision pending]
+    Pages --> R2[Private R2 files]
+    Pages --> Metadata[Supabase account metadata]
 ```
 
 The planned API is not implemented. The Pages Functions and Node API are **separate implementations**, not a single chain; the Pages routes do not call `LibraryService`.

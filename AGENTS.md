@@ -1,6 +1,6 @@
 # Project orientation
 
-Read `docs/agent-project-overview.md` for the architecture, Library data flows, development checks, and active `feat/multi-user-auth-foundation` / PR #16 work. Current direction: Cloudflare R2, PostgreSQL metadata, temporary per-user sign-in, then Microsoft Entra ID. Verify the temporary auth design and latest feature-branch state before development.
+Read `docs/agent-project-overview.md` for the architecture, Library data flows, development checks, and active `feat/multi-user-auth-foundation` / PR #16 work. Current direction: Cloudflare R2, PostgreSQL metadata, temporary per-user sign-in, then Microsoft Entra ID. Use current main authentication and account routes; read `docs/pr16-reconciliation.md` before changing legacy published Library storage. Historical SQL in `database/history/pr16/` must not be replayed.
 
 # Agent-accessible features
 

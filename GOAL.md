@@ -1,88 +1,11 @@
-# Auto3D Migration Goal
+# Auto3D backend direction
 
-## Goal
+Auto3D runs on Cloudflare Pages with private Cloudflare R2 model files and Supabase PostgreSQL metadata. Temporary Supabase email/password sign-in is mandatory for approved accounts; administrators create or approve accounts. Microsoft Entra ID is the future identity provider. Keep the browser behind the same-origin API contract so identity can change without rewriting the workspace.
 
-Complete the Auto3D backend transition so the browser no longer owns database credentials or publisher authentication, shared publishing is authorized by corporate identity, and the application can move from the current Supabase prototype to the corporate Microsoft stack without rewriting the 3D workspace.
+Current runtime includes account requests/approval, administrator revoke/reset controls, persistent secure sessions with explicit logout, personal Library files and synchronized preferences. Read `docs/temporary-auth.md` and `docs/account-storage.md` for the implemented flows. Published Library/share content is separate from personal files; PR #16 provides R2 and legacy Storage read compatibility. Shared publishing remains disabled pending corporate authorization.
 
-## Target architecture
+Security requirements: verify identity, approval and session status server-side; keep database secrets and R2 credentials out of browser code; enforce ownership and share permissions; keep authenticated file responses private and uncached; preserve read-only sessions; make remote writes explicit user actions. Maintain stable user IDs when introducing Entra identity mappings.
 
-```
-Auto3D browser
-    |
-    | HTTPS / JSON + binary assets
-    v
-Auto3D Library API
-    |
-    +-- Identity / authorization
-    |      Target: Microsoft Entra ID
-    |
-    +-- Metadata repository
-    |      Current: Supabase PostgreSQL
-    |      Target: Azure Database for PostgreSQL (preferred) or Azure SQL if corporate standards require it
-    |
-    +-- Object storage
-           Current: Supabase Storage
-           Target: Azure Blob Storage
-```
+Next work includes Entra integration, organization lifecycle/role administration where required, corporate retention and classification requirements, and representative format/performance validation. Azure runtime or storage migration is a separate future infrastructure decision; R2 remains the active object storage direction.
 
-The browser must depend on the Auto3D Library API contract, not Supabase, Azure, or AWS-specific SDKs.
-
-## Required outcomes
-
-- Remove the Supabase email/password publisher login from Auto3D.
-- Prevent browser-side publishing until corporate identity authorization is available.
-- Preserve read-only shared-library browsing and view-only share links during the transition.
-- Preserve Device library and portable `.auto3d` file workflows.
-- Move privileged publication, update, delete, moderation and future audit operations behind a backend service.
-- Use Microsoft Entra ID for corporate authentication and group/role authorization.
-- Keep the persistence contract provider-neutral enough to migrate storage/database implementations.
-- Add CI release gates for lint, tests and production build before v1.0.
-- Establish versioned `.auto3d` schema migration and backward-compatibility rules.
-- Complete dependency-license, security, privacy and representative format-fidelity validation.
-- Move source repository to private only after replacement hosting and deployment are verified.
-
-## Cloud direction
-
-### Preferred Microsoft implementation
-
-- Microsoft Entra ID: workforce authentication and authorization.
-- Azure Functions or Azure Container Apps/App Service: Auto3D Library API.
-- Azure Blob Storage: `.auto3d` archives, thumbnails and future generated artifacts.
-- Azure Database for PostgreSQL: preferred metadata database because Auto3D currently uses PostgreSQL semantics and migrations.
-- Azure Key Vault: application secrets and connection strings.
-- Application Insights / Azure Monitor: API and publishing telemetry.
-- GitHub Actions with OIDC federation to Azure: CI/CD without long-lived cloud credentials.
-
-### AWS usage
-
-Use AWS only for a workload with a specific technical or organizational advantage. Avoid splitting core identity, metadata and primary object storage across Azure and AWS unless a concrete requirement justifies the operational complexity.
-
-## Security invariants
-
-- No database secret/service key in browser code.
-- No anonymous publishing.
-- Remote publication is always an explicit user action.
-- Authorization is enforced server-side, never from browser claims alone.
-- Shared view links are read-only.
-- Production secrets come from managed secret stores.
-- Backend APIs use least-privilege identities and auditable operations.
-
-## Exit criteria
-
-The migration is complete when Auto3D can run with Supabase disabled in the browser, corporate users can authenticate through Entra ID, authorized publishers can manage shared content through the backend API, automated tests/build/deployment pass, and the repository can be made private without disrupting the production application.
-
-
-## Pre-transition build status — v0.21.0
-
-Engineering work that does not require GIS is complete in the v0.21.0 hardening baseline:
-
-- Browser-side Supabase publisher authentication and direct Supabase access removed.
-- Same-origin Library API active for shared reads on Cloudflare Pages.
-- Shared writes fail closed pending corporate identity.
-- Provider-neutral privileged Library API implemented and Entra-ready.
-- Repository private and replacement Cloudflare hosting operational.
-- CI/release gates, dependency license inventory, production vulnerability audit and full builds enabled.
-- Versioned `.auto3d` v2 contract with v1 migration, validation and recovery protection established.
-- Privacy/network boundary and pre-transition readiness documented.
-
-Remaining goal items are intentionally GIS-dependent: Entra tenant/app registration and role assignments, Azure runtime/database/blob/key-vault/monitoring resources, final corporate retention/classification values, and corporate security/legal approval. These should be completed without changing the browser API contract.
+Historical PR #16 SQL is recorded in `database/history/pr16/`. These records are already applied and must not be replayed as a fresh database setup. Preserve current account/session migrations and production users when developing new schema changes.

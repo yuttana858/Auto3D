@@ -1,5 +1,5 @@
 import { SupabaseConfig, SupabaseHeaders } from '../../_lib/supabase.js';
-const Bucket = 'auto3d-library';
+import { LibraryFile } from '../../_lib/libraryfiles.js';
 const Table = 'auto3d_library';
 const Uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -37,7 +37,9 @@ function item (row)
         createdAt : row.created_at,
         version : row.version || 1,
         supersedesId : row.supersedes_id || null,
-        status : row.status || 'published'
+        status : row.status || 'published',
+        storageProvider : row.storage_provider || 'supabase',
+        fileSize : Number (row.file_size_bytes || 0)
     };
 }
 
@@ -63,17 +65,14 @@ async function getItem (env, id)
 async function getFile (env, id, type)
 {
     const field = type === 'archive' ? 'archive_path' : 'thumbnail_path';
-    const row = await getRow (env, id, field);
+    const row = await getRow (env, id, 'storage_provider,' + type + '_object_key,' + field);
     if (!row) { return json ({ error : 'Library item not found.' }, 404); }
-    const { url, key } = SupabaseConfig (env);
-    const path = String (row[field]).split ('/').map (encodeURIComponent).join ('/');
-    const response = await fetch (url + '/storage/v1/object/authenticated/' + Bucket + '/' + path, { headers : SupabaseHeaders (key) });
-    if (!response.ok) { return json ({ error : 'Library file unavailable.' }, response.status === 404 ? 404 : 502); }
+    const body = await LibraryFile (env, row, type);
     const headers = new Headers ();
     headers.set ('Content-Type', type === 'archive' ? 'application/octet-stream' : 'image/png');
-    headers.set ('Cache-Control', 'public, max-age=300');
+    headers.set ('Cache-Control', 'private, no-store');
     headers.set ('X-Content-Type-Options', 'nosniff');
-    return new Response (response.body, { status : 200, headers });
+    return new Response (body, { status : 200, headers });
 }
 
 export async function onRequest (context)
