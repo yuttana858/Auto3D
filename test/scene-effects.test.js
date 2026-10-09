@@ -1,8 +1,8 @@
 import { CreateAgentCommands } from '../source/website/agentcommands.js';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { ShadingModel } from '../source/engine/viewer/shadingmodel.js';
 import { SceneEffects } from '../source/engine/viewer/sceneeffects.js';
+import { FloorShadow, FloorShadowDirection, FloorShadowProjection } from '../source/engine/viewer/floorshadow.js';
 import { Direction } from '../source/engine/geometry/geometry.js';
 function fixture () {
     const scene = new THREE.Scene (); const root = new THREE.Group (); const material = new THREE.MeshPhysicalMaterial ({ color : '#b89261', envMapIntensity : 1.4 }); const environment = new THREE.Texture (); material.envMap = environment; material.envMapRotation.set (0, 0.7, 0); root.add (new THREE.Mesh (new THREE.BoxGeometry (10, 10, 10), material)); scene.add (root);
@@ -56,7 +56,7 @@ describe ('Scene effects render state', () => {
         material.transparent = true; material.opacity = 0.6; material.depthWrite = false;
         effects.Set ('shadows', true); effects.Set ('shadowIntensity', 1);
         const floor = effects.shadowFloor;
-        assert.equal (floor.material.transparent, false);
+        assert.equal (floor.material.transparent, true);
         assert.equal (floor.material.blending, THREE.CustomBlending);
         assert.equal (floor.material.blendSrc, THREE.SrcAlphaFactor);
         assert.equal (floor.material.blendDst, THREE.OneMinusSrcAlphaFactor);
@@ -65,11 +65,11 @@ describe ('Scene effects render state', () => {
         assert.equal (material.transparent, true); assert.equal (material.opacity, 0.6); assert.equal (material.depthWrite, false);
         effects.Dispose ();
     });
-    it ('Keeps the shadow light outside translated bounds and resets the standard light target on disable', () => {
-        const { effects, viewer, root } = fixture (); root.position.set (10000, 5000, -2000); effects.Set ('shadows', true);
-        const light = viewer.shadingModel.directionalLight; ShadingModel.prototype.UpdateByCamera.call (viewer.shadingModel, { eye : { x : 10100, y : 5100, z : -1900 }, center : { x : 10000, y : 5000, z : -2000 } });
-        assert.deepEqual (light.target.position.toArray (), [10000, 5000, -2000]); assert.ok (Math.abs (light.position.distanceTo (light.target.position) - light.userData.auto3dShadowExtent * 3) < 0.0001); assert.ok (light.shadow.camera.near > 0);
-        effects.Set ('shadows', false); assert.deepEqual (light.target.position.toArray (), [0, 0, 0]); effects.Dispose ();
+    it ('Keeps floor projection finite for translated scenes without changing model lighting', () => {
+        const { effects, viewer, root } = fixture (); root.position.set (10000, 5000, -2000); const light = viewer.shadingModel.directionalLight; const target = light.target.position.clone (); const intensity = light.intensity;
+        effects.Set ('shadows', true); assert.equal (viewer.renderer.shadowMap.enabled, false); assert.equal (light.castShadow, false); assert.equal (light.intensity, intensity); assert.deepEqual (light.target.position.toArray (), target.toArray ());
+        const normal = new THREE.Vector3 (0, 1, 0); const direction = FloorShadowDirection (viewer.upVector, viewer.scene.environmentRotation); const projection = FloorShadowProjection (normal, effects.shadowFloor.position, direction);
+        const projected = new THREE.Vector3 (10000, 5010, -2000).applyMatrix4 (projection); assert.ok (Math.abs (projected.y - 4995) < 1e-8); assert.ok (projected.toArray ().every (Number.isFinite)); effects.Dispose ();
     });
     it ('Applies ambient fill to all material types and restores its intensity/color with lighting settings', () => {
         const { effects, viewer } = fixture (); effects.Set ('ambientIntensity', 0.5); effects.Set ('ambientColor', '#88aaff');
@@ -78,18 +78,42 @@ describe ('Scene effects render state', () => {
         assert.equal (effects.ambientFill.intensity, 0.5 * Math.PI); effects.Set ('ambientColor', 'invalid'); assert.equal (effects.settings.ambientColor, '#88aaff');
         const fill = effects.ambientFill; effects.Dispose (); assert.equal (viewer.scene.children.includes (fill), false);
     });
-    it ('Locks shadow direction to global lighting rather than orbiting cameras', () => {
-        const { effects, viewer } = fixture (); viewer.shadingModel.scene = viewer.scene;
-        effects.Set ('shadows', true);
-        const apply = camera => ShadingModel.prototype.UpdateByCamera.call (viewer.shadingModel, camera);
-        apply ({ eye : { x : 10, y : 5, z : 10 }, center : { x : 0, y : 0, z : 0 } });
-        const before = viewer.shadingModel.directionalLight.position.clone ();
-        apply ({ eye : { x : -10, y : 2, z : -15 }, center : { x : 0, y : 0, z : 0 } });
-        assert.ok (before.distanceTo (viewer.shadingModel.directionalLight.position) < 1e-9);
-        viewer.scene.environmentRotation.y = Math.PI / 2;
-        apply ({ eye : { x : -10, y : 2, z : -15 }, center : { x : 0, y : 0, z : 0 } });
-        assert.ok (before.distanceTo (viewer.shadingModel.directionalLight.position) > 1);
-        effects.Dispose ();
+    it ('Locks floor projection to global light rotation for every up axis, including flipped floors', () => {
+        for (const direction of [Direction.X, Direction.Y, Direction.Z]) { for (const isFlipped of [false, true]) {
+            const up = { direction, isFlipped }; const rotation = new THREE.Euler (); const before = FloorShadowDirection (up, rotation); const axis = direction === Direction.X ? 0 : direction === Direction.Y ? 1 : 2;
+            const normal = new THREE.Vector3 ().setComponent (axis, isFlipped ? -1 : 1); const point = new THREE.Vector3 (2, 3, 4); const projection = FloorShadowProjection (normal, point, before);
+            const projected = point.clone ().addScaledVector (normal, 10).applyMatrix4 (projection); assert.ok (Math.abs (normal.dot (projected.clone ().sub (point))) < 1e-8);
+            rotation.set (axis === 0 ? Math.PI / 2 : 0, axis === 1 ? Math.PI / 2 : 0, axis === 2 ? Math.PI / 2 : 0); assert.ok (before.distanceTo (FloorShadowDirection (up, rotation)) > 0.1);
+        } }
+        assert.equal (FloorShadowDirection ({ direction : Direction.Y, isFlipped : false }, new THREE.Euler (Math.PI, 0, 0)), null);
+    });
+    it ('Uses independent caster copies and releases them without disposing shared geometry or textures', () => {
+        const { effects, viewer, root, material } = fixture (); const original = root.children[0]; original.castShadow = true; original.receiveShadow = true;
+        const hidden = original.clone (); hidden.visible = false; root.add (hidden); const skipped = original.clone (); skipped.castShadow = false; root.add (skipped);
+        const node = {}; node.parent = node; original.userData = { engineNode : node };
+        const shadow = new FloorShadow (viewer); shadow.SyncCasters (); assert.equal (shadow.proxies.size, 1); const proxy = shadow.proxies.get (original); assert.equal (proxy.geometry, original.geometry); assert.notEqual (proxy.material, material); assert.equal (proxy.castShadow, false); assert.equal (material.opacity, 1); assert.equal (material.transparent, false);
+        let disposed = false; original.geometry.addEventListener ('dispose', () => { disposed = true; }); root.remove (original); shadow.SyncCasters (); assert.equal (shadow.proxies.size, 0); assert.equal (shadow.materials.size, 0); shadow.Dispose (); assert.equal (disposed, false); effects.Dispose ();
+    });
+    it ('Retains instanced, morph and skeletal render data without serializing imported metadata', () => {
+        const { effects, viewer, root, material } = fixture (); root.clear (); const geometry = new THREE.BoxGeometry (1, 1, 1);
+        const instances = new THREE.InstancedMesh (geometry, material, 2); instances.castShadow = true; instances.setMatrixAt (1, new THREE.Matrix4 ().makeTranslation (3, 0, 0)); root.add (instances);
+        const skin = new THREE.SkinnedMesh (geometry, material); skin.castShadow = true; const bone = new THREE.Bone (); skin.add (bone); skin.bind (new THREE.Skeleton ([bone])); skin.morphTargetInfluences = [0.4]; root.add (skin);
+        const shadow = new FloorShadow (viewer); shadow.SyncCasters (); const instanceCopy = shadow.proxies.get (instances); const skinCopy = shadow.proxies.get (skin);
+        assert.equal (instanceCopy.instanceMatrix, instances.instanceMatrix); assert.equal (instanceCopy.count, 2); assert.equal (skinCopy.skeleton, skin.skeleton); assert.equal (skinCopy.morphTargetInfluences, skin.morphTargetInfluences); assert.deepEqual (skinCopy.bindMatrixInverse.elements, skin.bindMatrixInverse.elements);
+        shadow.Dispose (); effects.Dispose ();
+    });
+    it ('Releases ambient material references when imports rebuild the viewer root', () => {
+        const { effects, root, material } = fixture (); const original = material.onBeforeCompile; effects.Set ('ambientIntensity', 1);
+        root.clear (); const replacement = new THREE.MeshPhysicalMaterial (); root.add (new THREE.Mesh (new THREE.BoxGeometry (1, 1, 1), replacement)); effects.UpdateAmbient ();
+        assert.equal (effects.ambientMaterials.size, 1); assert.equal (effects.ambientMaterials.has (replacement), true); assert.equal (material.onBeforeCompile, original); effects.Dispose ();
+    });
+    it ('Adds metallic fill once to shared PBR materials and composes with reflection shaders', () => {
+        const { effects, root, material } = fixture (); const original = material.onBeforeCompile; root.add (new THREE.Mesh (root.children[0].geometry, material));
+        effects.Set ('ambientIntensity', 2); effects.Set ('ambientColor', '#6688ff'); assert.equal (effects.ambientMaterials.size, 1);
+        const hook = material.onBeforeCompile; effects.Set ('ambientIntensity', 3); assert.equal (material.onBeforeCompile, hook);
+        effects.settings.modelReflections = true; effects.UpdateDynamicReflection (); const shader = { uniforms : {}, fragmentShader : '#include <lights_fragment_maps>' }; material.onBeforeCompile (shader);
+        assert.equal ((shader.fragmentShader.match (/uniform vec3 auto3dAmbientFillColor;/g) || []).length, 1); assert.match (shader.fragmentShader, /auto3dModelReflection/); assert.equal (shader.uniforms.auto3dAmbientFillIntensity.value, 3);
+        effects.Set ('ambientIntensity', 0); assert.equal (shader.uniforms.auto3dAmbientFillIntensity.value, 0); effects.Dispose (); assert.equal (material.onBeforeCompile, original);
     });
     it ('Uses additive Phong reflection and restores baseline combine and reflectivity', () => {
         const { effects, root } = fixture (); root.children[0].material = new THREE.MeshPhongMaterial (); const material = root.children[0].material; const combine = material.combine; const reflectivity = material.reflectivity;

@@ -72,7 +72,7 @@ export class LightingPanel
                 <div class="lighting_viewport_controls"><label><input type="checkbox" id="global_shadows"> Shadows</label></div>
                 <label class="slider_label" for="shadow_intensity">Floor shadow <output id="shadow_intensity_value">0.28×</output></label>
                 <input id="shadow_intensity" type="range" min="0" max="1" step="0.02" value="0.28">
-                <p class="section_hint">Reflect models uses a realtime cube capture. Floor reflection uses a planar render pass. Shadows use each model's Cast/Receive settings.</p>
+                <p class="section_hint">Reflect models uses a realtime cube capture. Floor reflection uses a planar render pass. Floor shadows follow global lighting and each model's Cast shadows setting.</p>
             </div>
             <p id="lighting_status" role="status">Default environment active.</p></div>`;
         const backgrounds = this.root.querySelector ('.background_gallery');

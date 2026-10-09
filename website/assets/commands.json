@@ -1586,9 +1586,9 @@
     },
     {
       "id": "lighting.effects",
-      "title": "Set reflections and shadows",
+      "title": "Set ambient fill, reflections and shadows",
       "category": "Lighting",
-      "description": "Set scene reflection/shadow options using the same functions as the Lighting panel.",
+      "description": "Set ambient diffuse/specular fill, reflections and floor-shadow options using the same functions as the Lighting panel.",
       "mutates": false,
       "inputSchema": {
         "type": "object",

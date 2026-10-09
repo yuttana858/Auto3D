@@ -385,8 +385,9 @@ export default function suite ()
             assert.equal (mesh.castShadow, true);
             assert.equal (mesh.receiveShadow, false);
             effects.Set ('shadows', true);
-            assert.equal (viewer.renderer.shadowMap.enabled, true);
-            assert.equal (light.castShadow, true);
+            assert.equal (viewer.renderer.shadowMap.enabled, false);
+            assert.equal (light.castShadow, false);
+            assert.equal (effects.InspectShadows ().pipeline, 'projected-color-mask');
             effects.Set ('environmentIntensity', 0.65);
             assert.equal (scene.userData.auto3dEnvironmentIntensity, 0.65);
             effects.Set ('shadows', false);

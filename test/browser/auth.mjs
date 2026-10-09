@@ -20,6 +20,14 @@ await page.route ('**/api/auth/**', async (route) => {
         await page.goto (process.env.AUTO3D_TEST_URL || 'http://127.0.0.1:8080/website/index.html', { waitUntil : 'domcontentloaded' });
         const splash = page.locator ('#auth_gate'); const form = splash.locator ('form');
         await form.waitFor ({ state : 'visible' });
+        const aligned = async panel => {
+            const bounds = await panel.boundingBox ();
+            for (const button of await panel.locator (':scope > button:visible, form > button:visible').all ()) {
+                const box = await button.boundingBox (); assert.ok (Math.abs (box.width - bounds.width) < 1); assert.ok (Math.abs (box.x - bounds.x) < 1);
+            }
+        };
+        await aligned (splash.locator ('.auth_panel')); assert.equal (await splash.getByRole ('button', { name : 'Sign out', exact : true }).isVisible (), false);
+
         await form.getByLabel ('Email', { exact : true }).fill ('member@example.com');
         await form.getByLabel ('Password', { exact : true }).fill ('browser-test-password');
         await form.getByRole ('button', { name : 'Sign in', exact : true }).click ();
@@ -30,8 +38,9 @@ await page.route ('**/api/auth/**', async (route) => {
         await splash.waitFor ({ state : 'hidden' });
         assert.equal ((await page.evaluate (() => window.Auto3D.execute ('auth.inspect', {}))).result.signedIn, true);
         assert.equal (await page.evaluate (() => JSON.stringify ({ ...localStorage }).includes ('browser-test-password')), false);
-        await page.getByRole ('button', { name : 'Account', exact : true }).click ();
+        await page.locator ('.auth_header_button').click ();
         const dialog = page.getByRole ('dialog', { name : 'Auto3D account' });
+        await aligned (dialog.locator ('.auth_panel')); await page.screenshot ({ path : `work/auth-aligned-${viewport.width}.png` });
         await dialog.getByRole ('button', { name : 'Sign out', exact : true }).click ();
         await splash.waitFor ({ state : 'visible' });
         assert.equal ((await page.evaluate (() => window.Auto3D.execute ('auth.inspect', {}))).result.signedIn, false);
