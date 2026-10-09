@@ -20,6 +20,8 @@ export class SceneEffects
         this.viewer = viewer;
         this.settings = {
             environmentIntensity : 1,
+            ambientIntensity : 0,
+            ambientColor : '#ffffff',
             modelReflections : false,
             modelReflectionIntensity : 0.55,
             floorReflection : false,
@@ -32,6 +34,7 @@ export class SceneEffects
         this.cubeCamera = null;
         this.floorReflector = null;
         this.shadowFloor = null;
+        this.ambientFill = new THREE.AmbientLight (0xffffff, 0); this.ambientFill.userData.auto3dSceneEffect = true; this.viewer.scene.add (this.ambientFill);
         this.viewer.renderer.shadowMap.enabled = false;
         // Use ordinary depth sampling instead of hardware comparison samplers.
         // This is the portable path on browsers/drivers with PCF draw failures.
@@ -62,6 +65,8 @@ export class SceneEffects
             if (typeof this.settings[key] === 'boolean' && typeof data[key] === 'boolean') { this.settings[key] = data[key]; }
             if (typeof this.settings[key] === 'number' && Number.isFinite (data[key])) { this.settings[key] = Math.max (0, Math.min (3, data[key])); }
         }
+        if (/^#[0-9a-f]{6}$/i.test (data.ambientColor || '')) { this.settings.ambientColor = data.ambientColor; }
+        this.UpdateAmbient ();
         this.settings.shadowIntensity = Math.min (1, this.settings.shadowIntensity);
         if (Object.keys (data).every ((key) => key === 'shadows' || key === 'shadowIntensity')) {
             this.UpdateShadows ();
@@ -75,6 +80,11 @@ export class SceneEffects
     Set (key, value)
     {
         if (!(key in this.settings)) { return; }
+        if (key === 'ambientColor' || key === 'ambientIntensity') {
+            if (key === 'ambientColor') { if (!/^#[0-9a-f]{6}$/i.test (value)) { return; } this.settings.ambientColor = value; }
+            else { if (!Number.isFinite (Number (value))) { return; } this.settings.ambientIntensity = Math.max (0, Math.min (3, Number (value))); }
+            this.UpdateAmbient (); this.viewer.Render (); return;
+        }
         if (key === 'shadowIntensity') {
             if (!Number.isFinite (Number (value))) { return; }
             this.settings.shadowIntensity = Math.max (0, Math.min (1, Number (value)));
@@ -86,6 +96,11 @@ export class SceneEffects
         this.settings[key] = typeof this.settings[key] === 'boolean' ? Boolean (value) : Math.max (0, Math.min (3, Number (value)));
         if (key === 'shadows') { this.UpdateShadows (); this.viewer.Render (); this.onDiagnostics?.(this.InspectShadows ()); return; }
         this.Update ();
+    }
+
+    UpdateAmbient ()
+    {
+        this.ambientFill.color.set (this.settings.ambientColor); this.ambientFill.intensity = this.settings.ambientIntensity * Math.PI;
     }
 
     UpdateShadows ()
@@ -387,6 +402,7 @@ export class SceneEffects
     Dispose ()
     {
         this.RestoreMaterialReflections ();
+        this.viewer.scene.remove (this.ambientFill);
         this.DisposeFloorReflection ();
         if (this.shadowFloor) { this.viewer.scene.remove (this.shadowFloor); this.shadowFloor.geometry.dispose (); this.shadowFloor.material.dispose (); }
         if (this.cubeCamera) { this.viewer.scene.remove (this.cubeCamera); }

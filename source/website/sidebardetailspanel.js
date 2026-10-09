@@ -20,6 +20,15 @@ export class SidebarDetailsPanel extends SidebarPanel
         super (parentDiv);
         this.modelFormat = null;
         this.unitSystem = 'metric';
+        const toggle = document.createElement ('button'); toggle.className = 'details_collapse'; toggle.textContent = '−'; toggle.setAttribute ('aria-label', 'Minimize Details'); toggle.setAttribute ('aria-expanded', 'true'); this.titleDiv.appendChild (toggle);
+        this.collapseButton = toggle; toggle.addEventListener ('click', () => this.SetCollapsed (!this.collapsed));
+    }
+
+    SetCollapsed (collapsed)
+    {
+        this.collapsed = Boolean (collapsed); this.contentDiv.hidden = this.collapsed;
+        this.collapseButton.textContent = this.collapsed ? '+' : '−'; this.collapseButton.setAttribute ('aria-expanded', String (!this.collapsed)); this.collapseButton.setAttribute ('aria-label', this.collapsed ? 'Expand Details' : 'Minimize Details');
+        return { collapsed : this.collapsed };
     }
 
     GetName ()

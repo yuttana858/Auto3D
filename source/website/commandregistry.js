@@ -63,7 +63,7 @@ export class CommandRegistry
         if (!command) { throw new Error ('Unknown command: ' + id); }
         Validate (args, command.inputSchema);
         if (command.mutates && this.context.readOnly) { throw new Error ('This shared viewer is read-only.'); }
-        if (this.context.busy && id !== 'polygon.cancel') { throw new Error ('The viewer is busy. Retry after loading completes.'); }
+        if (this.context.busy && id !== 'polygon.cancel' && !['auth.open', 'auth.inspect', 'auth.verify', 'auth.sign_out', 'render.queue.inspect', 'render.queue.enqueue', 'render.queue.start', 'render.queue.stop', 'render.queue.cancel', 'render.queue.clear', 'render.queue.download', 'sidebar.details.collapse'].includes (id)) { throw new Error ('The viewer is busy. Retry after loading completes.'); }
         return await command.handler (args) ?? null;
     }
     Execute (id, args = {})

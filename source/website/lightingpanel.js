@@ -60,7 +60,7 @@ export class LightingPanel
             <button class="section_button" id="hdri_reset">Reset adjustments</button><p class="section_hint">Rotate or tilt to reposition the light.</p>
             <a id="hdri_credit" href="https://polyhaven.com/hdris" target="_blank" rel="noopener">Poly Haven · CC0</a></div>
             <div class="lighting_viewport_controls"><label><input type="checkbox" id="horizon_gradient"> Dome horizon</label><label><input type="checkbox" id="ground_grid"> Ground grid</label></div>
-            <div class="scene_effects">
+            <div class="scene_effects"><strong>Ambient lighting</strong><label class="slider_label" for="ambient_intensity">Fill intensity <output id="ambient_intensity_value">0.00×</output></label><input id="ambient_intensity" type="range" min="0" max="3" step="0.05" value="0"><label>Fill color <input id="ambient_color" type="color" value="#ffffff" aria-label="Ambient light color"></label>
                 <strong>Reflections & shadows</strong>
                 <label class="slider_label" for="environment_reflection_intensity">Environment reflection <output id="environment_reflection_intensity_value">1.00×</output></label>
                 <input id="environment_reflection_intensity" type="range" min="0" max="2" step="0.05" value="1">
@@ -165,6 +165,11 @@ export class LightingPanel
                 control.addEventListener ('change', () => { if (before) { this.RecordHistory (before); before = null; } });
             }
         };
+        effectControl ('ambient_intensity', 'ambientIntensity', 'ambient_intensity_value');
+        const ambientColor = document.getElementById ('ambient_color');
+        let ambientBefore = null; ambientColor.addEventListener ('focus', () => { ambientBefore = this.Capture (); });
+        ambientColor.addEventListener ('input', () => { ambientBefore ||= this.Capture (); this.website.sceneEffects.Set ('ambientColor', ambientColor.value); this.website.sessionEditor?.MarkDirty (); });
+        ambientColor.addEventListener ('change', () => { if (ambientBefore) { this.RecordHistory (ambientBefore); ambientBefore = null; } });
         effectControl ('environment_reflection_intensity', 'environmentIntensity', 'environment_reflection_intensity_value');
         effectControl ('model_reflections', 'modelReflections');
         effectControl ('model_reflection_intensity', 'modelReflectionIntensity', 'model_reflection_intensity_value');
@@ -204,6 +209,8 @@ export class LightingPanel
     {
         const s = this.website.sceneEffects.settings;
         const values = {
+            ambient_intensity : s.ambientIntensity,
+            ambient_color : s.ambientColor,
             environment_reflection_intensity : s.environmentIntensity,
             model_reflections : s.modelReflections,
             model_reflection_intensity : s.modelReflectionIntensity,
@@ -216,7 +223,7 @@ export class LightingPanel
             const control = document.getElementById (id);
             if (control.type === 'checkbox') { control.checked = value; } else { control.value = value; }
         }
-        for (const id of ['environment_reflection_intensity', 'model_reflection_intensity', 'floor_reflection_intensity', 'shadow_intensity']) {
+        for (const id of ['ambient_intensity', 'environment_reflection_intensity', 'model_reflection_intensity', 'floor_reflection_intensity', 'shadow_intensity']) {
             document.getElementById (id + '_value').textContent = Number (document.getElementById (id).value).toFixed (2) + '×';
         }
     }

@@ -1,3 +1,4 @@
+import { ArrayPlacement } from './arraylayout.js';
 import * as THREE from 'three';
 import { Mesh } from '../engine/model/mesh.js';
 import { Triangle } from '../engine/model/triangle.js';
@@ -80,14 +81,14 @@ export class PolygonOptimizer
         finally { records.forEach ((record) => { record.node.meshIndices = record.indices; }); }
         const output = new ModelToThreeConversionOutput (); const root = await new Promise ((resolve) => ConvertModelToThreeObject (model, new ModelToThreeConversionParams (), output, { onTextureLoaded : () => {}, onModelLoaded : resolve })); return { root, urls : output.objectUrls };
     }
-    async ShowPreview (parent, counts = null)
+    async ShowPreview (parent, counts = null, layerRotation = 0)
     {
         const { root, urls } = await this.PreviewRoot ();
         if (!parent.isConnected) { root.traverse ((mesh) => { mesh.geometry?.dispose (); if (mesh.material) { (Array.isArray (mesh.material) ? mesh.material : [mesh.material]).forEach ((material) => material.dispose ()); } }); urls.forEach (URL.revokeObjectURL); throw new Error ('Preview closed.'); }
         const scene = new THREE.Scene (); scene.background = new THREE.Color (0x303238); const bounds = new THREE.Box3 ().setFromObject (root); const size = bounds.getSize (new THREE.Vector3 ());
         const view = new THREE.Group (); view.add (root);
         if (counts) {
-            const matrices = []; for (let h = 0; h < counts[2]; h++) { for (let l = 0; l < counts[1]; l++) { for (let w = 0; w < counts[0]; w++) { matrices.push (new THREE.Matrix4 ().makeTranslation (w * size.x, h * size.y, l * size.z)); } } }
+            const matrices = []; for (let h = 0; h < counts[2]; h++) { for (let l = 0; l < counts[1]; l++) { for (let w = 0; w < counts[0]; w++) { const placement = ArrayPlacement ({ position : [0, 0, 0], rotation : [0, 0, 0] }, bounds, size, w, l, h, layerRotation); matrices.push (new THREE.Matrix4 ().compose (new THREE.Vector3 (...placement.position), new THREE.Quaternion ().setFromEuler (new THREE.Euler (...placement.rotation.map (THREE.MathUtils.degToRad))), new THREE.Vector3 (1, 1, 1))); } } }
             root.updateMatrixWorld (true); const array = new THREE.Group (); root.traverse ((mesh) => { if (!mesh.isMesh) { return; } const instances = new THREE.InstancedMesh (mesh.geometry, mesh.material, matrices.length); matrices.forEach ((matrix, index) => instances.setMatrixAt (index, matrix.clone ().multiply (mesh.matrixWorld))); array.add (instances); }); view.remove (root); view.add (array);
         }
         const box = new THREE.Box3 ().setFromObject (view); const center = box.getCenter (new THREE.Vector3 ()); view.position.sub (center); const pivot = new THREE.Group (); pivot.add (view); const extent = Math.max (...box.getSize (new THREE.Vector3 ()).toArray (), 0.001); scene.add (pivot); scene.add (new THREE.HemisphereLight (0xffffff, 0x555555, 2)); const light = new THREE.DirectionalLight (0xffffff, 2); light.position.set (1, 2, 3); scene.add (light);

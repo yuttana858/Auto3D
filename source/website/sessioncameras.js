@@ -22,7 +22,7 @@ export class SessionCameras
     constructor (editor) { this.editor = editor; this.data = ValidateCameraViews (); }
     Inspect () { return structuredClone (this.data); }
     Load (data) { this.data = ValidateCameraViews (data); this.Refresh (); }
-    Refresh () { this.editor.website.cameraPanel?.Render (); this.editor.RefreshButtons?.(); }
+    Refresh () { this.editor.website.cameraPanel?.Render (); this.editor.website.renderingPanel?.SyncCameras (); this.editor.RefreshButtons?.(); }
     AssertWritable () { if (this.editor.readOnly || this.editor.busy) { throw new Error ('Camera views cannot be edited in this session.'); } }
     Change (update)
     {

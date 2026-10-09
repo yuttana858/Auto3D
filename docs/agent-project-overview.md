@@ -202,3 +202,7 @@ The October 9 workspace update adds administrator revoke/restore/password reset 
 ### Browser error review
 
 Preferences → Error logs provides bounded per-account browser-tab diagnostics, JSON export and shadow snapshots. See `docs/error-logs.md` for redaction, persistence and agent commands. These logs are local to the tab; agents need an authorized browser connection or an exported log to inspect a user's runtime errors.
+
+## Rendering and live-edit controls
+
+See `docs/rendering.md` for ambient fill, tiled HD/4K/16K PNG rendering, alpha model-only output, saved-camera queues, cancellation/account cleanup, collapsible Details and compact alternating-layer arrays. Render queues/images are local to the current tab; session lighting and named camera views persist with archives. Agent commands share the UI implementations.

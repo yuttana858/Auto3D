@@ -94,6 +94,7 @@ export function StartWebsite ()
         });
         website.errorLogs = errorLogs;
         website.auth = new AuthService ();
+        website.auth.Subscribe (user => { if (!user) { website.rendering.Lock (); } });
         website.auth.Subscribe ((user) => errorLogs.BindAccount (user?.id || null));
         website.Load ();
         website.sceneEffects.onDiagnostics = (diagnosis) => errorLogs.RecordShadow (diagnosis, 'Shadow controls updated');

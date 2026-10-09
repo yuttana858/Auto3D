@@ -71,6 +71,13 @@ describe ('Scene effects render state', () => {
         assert.deepEqual (light.target.position.toArray (), [10000, 5000, -2000]); assert.ok (Math.abs (light.position.distanceTo (light.target.position) - light.userData.auto3dShadowExtent * 3) < 0.0001); assert.ok (light.shadow.camera.near > 0);
         effects.Set ('shadows', false); assert.deepEqual (light.target.position.toArray (), [0, 0, 0]); effects.Dispose ();
     });
+    it ('Applies ambient fill to all material types and restores its intensity/color with lighting settings', () => {
+        const { effects, viewer } = fixture (); effects.Set ('ambientIntensity', 0.5); effects.Set ('ambientColor', '#88aaff');
+        assert.equal (effects.ambientFill.intensity, 0.5 * Math.PI); assert.equal (effects.ambientFill.color.getHexString (), '88aaff');
+        const saved = effects.Capture (); effects.Set ('ambientIntensity', 0); effects.Restore (saved);
+        assert.equal (effects.ambientFill.intensity, 0.5 * Math.PI); effects.Set ('ambientColor', 'invalid'); assert.equal (effects.settings.ambientColor, '#88aaff');
+        const fill = effects.ambientFill; effects.Dispose (); assert.equal (viewer.scene.children.includes (fill), false);
+    });
     it ('Locks shadow direction to global lighting rather than orbiting cameras', () => {
         const { effects, viewer } = fixture (); viewer.shadingModel.scene = viewer.scene;
         effects.Set ('shadows', true);
