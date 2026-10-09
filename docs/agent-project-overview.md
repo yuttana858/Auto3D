@@ -206,3 +206,7 @@ Preferences → Error logs provides bounded per-account browser-tab diagnostics,
 ## Rendering and live-edit controls
 
 See `docs/rendering.md` for ambient fill, tiled HD/4K/16K PNG rendering, alpha model-only output, saved-camera queues, cancellation/account cleanup, collapsible Details and compact alternating-layer arrays. Render queues/images are local to the current tab; session lighting and named camera views persist with archives. Agent commands share the UI implementations.
+
+### Metallic fill and isolated floor shadows
+
+Ambient fill adds specular radiance for metallic PBR materials as well as diffuse illumination. Floor shadows now use independent caster copies and an RGBA projected silhouette mask; the global Shadows control never enables shadow samplers or changes original model lighting/material alpha. Global environment rotation sets their direction. `lighting.shadow.inspect` includes `pipeline` and `captureError`. See `docs/rendering.md` and the pixel-level/browser regressions in `test/browser/lighting-isolation.mjs` and `lighting-ui.mjs`. Account-dialog actions are full-width, including Sign in/Sign out, while hidden actions and the password eye retain their visibility/layout rules.

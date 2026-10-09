@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 import { Direction } from '../geometry/geometry.js';
 import { MaterialReflectionStrength } from './materialreflection.js';
+import { FloorShadow } from './floorshadow.js';
 
 function MeshMaterials (root, callback)
 {
@@ -34,23 +35,13 @@ export class SceneEffects
         this.cubeCamera = null;
         this.floorReflector = null;
         this.shadowFloor = null;
+        this.floorShadow = null;
+        this.ambientMaterials = new Map ();
+        this.ambientRadiance = { value : 0 };
         this.ambientFill = new THREE.AmbientLight (0xffffff, 0); this.ambientFill.userData.auto3dSceneEffect = true; this.viewer.scene.add (this.ambientFill);
         this.viewer.renderer.shadowMap.enabled = false;
-        // Use ordinary depth sampling instead of hardware comparison samplers.
-        // This is the portable path on browsers/drivers with PCF draw failures.
+        // Retained for diagnostics; the floor uses an ordinary RGBA color mask.
         this.viewer.renderer.shadowMap.type = THREE.BasicShadowMap;
-        this.ConfigureShadowLight ();
-    }
-
-    ConfigureShadowLight ()
-    {
-        const light = this.viewer.shadingModel.directionalLight;
-        light.castShadow = false;
-        light.shadow.mapSize.set (2048, 2048);
-        light.shadow.bias = -0.0002;
-        light.shadow.normalBias = 0.02;
-        light.shadow.camera.near = 0.01;
-        light.shadow.camera.far = 100000;
     }
 
     Capture ()
@@ -66,7 +57,6 @@ export class SceneEffects
             if (typeof this.settings[key] === 'number' && Number.isFinite (data[key])) { this.settings[key] = Math.max (0, Math.min (3, data[key])); }
         }
         if (/^#[0-9a-f]{6}$/i.test (data.ambientColor || '')) { this.settings.ambientColor = data.ambientColor; }
-        this.UpdateAmbient ();
         this.settings.shadowIntensity = Math.min (1, this.settings.shadowIntensity);
         if (Object.keys (data).every ((key) => key === 'shadows' || key === 'shadowIntensity')) {
             this.UpdateShadows ();
@@ -101,17 +91,45 @@ export class SceneEffects
     UpdateAmbient ()
     {
         this.ambientFill.color.set (this.settings.ambientColor); this.ambientFill.intensity = this.settings.ambientIntensity * Math.PI;
+        this.ambientRadiance.value = this.settings.ambientIntensity;
+        const root = this.viewer.mainModel?.mainModel?.GetRootObject?.();
+        const current = new Set (); MeshMaterials (root, material => current.add (material));
+        let reflectionsRestored = false;
+        for (const [material, original] of this.ambientMaterials) {
+            if (current.has (material)) { continue; }
+            if (this.reflectionState.has (material)) { this.RestoreMaterialReflections (); reflectionsRestored = true; }
+            material.onBeforeCompile = original.onBeforeCompile; material.customProgramCacheKey = original.customProgramCacheKey; material.needsUpdate = true; this.ambientMaterials.delete (material);
+        }
+        if (this.settings.ambientIntensity === 0) { if (reflectionsRestored) { this.UpdateDynamicReflection (); } return; }
+        MeshMaterials (root, (material) => {
+            if (!(material.isMeshStandardMaterial || material.isMeshPhysicalMaterial) || this.ambientMaterials.has (material)) { return; }
+            if (this.reflectionState.has (material)) { this.RestoreMaterialReflections (); reflectionsRestored = true; }
+            const original = { onBeforeCompile : material.onBeforeCompile, customProgramCacheKey : material.customProgramCacheKey };
+            this.ambientMaterials.set (material, original);
+            material.onBeforeCompile = (shader, renderer) => {
+                original.onBeforeCompile.call (material, shader, renderer);
+                shader.uniforms.auto3dAmbientFillColor = { value : this.ambientFill.color };
+                shader.uniforms.auto3dAmbientFillIntensity = this.ambientRadiance;
+                shader.fragmentShader = 'uniform vec3 auto3dAmbientFillColor;\nuniform float auto3dAmbientFillIntensity;\n' + shader.fragmentShader;
+                shader.fragmentShader = shader.fragmentShader.replace ('#include <lights_fragment_maps>', `#include <lights_fragment_maps>
+#if defined(RE_IndirectSpecular)
+    radiance += auto3dAmbientFillColor * auto3dAmbientFillIntensity;
+    #ifdef USE_CLEARCOAT
+        clearcoatRadiance += auto3dAmbientFillColor * auto3dAmbientFillIntensity;
+    #endif
+#endif`);
+            };
+            material.customProgramCacheKey = () => original.customProgramCacheKey.call (material) + ':auto3d-ambient-radiance-v1';
+            material.needsUpdate = true;
+        });
+        if (reflectionsRestored) { this.UpdateDynamicReflection (); }
     }
 
     UpdateShadows ()
     {
-        const shading = this.viewer.shadingModel;
-        shading.directionalLight.castShadow = this.settings.shadows;
-        if (shading.hdriEnvironment !== null) {
-            shading.directionalLight.intensity = this.settings.shadows ? 0.22 * Math.PI : 0;
-        }
-        this.viewer.renderer.shadowMap.enabled = this.settings.shadows;
-        this.viewer.renderer.shadowMap.needsUpdate = true;
+        // Floor shadows have their own color-mask pass. Never enable shadow
+        // samplers or change the light/alpha on the original model's shaders.
+        this.viewer.renderer.shadowMap.enabled = false;
         this.UpdateShadowFloor ();
     }
 
@@ -128,7 +146,7 @@ export class SceneEffects
         });
         const renderer = this.viewer.renderer;
         const shaderErrors = (renderer.info?.programs || []).filter ((program) => program.diagnostics?.runnable === false).map ((program) => ({ name : program.name, log : program.diagnostics.programLog, vertex : program.diagnostics.vertexShader?.log, fragment : program.diagnostics.fragmentShader?.log }));
-        return { enabled : this.settings.shadows, intensity : this.settings.shadowIntensity, mapType : renderer.shadowMap.type, mapEnabled : renderer.shadowMap.enabled, contextLost : renderer.getContext?.().isContextLost () ?? false, rootVisible : root?.visible ?? null, ...counts, floor : this.shadowFloor ? { visible : this.shadowFloor.visible, depthWrite : this.shadowFloor.material.depthWrite, depthTest : this.shadowFloor.material.depthTest, transparent : this.shadowFloor.material.transparent, renderOrder : this.shadowFloor.renderOrder, opacity : this.shadowFloor.material.opacity } : null, shaderErrors };
+        return { enabled : this.settings.shadows, intensity : this.settings.shadowIntensity, pipeline : 'projected-color-mask', captureError : this.floorShadow?.lastError || null, mapType : renderer.shadowMap.type, mapEnabled : renderer.shadowMap.enabled, contextLost : renderer.getContext?.().isContextLost () ?? false, rootVisible : root?.visible ?? null, ...counts, floor : this.shadowFloor ? { visible : this.shadowFloor.visible, depthWrite : this.shadowFloor.material.depthWrite, depthTest : this.shadowFloor.material.depthTest, transparent : this.shadowFloor.material.transparent, renderOrder : this.shadowFloor.renderOrder, opacity : this.shadowFloor.material.opacity } : null, shaderErrors };
     }
 
     ApplyObjectSettings (objects)
@@ -148,6 +166,7 @@ export class SceneEffects
     {
         const scene = this.viewer.scene;
         const shading = this.viewer.shadingModel;
+        this.UpdateAmbient ();
         scene.userData.auto3dEnvironmentIntensity = this.settings.environmentIntensity;
         scene.environmentIntensity = this.settings.environmentIntensity;
         shading.UpdateShading ();
@@ -332,46 +351,25 @@ export class SceneEffects
         this.floorReflector.visible = true;
     }
 
-    UpdateShadowCamera (bounds)
-    {
-        const light = this.viewer.shadingModel.directionalLight;
-        const size = bounds.getSize (new THREE.Vector3 ());
-        const extent = Math.max (size.x, size.y, size.z, 1) * 1.5;
-        light.userData.auto3dShadowExtent = extent;
-        const up = this.viewer.upVector;
-        const direction = [1, 1, 1];
-        direction[up.direction === Direction.X ? 0 : up.direction === Direction.Z ? 2 : 1] = up.isFlipped ? -2 : 2;
-        light.userData.auto3dShadowDirection = direction;
-        light.shadow.camera.near = Math.max (0.000001, extent / 1000);
-        light.shadow.normalBias = extent * 0.001;
-        light.shadow.camera.left = -extent;
-        light.shadow.camera.right = extent;
-        light.shadow.camera.top = extent;
-        light.shadow.camera.bottom = -extent;
-        light.shadow.camera.far = extent * 10;
-        light.shadow.camera.updateProjectionMatrix ();
-        light.target.position.copy (bounds.getCenter (new THREE.Vector3 ()));
-        if (!light.target.parent) { this.viewer.scene.add (light.target); }
-    }
-
     UpdateShadowFloor ()
     {
         if (!this.settings.shadows) {
-            delete this.viewer.shadingModel.directionalLight.userData.auto3dShadowExtent;
-            this.viewer.shadingModel.directionalLight.target.position.set (0, 0, 0);
+            this.floorShadow?.Dispose (); this.floorShadow = null;
             if (this.shadowFloor) { this.viewer.scene.remove (this.shadowFloor); this.shadowFloor.geometry.dispose (); this.shadowFloor.material.dispose (); this.shadowFloor = null; }
             return;
         }
         const bounds = this.SceneBounds ();
         if (!bounds) { return; }
-        this.UpdateShadowCamera (bounds);
         if (!this.shadowFloor) {
-            // Blend onto the background before models, rather than compositing a
-            // transparent floor over models in the later transparent render queue.
-            // Custom blending retains shadow alpha while using the opaque queue.
-            const material = new THREE.ShadowMaterial ({
+            // Opaque models supply depth first; transparent models follow this
+            // low-order floor. Its RGBA mask never writes model depth or alpha.
+            this.floorShadow = new FloorShadow (this.viewer);
+            const material = new THREE.MeshBasicMaterial ({
+                color : 0x000000,
+                map : this.floorShadow.target.texture,
                 opacity : this.settings.shadowIntensity,
-                transparent : false,
+                transparent : true,
+                side : THREE.DoubleSide,
                 blending : THREE.CustomBlending,
                 blendEquation : THREE.AddEquation,
                 blendSrc : THREE.SrcAlphaFactor,
@@ -379,11 +377,12 @@ export class SceneEffects
                 blendSrcAlpha : THREE.OneFactor,
                 blendDstAlpha : THREE.OneMinusSrcAlphaFactor,
                 depthWrite : false,
-                depthTest : true
+                depthTest : true,
+                depthFunc : THREE.LessDepth
             });
             this.shadowFloor = new THREE.Mesh (new THREE.PlaneGeometry (1, 1), material);
             this.shadowFloor.userData.auto3dSceneEffect = true;
-            this.shadowFloor.receiveShadow = true;
+            this.shadowFloor.onBeforeRender = renderer => this.floorShadow.Render (renderer, this.shadowFloor);
             this.shadowFloor.material.depthWrite = false;
             this.shadowFloor.renderOrder = -9;
             this.viewer.scene.add (this.shadowFloor);
@@ -391,6 +390,7 @@ export class SceneEffects
         this.settings.shadowIntensity = Math.max (0, Math.min (1, this.settings.shadowIntensity));
         this.shadowFloor.material.opacity = this.settings.shadowIntensity;
         this.FloorTransform (this.shadowFloor, bounds);
+        this.floorShadow.Sync (bounds);
         this.shadowFloor.visible = true;
     }
 
@@ -402,6 +402,9 @@ export class SceneEffects
     Dispose ()
     {
         this.RestoreMaterialReflections ();
+        for (const [material, original] of this.ambientMaterials) { material.onBeforeCompile = original.onBeforeCompile; material.customProgramCacheKey = original.customProgramCacheKey; material.needsUpdate = true; }
+        this.ambientMaterials.clear ();
+        this.floorShadow?.Dispose ();
         this.viewer.scene.remove (this.ambientFill);
         this.DisposeFloorReflection ();
         if (this.shadowFloor) { this.viewer.scene.remove (this.shadowFloor); this.shadowFloor.geometry.dispose (); this.shadowFloor.material.dispose (); }

@@ -5,6 +5,9 @@
 .auth_panel label { display: grid; gap: 6px; font-size: 13px; }
 .auth_panel input { box-sizing: border-box; width: 100%; padding: 10px 12px; border: 1px solid #547087; border-radius: 5px; background: #fff; color: #15202b; font: inherit; }
 .auth_panel button, .auth_header_button { padding: 10px 16px; border: 1px solid #398ab1; border-radius: 5px; background: #65c4ee; color: #071421; cursor: pointer; font: inherit; }
+.auth_panel > button, .auth_panel form > button { box-sizing: border-box; display: block; width: 100%; min-height: 42px; text-align: center; white-space: normal; }
+.auth_panel > button[hidden], .auth_panel form > button[hidden] { display: none; }
+.auth_panel > button + button { margin-top: 12px; }
 .auth_panel button:disabled { opacity: .6; cursor: wait; }
 .auth_panel .auth_continue { width: 100%; margin-top: 12px; background: transparent; color: inherit; }
 .auth_hint { font-size: 12px; line-height: 1.5; opacity: .8; }
