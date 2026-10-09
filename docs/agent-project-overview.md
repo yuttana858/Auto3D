@@ -1,147 +1,85 @@
 # Auto3D: agent project overview
 
-Updated October 9, 2026. Current production uses Cloudflare Pages Functions, private R2 Library storage, Supabase account metadata and temporary email/password sign-in. Historical branch notes below describe earlier research; the current implementation sections and linked runtime documents take precedence.
-
-## Current development direction
-
-The user's current goal is **Cloudflare R2 storage and temporary sign-in for per-user Library files**, followed by transition to **Microsoft Entra ID (Azure identity)**. R2 is the active storage direction; Entra remains the identity destination. Earlier all-Azure storage/runtime recommendations are historical rather than the immediate implementation plan.
-
-This checkout implements mandatory Supabase email/password sign-in for administrator-created accounts, private per-account R2 Library files, synchronized preferences, and administrator requests/approvals/revoke/reset. Read `docs/temporary-auth.md`, `docs/account-storage.md`, and `docs/polygon-optimization.md` for current runtime behavior. Entra remains the future identity destination. Legacy published sharing is separate from private account storage.
-
-### PR #16 reconciliation
-
-Read `docs/pr16-reconciliation.md` for the resolved feature branch. Current main supplies mandatory login, account administration, personal R2 storage and preferences. PR #16 retains published Library/share R2 reads with legacy Storage compatibility and client file-size/provider metadata. API session gates remain intact and binary responses are private, no-store. The earlier parallel auth/admin implementation is superseded. Already-applied SQL is archived in `database/history/pr16/`; do not rerun it. Organization lifecycle administration and Entra integration remain future work.
+Updated 2026-10-09. Start with [project-status.md](project-status.md) for the development log, deployed commit, local release, validation and TODO list. This document describes the current application; earlier proposed R2/auth architecture has been superseded by the implemented account routes.
 
 ## Product and stack
 
-Auto3D is a browser 3D viewer/editor derived from MIT-licensed Online3DViewer. It imports CAD and mesh formats, assembles multi-object scenes, edits placement and materials, controls HDRI lighting/reflections/shadows, plays embedded skeletal/morph animation, and authors scene/camera keyframes. It saves portable `.auto3d` sessions and device-local Library entries, and opens read-only shared viewers. Meshy generation and curated paper-packaging knowledge are additional integrations.
+Auto3D is a browser 3D viewer/editor derived from MIT-licensed Online3DViewer. It imports CAD/mesh files, assembles multi-object scenes, edits transforms/materials, controls environments/lighting, creates arrays, previews polygon reduction, plays embedded animation and authors scene/camera timelines. It saves portable `.auto3d` sessions, private account Library entries and device-local entries. Packaging adds cut/score vector profiles and solid board extrusion. Render queues produce screen/HD/4K/16K PNGs, including model-only alpha output.
 
-The frontend uses JavaScript ES modules, imperative DOM UI, Three.js, fflate, Pickr, and CSS. There is no React application or frontend framework to migrate. esbuild bundles the website; rollup/TypeScript generate engine distribution artifacts. The separate Node.js backend uses built-in HTTP and crypto APIs. CI targets Node 22; backend requires Node >=22.
+The frontend uses JavaScript ES modules, imperative DOM, Three.js, fflate, Pickr and CSS. There is no React app. esbuild bundles the website and two workers; rollup/TypeScript produce engine distribution artifacts. CI targets Node 22. The separate Node backend is an alternate implementation, not the deployed Pages API.
 
-## Architecture and code map
+Current production: Cloudflare Pages Functions, private Cloudflare R2 objects, Supabase Auth/PostgreSQL account metadata. Temporary approved-account email/password login is implemented. Microsoft Entra ID is a future migration; the Node Entra verifier does not mean browser Entra sign-in exists.
+
+## Architecture
 
 ```mermaid
 flowchart TD
-    UI[Browser: Website and SessionEditor] --> Scene[SceneDocument / engine / Three.js]
-    UI --> Archive[Session archive and recovery worker]
-    Archive --> Local[IndexedDB Device Library or downloaded file]
-    UI --> Client[CloudLibrary HTTP client]
-    Client --> Pages[Cloudflare Pages Functions]
-    Pages --> Existing[Supabase metadata / files / share RPCs]
-    Alternate[Separate Node Library API] --> Service[LibraryService / Entra JWT verifier]
-    Service --> Adapter[SupabaseLibraryAdapter]
-    Adapter --> Existing
-    Pages --> R2[Private R2 files]
-    Pages --> Metadata[Supabase account metadata]
+    UI[Website / SessionEditor] --> Scene[SceneDocument / engine / Three.js]
+    UI --> Archive[Portable archive / recovery worker]
+    Archive --> Local[Account-scoped IndexedDB / file download]
+    UI --> Auth[AuthService / login gate]
+    UI --> Personal[AccountLibrary / Preferences]
+    Personal --> Pages[Pages Functions / session middleware]
+    Auth --> Pages
+    Pages --> Identity[Supabase Auth]
+    Pages --> Metadata[Supabase PostgreSQL]
+    Pages --> R2[Private R2 archives / thumbnails]
+    UI --> Legacy[CloudLibrary / published shares]
+    Legacy --> Pages
+    Pages --> Compat[Legacy Supabase Storage compatibility]
+    Alternate[Separate Node backend] --> Entra[Entra JWT verifier / LibraryService]
 ```
 
-The planned API is not implemented. The Pages Functions and Node API are **separate implementations**, not a single chain; the Pages routes do not call `LibraryService`.
-
-| Area | Entry points | Responsibility |
+| Area | Main entry points | Responsibility |
 | --- | --- | --- |
-| App bootstrap | `source/website/index.js`, `website/index.html` | Creates Website, loads UI, exposes `window.Auto3D` |
-| Viewer orchestration | `source/website/website.js` | Import pipeline, toolbar, panels, navigation, viewer settings |
-| Editing/session orchestration | `source/website/sessioneditor.js` | Selection, transforms, history, archive open/save, recovery, read-only share mode |
-| Scene state | `source/website/scenedocument.js` | Objects, duplication, hierarchy/material copies, SceneHistory |
-| Portable document | `source/website/sessionarchive.js` | Packing, migrations, validation, ZIP read/write |
-| Recovery | `sessionrecovery.js`, `sessionrecoverypack.js`, `sessionrecoveryworker.js` under `source/website/` | Background archive packing and device-local checkpoints |
-| Library UI/local storage | `source/website/modellibrary.js` | DeviceLibrary, nested folders, save destinations, cards, shares |
-| Browser remote client | `source/website/cloudlibrary.js` | Library HTTP reads and share requests; Save currently throws |
-| Animation | `sessionanimation.js`, `sessiontimeline.js`, `advanceanimation.js` under `source/website/` | Embedded clips and scene/camera timelines |
-| Appearance | `materialpanel.js`, `lightingpanel.js`, `preferences.js` under `source/website/` | Materials, lighting, units, preferences |
-| Engine | `source/engine/{import,export,model,geometry,viewer,threejs,io}` | Format support, geometry/model representation, rendering |
-| Agent commands | `source/website/agentcommands.js`, `commandregistry.js`, `commandpanel.js` | Schemas, serialization, macro execution, command UI |
-| Pages APIs | `functions/api/` | Library, shares, HDRI catalog, AI proxy, knowledge, health |
-| Alternate backend | `backend/server.mjs`, `library-service.mjs`, `auth/entra-jwt.mjs`, `adapters/supabase.mjs` | Node routes, privileged publication, JWT roles, persistence |
-| Deployment | `.github/workflows/cloudflare-pages.yml`, `tools/build_pages.mjs` | Builds `build/pages`, deploys Pages project `auto3d` |
+| Bootstrap | `source/website/index.js`, `website/index.html` | Creates website/services, command API, error logs and login gate |
+| Viewer | `website.js`, engine `viewer/` | Imports, UI panels, camera/navigation, viewport and rendering |
+| Editing | `sessioneditor.js`, `scenedocument.js` | Objects/selection, transforms, arrays/groups, history, dirty state and read-only shares |
+| Archive/recovery | `sessionarchive.js`, `sessionrecovery*.js` | Session schema/migrations/validation, worker packing, checkpoints |
+| Identity/admin | `authservice.js`, `authgate.js`, `authpanel.js`, `accountadmin.js`; `functions/api/auth/`, `accounts/` | Approved login, session/logout/revocation and admin workflows |
+| Account storage | `accountlibrary.js`, `modellibrary.js`; `functions/api/personal/`, `_lib/accountstorage.js` | Owned R2 files/metadata, account/device Library UI |
+| Preferences | `preferences.js`, `settings.js`; `functions/api/preferences.js` | Global units, appearance/viewport and account synchronization |
+| Legacy published Library | `cloudlibrary.js`; `functions/api/library/`, `share/` | Published items, R2/legacy reads and verified share access |
+| Effects | `lightingpanel.js`, engine `sceneeffects.js`, `floorshadow.js` | HDRI/reflections, ambient fill, isolated floor shadows |
+| Cameras/rendering | `sessioncameras.js`, `camerapanel.js`, `renderingpanel.js`, `renderqueue.js`, `rendercore.js` | Named views/FOV and tiled PNG queues |
+| Animation | `sessionanimation.js`, `sessiontimeline.js`, `advanceanimation.js` | Embedded clips and scene/camera keyframes |
+| Optimization | `polygonoptimizer.js`, `polygoncore.js`, `polygonworker.js`, `arraylayout.js` | Bounded static-mesh simplification and array layout |
+| Packaging | `packagingcore.js`, `packagingworkspace.js` | Canonical-mm profiles, SVG/DXF, board extrusion/history |
+| Commands/diagnostics | `agentcommands.js`, `commandregistry.js`, `macrodesign.js`, `agentcapture.js`, `errorlogs.js` | Shared agent actions, strict schemas/macros, bounded capture/logs |
+| Alternate backend | `backend/server.mjs`, `library-service.mjs`, `auth/entra-jwt.mjs`, `adapters/supabase.mjs` | Separate Node Library API; does not serve as Pages' internal service |
+| Release | `.github/workflows/cloudflare-pages.yml`, `tools/build_pages.mjs`, `verify_deployment.mjs` | Build, deploy and check production version/HTML/bundle |
 
-## Essential data flows
+Paths without a directory in this table are under `source/website/` unless identified as engine/backend/tools.
 
-**Import/edit:** input files enter Website's import path, engine importers produce model data, SessionEditor adds session objects to SceneDocument, and the viewer renders Three.js objects. Keep model state, rendered state, selection/history, dirty state, and serialized state consistent when changing editing behavior.
+## Critical data flows
 
-**Save:** Library save UI calls `SessionEditor.ArchiveAsync`, using the recovery worker packing path. The result goes to IndexedDB or an explicit file save/download. A selected model or full scene can be archived. Remote upload is disabled today. Reuse this archive preparation path for cloud saves rather than inventing another model representation.
+**Startup:** install diagnostics and services, restore the secure server session, load the signed-in account's preferences, initialize its Library, then unlock the UI. Explicit logout invalidates client restoration and the server session, returns to login and closes active work. Client gates supplement server enforcement; do not rely on hidden buttons to protect data. Background settings are distinct from Appearance theme. Explicitly opened sessions can restore their saved view/lighting.
 
-**Open:** local or remote archive bytes pass through `OpenArchive` and archive validation before replacing/appending scene state. Open replaces the workspace; Add appends objects. Animation reopens paused.
+**Import/edit:** engine importers create model data; SessionEditor adds objects to SceneDocument and renders converted Three.js objects. Keep engine geometry, rendered objects, selection, history, dirty state and serialized data consistent. Unknown source units stay model units rather than being guessed.
 
-**Recovery:** edits trigger a debounced device-local checkpoint; packing waits during dragging/playback and can reuse worker geometry snapshots. Recovery is not cloud sync. Explicit full-session save/discard clears the checkpoint. Cloud auth work must preserve this local behavior.
+**Save/open:** UI and account commands use the same archive preparation. Account saves write owned R2 archive/thumbnail objects and Supabase metadata through Pages; Device saves use IndexedDB; file saves download `.auto3d`. Open validates bytes before replacing/appending the scene. Full-session save clears the unsaved checkpoint; recovering an unsaved scene retains its checkpoint until saved. Worker bundles must deploy beside the main website bundle.
 
-## Library implementation today
+**Ownership:** private Library APIs authenticate and scope metadata/files to the actor, including thumbnails. DeviceLibrary uses `sw-auto3d-library-<account id>` for signed-in accounts; the unsuffixed legacy database is not automatically claimed. Reserved recovery/folder records are omitted from ordinary item lists. Account switching must invalidate queued work and remove stale lists/blob URLs.
 
-### Device Library
+**Published sharing:** `CloudLibrary` handles legacy published/shared data; it is separate from AccountLibrary. Its disabled publication destination is not the personal save path. PR #16 reconciliation preserves R2 and legacy Storage reads, published-status filtering, share verification and private/no-store binary responses behind current API gates. Do not restore obsolete parallel auth/admin routes. Historical SQL under `database/history/pr16/` is archival, not a migration runner.
 
-`DeviceLibrary` in `modellibrary.js` uses IndexedDB database `sw-auto3d-library`, version 1, object store `saves` keyed by `id`. Reserved `__auto3d_` records contain folders and recovery and are omitted from normal item listing. Items contain archive data, thumbnail, name, category, kind/object count, and timestamps.
+**3D effects:** metallic fill contributes specular radiance as well as diffuse illumination. Floor shadows use independent projected caster copies and an RGBA mask; original model opacity/materials are untouched. These are floor silhouettes, not physically accurate self-shadow. Capture/render failures must restore renderer targets, viewports, visibility, camera and lighting.
 
-Folders are path strings, not relational entities. Normalization bounds paths to eight segments and segment names to 60 characters. Add/rename/delete/move/bulk-delete use IndexedDB transactions; deleting a folder moves its saved items to its parent or Uncategorized. These are browser/origin-local records and are not account-owned or automatically uploaded.
+**Manufacturing profiles:** packaging coordinates/caliper are canonical millimeters; account units only affect display/input. SVG/DXF are vector outputs with separate cut/score groups/layers. Score paths do not fold the solid. Nominal caliper presets are not supplier-certified strength grades. Extrusion creates an independent flat solid with a stored profile.
 
-### Remote Library client
+## Contracts and boundaries
 
-`CloudLibrary` defaults to same-origin `/api`; `window.AUTO3D_LIBRARY_API_URL` overrides the origin for development. `Request` uses fetch without injecting a bearer token or an auth abstraction. Its Item mapper returns `shared: true` for all remote entries: personal cloud entries will need an explicit distinction from published/shared items.
+- Session schema is version 5; optional camera/packaging/object fields remain backward compatible. Animation reopens paused. Preserve reachable geometry, materials, textures, playback metadata and physical units.
+- Supabase URL and privileged keys are server-side configuration. Browser code must not receive service keys, raw tokens or passwords in logs/captures. R2 objects remain private.
+- Current routes include `/api/auth/*`, `/api/accounts/*`, `/api/personal/items`, `/api/preferences`, legacy `/api/library/items` and verified `/api/share/*`. Health/database readiness is distinct from authenticated UI health.
+- Account administration stays on the restricted current console route. An obscured route is not an authorization boundary; server admin verification is required.
+- The separate Node API has different role/publication semantics. Its Entra verifier does not establish personal ownership for the deployed Pages application.
+- Email delivery/custom SMTP and Entra migration remain open work. Do not assume the password recovery UI means SMTP delivery is configured.
+- Polygon optimization is lossy and excludes animated rig/morph topology. Preview and Undo are required. Dense models/arrays and 16K output remain device-memory constrained.
 
-Existing paths:
+## Agent development and release checks
 
-| Method/path | Current use |
-| --- | --- |
-| GET `/api/library/items` | List published entries |
-| GET `/api/library/items/{id}` | Metadata |
-| GET `/api/library/items/{id}/archive` | Portable session bytes |
-| GET `/api/library/items/{id}/thumbnail` | Thumbnail bytes |
-| POST `/api/share` | Create a persistent share token |
-| GET `/api/share/{token}` | Share metadata |
-| POST `/api/share/{token}/archive` | Code-checked viewer archive |
-| POST `/api/share/{token}/download` | Code-checked optional download |
-
-The save destination UI disables Shared Library; `CloudLibrary.Save` also throws. Authentication must be integrated with both UI state and actual backend enforcement before enabling upload.
-
-### Deployed-route source: Pages Functions
-
-`functions/api/library/[[path]].js` uses Supabase REST/Storage through server-side fetch with required `SUPABASE_URL` and `SUPABASE_SECRET_KEY`, shared with the share route through `functions/_lib/supabase.js`. Missing/invalid configuration fails with 503; there is no prototype project/key fallback. New secret keys use `apikey`; legacy JWTs also use bearer auth. `/api/health` performs a bounded metadata read and returns 200/503 for database readiness. It filters `status=published`, permits GET without an authenticated actor, and rejects non-GET requests with 503. Archives/thumbnails currently use public five-minute cache headers. That caching policy is unsuitable for private user files.
-
-`functions/api/share/[[path]].js` uses Supabase tables/RPCs for share creation and verification. Creation is currently anonymous for an existing published item. Tokens are UUIDs; optional access codes are four digits and hashed with the token. Archive responses use private/no-store. Download permission controls the explicit download endpoint, but viewers necessarily receive renderable archive data. Private cloud items must not be reachable through legacy public ID reads.
-
-Share metadata lookup rejects expired/invalid expiry timestamps; archive/code verification delegates to the RPC. Review actual database functions/policies before carrying these semantics forward. Do not infer a deployed share schema solely from the migration files present here.
-
-### Alternate Node backend
-
-`backend/server.mjs` exposes health and Library CRUD routes, including multipart publication. `LibraryService` validates metadata, requires Entra publisher/admin roles for Publish and admin roles for Delete. Its List/Get/Download methods are public and have no owner context. `created_by` is stored during publication, but this is provenance, not per-user isolation.
-
-`SupabaseLibraryAdapter` implements metadata and file persistence together. Publish writes immutable UUID paths, uploads archive/thumbnail, inserts metadata, and attempts cleanup on failure. Delete marks metadata archived before deleting files. There is no personal-library ownership filter. For R2, decide whether to split metadata and object storage interfaces so they can be tested and migrated independently.
-
-The Entra verifier checks RS256 signature, issuer, audience, expiry/not-before and returns subject/tenant/roles/groups. This is backend token verification, not a browser login implementation. It uses Node crypto and process-env defaults; do not copy it into Pages Functions without reviewing runtime compatibility and the chosen identity provider.
-
-## Portable session contract
-
-Source of truth: `SessionVersion = 5` in `source/website/sessionarchive.js`. `.auto3d` is a ZIP containing `session.json`, format marker `SW Auto3D`. Readers migrate v1→v2→v3→v4→v5 and reject unsupported newer versions.
-
-v3 added user metadata, v4 added cast/receive shadows, and v5 added object keyframes and scene/camera timeline defaults. Archives retain model/material/texture data, transforms, visibility, view settings, and embedded animation resources. Current local limits include 256 MB compressed/expanded payloads and 1,000 objects. The existing Node publication service separately limits archives to 64 MB. Establish a consistent cloud-size/quota policy before implementing uploads.
-
-Do not change the session schema merely to add remote storage. Ownership, sharing, and cloud revision metadata belong in backend metadata unless there is a specific portability requirement.
-
-## R2 + per-user auth implementation plan
-
-These are recommended next steps, not claims about existing infrastructure.
-
-1. Confirm the implementation branch, auth provider, account identity model, and intended runtime (Pages Functions or a separate Worker). Confirm whether the old public Library remains a separate catalog.
-2. Define an authenticated actor with stable provider/issuer + subject identity (and tenant where relevant). Never take owner identity from upload metadata or use email as the sole durable key.
-3. Follow the active branch's Supabase PostgreSQL metadata direction. Extend it for owners, organization membership, identity mappings, folders, versions, file keys, quotas and share grants. Do not introduce another metadata store without a reason and an explicit change of plan. R2 alone does not provide the application's indexed/transactional metadata model.
-4. Add private R2 bindings and storage operations behind the API. Use server-generated object keys; validate ownership before any metadata, archive, or thumbnail access. Do not treat a key prefix alone as authorization.
-5. Add a provider-appropriate sign-in/callback/logout/session flow and an API authentication boundary. Choose cookie or token handling deliberately; cookie-authenticated mutations need CSRF protection, and cross-origin token requests need explicit CORS behavior. Verify current provider/Cloudflare documentation during implementation.
-6. Implement personal list/save/open/delete first. Existing role-based publication is a different permission from managing one's own files. Define rename, move, folders, overwrite vs immutable revisions, concurrency conflicts, quotas, and upload failure cleanup.
-7. Integrate a Personal/Cloud destination into ModelLibrary. Keep Device/File destinations available. Handle signed-out, expired-session, upload progress, retry, and error states; clear account-specific lists/thumbnail URLs when switching accounts.
-8. Make sharing an owner-authorized action that creates a revocable scoped grant. Resolve that grant independently from the normal owner API. Define expiry, code-attempt limits, download behavior, and what happens after deletion/revision.
-9. Migrate legacy published files only through an explicit migration plan. Preserve IDs/share links where required; existing `created_by` data may not establish ownership in the new provider. Never silently claim legacy or device files for an account.
-10. Add agent commands on the same application functions, refresh the command catalog, test isolation and round trips, then validate preview deployment before production publication.
-
-Required acceptance cases: user A cannot list/read/download/delete/rename/share user B's files even with a known item ID or object key; missing/expired auth fails; thumbnails are private too; account switching cannot expose stale data; failed uploads do not create usable partial entries; private reads are not publicly cached; revoked/expired shares fail; local saves/recovery still work; session v5 textures/animation survive cloud save/open.
-
-## Agent development rules
-
-Read root `AGENTS.md` before edits. Every new user-facing action requires a stable command in `agentcommands.js` using CommandRegistry, with strict schema, example, category/description, mutation flag, and structured result. UI and agents share underlying functions; agents must not depend on DOM clicking or arbitrary evaluation.
-
-Keep `website/assets/commands.json` synchronized with `npm run build_command_catalog`. Commands opening dialogs must report that they opened a dialog, not that save/upload completed. Respect read-only sessions and explicit authorization for remote upload/publication. Add meaningful execution/validation/macro tests for affected commands.
-
-`window.Auto3D` exposes catalog, execute, runMacro, cancelMacro. This is an in-page API, not a deployed MCP server. Inspect `commandregistry.js` and the actual command before assuming read-only/mutation behavior or history support. `SceneHistory` and editor history are the implementation authority; portions of agent-interface documentation about material history are older than current editor behavior.
-
-## Local development and checks
+Read root `AGENTS.md`. Every new user action must have a strict command using shared application services, category/description/example, mutation flag and structured result. Commands opening a dialog report that interaction, not a completed save/upload. Respect account and read-only gates, await completion and validate before mutation. Keep `website/assets/commands.json` synchronized. `window.Auto3D` exposes catalog/execute/runMacro/cancelMacro; it is an in-page API, not a deployed MCP server.
 
 ```bash
 npm ci
@@ -150,63 +88,16 @@ npm start
 npm test
 npm run lint
 npm run check_licenses
+npm run audit_prod
 npm --prefix backend test
 npm run build_website
 node tools/build_pages.mjs
 ```
 
-`npm start` watches/bundles frontend sources and serves static files with caching disabled. It **does not run Pages Functions**. For integrated R2/auth development, establish a local Cloudflare runtime and local bindings, or explicitly connect a development backend. The Node backend covers Library routes but does not implement the Pages share/AI/environment routes. Load the Wrangler skill and inspect current CLI/config documentation before adding local Cloudflare commands.
+Run targeted browser tests for changed flows. Current regressions include `test/browser/auth.mjs`, `account-storage.mjs`, `preferences-recovery.mjs`, `lighting-ui.mjs`, `lighting-isolation.mjs`, packaging, cameras and rendering tests. Browser fixtures mock account APIs; they do not prove production credentials/email/schema readiness. Release gates and local evidence are logged in [project-status.md](project-status.md).
 
-`npm run test_browser_animation` requires a running app and Chromium; `BROWSER_EXECUTABLE` and `AUTO3D_TEST_URL` customize it. It covers animation, recovery and Device Library reopen, not authenticated cloud isolation.
+Production host: `https://auto3d-5av.pages.dev`. Pages deploys `main`. Release 0.27.1 adds `version.json`, HTML build metadata and `app.version.inspect`; the deployment workflow checks the served version and JavaScript hash after upload. Update version, release notes, commit and verification result together. Preserve unrelated dirty local files and publish only reviewed changes on the current remote main tree.
 
-Tests to start with: `test/tests/cloudlibrary_test.js`, `pagesapi_test.js`, `session_test.js`, `workspace_test.js`, and `backend/test/*.test.mjs`. CI also builds engine bundles/module/types and audits production dependencies.
+## Further reading
 
-Earlier checks in this session at the same commit: 322 frontend/unit tests passed, 11 backend tests passed, lint/license/whitespace checks passed. Backend server tests needed permission to bind localhost in this environment. This analysis did not run a fresh build, browser smoke test, production audit, or deployed-service check.
-
-Deployment pushes to `main` trigger Pages upload using GitHub secrets; manual workflow is also available. The deploy workflow builds/uploads but does not itself run all CI gates. The separate CI workflow runs on pull requests/manual dispatch. No R2/auth resource provisioning is shown in either workflow. Do not push/deploy just to document the project.
-
-## Documentation gaps and next reading
-
-| Document | How to use it |
-| --- | --- |
-| `README.md` | Product capabilities; some provider/migration text is historical |
-| Active feature branch `GOAL.md` | Current R2/PostgreSQL/AuthService direction; Entra remains identity target |
-| Local `GOAL.md`, `docs/backend-architecture.md`, `backend/README.md` | Earlier all-Azure data-plane direction; compare with feature branch before implementing |
-| `docs/auto3d-session-format.md` | Useful validation contract, but says v4; code is v5 |
-| `docs/native-keyframe-animation.md` | Timeline design/background |
-| `docs/agent-interface.md` | Command contract, macros, knowledge API; verify history behavior against code |
-| `docs/privacy-network-boundary.md`, `docs/pretransition-readiness.md` | Earlier baseline; reassess for authenticated cloud files |
-| `docs/cloudflare-pages.md`, `docs/build-maintenance.md` | Hosting/build background; no proof of live resource state |
-| `docs/ai-generative.md` | Meshy proxy/key boundary, relevant if account auth later protects AI spending |
-
-Before starting auth/R2 development, verify the latest feature branch, locate/confirm the temporary login provider and session design, and establish permitted users, organization ownership, private/public Library UX, legacy migration requirements, share access expectations, and upload/storage quota policy. PostgreSQL metadata and future Entra identity are already documented directions. Inspect non-secret binding/configuration information; never print or commit credentials.
-
-## Model dimensions and context menu
-
-The viewer navigation dispatches right-clicks to one session menu; right-drag orbit suppresses the menu. Model Data W/L/H map to X/Z/Y and resize the selected object through `SessionEditor.SetObjectDisplayDimension`, shared with `object.dimension` and transform Size inputs. Declared source units convert to the global mm/inches preference; undeclared units remain explicit model units. Dimensions are positive lengths, preserve mirrored scale signs, support undo, and cannot expand a zero-width axis by scaling.
-
-Account requests and administrator approvals now use `AccountAdmin`, `/api/accounts/{request,admin,review}`, and the server-only `auto3d_access_requests`/`auto3d_admin_emails` tables. See `docs/temporary-auth.md` for first-admin setup, the applied schema, approval reconciliation, and agent commands. The compact seven-action model context menu is retained through the single navigation dispatch.
-
-Model imports display upload/opening/preparation progress, with a shared supported-format list in `importformats.js` used by upload hints and failure dialogs. Array creation announces work before geometry processing, reports completed copy counts, yields between copies, and rolls back partial duplication on failure. The UI and `object.array` use the same `CreateArray` implementation.
-
-Mandatory login is enforced by `authgate.js`, command invocation, API middleware, and protected-file middleware. Read `docs/temporary-auth.md` before changing restoration/logout. Preserve both the explicit logout tombstone and server-side session checks; a provider-verified access JWT alone is insufficient after logout.
-
-Account storage is now implemented; `docs/account-storage.md` supersedes the personal-library recommendations above for the current Pages runtime. Preferences and private R2 files initialize automatically for each authenticated account. Legacy published sharing remains separate. Read the recovery/SMTP status and new administrator route in `docs/temporary-auth.md` before changing account UI.
-
-The October 9 workspace update adds administrator revoke/restore/password reset with server session cutoffs (`docs/temporary-auth.md`), unit-aware position/distance/area/volume display, top-row W/L/H editing and proportional/percentage scaling, persistent object groups, Ctrl-click additive selection, shared array mesh buffers, and worker-based polygon previews (`docs/polygon-optimization.md`). Preserve original geometry until polygon.apply, reject stale previews, and keep animated rig/morph topology intact. New commands and worker build entry points are documented in those files.
-
-## Packaging and lighting follow-up
-
-`docs/packaging-module.md` describes the flat dieline workspace, strict agent commands, canonical millimeter design, CUT/SCORE SVG/DXF exports, measured board caliper and closed-profile extrusion. The optional session/profile fields are validated in both regular and worker archives. Profile-only sessions can be saved through existing account/device Library flows. Keep original manufacturing profiles distinct from later 3D scaling. Shadows/reflections now retain HDRI diffuse lighting, restore capture state and avoid transparent-floor depth occlusion; test translated scenes and all three lighting modes when changing scene effects.
-
-### Browser error review
-
-Preferences → Error logs provides bounded per-account browser-tab diagnostics, JSON export and shadow snapshots. See `docs/error-logs.md` for redaction, persistence and agent commands. These logs are local to the tab; agents need an authorized browser connection or an exported log to inspect a user's runtime errors.
-
-## Rendering and live-edit controls
-
-See `docs/rendering.md` for ambient fill, tiled HD/4K/16K PNG rendering, alpha model-only output, saved-camera queues, cancellation/account cleanup, collapsible Details and compact alternating-layer arrays. Render queues/images are local to the current tab; session lighting and named camera views persist with archives. Agent commands share the UI implementations.
-
-### Metallic fill and isolated floor shadows
-
-Ambient fill adds specular radiance for metallic PBR materials as well as diffuse illumination. Floor shadows now use independent caster copies and an RGBA projected silhouette mask; the global Shadows control never enables shadow samplers or changes original model lighting/material alpha. Global environment rotation sets their direction. `lighting.shadow.inspect` includes `pipeline` and `captureError`. See `docs/rendering.md` and the pixel-level/browser regressions in `test/browser/lighting-isolation.mjs` and `lighting-ui.mjs`. Account-dialog actions are full-width, including Sign in/Sign out, while hidden actions and the password eye retain their visibility/layout rules.
+[Temporary authentication](temporary-auth.md) · [Account storage/preferences](account-storage.md) · [PR16 reconciliation](pr16-reconciliation.md) · [Agent commands](agent-interface.md) · [Agent capture](agent-screen-capture.md) · [Error logs](error-logs.md) · [Polygon optimization](polygon-optimization.md) · [Packaging](packaging-module.md) · [Cameras](session-cameras.md) · [Rendering](rendering.md) · [Cloudflare deployment](cloudflare-pages.md)

@@ -47,3 +47,6 @@ jobs:
           --project-name=auto3d
           --branch=main
           --commit-hash="${GITHUB_SHA}"
+
+      - name: Verify deployed version and bundle
+        run: node tools/verify_deployment.mjs https://auto3d-5av.pages.dev "${GITHUB_SHA}"

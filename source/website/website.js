@@ -657,7 +657,7 @@ export class Website
         this.themeHandler.SwitchTheme (this.settings.themeId);
         if (resetColors) {
             let defaultSettings = new Settings (this.settings.themeId);
-            this.settings.backgroundColor = defaultSettings.backgroundColor;
+            if (this.settings.backgroundPreset !== 'custom') { this.settings.backgroundColor = defaultSettings.backgroundColor; }
             this.settings.defaultLineColor = defaultSettings.defaultLineColor;
             this.settings.defaultColor = defaultSettings.defaultColor;
             this.UpdateViewport ();
@@ -689,24 +689,27 @@ export class Website
         if (this.viewer.renderer === null) {
             return;
         }
-        const dark = this.settings.themeId === Theme.Dark;
-        const background = GetBackgroundPreset (this.settings.backgroundPreset, dark);
-        if (this.settings.backgroundPreset !== 'custom') {
-            this.settings.backgroundColor = HexStringToRGBAColor (background.colors[0].slice (1) + 'ff');
-        }
-        const color = this.settings.backgroundColor;
-        const solidBackground = 'rgba(' + [color.r, color.g, color.b, color.a / 255].join (',') + ')';
-        this.parameters.viewerDiv.style.setProperty ('--sw_viewer_background', this.settings.horizonGradient ? GetBackgroundGradientCSS (background.colors) : solidBackground);
-        this.parameters.viewerDiv.classList.toggle ('dark_viewport', dark);
-        this.parameters.viewerDiv.classList.toggle ('horizon_viewport', this.settings.horizonGradient);
-        this.viewer.SetBackgroundColor (this.settings.backgroundColor);
-        const useDefaultDome = this.settings.horizonGradient && (!this.lightingPanel || this.lightingPanel.mode === 'default');
-        this.viewer.SetBackgroundGradient (this.settings.horizonGradient && !useDefaultDome, dark, background.colors);
-        this.viewer.SetDefaultDome (useDefaultDome, background.colors);
-        const darkGrid = this.settings.backgroundPreset === 'custom' ? (color.r + color.g + color.b) / 3 < 128 : background.dark;
-        this.parameters.viewerDiv.style.setProperty ('--sw_axis_text', darkGrid ? '#d5dce3' : '#394650');
-        this.viewer.SetGroundGrid (this.settings.showGroundGrid, darkGrid);
-        if (this.lightingPanel) { this.lightingPanel.SyncControls (); }
+        this.viewer.BeginRenderBatch ();
+        try {
+            const dark = this.settings.themeId === Theme.Dark;
+            const background = GetBackgroundPreset (this.settings.backgroundPreset, dark);
+            if (this.settings.backgroundPreset !== 'custom') {
+                this.settings.backgroundColor = HexStringToRGBAColor (background.colors[0].slice (1) + 'ff');
+            }
+            const color = this.settings.backgroundColor;
+            const solidBackground = 'rgba(' + [color.r, color.g, color.b, color.a / 255].join (',') + ')';
+            this.parameters.viewerDiv.style.setProperty ('--sw_viewer_background', this.settings.horizonGradient ? GetBackgroundGradientCSS (background.colors) : solidBackground);
+            this.parameters.viewerDiv.classList.toggle ('dark_viewport', dark);
+            this.parameters.viewerDiv.classList.toggle ('horizon_viewport', this.settings.horizonGradient);
+            this.viewer.SetBackgroundColor (this.settings.backgroundColor);
+            const useDefaultDome = this.settings.horizonGradient && (!this.lightingPanel || this.lightingPanel.mode === 'default');
+            this.viewer.SetBackgroundGradient (this.settings.horizonGradient && !useDefaultDome, dark, background.colors);
+            this.viewer.SetDefaultDome (useDefaultDome, background.colors);
+            const darkGrid = this.settings.backgroundPreset === 'custom' ? (color.r + color.g + color.b) / 3 < 128 : background.dark;
+            this.parameters.viewerDiv.style.setProperty ('--sw_axis_text', darkGrid ? '#d5dce3' : '#394650');
+            this.viewer.SetGroundGrid (this.settings.showGroundGrid, darkGrid);
+            if (this.lightingPanel) { this.lightingPanel.SyncControls (); }
+        } finally { this.viewer.EndRenderBatch (); }
     }
 
     ApplyBackgroundPreset (preset)

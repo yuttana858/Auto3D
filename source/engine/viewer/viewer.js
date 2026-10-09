@@ -178,6 +178,7 @@ export class Viewer
         this.groundGrid = null;
         this.groundGridSettings = { show : false, dark : false };
         this.defaultDome = null;
+        this.renderBatchDepth = 0;
         this.settings = {
             animationSteps : 40
         };
@@ -546,8 +547,12 @@ export class Viewer
         this.onRender = onRender;
     }
 
+    BeginRenderBatch () { this.renderBatchDepth++; }
+    EndRenderBatch () { if (this.renderBatchDepth > 0) { this.renderBatchDepth--; if (this.renderBatchDepth === 0) { this.Render (); } } }
+
     Render ()
     {
+        if (this.renderBatchDepth > 0) { return; }
         let navigationCamera = this.navigation.GetCamera ();
 
         this.camera.position.set (navigationCamera.eye.x, navigationCamera.eye.y, navigationCamera.eye.z);

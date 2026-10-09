@@ -73,7 +73,7 @@ export class AuthPanel
             event.preventDefault (); if (busy) { return; } busy = true; render (); status.textContent = 'Signing in…';
             try { await this.auth.SignIn (email.value, password.value); status.textContent = 'Signed in as ' + (this.auth.user.email || 'Auto3D user'); }
             catch (error) { status.textContent = error.message; }
-            finally { password.value = ''; password.type = 'password'; busy = false; email.disabled = password.disabled = submit.disabled = signOut.disabled = false; }
+            finally { password.value = ''; password.type = 'password'; busy = false; email.disabled = password.disabled = submit.disabled = signOut.disabled = forgot.disabled = false; }
         });
         signOut.addEventListener ('click', async () => {
             if (busy) { return; } busy = true; render (); status.textContent = 'Signing out…';

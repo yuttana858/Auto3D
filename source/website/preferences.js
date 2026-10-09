@@ -6,7 +6,29 @@ import { WorkspaceDialog } from './modellibrary.js';
 import { Unit } from '../engine/model/unit.js';
 import { OpenCommandPanel } from './commandpanel.js';
 
-export const AppVersion = '0.27.0';
+export const AppVersion = '0.27.1';
+
+export function AppBuildInfo ()
+{
+    const meta = typeof document === 'undefined' ? null : document.querySelector?.('meta[name="auto3d-build"]');
+    return { version : AppVersion, build : meta?.content || 'development' };
+}
+
+export function AccountPreferenceState (preferences = {})
+{
+    const settings = new Settings (preferences?.theme === Theme.Dark ? Theme.Dark : Theme.Light); const camera = new CameraSettings (); const view = preferences?.view || {};
+    if (/^[a-zA-Z0-9_-]{1,100}$/.test (view.environmentMapName || '')) { settings.environmentMapName = view.environmentMapName; }
+    if (['standard', 'dark', 'light', 'sunset', 'outdoor', 'custom'].includes (view.backgroundPreset)) { settings.backgroundPreset = view.backgroundPreset; }
+    for (const key of ['backgroundIsEnvMap', 'horizonGradient', 'showGroundGrid']) { if (typeof view[key] === 'boolean') { settings[key] = view[key]; } }
+    const color = (value, count) => Array.isArray (value) && value.length === count && value.every (n => Number.isInteger (n) && n >= 0 && n <= 255);
+    if (color (view.backgroundColor, 4)) { settings.backgroundColor = new RGBAColor (...view.backgroundColor); }
+    for (const key of ['defaultLineColor', 'defaultColor']) { if (color (view[key], 3)) { settings[key] = new RGBColor (...view[key]); } }
+    if (color (view.edgeColor, 3)) { settings.edgeSettings.edgeColor = new RGBColor (...view.edgeColor); }
+    if (typeof view.showEdges === 'boolean') { settings.edgeSettings.showEdges = view.showEdges; }
+    if (Number.isFinite (view.edgeThreshold) && view.edgeThreshold >= 0 && view.edgeThreshold <= 180) { settings.edgeSettings.edgeThreshold = view.edgeThreshold; }
+    for (const key of ['navigationMode', 'projectionMode']) { if ([1, 2].includes (view[key])) { camera[key] = view[key]; } }
+    return { settings, camera, units : preferences?.units === 'standard' ? 'standard' : 'metric' };
+}
 
 export function UnitFactor (sourceUnit, system)
 {
@@ -52,9 +74,9 @@ export class Preferences
     {
         this.website = website;
         this.units = 'metric';
-        this.accountId = null; this.applying = false; this.pendingSave = Promise.resolve ();
+        this.accountId = null; this.applying = false; this.pendingSave = Promise.resolve (); this.loadGeneration = 0; this.loading = null;
         website.sidebar.detailsPanel.unitSystem = this.units;
-        const badge = document.createElement ('span'); badge.className = 'version_badge'; badge.textContent = 'v' + AppVersion;
+        const badge = document.createElement ('span'); badge.className = 'version_badge'; badge.textContent = 'v' + AppVersion; badge.title = 'Build ' + AppBuildInfo ().build;
         document.querySelector ('.title_left').appendChild (badge);
         const button = document.createElement ('button'); button.className = 'preferences_button'; button.title = 'Preferences'; button.setAttribute ('aria-label', 'Preferences');
         button.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m9 3-1 3-3 1 1 3-2 2 2 2-1 3 3 1 1 3h6l1-3 3-1-1-3 2-2-2-2 1-3-3-1-1-3Z"/><circle cx="12" cy="12" r="3"/></svg>';
@@ -107,10 +129,11 @@ export class Preferences
         aiActions.append (saveAI, testAI, clearAI);
         const syncStatus = document.createElement ('p'); syncStatus.setAttribute ('role', 'status'); syncStatus.textContent = 'Theme and units are saved automatically to your account.'; this.syncStatus = syncStatus;
         const about = document.createElement ('p'); about.className = 'preferences_about';
-        about.textContent = 'SW Auto3D v' + AppVersion + ' — A browser workspace for inspecting, arranging and reviewing 3D models, materials, lighting and reusable layouts. Dimensions use the units declared by the source model; unspecified units remain model units.';
+        about.textContent = 'SW Auto3D v' + AppVersion + ' · Build ' + AppBuildInfo ().build + ' — A browser workspace for inspecting, arranging and reviewing 3D models, materials, lighting and reusable layouts. Dimensions use the units declared by the source model; unspecified units remain model units.';
         const commands = document.createElement ('button'); commands.textContent = 'Commands and macros'; commands.className = 'workspace_primary'; commands.addEventListener ('click', () => { dialog.close (); OpenCommandPanel (this.website); });
         const errorLogs = document.createElement ('button'); errorLogs.textContent = 'Error logs'; errorLogs.addEventListener ('click', () => { dialog.close (); OpenErrorLog (this.website); });
-        const heading = document.createElement ('strong'); heading.textContent = 'About'; form.append (appearance, unitLabel, syncStatus, commands, errorLogs, aiHeading, aiProviderLabel, aiBaseLabel, aiKeyLabel, rememberLabel, aiNote, aiActions, aiStatus, heading, about); dialog.appendChild (form);
+        const recovery = document.createElement ('button'); recovery.textContent = 'Recover unsaved session'; recovery.addEventListener ('click', () => { dialog.close (); this.website.sessionEditor.OfferRecovery (true).catch (error => this.website.sessionEditor.Status (error.message)); });
+        const heading = document.createElement ('strong'); heading.textContent = 'About'; form.append (appearance, unitLabel, syncStatus, commands, errorLogs, recovery, aiHeading, aiProviderLabel, aiBaseLabel, aiKeyLabel, rememberLabel, aiNote, aiActions, aiStatus, heading, about); dialog.appendChild (form);
     }
 
     SetUnits (units)
@@ -123,44 +146,53 @@ export class Preferences
         this.website.measureTool?.UpdatePanel (); this.website.sessionEditor?.packaging?.Refresh ();
         return this.SaveAccount ();
     }
-    async LoadAccount (id)
+    LockAccount ()
     {
-        if (this.accountId === id) { return; }
-        const response = await fetch ('/api/preferences', { credentials : 'same-origin', headers : { 'X-Auto3D-Account' : id } });
-        if (!response.ok) { throw new Error ('Could not load account preferences. Retry saved sign-in.'); }
-        const data = await response.json ();
-        if (this.website.auth.user?.id !== id) { throw new Error ('Account changed. Sign in again.'); }
-        this.applying = true;
-        try { this.units = data.preferences?.units === 'standard' ? 'standard' : 'metric'; this.website.sidebar.detailsPanel.unitSystem = this.units; this.website.SwitchTheme (data.preferences?.theme === 2 ? 2 : 1, true);
-            const settings = this.website.settings; const camera = this.website.cameraSettings; const defaults = new Settings (settings.themeId); const cameraDefaults = new CameraSettings ();
-            for (const key of ['environmentMapName', 'backgroundIsEnvMap', 'horizonGradient', 'backgroundPreset', 'showGroundGrid', 'backgroundColor', 'defaultLineColor', 'defaultColor', 'edgeSettings']) { settings[key] = defaults[key]; }
-            camera.navigationMode = cameraDefaults.navigationMode; camera.projectionMode = cameraDefaults.projectionMode;
-            const view = data.preferences?.view;
-            if (view) {
-                for (const key of ['environmentMapName', 'backgroundIsEnvMap', 'horizonGradient', 'backgroundPreset', 'showGroundGrid']) { settings[key] = view[key]; }
-                settings.backgroundColor = new RGBAColor (...view.backgroundColor); settings.defaultLineColor = new RGBColor (...view.defaultLineColor); settings.defaultColor = new RGBColor (...view.defaultColor);
-                settings.edgeSettings.showEdges = view.showEdges; settings.edgeSettings.edgeColor = new RGBColor (...view.edgeColor); settings.edgeSettings.edgeThreshold = view.edgeThreshold;
-                camera.navigationMode = view.navigationMode; camera.projectionMode = view.projectionMode;
-            }
-            this.website.viewer.SetNavigationMode (camera.navigationMode); this.website.viewer.SetProjectionMode (camera.projectionMode); this.website.viewer.SetEdgeSettings (settings.edgeSettings);
-            this.website.UpdateEnvironmentMap (); this.website.UpdateViewport (); this.website.sidebar.UpdateControlsStatus ();
-            settings.onChange = camera.onChange = () => this.ScheduleSave ();
-            this.website.sessionEditor.UnitsChanged (); this.website.sessionEditor.library.InitializeAccount (id); this.website.aiWorkspace?.InitializeAccount (id); this.accountId = id; }
-        finally { this.applying = false; }
+        this.loadGeneration++; this.loading?.controller.abort (); this.loading = null; this.accountId = null;
+        this.website.settings.onChange = this.website.cameraSettings.onChange = null;
+    }
+    LoadAccount (id)
+    {
+        if (this.accountId === id) { return Promise.resolve (); }
+        if (this.loading?.id === id) { return this.loading.promise; }
+        const operation = { id, generation : ++this.loadGeneration, controller : new AbortController () };
+        this.loading?.controller.abort (); this.loading = operation;
+        operation.promise = (async () => {
+            try {
+                const response = await fetch ('/api/preferences', { credentials : 'same-origin', headers : { 'X-Auto3D-Account' : id }, signal : operation.controller.signal });
+                if (!response.ok) { throw new Error ('Could not load account preferences. Retry saved sign-in.'); }
+                const data = await response.json ();
+                if (this.website.auth.user?.id !== id || operation.generation !== this.loadGeneration) { throw new Error ('Account changed. Sign in again.'); }
+                const state = AccountPreferenceState (data?.preferences); this.applying = true; this.website.viewer.BeginRenderBatch?.();
+                try {
+                    this.units = state.units; this.website.sidebar.detailsPanel.unitSystem = this.units;
+                    const settings = this.website.settings; const camera = this.website.cameraSettings;
+                    Object.assign (settings, state.settings); Object.assign (camera, state.camera);
+                    this.website.SwitchTheme (settings.themeId, false);
+                    this.website.viewer.SetNavigationMode (camera.navigationMode); this.website.viewer.SetProjectionMode (camera.projectionMode); this.website.viewer.SetEdgeSettings (settings.edgeSettings);
+                    this.website.UpdateEnvironmentMap (); this.website.UpdateViewport (); this.website.sidebar.UpdateControlsStatus ();
+                    camera.SaveToCookies ();
+                    settings.onChange = camera.onChange = () => this.ScheduleSave ();
+                    this.website.sessionEditor.UnitsChanged (); this.website.sessionEditor.library.InitializeAccount (id); this.website.aiWorkspace?.InitializeAccount (id); this.accountId = id;
+                }
+                finally { this.applying = false; this.website.viewer.EndRenderBatch?.(); }
+            } finally { if (this.loading === operation) { this.loading = null; } }
+        }) ();
+        return operation.promise;
     }
     ViewPreferences ()
     {
         const s = this.website.settings; const camera = this.website.cameraSettings;
-        const rgb = (color) => [color.r, color.g, color.b];
-        return { environmentMapName : s.environmentMapName, backgroundIsEnvMap : s.backgroundIsEnvMap, horizonGradient : s.horizonGradient, backgroundPreset : s.backgroundPreset, showGroundGrid : s.showGroundGrid, backgroundColor : [...rgb (s.backgroundColor), s.backgroundColor.a], defaultLineColor : rgb (s.defaultLineColor), defaultColor : rgb (s.defaultColor), showEdges : s.edgeSettings.showEdges, edgeColor : rgb (s.edgeSettings.edgeColor), edgeThreshold : s.edgeSettings.edgeThreshold, navigationMode : camera.navigationMode, projectionMode : camera.projectionMode };
+        const component = value => Math.round (Math.max (0, Math.min (255, value))); const rgb = (color) => [color.r, color.g, color.b].map (component);
+        return { environmentMapName : s.environmentMapName, backgroundIsEnvMap : s.backgroundIsEnvMap, horizonGradient : s.horizonGradient, backgroundPreset : s.backgroundPreset, showGroundGrid : s.showGroundGrid, backgroundColor : [...rgb (s.backgroundColor), component (s.backgroundColor.a)], defaultLineColor : rgb (s.defaultLineColor), defaultColor : rgb (s.defaultColor), showEdges : s.edgeSettings.showEdges, edgeColor : rgb (s.edgeSettings.edgeColor), edgeThreshold : s.edgeSettings.edgeThreshold, navigationMode : camera.navigationMode, projectionMode : camera.projectionMode };
     }
     ScheduleSave () { this.SaveAccount ().catch ((error) => { this.website.sessionEditor.Status (error.message); if (this.syncStatus?.isConnected) { this.syncStatus.textContent = error.message; } }); }
     SaveAccount ()
     {
         if (this.applying || !this.accountId || this.website.auth.user?.id !== this.accountId) { return Promise.resolve (); }
-        const owner = this.accountId; const preferences = { units : this.units, theme : this.website.settings.themeId, view : this.ViewPreferences () };
+        const owner = this.accountId; const generation = this.loadGeneration; const preferences = { units : this.units, theme : this.website.settings.themeId, view : this.ViewPreferences () };
         this.pendingSave = this.pendingSave.catch (() => {}).then (async () => {
-            if (this.website.auth.user?.id !== owner) { return; }
+            if (this.website.auth.user?.id !== owner || generation !== this.loadGeneration) { return; }
             if (this.syncStatus?.isConnected) { this.syncStatus.textContent = 'Saving account preferences…'; }
             const response = await fetch ('/api/preferences', { method : 'PUT', credentials : 'same-origin', headers : { 'Content-Type' : 'application/json', 'X-Auto3D-Account' : owner }, body : JSON.stringify ({ preferences }) });
             if (!response.ok) { throw new Error ('Account preferences could not be saved. Retry the change.'); }

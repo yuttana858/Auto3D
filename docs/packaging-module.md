@@ -45,7 +45,7 @@ Point and thickness commands default to global display units; `units: 'mm'` make
 
 ## Lighting regression fixes
 
-Transparent shadow and reflection floors no longer write depth over model geometry. Shadow maps use portable shader depth comparison (BasicShadowMap; hard edges) instead of GPU comparison samplers; shadow/floor-strength controls update only the shadow pipeline and never run reflection capture or replace model materials; the shadow frustum, normal bias and light position scale with scene bounds and follow translated scene centers. Dynamic capture excludes floor/helper overlays, is positioned outside closed model bounds, and restores visibility and shadow-update state in a `finally` block. Physical materials retain their HDRI irradiance, intensity and rotation; a shader contribution adds local model specular radiance instead of replacing the diffuse environment. Phong uses additive rather than multiplying reflection. Turning the effect off restores original material callbacks and properties. One scene capture remains an approximation, rather than per-object ray-traced interreflection.
+PR #21 replaced the floor shadow-map path with independent caster copies and an RGBA silhouette projected along global lighting. It never enables shadow samplers or changes original model alpha/materials. Renderer state restores after mask/reflection captures, including offscreen PNG tiles. Metallic/clearcoat materials receive uniform specular fill alongside diffuse ambient light. Floor shadows do not produce model self-shadow. See [rendering.md](rendering.md) for current behavior; earlier shadow-frustum/BasicShadowMap descriptions are superseded.
 
 ## Validation
 

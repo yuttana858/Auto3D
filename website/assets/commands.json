@@ -2742,6 +2742,76 @@
       "example": {}
     },
     {
+      "id": "app.version.inspect",
+      "title": "Inspect application version",
+      "category": "Preferences",
+      "description": "Return the running application version and build identifier for release verification.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "preferences.viewport.inspect",
+      "title": "Inspect saved viewport preferences",
+      "category": "Preferences",
+      "description": "Return account preference loading state and current background/grid/camera defaults, without credentials.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "session.recovery.inspect",
+      "title": "Inspect unsaved recovery",
+      "category": "Sessions",
+      "description": "Validate this account's device recovery checkpoint and return its status/error without archive contents.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "session.recovery.open",
+      "title": "Open recovery dialog",
+      "category": "Sessions",
+      "description": "Open the recovery dialog for an empty workspace, including a readable reason when no usable checkpoint exists. Interactive dialog.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "session.recovery.restore",
+      "title": "Restore unsaved recovery",
+      "category": "Sessions",
+      "description": "Restore a valid device checkpoint into an empty editable workspace. Retains the checkpoint until an explicit full-session save.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
       "id": "preferences.inspect",
       "title": "Inspect preferences",
       "category": "Preferences",
