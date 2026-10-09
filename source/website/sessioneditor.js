@@ -373,22 +373,46 @@ export class SessionEditor
         try { await this.library.deviceStorage.ClearRecovery (); } catch { /* Recovery cleanup is best effort. */ }
     }
 
-    async OfferRecovery ()
+    async ReadRecovery ()
     {
-        if (this.recoveryPromptOpen || this.recoveryPromptHandled) { return; }
-        let recovery = null;
-        try { recovery = await this.library.deviceStorage.GetRecovery (); }
-        catch (error) { console.warn ('Auto3D recovery lookup failed.', error); return; }
-        if (!recovery?.archive || this.document.objects.length) { return; }
-
-        let buffer = null;
-        let validationError = null;
-        try {
-            buffer = await RecoveryArchiveBuffer (recovery.archive);
-            OpenSessionArchive (buffer);
-        } catch (error) {
-            validationError = error;
+        const storage = this.library.deviceStorage; const owner = storage.accountId;
+        const check = () => { if (!owner || this.website.auth?.user?.id !== owner || !this.website.accountReady || this.library.deviceStorage !== storage) { throw new Error ('Sign in to the same account before inspecting recovery.'); } };
+        check (); const recovery = await storage.GetRecovery (); check ();
+        let buffer = null; let validationError = null;
+        if (recovery?.archive) {
+            try { buffer = await RecoveryArchiveBuffer (recovery.archive); check (); OpenSessionArchive (buffer); }
+            catch (error) { validationError = error; }
         }
+        check (); return { recovery, buffer, validationError };
+    }
+    async InspectRecovery ()
+    {
+        const { recovery, buffer, validationError } = await this.ReadRecovery ();
+        return { available : Boolean (recovery?.archive), valid : Boolean (buffer && !validationError), updatedAt : recovery?.updatedAt || null, bytes : buffer?.byteLength || 0, error : validationError?.message || null };
+    }
+    async RestoreRecovery ()
+    {
+        if (this.readOnly || this.busy) { throw new Error ('Recovery requires an idle, editable workspace.'); }
+        if (this.document.objects.length || this.document.packaging?.paths?.length) { throw new Error ('Save and close the current session before restoring recovery.'); }
+        const { recovery, buffer, validationError } = await this.ReadRecovery ();
+        if (this.readOnly || this.busy || this.document.objects.length || this.document.packaging?.paths?.length) { throw new Error ('Workspace changed before recovery could be restored.'); }
+        if (!recovery?.archive) { throw new Error ('No unsaved recovery checkpoint is available for this account on this device.'); }
+        if (validationError) { throw validationError; }
+        await this.OpenArchive (buffer.slice (0), false, true);
+        // Retain the only unsaved copy until an explicit full-session save.
+        this.MarkDirty (); this.recoveryPromptHandled = true;
+        this.Status ('Recovered unsaved session · Save to keep it.'); return { recovered : true, objects : this.document.objects.length };
+    }
+    async OfferRecovery (force = false)
+    {
+        if (this.recoveryPromptOpen || this.recoveryPromptHandled && !force) { return { opened : false }; }
+        if (this.document.objects.length || this.document.packaging?.paths?.length) { const message = 'Save and close the current session before restoring recovery.'; if (force) { this.Status (message); } return { opened : false, reason : message }; }
+        let result;
+        try { result = await this.ReadRecovery (); }
+        catch (error) { console.warn ('Auto3D recovery lookup failed.', error); if (force) { this.Status (error.message); } return { opened : false, reason : error.message }; }
+        const { recovery, validationError } = result;
+        if (!recovery?.archive) { const message = 'No unsaved recovery checkpoint is available for this account on this device.'; if (force) { this.Status (message); } return { opened : false, reason : message }; }
+        if (validationError) { this.website.errorLogs?.Record ('error', 'recovery', validationError.message); }
 
         this.recoveryPromptOpen = true;
         const dialog = WorkspaceDialog ('Recover unsaved session');
@@ -398,7 +422,7 @@ export class SessionEditor
         message.textContent = validationError
             ? 'The saved recovery checkpoint cannot be opened: ' + validationError.message
             : 'Auto3D found an unsaved recovery checkpoint' + (timestamp && !Number.isNaN (timestamp.getTime ()) ? ' from ' + timestamp.toLocaleString () : '') + '.';
-        const restore = document.createElement ('button'); restore.type = 'button'; restore.className = 'workspace_primary'; restore.textContent = 'Restore recovery'; restore.disabled = Boolean (validationError);
+        const restore = document.createElement ('button'); restore.type = 'button'; restore.className = 'workspace_primary'; restore.textContent = 'Restore recovery'; restore.disabled = Boolean (validationError) || this.readOnly;
         const discard = document.createElement ('button'); discard.type = 'button'; discard.textContent = validationError ? 'Discard invalid recovery' : 'Discard recovery';
 
         const dismiss = () => {
@@ -408,13 +432,10 @@ export class SessionEditor
         };
 
         restore.addEventListener ('click', async () => {
-            if (!buffer) { return; }
             dismiss ();
             this.Status ('Restoring recovery…');
             try {
-                await this.OpenArchive (buffer.slice (0), false, true);
-                await this.library.deviceStorage.ClearRecovery ().catch (() => {});
-                this.Status ('Recovered unsaved session · Save to keep it.');
+                await this.RestoreRecovery ();
             } catch (error) {
                 this.Status ('Recovery could not be restored: ' + error.message);
             }
@@ -431,7 +452,7 @@ export class SessionEditor
         }, { once : true });
 
         dialog.addEventListener ('close', () => { this.recoveryPromptOpen = false; }, { once : true });
-        body.append (message, restore, discard); dialog.appendChild (body);
+        body.append (message, restore, discard); dialog.appendChild (body); return { opened : true, valid : !validationError };
     }
     AddModel () { if (this.readOnly) { return; } this.replaceTarget = null; this.website.OpenFileBrowserDialog (); }
     UpdateModel (object = this.selected) { if (!this.readOnly && object) { this.replaceTarget = object; this.website.OpenFileBrowserDialog (); } }

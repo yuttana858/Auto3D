@@ -26,6 +26,7 @@ export function InstallAuthGate (website)
         for (const id of ['main', 'header', 'toolbar', 'intro', 'material_drawer', 'advance_animation_panel']) { const element = document.getElementById (id); if (element) { element.inert = locked; } }
         if (locked) {
             website.accountReady = false;
+            website.preferences.LockAccount ();
             if (unlocked) { website.sessionEditor.dirty = false; }
             document.querySelectorAll ('dialog[open]').forEach ((dialog) => dialog.close ());
             website.sessionEditor.timeline?.Stop (); website.sessionEditor.controls.detach (); website.commands?.Cancel (); website.sessionEditor.polygonOptimizer?.Cancel ();

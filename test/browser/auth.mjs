@@ -33,6 +33,7 @@ await page.route ('**/api/auth/**', async (route) => {
         await form.getByRole ('button', { name : 'Sign in', exact : true }).click ();
         await splash.getByRole ('status').filter ({ hasText : 'incorrect' }).waitFor ();
         assert.equal (await form.getByLabel ('Password', { exact : true }).inputValue (), '');
+        assert.equal (await splash.getByRole ('button', { name : 'Forgot Password', exact : true }).isEnabled (), true);
         await form.getByLabel ('Password', { exact : true }).fill ('browser-test-password');
         await form.getByRole ('button', { name : 'Sign in', exact : true }).click ();
         await splash.waitFor ({ state : 'hidden' });
