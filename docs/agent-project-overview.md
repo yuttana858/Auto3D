@@ -4,7 +4,7 @@ Updated 2026-10-09. Start with [project-status.md](project-status.md) for the de
 
 ## Product and stack
 
-Auto3D is a browser 3D viewer/editor derived from MIT-licensed Online3DViewer. It imports CAD/mesh files, assembles multi-object scenes, edits transforms/materials, controls environments/lighting, creates arrays, previews polygon reduction, plays embedded animation and authors scene/camera timelines. It saves portable `.auto3d` sessions, private account Library entries and device-local entries. Packaging adds cut/score vector profiles, solid board extrusion, and the first FEFCO 02-series generators (0200–0203) for folded kraft boxes. Render queues produce screen/HD/4K/16K PNGs, including model-only alpha output.
+Auto3D is a browser 3D viewer/editor derived from MIT-licensed Online3DViewer. It imports CAD/mesh files, assembles multi-object scenes, edits transforms/materials, controls environments/lighting, creates arrays, previews polygon reduction, plays embedded animation and authors scene/camera timelines. It saves portable `.auto3d` sessions, private account Library entries and device-local entries. Packaging is an independently built module with cut/score profiles, board extrusion, 0200–0203 folded-box generation and selected-box unfolding. Its geometry, textures and catalog UI load on demand through a small Auto3D adapter; its standalone preview has no account or Auto3D dependency. Render queues produce screen/HD/4K/16K PNGs, including model-only alpha output.
 
 The frontend uses JavaScript ES modules, imperative DOM, Three.js, fflate, Pickr and CSS. There is no React app. esbuild bundles the website and two workers; rollup/TypeScript produce engine distribution artifacts. CI targets Node 22. The separate Node backend is an alternate implementation, not the deployed Pages API.
 
@@ -44,7 +44,7 @@ flowchart TD
 | Cameras/rendering | `sessioncameras.js`, `camerapanel.js`, `renderingpanel.js`, `renderqueue.js`, `rendercore.js` | Named views/FOV and tiled PNG queues |
 | Animation | `sessionanimation.js`, `sessiontimeline.js`, `advanceanimation.js` | Embedded clips and scene/camera keyframes |
 | Optimization | `polygonoptimizer.js`, `polygoncore.js`, `polygonworker.js`, `arraylayout.js` | Bounded static-mesh simplification and array layout |
-| Packaging | `packagingcore.js`, `packagingworkspace.js`, `fefcocore.js`, `fefcocatalog.js`, `fefcopanel.js` | Canonical-mm profiles, SVG/DXF, board extrusion/history, categorized FEFCO thumbnails and folded box generation |
+| Packaging | `modules/packaging/src/`, `packagingadapter.js`, `packagingworkspace.js` | Independent versioned generator/UI build, canonical-mm mesh/profile API, demand loading, flat dielines and Auto3D scene/history adapter |
 | Commands/diagnostics | `agentcommands.js`, `commandregistry.js`, `macrodesign.js`, `agentcapture.js`, `errorlogs.js` | Shared agent actions, strict schemas/macros, bounded capture/logs |
 | Alternate backend | `backend/server.mjs`, `library-service.mjs`, `auth/entra-jwt.mjs`, `adapters/supabase.mjs` | Separate Node Library API; does not serve as Pages' internal service |
 | Release | `.github/workflows/cloudflare-pages.yml`, `tools/build_pages.mjs`, `verify_deployment.mjs` | Build, deploy and check production version/HTML/bundle |
@@ -101,3 +101,9 @@ Production host: `https://auto3d-5av.pages.dev`. Pages deploys `main`. Release 0
 ## Further reading
 
 [Temporary authentication](temporary-auth.md) · [Account storage/preferences](account-storage.md) · [PR16 reconciliation](pr16-reconciliation.md) · [Agent commands](agent-interface.md) · [Agent capture](agent-screen-capture.md) · [Error logs](error-logs.md) · [Polygon optimization](polygon-optimization.md) · [Packaging](packaging-module.md) · [Cameras](session-cameras.md) · [Rendering](rendering.md) · [Cloudflare deployment](cloudflare-pages.md)
+
+## Independent Packaging development — v0.29.0
+
+Packaging module v1.0.0 lives under modules/packaging and can be copied into a separate checkout with its own package.json, source, tests, build and standalone preview. Run npm run build_packaging, npm run test_packaging or npm run preview_packaging from the repo root, or the corresponding build/test/preview scripts inside that package. This is a separate package within the current Git repository; no new external repository or deployment is created. The app owns authentication, scene conversion, history, archives and display units. Lightweight pure profile validation is shared for archive safety. The module returns canonical-mm mesh/material/profile data, with no Auto3D engine imports.
+
+The main application loads packaging.module.js and packaging.module.css only when its Packaging tab or a geometry action is used. Build artifact hashing and deployment verification include both files. Saved scenes retain ordinary engine geometry and textures, so opening them does not require the generator. See modules/packaging/README.md for the API and host contract.

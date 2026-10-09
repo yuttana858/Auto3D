@@ -1,4 +1,4 @@
-import { FefcoPanel } from './fefcopanel.js';
+import { LoadPackagingModule } from './packagingadapter.js';
 
 const AIStorageKey = 'auto3d-ai-connections-v1';
 
@@ -95,8 +95,8 @@ export class AIWorkspace
         this.tabButtons = new Map ();
         for (const [id, label] of [['ai', 'AI'], ['packaging', 'Packaging']]) {
             const button = Element ('button', null, label, tabs); button.id = 'workspace_tab_' + id; button.setAttribute ('role', 'tab'); button.setAttribute ('aria-controls', 'workspace_pane_' + id);
-            button.addEventListener ('click', () => this.SetTab (id));
-            button.addEventListener ('keydown', event => { if (['ArrowLeft', 'ArrowRight'].includes (event.key)) { event.preventDefault (); const next = id === 'ai' ? 'packaging' : 'ai'; this.SetTab (next); this.tabButtons.get (next).focus (); } });
+            button.addEventListener ('click', () => this.website.sessionEditor.Run (() => this.SetTab (id)));
+            button.addEventListener ('keydown', event => { if (['ArrowLeft', 'ArrowRight'].includes (event.key)) { event.preventDefault (); const next = id === 'ai' ? 'packaging' : 'ai'; this.website.sessionEditor.Run (() => this.SetTab (next)); this.tabButtons.get (next).focus (); } });
             this.tabButtons.set (id, button);
         }
         this.aiPane = Element ('div', 'ai_workspace_pane', undefined, panel); this.aiPane.id = 'workspace_pane_ai'; this.aiPane.setAttribute ('role', 'tabpanel'); this.aiPane.setAttribute ('aria-labelledby', 'workspace_tab_ai');
@@ -139,7 +139,7 @@ export class AIWorkspace
         this.recentGrid = Element ('div', 'ai_recent_grid', undefined, recentSection);
         this.RenderRecent (); this.RefreshConnection ();
         this.packagingPane = Element ('div', 'ai_workspace_pane ai_packaging_pane', undefined, panel); this.packagingPane.id = 'workspace_pane_packaging'; this.packagingPane.setAttribute ('role', 'tabpanel'); this.packagingPane.setAttribute ('aria-labelledby', 'workspace_tab_packaging');
-        this.fefcoPanel = new FefcoPanel (this.website.sessionEditor.packaging, this.packagingPane);
+        this.packagingModuleMount = Element ('div', null, undefined, this.packagingPane);
         Element ('strong', null, 'Packaging design', this.packagingPane);
         Element ('p', 'section_hint', 'Draw cut and score profiles, set board thickness, and export SVG or DXF patterns.', this.packagingPane);
         this.packagingSummary = Element ('p', 'ai_packaging_summary', '', this.packagingPane);
@@ -161,25 +161,35 @@ export class AIWorkspace
         this.fefcoPanel?.Refresh ();
     }
 
-    SetTab (tab)
+    async EnsurePackagingPanel ()
+    {
+        if (this.fefcoPanel) { return; }
+        if (!this.packagingPanelPromise) {
+            this.packagingModuleMount.textContent = 'Loading Packaging…';
+            this.packagingPanelPromise = LoadPackagingModule ().then (module => { this.packagingModuleMount.replaceChildren (); this.fefcoPanel = new module.FefcoPanel (this.website.sessionEditor.packaging.PanelHost (), this.packagingModuleMount); }).catch (error => { this.packagingPanelPromise = null; this.packagingModuleMount.textContent = error.message + ' Open this tab again to retry.'; throw error; });
+        }
+        await this.packagingPanelPromise;
+    }
+
+    async SetTab (tab)
     {
         if (!['ai', 'packaging'].includes (tab)) { throw new Error ('Choose AI or Packaging.'); }
         this.activeTab = tab;
         for (const [id, button] of this.tabButtons) { button.setAttribute ('aria-selected', String (id === tab)); button.tabIndex = id === tab ? 0 : -1; }
         this.aiPane.hidden = tab !== 'ai'; this.packagingPane.hidden = tab !== 'packaging';
-        if (tab === 'packaging') { this.RefreshPackaging (); }
+        if (tab === 'packaging') { await this.EnsurePackagingPanel (); this.RefreshPackaging (); }
     }
 
-    Open (tab = 'ai')
+    async Open (tab = 'ai')
     {
         const right = this.website.parameters.rightContainerDiv;
         right.classList.remove ('collapsed');
         document.getElementById ('data_panel_content').hidden = true;
-        this.panel.hidden = false; this.SetTab (tab);
+        this.panel.hidden = false; const ready = this.SetTab (tab);
         const toggle = document.getElementById ('data_panel_toggle'); toggle.querySelector ('span:first-child').textContent = 'AI & Packaging'; toggle.setAttribute ('aria-expanded', 'true');
         this.headerButton?.setAttribute ('aria-pressed', 'true');
         this.website.layouter.Resize ();
-        this.RefreshConnection (); return { opened : true, tab };
+        this.RefreshConnection (); await ready; return { opened : true, tab };
     }
 
     Close ()

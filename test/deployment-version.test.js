@@ -12,4 +12,18 @@ describe ('Production release verification', () => {
         await assert.rejects (VerifyDeployment ('https://fixture.example', sha, fixture ({}, 'old bundle')), /bundle/);
         await assert.rejects (VerifyDeployment ('https://fixture.example', sha, fixture ({ script : 'https://elsewhere.example/app.js' })), /location/);
     });
+    it ('verifies separately deployed Packaging script and styles, and rejects stale or external module assets', async () => {
+        const hash = text => createHash ('sha256').update (text).digest ('hex');
+        const module = { version : '1.0.0', script : '/o3dv/packaging/packaging.module.js?v=0123456789ab', scriptHash : hash ('packaging'), stylesheet : '/o3dv/packaging/packaging.module.css?v=0123456789ab', stylesheetHash : hash ('styles') };
+        const fetcher = (override = {}, content = 'packaging') => async url => {
+            if (url.pathname === '/version.json') { return new Response (JSON.stringify ({ ...release, modules : { packaging : { ...module, ...override } } })); }
+            if (url.pathname.includes ('packaging.module.js')) { return new Response (content); }
+            if (url.pathname.includes ('packaging.module.css')) { return new Response ('styles'); }
+            return fixture () (url);
+        };
+        assert.equal ((await VerifyDeployment ('https://fixture.example', sha, fetcher ())).verified, true);
+        await assert.rejects (VerifyDeployment ('https://fixture.example', sha, fetcher ({}, 'old module')), /Packaging module script/);
+        await assert.rejects (VerifyDeployment ('https://fixture.example', sha, fetcher ({ stylesheetHash : hash ('old styles') })), /Packaging module stylesheet/);
+        await assert.rejects (VerifyDeployment ('https://fixture.example', sha, fetcher ({ script : 'https://elsewhere.example/module.js' })), /module location/);
+    });
 });

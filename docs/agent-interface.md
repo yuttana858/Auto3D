@@ -79,3 +79,6 @@ Use the bottom input for supported phrases, such as `array model 4x4x6`, `fit`, 
 
 
 FEFCO v0.28.0 adds `packaging.fefco.catalog/inspect/configure/generate`. Configuration changes temporary generation settings; generation creates a folded box and concept cut/score profile with Undo. All dimensions and caliper in these commands are millimeters, independent of account display units. Catalog lists four supported slotted styles and the planned families. The bottom bar also accepts `generate rsc 400x300x250 mm` and `create hsc 400x300x250` (internal L×W×H). See [packaging-module.md](packaging-module.md).
+
+
+Auto3D v0.29.0 adds `packaging.fefco.unfold` with optional objectId. It replaces a generated folded box with its stored concept dieline, current dominant board/edge material and CUT/SCORE guides. Undo/Redo restores both scene object and active profile; archives preserve flat state. Scaled objects, arbitrary imported meshes and already-flat objects are rejected. `unfold box` and `unfold model` use this same command; generation and unfolding can be sequential macro steps using result objectId references. Packaging implementation now lives in the independently built modules/packaging package (v1.0.0), loaded on demand.

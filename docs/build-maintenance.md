@@ -29,3 +29,8 @@ This renderer version passed the full Auto3D hardening gate (workspace, material
 To reduce GitHub Actions usage and notification noise, the full validation suite runs on pull requests (and manual dispatch) only. Superseded PR runs are cancelled automatically.
 
 A merge to `main` runs only the Cloudflare production build/deploy workflow. This avoids repeating the full lint/test/engine/module/website validation immediately after a PR has already passed it.
+
+
+## Packaging boundary — v0.29.0
+
+modules/packaging is versioned independently (initial release 1.0.0, API v1). Root build_website/build_website_dev build its JS/CSS beside the application; the development server watches its source and CSS separately. build_pages includes both hashes in the cache digest/version manifest; verify_deployment checks them after publication. Standalone build/test/preview commands are documented in modules/packaging/README.md. Root tests include the independent package tests and compile-time dependency-boundary checks. Three.js/fflate versions are shared with the current reviewed root dependency baseline; no engine renderer upgrade is included.

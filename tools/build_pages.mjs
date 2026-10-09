@@ -6,12 +6,14 @@ const output = 'build/pages';
 await mkdir (output, { recursive: true });
 await cp ('website', output, { recursive: true });
 await cp ('build/website', path.join (output, 'o3dv'), { recursive: true });
-const version = createHash ('sha256').update (await readFile ('build/website/o3dv.website.min.js')).update (await readFile ('build/website/o3dv.website.min.css')).update (await readFile ('build/website/o3dv.optimize.js')).update (await readFile ('build/website/o3dv.recovery.js')).digest ('hex').slice (0, 12);
+const moduleJS = await readFile ('build/website/packaging/packaging.module.js'); const moduleCSS = await readFile ('build/website/packaging/packaging.module.css');
+const version = createHash ('sha256').update (await readFile ('build/website/o3dv.website.min.js')).update (await readFile ('build/website/o3dv.website.min.css')).update (await readFile ('build/website/o3dv.optimize.js')).update (await readFile ('build/website/o3dv.recovery.js')).update (moduleJS).update (moduleCSS).digest ('hex').slice (0, 12);
 const buildCandidate = process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA || version;
 const build = /^[a-f0-9]{7,64}$/i.test (buildCandidate) ? buildCandidate : version;
 const appVersion = (await readFile ('source/website/preferences.js', 'utf8')).match (/AppVersion = '([^']+)'/)[1];
 const scriptHash = createHash ('sha256').update (await readFile ('build/website/o3dv.website.min.js')).digest ('hex');
-await writeFile (path.join (output, 'version.json'), JSON.stringify ({ version : appVersion, build, assetDigest : version, script : `/o3dv/o3dv.website.min.js?v=${version}`, scriptHash }, null, 2));
+const modules = { packaging : { version : JSON.parse (await readFile ('modules/packaging/package.json', 'utf8')).version, script : `/o3dv/packaging/packaging.module.js?v=${version}`, scriptHash : createHash ('sha256').update (moduleJS).digest ('hex'), stylesheet : `/o3dv/packaging/packaging.module.css?v=${version}`, stylesheetHash : createHash ('sha256').update (moduleCSS).digest ('hex') } };
+await writeFile (path.join (output, 'version.json'), JSON.stringify ({ version : appVersion, build, assetDigest : version, script : `/o3dv/o3dv.website.min.js?v=${version}`, scriptHash, modules }, null, 2));
 for (const file of ['index.html', 'embed.html', 'info/index.html', 'info/cookies.html', 'info/faq.html']) {
     const target = path.join (output, file);
     const prefix = file.startsWith ('info/') ? '../' : '';

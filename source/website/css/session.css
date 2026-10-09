@@ -997,18 +997,3 @@ div.main_viewer
 .ai_workspace_panel .ai_image_row button { white-space: normal; overflow-wrap: anywhere; }
 .ai_workspace_panel .ai_image_name { flex: 0 1 auto; width: 100%; max-width: 100%; }
 .ai_workspace_panel .section_hint { font-size: 11px; }
-
-.fefco_catalog { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; border-bottom: 1px solid var(--ov_border_color); margin-bottom: 12px; }
-.fefco_group { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
-.fefco_cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; }
-.fefco_card { display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 8px; text-align: left; min-width: 0; border: 1px solid var(--ov_border_color); border-radius: 8px; background: var(--ov_background_color); color: var(--ov_foreground_color); cursor: pointer; }
-.fefco_card[aria-pressed="true"] { border-color: #bc8d52; box-shadow: inset 0 0 0 1px #bc8d52; }
-.fefco_card img { width: 100%; height: 90px; object-fit: contain; background: #f0e8dd; border-radius: 4px; }
-.fefco_card span { font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; }
-.fefco_card small { font-size: 10px; color: #aa793d; }
-.fefco_dimensions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.fefco_field { display: flex; flex-direction: column; gap: 5px; min-width: 0; font-size: 11px; }
-.fefco_field input, .fefco_field select { box-sizing: border-box; width: 100%; min-width: 0; padding: 7px; border: 1px solid var(--ov_border_color); border-radius: 4px; color: var(--ov_foreground_color); background: var(--ov_background_color); }
-.fefco_generate { padding: 10px; cursor: pointer; border-radius: 6px; }
-.fefco_reference { font-size: 11px; }
-.fefco_field[hidden] { display: none; }

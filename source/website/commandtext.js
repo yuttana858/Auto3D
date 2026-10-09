@@ -7,7 +7,8 @@ const aliases = {
     'drop to floor' : 'object.drop_to_floor', 'drop model to floor' : 'object.drop_to_floor',
     library : 'ui.library', save : 'ui.save', commands : 'ui.commands', macros : 'ui.commands',
     ai : 'ui.ai', packaging : 'ui.ai.packaging', array : 'ui.array', 'array model' : 'ui.array',
-    'add model' : 'ui.add_model', 'update model' : 'ui.update_model', export : 'ui.export'
+    'add model' : 'ui.add_model', 'update model' : 'ui.update_model', export : 'ui.export',
+    'unfold box' : 'packaging.fefco.unfold', 'unfold model' : 'packaging.fefco.unfold'
 };
 
 export function ParseCommandText (input)

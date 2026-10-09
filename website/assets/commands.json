@@ -382,6 +382,24 @@
       "example": {}
     },
     {
+      "id": "packaging.fefco.unfold",
+      "title": "Unfold FEFCO box",
+      "category": "Packaging",
+      "description": "Replace a generated folded box with its saved flat dieline, preserving its current dominant liner and edge material. Uses saved design dimensions; object scaling must be reset first. Adds red cut and dashed blue score guides. Undo restores the box and previous profile. Does not unfold arbitrary imported meshes or publish.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
       "id": "packaging.fefco.catalog",
       "title": "Read FEFCO catalog",
       "category": "Packaging",
