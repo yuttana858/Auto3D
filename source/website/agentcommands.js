@@ -1,3 +1,5 @@
+import { ExecuteCommandText } from './commandtext.js';
+import { OpenCommandPanel } from './commandpanel.js';
 import { OpenErrorLog } from './errorlogpanel.js';
 import { CaptureApp } from './agentcapture.js';
 import { EditMacro } from './macrodesign.js';
@@ -66,6 +68,10 @@ export function CreateAgentCommands (website)
     add ('packaging.download', 'Download packaging vectors', 'Packaging', 'Download a local SVG or DXF file at physical millimeter scale. No remote publication.', { format : enumOf ('svg', 'dxf') }, ['format'], false, ({ format }) => editor.packaging.Download (format), { format : 'dxf' });
     add ('scene.inspect', 'Inspect scene', 'Scene', 'Return all objects, selected object ID and loading state.', {}, [], false, () => ({ name : editor.document.name, objects : editor.document.objects.map (describe), selectedObjectId : editor.selected?.id || null, selectedObjectIds : editor.SelectedObjects?.().map ((item) => item.id) || [], groups : [...new Set (editor.document.objects.map ((item) => item.userData?._auto3dGroup).filter (Boolean))] }));
     add ('object.select', 'Select object', 'Objects', 'Select an object by its stable ID.', { objectId : text, additive : boolean, single : boolean }, ['objectId'], false, ({ objectId, additive = false, single = false }) => { const item = object (objectId); editor.Select (item, false, additive, single); return describe (item); });
+    add ('object.tool', 'Activate model tool', 'Objects', 'Activate selection, move, rotate or scale controls. Transform tools require a selected editable object; activating a tool does not change its transform.', { mode : enumOf ('select', 'translate', 'rotate', 'scale') }, ['mode'], false, ({ mode }) => {
+        if (mode !== 'select') { if (editor.readOnly) { throw new Error ('This shared viewer is read-only.'); } object (); }
+        editor.SetMode (mode); return { mode };
+    }, { mode : 'translate' });
     add ('object.transform', 'Transform object', 'Objects', 'Set position in model units (or global display units when units=display), rotation in degrees, and scale. Omitted vectors stay unchanged. Undo supported.', { objectId : text, position : vector, rotation : vector, scale : vector, units : enumOf ('model', 'display') }, [], true, (args) => {
         const item = object (args.objectId); if (args.scale?.some ((value) => Math.abs (value) < 1e-6)) { throw new Error ('Scale components must be nonzero.'); }
         const before = { position : [...item.position], rotation : [...item.rotation], scale : [...item.scale] };
@@ -225,5 +231,12 @@ export function CreateAgentCommands (website)
     add ('library.account.folder.delete', 'Delete account Library folder', 'Library', 'Remove a private folder and move its files to the parent without deleting archives.', { path : folderPath }, ['path'], true, async ({ path }) => ({ destination : await editor.library.accountStorage.DeleteFolder (path) }), { path : 'Projects/Concepts' });
     add ('ui.library', 'Open library', 'Panels', 'Open the saved-model library.', {}, [], false, async () => { await editor.library.Open (); return { opened : true }; });
     add ('ui.save', 'Open save dialog', 'Panels', 'Ask the user where to save. This command opens a dialog; it does not publish.', {}, [], false, () => { editor.library.SaveDialog (true); return { opened : true }; });
+    add ('commands.text', 'Run typed commands', 'Commands', 'Run supported phrases such as array model 4x4x6, fit, undo, or run macro Name. Semicolons run a sequence through the strict registry. Each action retains authentication, read-only and busy checks; saved macros may partially complete before a runtime failure. Does not accept arbitrary code.', { text : { type : 'string', minLength : 1, maxLength : 2000 } }, ['text'], false, ({ text }) => ExecuteCommandText (registry, text), { text : 'array model 4x4x6' });
+    add ('ui.commands', 'Open commands and macros', 'Panels', 'Open the interactive command catalog and macro builder; does not execute commands.', {}, [], false, () => { OpenCommandPanel (website); return { opened : true }; });
+    add ('ui.ai', 'Open AI panel', 'Panels', 'Open AI generation controls. Does not send a generation request.', {}, [], false, () => website.aiWorkspace.Open ('ai'));
+    add ('ui.ai.packaging', 'Open Packaging tab', 'Panels', 'Open the Packaging tab within the AI panel. The designer opens separately through packaging.open.', {}, [], false, () => website.aiWorkspace.Open ('packaging'));
+    add ('ui.add_model', 'Open model picker', 'Panels', 'Open a local file picker to add models. Requires interactive file selection.', {}, [], true, () => { editor.AddModel (); return { opened : true }; });
+    add ('ui.update_model', 'Open replacement model picker', 'Panels', 'Open a local file picker to replace the selected model. Requires interactive file selection.', {}, [], true, () => { object (); editor.UpdateModel (); return { opened : true }; });
+    add ('ui.export', 'Open export dialog', 'Panels', 'Open the interactive export dialog. Does not export or publish until the user chooses a format.', {}, [], false, () => { if (editor.readOnly) { throw new Error ('This shared viewer is read-only.'); } editor.Export (); return { opened : true }; });
     return registry;
 }

@@ -1,3 +1,5 @@
+import { CommandBar } from './commandbar.js';
+import { ProcessingFeedback } from './processingfeedback.js';
 import { ArrayPlacement } from './arraylayout.js';
 import { SessionCameras } from './sessioncameras.js';
 import { CalculateVolume, CalculateSurfaceArea } from '../engine/model/quantities.js';
@@ -101,7 +103,6 @@ export class SessionEditor
         window.addEventListener ('blur', cancelDrag);
         this.CreateUI ();
         const headerLibrary = Element ('button', 'header_library_button', undefined, document.getElementById ('header_buttons'));
-        const packagingButton = Element ('button', 'header_library_button', 'Packaging', document.getElementById ('header_buttons')); packagingButton.setAttribute ('aria-label', 'Packaging design'); packagingButton.addEventListener ('click', () => this.Run (() => this.packaging.Open ()));
         headerLibrary.title = 'Saved models and sessions'; headerLibrary.setAttribute ('aria-label', 'Library');
         headerLibrary.innerHTML = '<svg viewBox="0 0 26 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6">' + Icons.library + '</svg><span>Library</span>';
         headerLibrary.addEventListener ('click', () => this.library.Open ());
@@ -203,10 +204,26 @@ export class SessionEditor
         resize ();
     }
 
+    ModelTools ()
+    {
+        return [['packaging', 'Packaging design', () => this.website.aiWorkspace?.Open ('packaging')], ['select', 'Select (V)', () => this.SetMode ('select')], ['move', 'Move (W)', () => this.SetMode ('translate')], ['rotate', 'Rotate (E)', () => this.SetMode ('rotate')], ['scale', 'Scale (R)', () => this.SetMode ('scale')], ['duplicate', 'Duplicate object (Ctrl+D)', () => this.Duplicate ()], ['array', 'Array selected object', () => this.ArrayDialog ()], ['floor', 'Drop selected object to floor', () => this.DropToFloor ()], ['visible', 'Hide or show object (H)', () => this.ToggleVisibility ()], ['remove', 'Delete object', () => this.Delete ()], ['focus', 'Focus object (F)', () => this.Focus ()], ['fit', 'Fit all objects to screen', () => this.FitScene ()], ['update', 'Update selected model', () => this.UpdateModel ()], ['undo', 'Undo object edit (Ctrl+Z)', () => this.Undo ()], ['redo', 'Redo object edit (Ctrl+Shift+Z)', () => this.Redo ()], ['add', 'Add model', () => this.AddModel ()], ['save', 'Save or open session (Ctrl+S)', () => this.library.SaveDialog (true)], ['export', 'Export', () => this.Export ()], ['library', 'Model library', () => this.library.Open ()], ['ai', 'AI Generative', () => this.website.aiWorkspace?.Open ()]];
+    }
+
+    ToolDisabled (key)
+    {
+        return this.busy || (this.readOnly && !['select', 'focus', 'fit'].includes (key)) || (['move', 'rotate', 'scale', 'duplicate', 'array', 'floor', 'visible', 'remove', 'focus', 'update'].includes (key) && !this.selected) || (key === 'export' && !this.document.objects.length) || (key === 'undo' && !this.history.undo.length) || (key === 'redo' && !this.history.redo.length);
+    }
+
+    ModelToolMenu ()
+    {
+        return this.ModelTools ().map (([key, name, onClick]) => ({ name, onClick, disabled : this.ToolDisabled (key) }));
+    }
+
     CreateUI ()
     {
         this.strip = Element ('div', 'scene_tools', undefined, this.website.parameters.rightContainerDiv); this.strip.setAttribute ('role', 'toolbar'); this.strip.setAttribute ('aria-label', 'Object tools');
-        const tools = [['packaging', 'Packaging design', () => this.packaging.Open ()], ['select', 'Select (V)', () => this.SetMode ('select')], ['move', 'Move (W)', () => this.SetMode ('translate')], ['rotate', 'Rotate (E)', () => this.SetMode ('rotate')], ['scale', 'Scale (R)', () => this.SetMode ('scale')], ['duplicate', 'Duplicate object (Ctrl+D)', () => this.Duplicate ()], ['array', 'Array selected object', () => this.ArrayDialog ()], ['floor', 'Drop selected object to floor', () => this.DropToFloor ()], ['visible', 'Hide or show object (H)', () => this.ToggleVisibility ()], ['remove', 'Delete object', () => this.Delete ()], ['focus', 'Focus object (F)', () => this.Focus ()], ['fit', 'Fit all objects to screen', () => this.FitScene ()], ['update', 'Update selected model', () => this.UpdateModel ()], ['undo', 'Undo object edit (Ctrl+Z)', () => this.Undo ()], ['redo', 'Redo object edit (Ctrl+Shift+Z)', () => this.Redo ()], ['add', 'Add model', () => this.AddModel ()], ['save', 'Save or open session (Ctrl+S)', () => this.library.SaveDialog (true)], ['export', 'Export', () => this.Export ()], ['library', 'Model library', () => this.library.Open ()], ['ai', 'AI Generative', () => this.website.aiWorkspace?.Open ()]];
+        this.processing = new ProcessingFeedback ();
+        const tools = this.ModelTools ();
         for (const [key, label, action] of tools) {
             const button = Element ('button', 'scene_tool', undefined, this.strip); button.title = label; button.setAttribute ('aria-label', label); button.innerHTML = '<svg viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">' + Icons[key] + '</svg>';
             button.addEventListener ('click', () => this.Run (action)); this.buttons.set (key, button);
@@ -231,12 +248,12 @@ export class SessionEditor
         }
         const space = Element ('select', null, undefined, this.transformPanel); space.setAttribute ('aria-label', 'Transform space'); space.add (new Option ('World', 'world')); space.add (new Option ('Local', 'local')); space.addEventListener ('change', () => this.controls.setSpace (space.value));
         this.transformHint = Element ('p', 'section_hint', 'Position uses source coordinates. Size follows the global unit preference.', this.transformPanel);
-        this.status = Element ('div', 'scene_status', 'Add a model to begin', this.website.parameters.viewerDiv); this.status.setAttribute ('role', 'status');
-        const section = Element ('details', 'workspace_section'); section.open = true; section.id = 'session_objects'; Element ('summary', null, 'Session objects', section);
+        this.commandBar = new CommandBar (this.website, this.website.parameters.viewerDiv); this.status = this.commandBar.status;
+        const section = Element ('details', 'workspace_section'); section.open = false; section.id = 'session_objects'; Element ('summary', null, 'Session objects', section);
         const content = Element ('div', 'section_content', undefined, section); const actions = Element ('div', 'mode_buttons', undefined, content);
         const add = Element ('button', null, 'Add model', actions); add.addEventListener ('click', () => this.AddModel ()); const library = Element ('button', null, 'Library', actions); library.addEventListener ('click', () => this.library.Open ());
         this.objectList = Element ('div', 'session_object_list', undefined, content);
-        const animationSection = Element ('details', 'workspace_section'); animationSection.open = true; animationSection.id = 'session_animation'; Element ('summary', null, 'Animation', animationSection);
+        const animationSection = Element ('details', 'workspace_section'); animationSection.open = false; animationSection.id = 'session_animation'; Element ('summary', null, 'Animation', animationSection);
         const animationContent = Element ('div', 'section_content', undefined, animationSection); this.animationPanel = Element ('div', 'animation_panel', undefined, animationContent);
         const uploadContent = document.getElementById ('upload_panel_content'); const materials = document.getElementById ('materials_section');
         uploadContent.insertBefore (section, materials); uploadContent.insertBefore (animationSection, materials);
@@ -251,7 +268,7 @@ export class SessionEditor
         this.closeContextMenu?. ();
         const menu = Element ('div', 'auto3d_context_menu', undefined, document.body);
         menu.setAttribute ('role', 'menu');
-        Object.assign (menu.style, { position : 'fixed', zIndex : '100000', minWidth : '170px', padding : '6px', borderRadius : '8px', background : 'var(--ov_background_color, #242424)', boxShadow : '0 8px 28px rgba(0,0,0,.35)' });
+        Object.assign (menu.style, { maxHeight : 'calc(100vh - 24px)', overflowY : 'auto', position : 'fixed', zIndex : '100000', minWidth : '170px', padding : '6px', borderRadius : '8px', background : 'var(--ov_background_color, #242424)', boxShadow : '0 8px 28px rgba(0,0,0,.35)' });
         const dismiss = (event) => { if (!menu.contains (event.target)) { close (); } };
         const drag = (event) => { if ((event.buttons & 2) && Math.hypot (event.clientX - coordinates.x, event.clientY - coordinates.y) > 5) { close (); } };
         const escape = (event) => { if (event.key === 'Escape') { close (); } };
@@ -264,9 +281,9 @@ export class SessionEditor
             menu.remove ();
         };
         this.closeContextMenu = close;
-        for (const { name, onClick } of actions) {
+        for (const { name, onClick, disabled = false } of actions) {
             const button = Element ('button', 'scene_context_action', name, menu);
-            button.setAttribute ('role', 'menuitem');
+            button.setAttribute ('role', 'menuitem'); button.disabled = disabled; button.setAttribute ('aria-disabled', String (disabled));
             Object.assign (button.style, { display : 'block', width : '100%', padding : '7px 10px', textAlign : 'left' });
             button.addEventListener ('click', () => { close (); this.Run (onClick); });
         }
@@ -279,7 +296,7 @@ export class SessionEditor
     }
 
     async Run (action) { if (this.busy) { return; } try { await action (); } catch (error) { this.website.errorLogs?.Record ('error', 'operation', error.message, error.stack || ''); this.Status (error.message); } }
-    Status (text) { this.status.textContent = text; }
+    Status (text) { this.status.textContent = text; this.processing?.Update (text); }
 
     PushHistory (undo, redo)
     {
@@ -617,8 +634,9 @@ export class SessionEditor
     }
     RefreshButtons ()
     {
+        this.processing?.Sync (this.busy); this.commandBar?.SetBusy (this.busy);
         for (const [key, button] of this.buttons) {
-            button.disabled = this.busy || (this.readOnly && !['select', 'focus', 'fit'].includes (key)) || (['move', 'rotate', 'scale', 'duplicate', 'array', 'floor', 'visible', 'remove', 'focus', 'update'].includes (key) && !this.selected) || (key === 'export' && !this.document.objects.length) || (key === 'undo' && !this.history.undo.length) || (key === 'redo' && !this.history.redo.length);
+            button.disabled = this.ToolDisabled (key);
             if (['select', 'move', 'rotate', 'scale'].includes (key)) { button.setAttribute ('aria-pressed', String ((key === 'move' ? 'translate' : key) === this.mode)); }
         }
         const groupButtons = this.objectList?.querySelectorAll ('.selection_group_tools button');

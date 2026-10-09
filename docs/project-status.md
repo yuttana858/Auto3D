@@ -65,6 +65,20 @@ A verified reflection-capture failure path can leave the renderer targeting a cu
 
 Regression coverage includes a failed cubemap pass while floor shadows are enabled, restored display output, successful retry, original model/material state, and actual UI toggles under Default and HDRI lighting. Validation: 456 unit tests, lint and website build pass; local Chromium passes UI combinations in Default and packaged HDRI lighting plus injected capture failure and tiled render checks. Captured offscreen errors are included in the Error logs error filter. Work remains on a review branch; no production deployment is authorized by this investigation.
 
+## Workspace controls update — review branch
+
+The workspace now starts with both side panels, all left sections and Details collapsed. Right-click model tools share the tool strip's underlying actions and disabled states, including array, floor placement, replacement, undo/redo, save/export and panel access.
+
+Busy model operations show a modal **Processing..** spinner and the current operation message. Arrays display completed copy counts and continue yielding between copies. The modal closes on completion or failure; this adds visual feedback, not a higher model-size/object limit or a cancellation promise.
+
+The AI panel has **AI** and **Packaging** tabs, reserves space for the tool strip and wraps text on narrow screens. Packaging moves off the top header into its tab, which opens the existing full designer and provides SVG/DXF downloads. AI generation still requires an explicitly configured provider/request.
+
+The bottom command bar supports `array model 4x4x6` (W=X, L=Z, H=Y), `move model`, `rotate model`, `scale model`, `select model`, `duplicate model`, `hide model`, `show model`, `delete model`, `drop model to floor`, `fit`, `focus`, `undo`, `redo`, `add model`, `update model`, `export`, `library`, `save`, `ai`, `packaging`, `commands` and `macros`. Semicolons sequence supported phrases; `run macro Name` runs a saved local macro. Up/Down recalls successful commands. This is a bounded phrase parser, not arbitrary code or an unrestricted natural-language agent. All actions pass through the existing strict registry, with authentication/read-only/busy checks and macro prevalidation. Nested macros are rejected. Dialog actions still require user interaction.
+
+New registry commands are documented in the generated catalog: commands.text, object.tool, ui.commands, ui.ai, ui.ai.packaging, ui.add_model, ui.update_model and ui.export.
+
+Validation: 464 unit tests, lint and website/Pages build; Chromium covers clean startup, context/strip parity, a real 96-object array with processing feedback and undo, saved macro execution, validation failures, and desktop/mobile AI/Packaging panels. Large real-world model performance still depends on geometry, textures and the user's GPU. These changes are prepared for review and are not deployed by this branch.
+
 ## Immediate release checklist
 
 - [x] Confirm PR #21 merge and production deployment identity directly in GitHub/Cloudflare.

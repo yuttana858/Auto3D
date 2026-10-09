@@ -279,7 +279,7 @@ export class Website
                 toggle.setAttribute ('aria-label', (collapsed ? 'Expand ' : 'Collapse ') + (side === 'left' ? 'model upload panel' : 'model data panel'));
                 toggle.querySelector ('.panel_chevron').textContent = (side === 'left') === collapsed ? '›' : '‹';
             };
-            apply (side === 'right' || window.innerWidth < 800);
+            apply (true);
             toggle.addEventListener ('click', () => {
                 const collapsed = !container.classList.contains ('collapsed');
                 if (!collapsed && window.innerWidth < 800) {
@@ -293,6 +293,7 @@ export class Website
                 this.layouter.Resize ();
             });
         }
+        this.sidebar.detailsPanel.SetCollapsed (true);
         this.sidebar.detailsPanel.contentDiv.textContent = 'Load a model to view geometry, dimensions, materials and properties.';
     }
 
@@ -397,18 +398,8 @@ export class Website
             const owner = this.sessionEditor.document.Owner (meshUserData.originalMeshInstance);
             if (owner && !this.sessionEditor.SelectedObjects ().includes (owner)) { this.sessionEditor.Select (owner); }
         }
-        const selected = this.sessionEditor.selected;
-        if (selected && !this.sessionEditor.readOnly) {
-            const actions = [
-                ['Move', () => this.sessionEditor.SetMode ('translate')],
-                ['Rotate', () => this.sessionEditor.SetMode ('rotate')],
-                ['Scale', () => this.sessionEditor.SetMode ('scale')],
-                ['Focus', () => this.sessionEditor.Focus ()],
-                ['Duplicate', () => this.sessionEditor.Duplicate ()],
-                [selected.visible ? 'Hide' : 'Show', () => this.sessionEditor.ToggleVisibility ()],
-                ['Delete', () => this.sessionEditor.Delete ()]
-            ].map (([name, onClick]) => ({ name, onClick }));
-            this.sessionEditor.OpenContextMenu (globalMouseCoordinates, actions);
+        if (!this.sessionEditor.readOnly) {
+            this.sessionEditor.OpenContextMenu (globalMouseCoordinates, this.sessionEditor.ModelToolMenu ());
             return;
         }
         const items = [];

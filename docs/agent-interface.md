@@ -69,3 +69,10 @@ Packaging commands share `PackagingWorkspace` with the dieline UI: `packaging.op
 `capture.image` returns PNG image content for the viewport or visible workspace. Forward `result.content` as image blocks to the chat tool result. The Commands panel provides preview/download. See [agent-screen-capture.md](agent-screen-capture.md) for the authorized Playwright adapter, privacy filters, limits and connection requirements.
 
 `lighting.shadow.inspect` reports effective model visibility (including hidden parents), cast/receive counts, floor opacity/depth writes, WebGL context loss and failed shader diagnostics. It is read-only and accepts no arguments. Use it before/after a shadow toggle when investigating device-specific rendering failures.
+
+
+## Bottom command bar
+
+Use the bottom input for supported phrases, such as `array model 4x4x6`, `fit`, `undo`, `move model`, or `run macro Layout`. Arrays use W × L × H (X × Z × Y); the original counts and 1,000-object session limit still apply. Type `commands` or click Commands & macros to browse the full strict catalog and build/save macros. Semicolons sequence phrases, with validation before execution. A runtime failure stops subsequent steps and retains completed changes. Nested macros are not supported.
+
+`commands.text` accepts only `{text}` and returns structured completed steps through the shared registry. Each dispatched action still enforces authentication, read-only and busy state. Activation uses `object.tool`. `ui.ai.packaging` opens the Packaging tab; `packaging.open` opens the interactive designer. File picker/save/export commands open dialogs and do not claim that a file operation or publication completed.

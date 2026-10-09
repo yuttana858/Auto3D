@@ -480,7 +480,11 @@ div.main_viewer
 
 .ai_workspace_panel
 {
-    height: 100%;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    margin-left: 40px;
+    width: calc(100% - 40px);
     overflow: auto;
     box-sizing: border-box;
     padding: 10px;
@@ -508,6 +512,8 @@ div.main_viewer
     align-items: center;
     gap: 8px;
     min-width: 0;
+    flex-wrap: wrap;
+    overflow-wrap: anywhere;
 }
 
 .ai_workspace_header button,
@@ -535,12 +541,11 @@ div.main_viewer
 
 .ai_connection_badge
 {
-    max-width: 150px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
     color: var(--ov_light_icon_color);
-    font-size: 7.33px;
+    font-size: 11px;
 }
 
 .ai_connection_badge.connected
@@ -956,3 +961,39 @@ div.main_viewer
 .render_queue_job progress { width: 100%; }
 .details_collapse { float: right; border: 0; background: transparent; color: var(--ov_foreground_color); font-size: 18px; cursor: pointer; }
 .ov_sidebar_content[hidden] { display: none; }
+
+.scene_command_bar { position: absolute; bottom: 12px; left: 110px; right: 12px; z-index: 3; padding: 8px 10px; border: 1px solid var(--ov_border_color); border-radius: 7px; background: var(--ov_background_color); color: var(--ov_foreground_color); box-sizing: border-box; }
+.scene_command_bar .scene_status { position: static; padding: 0; margin-bottom: 5px; pointer-events: auto; background: transparent; font-size: 12px; }
+.scene_command_form { display: flex; gap: 6px; flex-wrap: wrap; }
+.scene_command_form input { flex: 1 1 180px; min-width: 0; }
+.scene_command_form input, .scene_command_form button { background: var(--ov_background_color); color: var(--ov_foreground_color); border: 1px solid var(--ov_border_color); border-radius: 4px; padding: 7px; font: inherit; font-size: 12px; }
+.scene_command_form button { cursor: pointer; }
+.scene_command_form button:disabled { opacity: .45; cursor: default; }
+.processing_dialog { width: min(330px, calc(100vw - 48px)); border: 1px solid var(--ov_border_color); border-radius: 12px; padding: 26px; box-sizing: border-box; background: var(--ov_background_color); color: var(--ov_foreground_color); text-align: center; }
+.processing_dialog::backdrop { background: #0005; }
+.processing_dialog p { margin-bottom: 0; overflow-wrap: anywhere; font-size: 13px; }
+.processing_spinner { width: 30px; height: 30px; margin: 0 auto 16px; border: 3px solid var(--ov_border_color); border-top-color: var(--ov_button_color); border-radius: 50%; animation: processing-spin .8s linear infinite; }
+@keyframes processing-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .processing_spinner { animation: none; border-top-color: var(--ov_button_color); } }
+.auto3d_context_menu button:disabled { opacity: .4; cursor: default; }
+.ai_workspace_panel[hidden], .ai_workspace_pane[hidden] { display: none; }
+.ai_workspace_tabs { display: flex; gap: 6px; margin: 10px 0; }
+.ai_workspace_tabs button, .ai_packaging_action { padding: 8px; font: inherit; font-size: 12px; color: var(--ov_foreground_color); background: var(--ov_background_color); border: 1px solid var(--ov_border_color); border-radius: 5px; cursor: pointer; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.ai_workspace_tabs button { flex: 1; }
+.ai_workspace_tabs button[aria-selected="true"] { border-color: var(--ov_button_color); background: var(--ov_hover_color); }
+.ai_packaging_pane { display: flex; flex-direction: column; gap: 10px; }
+.ai_workspace_panel .section_hint, .ai_workspace_header strong, .ai_workspace_section, .ai_packaging_summary { overflow-wrap: anywhere; white-space: normal; min-width: 0; }
+.ai_workspace_panel .ai_image_row { flex-wrap: wrap; }
+.ai_workspace_panel .ai_image_name { white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
+.ai_workspace_panel .ai_generation_action { white-space: normal; overflow-wrap: anywhere; font-size: 12px; }
+@media (max-width: 600px) { .scene_command_bar { left: 12px; bottom: 8px; } .scene_command_form input { flex-basis: 100%; } }
+
+.mini_shared_view .scene_command_bar { display: none; }
+.ai_workspace_panel .ai_generation_options { grid-template-columns: minmax(0, 1fr); }
+.ai_workspace_panel .ai_generation_options label { font-size: 11px; }
+.ai_workspace_panel .ai_image_row button, .ai_workspace_panel .ai_image_name, .ai_workspace_panel .ai_recent_header button { font-size: 11px; }
+.ai_workspace_panel .ai_recent_empty { font-size: 11px; overflow-wrap: anywhere; }
+.ai_workspace_panel .ai_image_row { flex-direction: column; align-items: stretch; }
+.ai_workspace_panel .ai_image_row button { white-space: normal; overflow-wrap: anywhere; }
+.ai_workspace_panel .ai_image_name { flex: 0 1 auto; width: 100%; max-width: 100%; }
+.ai_workspace_panel .section_hint { font-size: 11px; }
