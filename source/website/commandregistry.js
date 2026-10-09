@@ -57,18 +57,21 @@ export class CommandRegistry
     }
     async Invoke (id, args = {})
     {
+        const auth = this.context?.website?.auth;
+        if (auth && (!auth.user || this.context.website.accountReady === false) && !['auth.inspect', 'auth.open', 'auth.request_account', 'auth.sign_out', 'auth.recover'].includes (id)) { throw new Error ('Sign in to use Auto3D.'); }
         const command = this.commands.get (id);
         if (!command) { throw new Error ('Unknown command: ' + id); }
         Validate (args, command.inputSchema);
         if (command.mutates && this.context.readOnly) { throw new Error ('This shared viewer is read-only.'); }
-        if (this.context.busy) { throw new Error ('The viewer is busy. Retry after loading completes.'); }
+        if (this.context.busy && id !== 'polygon.cancel') { throw new Error ('The viewer is busy. Retry after loading completes.'); }
         return await command.handler (args) ?? null;
     }
     Execute (id, args = {})
     {
+        if (id === 'polygon.cancel') { return this.Invoke (id, args).then ((result) => ({ ok : true, command : id, result })).catch ((error) => ({ ok : false, command : id, error : { code : 'COMMAND_FAILED', message : error.message } })); }
         return this.Queue (async () => {
             try { return { ok : true, command : id, result : await this.Invoke (id, args) }; }
-            catch (error) { return { ok : false, command : id, error : { code : 'COMMAND_FAILED', message : error.message } }; }
+            catch (error) { this.context?.website?.errorLogs?.Record ('error', 'command', id + ': ' + error.message); return { ok : false, command : id, error : { code : 'COMMAND_FAILED', message : error.message } }; }
         });
     }
     Cancel () { if (this.running) { this.running.cancelled = true; } return { requested : !!this.running }; }
@@ -91,10 +94,10 @@ export class CommandRegistry
                     try {
                         const result = await this.Invoke (step.command, Resolve (step.arguments || {}, results));
                         results[step.id] = result; completed.push ({ id : step.id, command : step.command, result });
-                    } catch (error) { return { ok : false, failedStep : step.id, error : { code : 'STEP_FAILED', message : error.message }, completed }; }
+                    } catch (error) { this.context?.website?.errorLogs?.Record ('error', 'macro', step.command + ': ' + error.message); return { ok : false, failedStep : step.id, error : { code : 'STEP_FAILED', message : error.message }, completed }; }
                 }
                 return { ok : true, completed };
-            } catch (error) { return { ok : false, error : { code : 'INVALID_MACRO', message : error.message }, completed }; }
+            } catch (error) { this.context?.website?.errorLogs?.Record ('error', 'macro', error.message); return { ok : false, error : { code : 'INVALID_MACRO', message : error.message }, completed }; }
             finally { this.running = null; }
         });
     }

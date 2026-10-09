@@ -9,7 +9,3 @@
 
 /o3dv/*
   Cache-Control: public, max-age=31536000, immutable
-
-/ops-ae8d3fdfeab9b8a0.html
-  X-Robots-Tag: noindex, nofollow, noarchive
-  Cache-Control: no-store

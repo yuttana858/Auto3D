@@ -46,3 +46,15 @@ describe ('Agent commands and macros', () => {
         assert.equal ((await queued).result.value, 3);
     });
 });
+
+describe ('Polygon worker cancellation commands', () => {
+    it ('can interrupt a pending preview without bypassing auth or input validation', async () => {
+        const context = { busy : false }; const registry = new CommandRegistry (context); let release;
+        registry.Register ({ id : 'preview', inputSchema : { type : 'object', properties : {}, required : [] } }, async () => { context.busy = true; await new Promise ((resolve) => { release = resolve; }); context.busy = false; return {}; });
+        registry.Register ({ id : 'polygon.cancel', inputSchema : { type : 'object', properties : {}, required : [], additionalProperties : false } }, () => { release (); return { cancelled : true }; });
+        const pending = registry.Execute ('preview'); await new Promise ((resolve) => setTimeout (resolve, 0));
+        assert.equal ((await registry.Execute ('polygon.cancel', { extra : true })).ok, false); assert.equal (context.busy, true);
+        assert.equal ((await registry.Execute ('polygon.cancel')).result.cancelled, true); assert.equal ((await pending).ok, true);
+        context.website = { auth : { user : null } }; assert.equal ((await registry.Execute ('polygon.cancel')).ok, false);
+    });
+});

@@ -1,6 +1,5 @@
-const DefaultSupabaseUrl = 'https://iesepcoxqochycckbwoh.supabase.co';
-const DefaultPublishableKey = 'sb_publishable_CmRJpuYE32OBF9rIV1jwqQ_diMF7OXh';
-const LegacyBucket = 'auto3d-library';
+import { SupabaseConfig, SupabaseHeaders } from '../../_lib/supabase.js';
+import { LibraryFile } from '../../_lib/libraryfiles.js';
 const LinkTable = 'auto3d_share_links';
 const LibraryTable = 'auto3d_library';
 const Uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -18,19 +17,11 @@ function json (data, status = 200)
     });
 }
 
-function config (env)
-{
-    return {
-        url : String (env.SUPABASE_URL || DefaultSupabaseUrl).replace (/\/$/, ''),
-        key : String (env.SUPABASE_PUBLISHABLE_KEY || DefaultPublishableKey)
-    };
-}
-
 async function request (env, path, options = {})
 {
-    const { url, key } = config (env);
-    const headers = { apikey : key, ...options.headers };
-    const response = await fetch (url + path, { ...options, headers });
+    const { url, key } = SupabaseConfig (env);
+    const headers = { ...options.headers, ...SupabaseHeaders (key) };
+    const response = await fetch (url + path, { ...options, headers, signal : AbortSignal.timeout (10000) });
     if (!response.ok) {
         console.error ('Auto3D share upstream error', response.status, path);
         throw Object.assign (new Error ('Share service is unavailable.'), { status : 502 });
@@ -93,6 +84,7 @@ async function shareInfo (env, token)
     const rows = await response.json ();
     if (!rows.length) { return null; }
     const share = rows[0];
+    if (share.expires_at && !(Date.parse (share.expires_at) > Date.now ())) { return null; }
     const item = await libraryItem (env, share.item_id);
     if (!item) { return null; }
     return {
@@ -120,28 +112,6 @@ async function verifyShare (env, token, code)
     return rows[0] || null;
 }
 
-async function archiveResponse (env, row)
-{
-    if (row.storage_provider === 'r2') {
-        if (!env.AUTO3D_LIBRARY_R2) {
-            throw Object.assign (new Error ('R2 Library storage is not configured.'), { status : 503 });
-        }
-        const key = row.archive_object_key || row.archive_path;
-        const object = key ? await env.AUTO3D_LIBRARY_R2.get (key) : null;
-        if (!object) { return null; }
-        return new Response (object.body, {
-            status : 200,
-            headers : { 'Content-Type' : 'application/octet-stream' }
-        });
-    }
-
-    const { url, key } = config (env);
-    const path = String (row.archive_path || '').split ('/').map (encodeURIComponent).join ('/');
-    if (!path) { return null; }
-    const response = await fetch (url + '/storage/v1/object/authenticated/' + LegacyBucket + '/' + path, { headers : { apikey : key } });
-    return response.ok ? response : null;
-}
-
 async function shareArchive (context, token, asDownload)
 {
     let body = {};
@@ -152,39 +122,38 @@ async function shareArchive (context, token, asDownload)
     if (!grant) { return json ({ error : 'Incorrect access code or unavailable share link.' }, 401); }
     if (asDownload && !grant.allow_download) { return json ({ error : 'Downloads are disabled for this share link.' }, 403); }
 
-    const response = await request (context.env, '/rest/v1/' + LibraryTable + '?select=name,storage_provider,archive_object_key,archive_path&id=eq.' + encodeURIComponent (grant.item_id) + '&status=eq.published&limit=1');
+    const response = await request (context.env, '/rest/v1/' + LibraryTable + '?select=name,archive_path,storage_provider,archive_object_key&id=eq.' + encodeURIComponent (grant.item_id) + '&status=eq.published&limit=1');
     const rows = await response.json ();
     if (!rows.length) { return json ({ error : 'Library item not found.' }, 404); }
-    const file = await archiveResponse (context.env, rows[0]);
-    if (!file) { return json ({ error : 'Shared model data is unavailable.' }, 404); }
-
-    const headers = new Headers (file.headers);
-    headers.set ('Content-Type', 'application/octet-stream');
-    headers.set ('Cache-Control', 'private, no-store');
-    headers.set ('X-Content-Type-Options', 'nosniff');
+    const fileBody = await LibraryFile (context.env, rows[0], 'archive');
+    const headers = new Headers ({
+        'Content-Type' : 'application/octet-stream',
+        'Cache-Control' : 'private, no-store',
+        'X-Content-Type-Options' : 'nosniff'
+    });
     if (asDownload) {
         const safe = String (rows[0].name || 'Auto3D-share').replace (/[^a-z0-9._-]+/gi, '_');
         headers.set ('Content-Disposition', 'attachment; filename="' + safe + '.auto3d"');
     }
-    return new Response (file.body, { status : 200, headers });
+    return new Response (fileBody, { status : 200, headers });
 }
 
 export async function onRequest (context)
 {
     try {
         const path = context.params.path || [];
-        if (context.request.method === 'POST' && path.length === 0) { return createShare (context); }
+        if (context.request.method === 'POST' && path.length === 0) { return await createShare (context); }
         const token = String (path[0] || '');
         if (!Uuid.test (token)) { return json ({ error : 'Invalid share link.' }, 400); }
         if (context.request.method === 'GET' && path.length === 1) {
             const info = await shareInfo (context.env, token);
             return info ? json (info) : json ({ error : 'Share link not found.' }, 404);
         }
-        if (context.request.method === 'POST' && path.length === 2 && path[1] === 'archive') { return shareArchive (context, token, false); }
-        if (context.request.method === 'POST' && path.length === 2 && path[1] === 'download') { return shareArchive (context, token, true); }
+        if (context.request.method === 'POST' && path.length === 2 && path[1] === 'archive') { return await shareArchive (context, token, false); }
+        if (context.request.method === 'POST' && path.length === 2 && path[1] === 'download') { return await shareArchive (context, token, true); }
         return json ({ error : 'Not found.' }, 404);
     } catch (error) {
-        console.error (error);
+        console.error ('Auto3D share request failed');
         return json ({ error : error.status ? error.message : 'Share service unavailable.' }, error.status || 500);
     }
 }

@@ -315,13 +315,16 @@ export default function suite ()
             effects.cubeTarget = { texture : new THREE.Texture (), dispose : () => {} };
             effects.cubeCamera = new THREE.Object3D (); effects.cubeCamera.update = () => {};
             effects.UpdateDynamicReflection ();
-            assert.equal (material.envMapIntensity, 0.2);
+            assert.equal (material.envMapIntensity, 1);
+            assert.equal (effects.reflectionState.get (material).strength.value, 0.2);
+            const shader = { uniforms : {}, fragmentShader : '#include <lights_fragment_maps>' }; material.onBeforeCompile (shader);
+            assert.equal (shader.uniforms.auto3dModelReflectionStrength.value, 0.2); assert.match (shader.fragmentShader, /radiance \+= textureLod/);
             assert.equal (material.roughnessMap, roughnessMap);
             assert.equal (material.metalnessMap, metalnessMap);
             assert.equal (material.normalMap, normalMap);
             SetMaterialReflectionStrength (material, 0.8);
             effects.SyncMaterialProperties ();
-            assert.equal (material.envMapIntensity, 0.4);
+            assert.equal (material.envMapIntensity, 1); assert.equal (effects.reflectionState.get (material).strength.value, 0.4);
             effects.RestoreMaterialReflections ();
             effects.Dispose ();
         });

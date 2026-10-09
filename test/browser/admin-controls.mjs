@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright-core';
+const browser = await chromium.launch ({ executablePath : '/usr/bin/chromium', args : ['--no-sandbox', '--enable-unsafe-swiftshader'] });
+try {
+    const page = await browser.newPage ({ viewport : { width : 1440, height : 1000 } }); page.setDefaultTimeout (30000); const errors = []; const changes = []; let disabled = false; let revoked = false;
+    const target = { id : '00000000-0000-4000-8000-000000000002', email : 'user@example.com', name : 'User', isAdmin : false };
+    page.on ('pageerror', (error) => errors.push (error.message)); page.on ('dialog', (dialog) => dialog.accept ());
+    await page.route ('**/api/auth/**', (route) => revoked ? route.fulfill ({ status : 401, json : { error : 'Session revoked.' } }) : route.fulfill ({ json : { user : { id : 'admin-user', email : 'admin@example.com', name : 'Admin' } } }));
+    await page.route ('**/api/preferences', (route) => route.fulfill ({ json : { preferences : { units : 'metric', theme : 2 }, folders : [] } }));
+    await page.route ('**/api/accounts/**', (route) => { const url = new URL (route.request ().url ()); if (url.pathname.endsWith ('users')) { return route.fulfill ({ json : { users : [{ ...target, disabled }], hasMore : false } }); } if (url.pathname.endsWith ('manage')) { const body = route.request ().postDataJSON (); changes.push (body); disabled = body.action === 'revoke' ? true : body.action === 'restore' ? false : disabled; return route.fulfill ({ json : { message : 'Account updated.' } }); } return route.fulfill ({ json : { isAdmin : true, requests : [] } }); });
+    await page.goto ('http://127.0.0.1:8080/website/index.html'); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
+    const open = await page.evaluate (() => Auto3D.execute ('admin.open')); assert.equal (open.ok, true); const dialog = page.getByRole ('dialog', { name : 'Account administration', exact : true });
+    await dialog.getByRole ('button', { name : 'Revoke access', exact : true }).click (); await dialog.getByRole ('button', { name : 'Restore access', exact : true }).waitFor (); assert.equal (changes[0].action, 'revoke');
+    await dialog.getByRole ('button', { name : 'Restore access', exact : true }).click (); await dialog.getByRole ('button', { name : 'Revoke access', exact : true }).waitFor (); assert.equal (changes[1].action, 'restore');
+    await dialog.getByText ('Reset password', { exact : true }).click (); const password = dialog.getByLabel ('New password for user@example.com'); await password.fill ('initial-new-password'); await dialog.getByRole ('button', { name : 'Set new password', exact : true }).click (); await page.waitForFunction (() => document.querySelector ('.account_request_row input')?.value === ''); assert.equal (changes[2].action, 'reset_password'); assert.equal (changes[2].password, 'initial-new-password');
+    const rejected = await page.evaluate (() => Auto3D.execute ('admin.reset_password', { id : '00000000-0000-4000-8000-000000000002', password : 'not-allowed' })); assert.equal (rejected.ok, false); revoked = true; await page.evaluate (() => Auto3D.execute ('auth.verify')); await page.waitForFunction (() => document.body.classList.contains ('auth_locked')); assert.deepEqual (errors, []); console.log ('Admin revoke/restore/reset forms, password clearing and strict agent inputs passed.');
+} finally { await browser.close (); }

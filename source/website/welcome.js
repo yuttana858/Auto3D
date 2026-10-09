@@ -99,7 +99,7 @@ function ShowWelcome ()
 function StartTour ()
 {
     const steps = [
-        ['#upload_panel_content', 'Bring your models in', 'Upload or drop a model here. Include its textures, or use a bundled ZAE file. Try the sample model to get started.'],
+        ['#upload_panel_content', 'Bring your models in', 'Upload or drop a model here. Include its textures, or use a bundled ZAE file.'],
         ['#session_objects', 'Build your scene', 'Add multiple models, select an object, and manage its visibility or replace it while keeping its placement.'],
         ['#materials_section', 'Give every surface a look', 'Select a model to see its materials. The advanced editor lets you replace textures, inspect UVs, and adjust surface properties.'],
         ['#lighting_section', 'Set the atmosphere', 'Choose backgrounds, studio lighting or HDRI environments. Toggle the horizon and ground grid to frame your scene.'],
@@ -139,7 +139,7 @@ function StartTour ()
     document.body.appendChild (dialog); dialog.showModal (); show ();
 }
 
-export function StartWelcomeSequence (authService)
+export function StartWelcomeSequence (authPanel)
 {
     const splash = document.getElementById ('startup_splash');
     if (!splash) { return; }
@@ -147,39 +147,13 @@ export function StartWelcomeSequence (authService)
     const dispose = CreateScene (splash.querySelector ('canvas'), true);
     const main = document.getElementById ('main'); const header = document.getElementById ('header');
     main.inert = true; header.inert = true;
-
-    const identity = splash.querySelector ('.splash_identity');
-    const login = document.createElement ('form'); login.className = 'splash_login'; login.setAttribute ('aria-label', 'Auto3D sign in');
-    const message = document.createElement ('p'); message.className = 'splash_login_message'; message.textContent = 'Sign in to access your Library, saved sessions and shared models.';
-    const email = document.createElement ('input'); email.type = 'email'; email.autocomplete = 'username'; email.placeholder = 'Email'; email.required = true; email.setAttribute ('aria-label', 'Email');
-    const password = document.createElement ('input'); password.type = 'password'; password.autocomplete = 'current-password'; password.placeholder = 'Password'; password.required = true; password.setAttribute ('aria-label', 'Password');
-    const fields = document.createElement ('div'); fields.className = 'splash_login_fields'; fields.append (email, password);
-    const actions = document.createElement ('div'); actions.className = 'splash_login_actions';
-    const signIn = document.createElement ('button'); signIn.className = 'splash_signin'; signIn.type = 'submit'; signIn.textContent = 'Sign in';
-    const request = document.createElement ('button'); request.className = 'splash_request'; request.type = 'button'; request.textContent = 'Request access';
-    const guest = document.createElement ('button'); guest.className = 'splash_guest'; guest.type = 'button'; guest.textContent = 'Continue as guest';
-    const status = document.createElement ('span'); status.className = 'splash_login_status'; status.setAttribute ('role', 'status');
-    actions.append (signIn, request, guest); login.append (message, fields, actions, status); identity.appendChild (login);
-
-    const requestPanel = document.createElement ('div'); requestPanel.className = 'splash_request_panel';
-    const requestName = document.createElement ('input'); requestName.placeholder = 'Name'; requestName.autocomplete = 'name';
-    const requestEmail = document.createElement ('input'); requestEmail.type = 'email'; requestEmail.placeholder = 'Work email'; requestEmail.autocomplete = 'email';
-    const requestOrg = document.createElement ('input'); requestOrg.placeholder = 'Organization / team';
-    const requestMessage = document.createElement ('textarea'); requestMessage.placeholder = 'Optional note'; requestMessage.rows = 2;
-    const submitRequest = document.createElement ('button'); submitRequest.type = 'button'; submitRequest.className = 'splash_signin'; submitRequest.textContent = 'Submit request';
-    const cancelRequest = document.createElement ('button'); cancelRequest.type = 'button'; cancelRequest.className = 'splash_guest'; cancelRequest.textContent = 'Back';
-    const requestActions = document.createElement ('div'); requestActions.className = 'splash_login_actions'; requestActions.append (submitRequest, cancelRequest);
-    requestPanel.append (requestName, requestEmail, requestOrg, requestMessage, requestActions);
-    login.appendChild (requestPanel);
-
     let finished = false;
-    let signedInUser = null;
-    let changingPassword = false;
+    let loginPanel = null;
     const finish = async (tour = false, greetUser = true) => {
         if (finished) { return; } finished = true;
         splash.style.pointerEvents = 'none';
         await FadeOut (splash, 500);
-        dispose (); splash.remove (); main.inert = false; header.inert = false;
+        loginPanel?.dispose (); dispose (); splash.remove (); main.inert = false; header.inert = false;
         if (tour) { StartTour (); return; }
         if (!greetUser) { return; }
         const greet = () => {
@@ -188,95 +162,15 @@ export function StartWelcomeSequence (authService)
         };
         greet ();
     };
-
-    login.addEventListener ('submit', async (event) => {
-        event.preventDefault ();
-        if (signedInUser && !changingPassword) { finish (false, false); return; }
-        if (signedInUser && changingPassword) {
-            const newPassword = password.value;
-            status.textContent = 'Updating password…'; signIn.disabled = true;
-            try {
-                await authService.ChangePassword (newPassword);
-                changingPassword = false;
-                message.textContent = 'Password updated. You are signed in as ' + (signedInUser.displayName || signedInUser.email) + '.';
-                status.textContent = ''; fields.hidden = true; request.hidden = true; guest.hidden = true;
-                signIn.textContent = 'Continue'; signIn.disabled = false;
-            } catch (error) {
-                status.textContent = error.message; signIn.disabled = false;
-            }
-            return;
-        }
-        status.textContent = 'Signing in…'; signIn.disabled = true;
-        try {
-            signedInUser = await authService.SignIn (email.value.trim (), password.value);
-            if (signedInUser.requiresPasswordChange) {
-                changingPassword = true;
-                message.textContent = 'Set a new password before entering Auto3D.';
-                email.hidden = true;
-                password.value = '';
-                password.placeholder = 'New password (12+ characters)';
-                password.autocomplete = 'new-password';
-                request.hidden = true; guest.hidden = true;
-                signIn.textContent = 'Update password'; signIn.disabled = false; status.textContent = '';
-                password.focus ();
-                return;
-            }
-            message.textContent = 'Signed in as ' + (signedInUser.displayName || signedInUser.email) + '.';
-            status.textContent = ''; fields.hidden = true; request.hidden = true; guest.hidden = true;
-            signIn.textContent = 'Continue'; signIn.disabled = false;
-        } catch (error) {
-            status.textContent = error.message; signIn.disabled = false;
-        }
-    });
-
-    request.addEventListener ('click', () => {
-        requestPanel.classList.add ('visible'); fields.hidden = true; actions.hidden = true; status.textContent = '';
-        requestEmail.value = email.value.trim ();
-    });
-    cancelRequest.addEventListener ('click', () => {
-        requestPanel.classList.remove ('visible'); fields.hidden = false; actions.hidden = false; status.textContent = '';
-    });
-    submitRequest.addEventListener ('click', async () => {
-        submitRequest.disabled = true; status.textContent = 'Submitting request…';
-        try {
-            await authService.RequestAccess ({
-                displayName : requestName.value.trim (),
-                email : requestEmail.value.trim (),
-                organizationName : requestOrg.value.trim (),
-                message : requestMessage.value.trim ()
-            });
-            requestPanel.classList.remove ('visible'); message.textContent = 'Request submitted. An administrator will review your access request.';
-            status.textContent = ''; fields.hidden = true; actions.hidden = false; signIn.hidden = true; request.hidden = true;
-        } catch (error) {
-            status.textContent = error.message;
-        } finally {
-            submitRequest.disabled = false;
-        }
-    });
-    guest.addEventListener ('click', () => finish (false, false));
-
     const tour = document.createElement ('button'); tour.className = 'splash_tour'; tour.textContent = 'Take a tour →';
     tour.addEventListener ('click', () => finish (true)); splash.appendChild (tour);
-
-    window.setTimeout (() => login.classList.add ('visible'), 450);
-
-    Promise.resolve (authService?.Initialize?.()).then ((user) => {
-        if (!user || finished) { return; }
-        signedInUser = user;
-        if (user.requiresPasswordChange) {
-            changingPassword = true;
-            message.textContent = 'Set a new password before entering Auto3D.';
-            email.hidden = true;
-            password.value = '';
-            password.placeholder = 'New password (12+ characters)';
-            password.autocomplete = 'new-password';
-            request.hidden = true; guest.hidden = true;
-            signIn.textContent = 'Update password';
-            password.focus ();
-            return;
-        }
-        message.textContent = 'Signed in as ' + (user.displayName || user.email || 'your account') + '.';
-        fields.hidden = true; request.hidden = true; guest.hidden = true;
-        signIn.textContent = 'Continue';
-    }).catch (() => { status.textContent = ''; });
+    splash.addEventListener ('click', (event) => { if (event.target === splash || event.target.tagName === 'CANVAS') { finish (false, false); } });
+    window.setTimeout (() => {
+        if (finished) { return; }
+        loginPanel = authPanel.Create (() => finish (false, false));
+        splash.querySelector ('.splash_identity').appendChild (loginPanel);
+        splash.setAttribute ('role', 'region'); splash.setAttribute ('aria-label', 'Welcome to Auto3D');
+        loginPanel.querySelector ('input')?.focus ();
+    }, 3000);
+    authPanel.auth.Restore ().catch (() => { /* Login remains available for retry. */ });
 }

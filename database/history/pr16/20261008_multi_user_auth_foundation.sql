@@ -87,3 +87,4 @@ create index if not exists auto3d_users_status_email_idx
     on public.auto3d_users (status, email);
 create index if not exists auto3d_audit_events_created_idx
     on public.auto3d_audit_events (created_at desc);
+

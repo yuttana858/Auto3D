@@ -1,282 +1,99 @@
-const DefaultSupabaseUrl = 'https://iesepcoxqochycckbwoh.supabase.co';
-const DefaultPublishableKey = 'sb_publishable_CmRJpuYE32OBF9rIV1jwqQ_diMF7OXh';
-const AccessCookie = 'auto3d_access';
-const RefreshCookie = 'auto3d_refresh';
+import { Recover, ResetPassword } from '../../_lib/recovery.js';
+import { AccessCookie, RefreshCookie, LoggedOutCookie, AuthCookies, AuthRequest, AuthResponse, VerifiedUser } from '../../_lib/auth.js';
 
-function json (data, status = 200, headers = {})
+export async function ReadBody (request)
 {
-    return new Response (JSON.stringify (data), {
-        status,
-        headers : { 'Content-Type' : 'application/json', 'Cache-Control' : 'no-store', 'X-Content-Type-Options' : 'nosniff', ...headers }
-    });
-}
-
-function config (env)
-{
-    return {
-        url : String (env.SUPABASE_URL || DefaultSupabaseUrl).replace (/\/$/, ''),
-        publishable : String (env.SUPABASE_PUBLISHABLE_KEY || DefaultPublishableKey),
-        secret : String (env.SUPABASE_SECRET_KEY || '')
-    };
-}
-
-function cookieMap (request)
-{
-    const result = {};
-    const raw = request.headers.get ('Cookie') || '';
-    for (const part of raw.split (';')) {
-        const index = part.indexOf ('=');
-        if (index < 0) { continue; }
-        result[part.slice (0, index).trim ()] = decodeURIComponent (part.slice (index + 1).trim ());
+    if (!request.headers.get ('Content-Type')?.startsWith ('application/json')) { throw Object.assign (new Error ('Use a JSON request.'), { status : 400 }); }
+    // Bound credential requests even when Content-Length is absent.
+    const reader = request.body?.getReader (); let size = 0; const chunks = [];
+    if (!reader) { throw Object.assign (new Error ('Enter your sign-in details.'), { status : 400 }); }
+    for (let chunk = await reader.read (); !chunk.done; chunk = await reader.read ()) {
+        const { value } = chunk;
+        size += value.byteLength;
+        if (size > 8192) { await reader.cancel (); throw Object.assign (new Error ('Sign-in request is too large.'), { status : 413 }); }
+        chunks.push (value);
     }
-    return result;
+    const bytes = new Uint8Array (size); let offset = 0;
+    for (const chunk of chunks) { bytes.set (chunk, offset); offset += chunk.byteLength; }
+    try { return JSON.parse (new TextDecoder ().decode (bytes)); }
+    catch { throw Object.assign (new Error ('Invalid sign-in request.'), { status : 400 }); }
 }
 
-function cookie (name, value, maxAge)
+async function Session (context)
 {
-    return name + '=' + encodeURIComponent (value) + '; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=' + maxAge;
-}
-
-async function authFetch (env, path, options = {})
-{
-    const { url, publishable } = config (env);
-    const headers = { apikey : publishable, 'Content-Type' : 'application/json', ...options.headers };
-    return fetch (url + path, { ...options, headers });
-}
-
-async function userFromToken (env, token)
-{
-    if (!token) { return null; }
-    const response = await authFetch (env, '/auth/v1/user', { headers : { Authorization : 'Bearer ' + token } });
-    return response.ok ? response.json () : null;
-}
-
-async function appProfile (env, authUser)
-{
-    const { url, secret } = config (env);
-    if (!secret || !authUser) {
-        return { user : authUser ? { id : authUser.id, email : authUser.email, displayName : authUser.user_metadata?.display_name || authUser.user_metadata?.name || null } : null, organization : null, permissions : [] };
+    const cookies = AuthCookies (context.request);
+    if (cookies[LoggedOutCookie]) { return AuthResponse ({ user : null }); }
+    if (!cookies[AccessCookie]) {
+        return AuthResponse ({ user : null }, cookies[RefreshCookie] ? 401 : 200);
     }
-    const headers = { apikey : secret, Authorization : 'Bearer ' + secret };
-    const query = '/rest/v1/auto3d_users?select=id,email,display_name,status,is_platform_admin,requires_password_change&auth_user_id=eq.' + encodeURIComponent (authUser.id) + '&limit=1';
-    const response = await fetch (url + query, { headers });
-    const rows = response.ok ? await response.json () : [];
-    let profile = rows[0];
-    const bootstrapEmail = String (env.AUTO3D_BOOTSTRAP_ADMIN_EMAIL || '').trim ().toLowerCase ();
-    if (!profile && bootstrapEmail && String (authUser.email || '').toLowerCase () === bootstrapEmail) {
-        const createResponse = await fetch (url + '/rest/v1/auto3d_users', {
-            method : 'POST',
-            headers : { apikey : secret, Authorization : 'Bearer ' + secret, 'Content-Type' : 'application/json', Prefer : 'return=representation' },
-            body : JSON.stringify ({
-                auth_user_id : authUser.id,
-                email : String (authUser.email || '').toLowerCase (),
-                display_name : authUser.user_metadata?.display_name || authUser.user_metadata?.name || authUser.email,
-                status : 'active',
-                is_platform_admin : true
-            })
-        });
-        if (createResponse.ok) {
-            profile = (await createResponse.json ())[0];
-            await fetch (url + '/rest/v1/auto3d_user_identities', {
-                method : 'POST',
-                headers : { apikey : secret, Authorization : 'Bearer ' + secret, 'Content-Type' : 'application/json', Prefer : 'return=minimal' },
-                body : JSON.stringify ({
-                    user_id : profile.id,
-                    provider : 'supabase',
-                    provider_tenant_id : '',
-                    provider_subject_id : authUser.id,
-                    provider_email : authUser.email
-                })
-            });
-        }
+    return AuthResponse ({ user : await VerifiedUser (context.env, cookies[AccessCookie]) });
+}
+
+async function Login (context)
+{
+    const body = await ReadBody (context.request);
+    if (typeof body?.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test (body.email.trim ()) || body.email.length > 254 || typeof body.password !== 'string' || !body.password.length || body.password.length > 1024) {
+        return AuthResponse ({ error : 'Enter a valid email and password.' }, 400);
     }
-    if (!profile || profile.status !== 'active') { return { user : null, organization : null, permissions : [] }; }
-
-    let organization = null;
-    let permissions = profile.is_platform_admin ? ['platform.admin'] : [];
-    const membershipResponse = await fetch (url + '/rest/v1/auto3d_organization_members?select=role,organization_id,auto3d_organizations(id,name,slug,status)&user_id=eq.' + encodeURIComponent (profile.id) + '&status=eq.active&limit=1', { headers });
-    if (membershipResponse.ok) {
-        const memberships = await membershipResponse.json ();
-        const membership = memberships[0];
-        if (membership?.auto3d_organizations?.status === 'active') {
-            organization = membership.auto3d_organizations;
-            const role = membership.role;
-            const rolePermissions = {
-                owner : ['library.read','library.write','share.create','share.revoke','user.invite','user.manage','organization.manage'],
-                admin : ['library.read','library.write','share.create','share.revoke','user.invite','user.manage'],
-                editor : ['library.read','library.write','share.create'],
-                viewer : ['library.read']
-            };
-            permissions = [...new Set ([...permissions, ...(rolePermissions[role] || [])])];
-        }
-    }
-
-    return {
-        user : { id : profile.id, authUserId : authUser.id, email : profile.email, displayName : profile.display_name, platformAdmin : profile.is_platform_admin, requiresPasswordChange : profile.requires_password_change === true },
-        organization,
-        permissions
-    };
+    return await Exchange (context, 'password', { email : body.email.trim (), password : body.password });
 }
 
-async function login (context)
+async function Exchange (context, grant, body)
 {
-    let body;
-    try { body = await context.request.json (); } catch { return json ({ error : 'Invalid sign-in request.' }, 400); }
-    const email = String (body.email || '').trim ().toLowerCase ();
-    const password = String (body.password || '');
-    if (!email || !password) { return json ({ error : 'Email and password are required.' }, 400); }
-
-    const response = await authFetch (context.env, '/auth/v1/token?grant_type=password', {
-        method : 'POST',
-        body : JSON.stringify ({ email, password })
-    });
-    const data = await response.json ().catch (() => ({}));
-    if (!response.ok || !data.access_token) { return json ({ error : data.error_description || data.msg || 'Incorrect email or password.' }, 401); }
-
-    const authUser = data.user || await userFromToken (context.env, data.access_token);
-    const profile = await appProfile (context.env, authUser);
-    if (!profile.user) { return json ({ error : 'This Auto3D account is not active.' }, 403); }
-
-    const headers = new Headers ();
-    headers.append ('Set-Cookie', cookie (AccessCookie, data.access_token, Math.max (60, Number (data.expires_in || 3600))));
-    headers.append ('Set-Cookie', cookie (RefreshCookie, data.refresh_token || '', 60 * 60 * 24 * 30));
-    return json (profile, 200, headers);
-}
-
-async function refresh (env, refreshToken)
-{
-    if (!refreshToken) { return null; }
-    const response = await authFetch (env, '/auth/v1/token?grant_type=refresh_token', {
-        method : 'POST',
-        body : JSON.stringify ({ refresh_token : refreshToken })
-    });
-    if (!response.ok) { return null; }
-    return response.json ();
-}
-
-async function session (context)
-{
-    const cookies = cookieMap (context.request);
-    let access = cookies[AccessCookie] || '';
-    let authUser = await userFromToken (context.env, access);
-    let refreshed = null;
-    if (!authUser && cookies[RefreshCookie]) {
-        refreshed = await refresh (context.env, cookies[RefreshCookie]);
-        access = refreshed?.access_token || '';
-        authUser = await userFromToken (context.env, access);
-    }
-    if (!authUser) { return json ({ user : null, organization : null, permissions : [] }); }
-    const profile = await appProfile (context.env, authUser);
-    if (!refreshed) { return json (profile); }
-    const headers = new Headers ();
-    headers.append ('Set-Cookie', cookie (AccessCookie, refreshed.access_token, Math.max (60, Number (refreshed.expires_in || 3600))));
-    headers.append ('Set-Cookie', cookie (RefreshCookie, refreshed.refresh_token || cookies[RefreshCookie], 60 * 60 * 24 * 30));
-    return json (profile, 200, headers);
-}
-
-async function requestAccess (context)
-{
-    const { url, secret } = config (context.env);
-    if (!secret) { return json ({ error : 'Account requests are not configured yet.' }, 503); }
-    let body;
-    try { body = await context.request.json (); } catch { return json ({ error : 'Invalid account request.' }, 400); }
-    const email = String (body.email || '').trim ().toLowerCase ();
-    const displayName = String (body.displayName || '').trim ().slice (0, 120);
-    const organizationName = String (body.organizationName || '').trim ().slice (0, 120);
-    const message = String (body.message || '').trim ().slice (0, 1000);
-    if (!/^\S+@\S+\.\S+$/.test (email)) { return json ({ error : 'Enter a valid email address.' }, 400); }
-
-    const headers = { apikey : secret, Authorization : 'Bearer ' + secret, 'Content-Type' : 'application/json', Prefer : 'return=minimal' };
-    const response = await fetch (url + '/rest/v1/auto3d_account_requests', {
-        method : 'POST', headers,
-        body : JSON.stringify ({ email, display_name : displayName || null, organization_name : organizationName || null, message : message || null })
-    });
+    const response = await AuthRequest (context.env, 'token?grant_type=' + grant, { method : 'POST', body : JSON.stringify (body) });
     if (!response.ok) {
-        const detail = await response.json ().catch (() => ({}));
-        if (response.status === 409) { return json ({ error : 'A pending request already exists for this email.' }, 409); }
-        console.error ('Account request error', response.status, detail);
-        return json ({ error : 'Unable to submit account request.' }, 502);
+        const status = response.status === 429 ? 429 : response.status >= 500 ? 503 : 401;
+        const error = status === 429 ? 'Too many sign-in attempts. Please wait and try again.' : status === 503 ? 'Sign-in service is unavailable. Try again.' : grant === 'password' ? 'Email or password is incorrect, or the account is not confirmed.' : 'Your session has expired. Sign in again.';
+        return AuthResponse ({ error }, status, null, grant !== 'password' && status === 401);
     }
-    return json ({ ok : true }, 201);
+    const tokens = await response.json ();
+    if (typeof tokens.access_token !== 'string' || !tokens.access_token || typeof tokens.refresh_token !== 'string' || !tokens.refresh_token) { return AuthResponse ({ error : 'Sign-in service returned an incomplete session.' }, 503); }
+    const user = await VerifiedUser (context.env, tokens.access_token);
+    return AuthResponse ({ user }, 200, tokens, false, grant === 'password' ? 'login' : null);
 }
 
-async function changePassword (context)
+async function Logout (context)
 {
-    const cookies = cookieMap (context.request);
-    const access = cookies[AccessCookie] || '';
-    const authUser = await userFromToken (context.env, access);
-    if (!authUser) { return json ({ error : 'Sign in required.' }, 401); }
-
-    let body;
-    try { body = await context.request.json (); } catch { return json ({ error : 'Invalid password request.' }, 400); }
-    const password = String (body.password || '');
-    if (password.length < 12) { return json ({ error : 'Password must be at least 12 characters.' }, 400); }
-
-    const response = await authFetch (context.env, '/auth/v1/user', {
-        method : 'PUT',
-        headers : { Authorization : 'Bearer ' + access },
-        body : JSON.stringify ({ password })
-    });
-    if (!response.ok) {
-        const detail = await response.json ().catch (() => ({}));
-        return json ({ error : detail.msg || detail.message || 'Unable to change password.' }, response.status);
-    }
-
-    const { url, secret } = config (context.env);
-    if (secret) {
-        const profileResponse = await fetch (url + '/rest/v1/auto3d_users?select=id&auth_user_id=eq.' + encodeURIComponent (authUser.id) + '&limit=1', {
-            headers : { apikey : secret, Authorization : 'Bearer ' + secret }
-        });
-        if (profileResponse.ok) {
-            const rows = await profileResponse.json ();
-            if (rows[0]) {
-                await fetch (url + '/rest/v1/auto3d_users?id=eq.' + encodeURIComponent (rows[0].id), {
-                    method : 'PATCH',
-                    headers : { apikey : secret, Authorization : 'Bearer ' + secret, 'Content-Type' : 'application/json', Prefer : 'return=minimal' },
-                    body : JSON.stringify ({ requires_password_change : false, updated_at : new Date ().toISOString () })
-                });
-                await fetch (url + '/rest/v1/auto3d_audit_events', {
-                    method : 'POST',
-                    headers : { apikey : secret, Authorization : 'Bearer ' + secret, 'Content-Type' : 'application/json', Prefer : 'return=minimal' },
-                    body : JSON.stringify ({
-                        actor_user_id : rows[0].id,
-                        action : 'USER_PASSWORD_CHANGE',
-                        resource_type : 'user',
-                        resource_id : rows[0].id,
-                        metadata : {}
-                    })
-                });
-            }
+    const cookies = AuthCookies (context.request);
+    let token = cookies[AccessCookie];
+    let response = token ? await AuthRequest (context.env, 'logout?scope=local', { method : 'POST', headers : { Authorization : 'Bearer ' + token } }) : null;
+    if ((!token || response.status === 401) && cookies[RefreshCookie]) {
+        const refreshed = await AuthRequest (context.env, 'token?grant_type=refresh_token', { method : 'POST', body : JSON.stringify ({ refresh_token : cookies[RefreshCookie] }) });
+        if (refreshed.ok) {
+            token = (await refreshed.json ()).access_token;
+            if (!token) { return AuthResponse ({ error : 'Could not revoke the session. Please try again.' }, 503, null, true, 'logout'); }
+            response = await AuthRequest (context.env, 'logout?scope=local', { method : 'POST', headers : { Authorization : 'Bearer ' + token } });
+        } else if (![400, 401, 403].includes (refreshed.status)) {
+            return AuthResponse ({ error : 'Could not revoke the session. Please try again.' }, 503, null, true, 'logout');
         }
     }
-    return json ({ ok : true });
-}
-
-async function logout (context)
-{
-    const cookies = cookieMap (context.request);
-    const access = cookies[AccessCookie] || '';
-    if (access) {
-        await authFetch (context.env, '/auth/v1/logout', {
-            method : 'POST',
-            headers : { Authorization : 'Bearer ' + access },
-            body : '{}'
-        }).catch (() => {});
+    if (response) {
+        if (!response.ok && ![401, 403, 404].includes (response.status)) {
+            return AuthResponse ({ error : 'Could not revoke the session. Please try signing out again.' }, 503, null, true, 'logout');
+        }
     }
-    const headers = new Headers ();
-    headers.append ('Set-Cookie', cookie (AccessCookie, '', 0));
-    headers.append ('Set-Cookie', cookie (RefreshCookie, '', 0));
-    return json ({ ok : true }, 200, headers);
+    return AuthResponse ({ user : null }, 200, null, true, 'logout');
 }
 
 export async function onRequest (context)
 {
     const path = context.params.path || [];
-    const action = String (path[0] || '');
-    if (context.request.method === 'GET' && action === 'session') { return session (context); }
-    if (context.request.method === 'POST' && action === 'login') { return login (context); }
-    if (context.request.method === 'POST' && action === 'logout') { return logout (context); }
-    if (context.request.method === 'POST' && action === 'change-password') { return changePassword (context); }
-    if (context.request.method === 'POST' && action === 'request') { return requestAccess (context); }
-    return json ({ error : 'Not found.' }, 404);
+    if (path.length !== 1 || !['session', 'login', 'refresh', 'logout', 'recover', 'reset-password'].includes (path[0])) { return AuthResponse ({ error : 'Not found.' }, 404); }
+    if (context.request.method !== (path[0] === 'session' ? 'GET' : 'POST')) { return AuthResponse ({ error : 'Method not allowed.' }, 405); }
+    if (context.request.method === 'POST' && context.request.headers.get ('Origin') !== new URL (context.request.url).origin) { return AuthResponse ({ error : 'Sign-in requests must come from this application.' }, 403); }
+    try {
+        if (path[0] === 'recover') { return await Recover (context, await ReadBody (context.request)); }
+        if (path[0] === 'reset-password') { return await ResetPassword (context, await ReadBody (context.request)); }
+        if (path[0] === 'session') { return await Session (context); }
+        if (path[0] === 'login') { return await Login (context); }
+        if (path[0] === 'logout') { return await Logout (context); }
+        const cookies = AuthCookies (context.request);
+        if (cookies[LoggedOutCookie]) { return AuthResponse ({ error : 'Sign in again.' }, 401, null, true); }
+        const token = cookies[RefreshCookie];
+        if (!token) { return AuthResponse ({ error : 'Sign in again.' }, 401, null, true); }
+        return await Exchange (context, 'refresh_token', { refresh_token : token });
+    } catch (error) {
+        const message = [400, 413].includes (error.status) ? error.message : error.status === 401 ? 'Your session has expired. Sign in again.' : 'Sign-in service is unavailable. Try again.';
+        return AuthResponse ({ error : message }, error.status || 503, null, path[0] === 'logout', path[0] === 'logout' ? 'logout' : null);
+    }
 }

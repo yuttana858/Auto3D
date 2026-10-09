@@ -48,7 +48,7 @@ export class SceneDocument
     constructor ()
     {
         this.model = new Model ();
-        this.objects = [];
+        this.objects = []; this.packaging = null;
         this.name = 'Untitled session';
     }
 
@@ -146,13 +146,21 @@ export class SceneDocument
         return result;
     }
 
+    Instance (object)
+    {
+        const meshMap = new Map (); object.node.EnumerateMeshIndices ((index) => meshMap.set (index, index));
+        const node = CopyNodeTree (object.node, this.model.root, meshMap);
+        const copy = { ...object, id : crypto.randomUUID (), node, name : object.name + ' copy', threeObject : null, position : [...object.position], rotation : [...object.rotation], scale : [...object.scale], userData : { ...(object.userData || {}) }, hiddenParts : [...(object.hiddenParts || [])], keyframes : [] };
+        delete copy.player; this.objects.push (copy); this.ApplyTransform (copy); return copy;
+    }
+
     Duplicate (object)
     {
         const asset = this.CompactModel ([object], true);
         // Drop the session wrapper so the copy has one editable object origin.
         asset.root = asset.root.GetChildNode (0);
         const copy = this.AddImported (asset, object.name + ' copy', Direction.Y, false);
-        copy.unit = object.unit; copy.hiddenParts = [...(object.hiddenParts || [])]; copy.userData = { ...(object.userData || {}) }; copy.castShadow = object.castShadow !== false; copy.receiveShadow = object.receiveShadow !== false;
+        copy.packagingProfile = object.packagingProfile ? JSON.parse (JSON.stringify (object.packagingProfile)) : undefined; copy.unit = object.unit; copy.hiddenParts = [...(object.hiddenParts || [])]; copy.userData = { ...(object.userData || {}) }; copy.castShadow = object.castShadow !== false; copy.receiveShadow = object.receiveShadow !== false;
         if (object.animationAsset) { copy.animationAsset = object.animationAsset; copy.playback = { ...object.playback, playing : false }; }
         copy.position = [...object.position]; copy.rotation = [...object.rotation]; copy.scale = [...object.scale];
         let minX = Infinity; let maxX = -Infinity;

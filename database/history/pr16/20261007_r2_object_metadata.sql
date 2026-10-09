@@ -12,3 +12,4 @@ alter table public.auto3d_library
 
 create index if not exists auto3d_library_storage_provider_idx
 on public.auto3d_library (storage_provider);
+

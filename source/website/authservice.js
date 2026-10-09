@@ -1,106 +1,82 @@
 export class AuthService
 {
-    constructor (options = {})
+    constructor (fetchImpl = fetch)
     {
-        this.apiUrl = String (options.apiUrl || '').replace (/\/$/, '');
-        this.user = null;
-        this.organization = null;
-        this.permissions = [];
-        this.ready = false;
-    }
-
-    Endpoint (path)
-    {
-        return this.apiUrl + path;
-    }
-
-    async Initialize ()
-    {
-        try {
-            const response = await fetch (this.Endpoint ('/api/auth/session'), {
-                method : 'GET',
-                credentials : 'same-origin',
-                headers : { Accept : 'application/json' }
+        this.fetch = (...args) => fetchImpl (...args); this.user = null; this.listeners = new Set (); this.restoring = null; this.tail = Promise.resolve (); this.generation = 0; this.loggedOut = false;
+        this.storageKey = 'auto3d-explicit-logout-v1';
+        try { this.loggedOut = localStorage.getItem (this.storageKey) === '1'; } catch { /* Storage unavailable. */ }
+        if (typeof window !== 'undefined') {
+            window.addEventListener ('storage', (event) => {
+                if (event.key !== this.storageKey) { return; }
+                this.generation++;
+                if (event.newValue === '1') { this.loggedOut = true; this.Update (null); }
+                else { this.loggedOut = false; this.Restore ().catch (() => {}); }
             });
-            if (response.ok) {
-                const session = await response.json ();
-                this.user = session.user || null;
-                this.organization = session.organization || null;
-                this.permissions = Array.isArray (session.permissions) ? session.permissions : [];
-            }
-        } catch {
-            // Authentication may not be configured yet. Guest mode remains available.
         }
-        this.ready = true;
-        return this.user;
     }
 
-    async SignIn (email, password)
-    {
-        const response = await fetch (this.Endpoint ('/api/auth/login'), {
-            method : 'POST',
-            credentials : 'same-origin',
-            headers : { 'Content-Type' : 'application/json', Accept : 'application/json' },
-            body : JSON.stringify ({ email, password })
-        });
-        const data = await response.json ().catch (() => ({}));
-        if (!response.ok) { throw new Error (data.error || 'Unable to sign in.'); }
-        this.user = data.user || null;
-        this.organization = data.organization || null;
-        this.permissions = Array.isArray (data.permissions) ? data.permissions : [];
-        return this.user;
-    }
+    Subscribe (listener) { this.listeners.add (listener); return () => this.listeners.delete (listener); }
+    Update (user) { this.user = user; this.listeners.forEach ((listener) => listener (this.user)); return this.user; }
+    Inspect () { return { signedIn : Boolean (this.user), user : this.user ? { ...this.user } : null }; }
+    Queue (operation) { const result = this.tail.then (operation, operation); this.tail = result.catch (() => {}); return result; }
 
-    async RequestAccess (details)
+    async Request (action, body)
     {
-        const response = await fetch (this.Endpoint ('/api/auth/request'), {
-            method : 'POST',
-            credentials : 'same-origin',
-            headers : { 'Content-Type' : 'application/json', Accept : 'application/json' },
-            body : JSON.stringify (details)
-        });
-        const data = await response.json ().catch (() => ({}));
-        if (!response.ok) { throw new Error (data.error || 'Unable to submit request.'); }
+        let response;
+        try {
+            response = await this.fetch ('/api/auth/' + action, { method : action === 'session' ? 'GET' : 'POST', credentials : 'same-origin', headers : { 'Content-Type' : 'application/json' }, ...(body ? { body : JSON.stringify (body) } : {}) });
+        } catch { throw new Error ('Sign-in service is unavailable. Try again.'); }
+        let data;
+        try { data = await response.json (); } catch { throw new Error ('Sign-in service is unavailable. Try again.'); }
+        if (!response.ok) { throw Object.assign (new Error (data.error || 'Sign-in failed.'), { status : response.status }); }
         return data;
     }
 
-    async ChangePassword (password)
+    async Restore ()
     {
-        const response = await fetch (this.Endpoint ('/api/auth/change-password'), {
-            method : 'POST',
-            credentials : 'same-origin',
-            headers : { 'Content-Type' : 'application/json', Accept : 'application/json' },
-            body : JSON.stringify ({ password })
+        if (this.loggedOut) { return this.Update (null); }
+        if (this.restoring) { return this.restoring; }
+        const generation = this.generation;
+        this.restoring = this.Queue (async () => {
+            try {
+                let data;
+                try { data = await this.Request ('session'); }
+                catch (error) { if (error.status !== 401) { throw error; } data = await this.Request ('refresh'); }
+                if (this.loggedOut || generation !== this.generation) { return this.user; }
+                return this.Update (data.user);
+            } catch (error) { if (generation === this.generation) { this.Update (null); } if (error.status === 401) { return null; } throw error; }
+            finally { this.restoring = null; }
         });
-        const data = await response.json ().catch (() => ({}));
-        if (!response.ok) { throw new Error (data.error || 'Unable to change password.'); }
-        if (this.user) { this.user.requiresPasswordChange = false; }
-        return data;
+        return this.restoring;
     }
 
-    async SignOut ()
+    async VerifyCurrentSession ()
     {
-        await fetch (this.Endpoint ('/api/auth/logout'), { method : 'POST', credentials : 'same-origin' });
-        this.user = null; this.organization = null; this.permissions = [];
+        if (!this.user || this.loggedOut) { return this.Inspect (); }
+        const generation = this.generation; const id = this.user.id;
+        try { const data = await this.Request ('session'); if (generation === this.generation && (!data.user || data.user.id !== id)) { this.Update (null); } }
+        catch (error) { if (error.status !== 401) { throw error; } if (generation === this.generation) { await this.Restore (); } }
+        return this.Inspect ();
     }
 
-    GetUser ()
+    Recover (email) { return this.Request ('recover', { email }); }
+    ResetPassword (accessToken, password) { return this.Request ('reset-password', { accessToken, password }); }
+    SignIn (email, password)
     {
-        return this.user;
+        const generation = ++this.generation;
+        return this.Queue (async () => {
+            const data = await this.Request ('login', { email, password });
+            if (generation !== this.generation) { return this.user; }
+            this.loggedOut = false;
+            try { localStorage.removeItem (this.storageKey); } catch { /* Storage unavailable. */ }
+            return this.Update (data.user);
+        });
     }
-
-    GetOrganization ()
+    SignOut ()
     {
-        return this.organization;
-    }
-
-    GetPermissions ()
-    {
-        return [...this.permissions];
-    }
-
-    HasPermission (permission)
-    {
-        return this.permissions.includes (permission);
+        this.generation++; this.loggedOut = true;
+        try { localStorage.setItem (this.storageKey, '1'); } catch { /* Storage unavailable. */ }
+        this.Update (null);
+        return this.Queue (async () => { await this.Request ('logout'); return this.Inspect (); });
     }
 }

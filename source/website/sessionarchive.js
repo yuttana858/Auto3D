@@ -12,6 +12,7 @@ import { Node } from '../engine/model/node.js';
 import { Matrix } from '../engine/geometry/matrix.js';
 import { Transformation } from '../engine/geometry/transformation.js';
 import { CheckModel } from '../engine/model/modelfinalization.js';
+import { ValidatePackaging } from './packagingcore.js';
 import { SceneDocument } from './scenedocument.js';
 
 const TriangleKeys = ['v0', 'v1', 'v2', 'c0', 'c1', 'c2', 'n0', 'n1', 'n2', 'u0', 'u1', 'u2', 'mat', 'curve'];
@@ -162,8 +163,8 @@ export function PackSession (document, view = {}, objects = document.objects, ki
 {
     const model = document.CompactModel (objects);
     return {
-        format : 'SW Auto3D', version : SessionVersion, metadata : { savedAt : new Date ().toISOString () }, kind, name : document.name, view,
-        objects : objects.map ((object) => ({ id : object.id, name : object.name, source : object.source, unit : object.unit, visible : object.visible, hiddenParts : object.hiddenParts || [], position : object.position, rotation : object.rotation, scale : object.scale, userData : object.userData || {}, castShadow : object.castShadow !== false, receiveShadow : object.receiveShadow !== false, keyframes : Array.isArray (object.keyframes) ? object.keyframes : [], playback : object.playback, animationAsset : object.animationAsset ? { main : object.animationAsset.main, files : object.animationAsset.files.map ((file) => ({ name : file.name, buffer : EncodeBuffer (file.buffer) })) } : null })),
+        format : 'SW Auto3D', version : SessionVersion, metadata : { savedAt : new Date ().toISOString () }, kind, name : document.name, view, packaging : kind === 'session' && document.packaging ? ValidatePackaging (document.packaging) : null,
+        objects : objects.map ((object) => ({ id : object.id, packagingProfile : object.packagingProfile ? ValidatePackaging (object.packagingProfile) : null, name : object.name, source : object.source, unit : object.unit, visible : object.visible, hiddenParts : object.hiddenParts || [], position : object.position, rotation : object.rotation, scale : object.scale, userData : object.userData || {}, castShadow : object.castShadow !== false, receiveShadow : object.receiveShadow !== false, keyframes : Array.isArray (object.keyframes) ? object.keyframes : [], playback : object.playback, animationAsset : object.animationAsset ? { main : object.animationAsset.main, files : object.animationAsset.files.map ((file) => ({ name : file.name, buffer : EncodeBuffer (file.buffer) })) } : null })),
         model : { unit : model.unit, properties : model.propertyGroups, materials : model.materials.map (PackMaterial), meshes : model.meshes.map (PackMesh), nodes : model.root.childNodes.map (PackNode) }
     };
 }
@@ -173,7 +174,7 @@ export function ReadSession (data)
     data = MigrateSessionData (data);
     if (!data.model || !Array.isArray (data.model.nodes) || !Array.isArray (data.model.materials) || !Array.isArray (data.model.meshes)) { throw new Error ('Invalid model data.'); }
     if (!Array.isArray (data.objects) || data.objects.length > 1000 || data.objects.length !== data.model.nodes.length) { throw new Error ('Invalid object list.'); }
-    const document = new SceneDocument ();
+    const document = new SceneDocument (); document.packaging = data.packaging ? ValidatePackaging (data.packaging) : null;
     const model = new Model ();
     model.unit = data.model.unit;
     ReadProperties (model, data.model.properties);
@@ -209,7 +210,7 @@ export function ReadSession (data)
         object.hiddenParts = Array.isArray (data.hiddenParts) ? data.hiddenParts.filter ((index) => Number.isInteger (index) && index >= 0) : [];
         object.castShadow = data.castShadow !== false;
         object.receiveShadow = data.receiveShadow !== false;
-        object.userData = {};
+        object.userData = {}; object.packagingProfile = data.packagingProfile ? ValidatePackaging (data.packagingProfile) : null;
         object.keyframes = Array.isArray (data.keyframes) ? data.keyframes.filter ((item) => item && Number.isFinite (item.time) && item.time >= 0 && [item.position, item.rotation, item.scale].every ((value) => Array.isArray (value) && value.length === 3 && value.every (Number.isFinite))).slice (0, 1000).map ((item) => ({
             id : String (item.id || ''),
             time : item.time,

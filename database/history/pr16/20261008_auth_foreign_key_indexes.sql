@@ -9,3 +9,4 @@ create index if not exists auto3d_audit_events_actor_idx
 
 create index if not exists auto3d_audit_events_org_idx
     on public.auto3d_audit_events (organization_id);
+

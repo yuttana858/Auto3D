@@ -1,3 +1,4 @@
+import { ModelExtensions, SupportedFormatsText } from './importformats.js';
 import { GetFileExtension, TransformFileHostUrls } from '../engine/io/fileutils.js';
 import { InputFilesFromFileObjects, InputFilesFromUrls } from '../engine/import/importerfiles.js';
 import { ImportErrorCode, ImportSettings } from '../engine/import/importer.js';
@@ -5,7 +6,6 @@ import { NavigationMode, ProjectionMode } from '../engine/viewer/camera.js';
 import { RGBColor, HexStringToRGBAColor } from '../engine/model/color.js';
 import { Viewer } from '../engine/viewer/viewer.js';
 import { AddDomElement, ShowDomElement, SetDomElementOuterHeight, CreateDomElement, GetDomElementOuterWidth } from '../engine/viewer/domutils.js';
-import { CalculatePopupPositionToScreen, ShowListPopup } from './dialogs.js';
 import { HandleEvent } from './eventhandler.js';
 import { HashHandler } from './hashhandler.js';
 import { Navigator, Selection, SelectionType } from './navigator.js';
@@ -37,7 +37,7 @@ import { Preferences } from './preferences.js';
 import { AIWorkspace } from './aiworkspace.js';
 import { SceneEffects } from '../engine/viewer/sceneeffects.js';
 
-const MultiModelExtensions = new Set (['3dm', '3ds', '3mf', 'amf', 'bim', 'brep', 'dae', 'fbx', 'fcstd', 'gltf', 'glb', 'ifc', 'iges', 'igs', 'step', 'stp', 'stl', 'obj', 'off', 'ply', 'wrl', 'zae']);
+const MultiModelExtensions = new Set (ModelExtensions);
 
 const WebsiteUIState =
 {
@@ -181,6 +181,7 @@ export class Website
         this.cameraSettings = new CameraSettings ();
         this.viewer = new Viewer ();
         this.measureTool = new MeasureTool (this.viewer, this.settings);
+        this.measureTool.sourceUnit = () => this.model?.GetUnit (); this.measureTool.unitSystem = () => this.preferences?.units || 'metric';
         this.hashHandler = new HashHandler ();
         this.toolbar = new Toolbar (this.parameters.toolbarDiv);
         this.navigator = new Navigator (this.parameters.navigatorDiv);
@@ -225,7 +226,7 @@ export class Website
         this.SetUIState (WebsiteUIState.Intro);
 
         this.hashHandler.SetEventListener (this.OnHashChange.bind (this));
-        if (this.sessionEditor.readOnly) { this.sessionEditor.LoadShared (); } else { this.OnHashChange (); }
+
 
         window.addEventListener ('resize', () => {
 			this.layouter.Resize ();
@@ -261,14 +262,9 @@ export class Website
             });
         }
         this.UpdateViewport ();
+        const formats = document.getElementById ('supported_formats');
+        if (formats) { formats.textContent = SupportedFormatsText; }
         document.getElementById ('workspace_upload').addEventListener ('click', () => this.OpenFileBrowserDialog ());
-        document.getElementById ('workspace_open_url').addEventListener ('click', () => {
-            ShowOpenUrlDialog ((urls) => {
-                if (urls.length > 0) {
-                    this.hashHandler.SetModelFilesToHash (urls);
-                }
-            });
-        });
         for (const [side, toggleId] of [['left', 'upload_panel_toggle'], ['right', 'data_panel_toggle']]) {
             const container = side === 'left' ? this.parameters.leftContainerDiv : this.parameters.rightContainerDiv;
             const toggle = document.getElementById (toggleId);
@@ -278,7 +274,7 @@ export class Website
                 toggle.setAttribute ('aria-label', (collapsed ? 'Expand ' : 'Collapse ') + (side === 'left' ? 'model upload panel' : 'model data panel'));
                 toggle.querySelector ('.panel_chevron').textContent = (side === 'left') === collapsed ? '›' : '‹';
             };
-            apply (window.innerWidth < 800);
+            apply (side === 'right' || window.innerWidth < 800);
             toggle.addEventListener ('click', () => {
                 const collapsed = !container.classList.contains ('collapsed');
                 if (!collapsed && window.innerWidth < 800) {
@@ -362,9 +358,9 @@ export class Website
         if (fit) { this.FitModelToWindow (true); }
     }
 
-    OnModelClicked (button, mouseCoordinates)
+    OnModelClicked (button, mouseCoordinates, modifiers = {})
     {
-        if (this.sessionEditor.controls.axis !== null || this.sessionEditor.controls.dragging) { return; }
+        if (this.sessionEditor.busy || this.sessionEditor.controls.axis !== null || this.sessionEditor.controls.dragging) { return; }
         if (button !== 1) {
             return;
         }
@@ -374,12 +370,12 @@ export class Website
             return;
         }
 
-        let meshUserData = this.viewer.GetMeshUserDataUnderMouse (IntersectionMode.MeshAndLine, mouseCoordinates);
-        if (meshUserData === null) {
-            this.navigator.SetSelection (null);
-        } else {
-            this.navigator.SetSelection (new Selection (SelectionType.Mesh, meshUserData.originalMeshInstance.id));
-        }
+        const meshUserData = this.viewer.GetMeshUserDataUnderMouse (IntersectionMode.MeshAndLine, mouseCoordinates);
+        const additive = Boolean (modifiers.ctrlKey || modifiers.metaKey);
+        if (!meshUserData) { if (!additive) { this.sessionEditor.Select (null); } return; }
+        const owner = this.sessionEditor.document.Owner (meshUserData.originalMeshInstance);
+        if (owner) { this.sessionEditor.Select (owner, false, additive); }
+        else { this.navigator.SetSelection (new Selection (SelectionType.Mesh, meshUserData.originalMeshInstance.id)); }
     }
 
     OnModelMouseMoved (mouseCoordinates)
@@ -392,6 +388,24 @@ export class Website
     OnModelContextMenu (globalMouseCoordinates, mouseCoordinates)
     {
         const meshUserData = this.viewer.GetMeshUserDataUnderMouse (IntersectionMode.MeshAndLine, mouseCoordinates);
+        if (meshUserData) {
+            const owner = this.sessionEditor.document.Owner (meshUserData.originalMeshInstance);
+            if (owner && !this.sessionEditor.SelectedObjects ().includes (owner)) { this.sessionEditor.Select (owner); }
+        }
+        const selected = this.sessionEditor.selected;
+        if (selected && !this.sessionEditor.readOnly) {
+            const actions = [
+                ['Move', () => this.sessionEditor.SetMode ('translate')],
+                ['Rotate', () => this.sessionEditor.SetMode ('rotate')],
+                ['Scale', () => this.sessionEditor.SetMode ('scale')],
+                ['Focus', () => this.sessionEditor.Focus ()],
+                ['Duplicate', () => this.sessionEditor.Duplicate ()],
+                [selected.visible ? 'Hide' : 'Show', () => this.sessionEditor.ToggleVisibility ()],
+                ['Delete', () => this.sessionEditor.Delete ()]
+            ].map (([name, onClick]) => ({ name, onClick }));
+            this.sessionEditor.OpenContextMenu (globalMouseCoordinates, actions);
+            return;
+        }
         const items = [];
         if (meshUserData === null) {
             items.push ({
@@ -415,33 +429,6 @@ export class Website
                 icon : 'fit',
                 onClick : () => this.sessionEditor.Focus ()
             });
-            if (!this.sessionEditor.readOnly && object) {
-                items.push ({
-                    name : 'Array selected model…',
-                    icon : 'files',
-                    onClick : () => this.sessionEditor.ArrayDialog ()
-                });
-                items.push ({
-                    name : 'Drop selected model to floor',
-                    icon : 'up_y',
-                    onClick : () => this.sessionEditor.DropToFloor ()
-                });
-                items.push ({
-                    name : 'Duplicate selected model',
-                    icon : 'files',
-                    onClick : () => this.sessionEditor.Run (() => this.sessionEditor.Duplicate ())
-                });
-                items.push ({
-                    name : object.visible ? 'Hide selected model' : 'Show selected model',
-                    icon : object.visible ? 'hidden' : 'visible',
-                    onClick : () => this.sessionEditor.ToggleVisibility ()
-                });
-                items.push ({
-                    name : 'Delete selected model',
-                    icon : 'close',
-                    onClick : () => this.sessionEditor.Run (() => this.sessionEditor.Delete ())
-                });
-            }
             if (this.navigator.MeshItemCount () > 1) {
                 const isMeshIsolated = this.navigator.IsMeshIsolated (instance.id);
                 items.push ({
@@ -454,14 +441,12 @@ export class Website
                 });
             }
         }
-        ShowListPopup (items, {
-            calculatePosition : (contentDiv) => CalculatePopupPositionToScreen (globalMouseCoordinates, contentDiv),
-            onClick : (index) => items[index].onClick ()
-        });
+        this.sessionEditor.OpenContextMenu (globalMouseCoordinates, items);
     }
 
     OnHashChange ()
     {
+        if (this.auth && !this.auth.user) { return; }
         if (this.sessionEditor.readOnly) { return; }
         if (this.hashHandler.HasHash ()) {
             let urls = this.hashHandler.GetModelFilesFromHash ();
@@ -547,14 +532,14 @@ export class Website
 
     async LoadModelFromFileList (files)
     {
-        if (this.sessionEditor.readOnly) { return; }
+        if (this.sessionEditor.readOnly || this.sessionEditor.busy || this.modelLoaderUI.GetModelLoader ().InProgress ()) { return; }
         const selected = Array.from (files);
         const session = selected.find ((file) => file.name.toLowerCase ().endsWith ('.auto3d'));
         if (session) { await this.sessionEditor.Run (() => this.sessionEditor.OpenArchiveFile (session)); return; }
 
         const candidates = selected.filter ((file) => MultiModelExtensions.has (GetFileExtension (file.name).toLowerCase ()));
         if (!this.sessionEditor.replaceTarget && candidates.length > 1) {
-            this.sessionEditor.Status ('Importing ' + candidates.length + ' models into this session…');
+            this.sessionEditor.Status ('Uploading models… ' + candidates.length + ' selected');
             let imported = 0;
             for (const candidate of candidates) {
                 const importSettings = new ImportSettings ();
@@ -583,7 +568,7 @@ export class Website
             onStart : () =>
             {
                 if (!this.sessionEditor.document.objects.length) { this.SetUIState (WebsiteUIState.Loading); }
-                this.sessionEditor.Status ('Loading model…');
+                this.sessionEditor.Status ('Uploading models…');
             },
             onFinish : (importResult, threeObject) =>
             {
@@ -600,7 +585,8 @@ export class Website
             {
                 this.SetUIState (this.sessionEditor.document.objects.length ? WebsiteUIState.Model : WebsiteUIState.Intro);
                 this.sessionEditor.replaceTarget = null;
-                this.sessionEditor.Status ('Model could not be loaded. Existing objects are retained.');
+                this.errorLogs?.Record ('error', 'model import', 'Cannot open file.', String (importError.code ?? 'unknown import error'));
+                this.sessionEditor.Status ('Cannot open file. ' + SupportedFormatsText);
                 let extensionStr = null;
                 if (importError.mainFile !== null) {
                     extensionStr = GetFileExtension (importError.mainFile);
@@ -927,17 +913,6 @@ export class Website
             });
         });
 
-        let selectedTheme = (this.settings.themeId === Theme.Light ? 1 : 0);
-        AddRadioButton (this.toolbar, ['dark_mode', 'light_mode'], [Loc ('Dark mode'), Loc ('Light mode')], selectedTheme, ['align_right'], (buttonIndex) => {
-            if (buttonIndex === 0) {
-                this.settings.themeId = Theme.Dark;
-            } else if (buttonIndex === 1) {
-                this.settings.themeId = Theme.Light;
-            }
-            HandleEvent ('theme_changed', this.settings.themeId === Theme.Light ? 'light' : 'dark');
-            this.SwitchTheme (this.settings.themeId, true);
-        });
-
         this.parameters.fileInput.addEventListener ('change', (ev) => {
             if (ev.target.files.length > 0) {
                 HandleEvent ('model_load_started', 'open_file');
@@ -1130,7 +1105,8 @@ export class Website
                 this.sidebar.AddObject3DProperties (this.model, this.model);
             },
             onMeshSelected : (meshInstanceId) => {
-                let meshInstance = this.model.GetMeshInstance (meshInstanceId);
+                const meshInstance = this.model?.GetMeshInstance (meshInstanceId);
+                if (!meshInstance) { return; }
                 this.sidebar.AddObject3DProperties (this.model, meshInstance);
             },
             onMaterialSelected : (materialIndex) => {

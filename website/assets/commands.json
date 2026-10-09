@@ -2,6 +2,890 @@
   "apiVersion": 1,
   "commands": [
     {
+      "id": "capture.image",
+      "title": "Capture app screenshot",
+      "category": "Capture",
+      "description": "Capture PNG image content for an agent to attach in chat. Viewport captures the 3D scene; workspace captures the visible app with account dialogs and input fields omitted. No upload or chat message is sent automatically.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "viewport",
+              "workspace"
+            ]
+          },
+          "maxSize": {
+            "type": "number",
+            "minimum": 256,
+            "maximum": 2048
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "scope": "workspace",
+        "maxSize": 1600
+      }
+    },
+    {
+      "id": "diagnostics.shadow",
+      "title": "Record shadow state",
+      "category": "Diagnostics",
+      "description": "Append a sanitized visibility, floor and shader diagnostic snapshot to the browser-tab error log.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "diagnostics.open",
+      "title": "Open error logs",
+      "category": "Diagnostics",
+      "description": "Open recent error and rendering logs in Preferences.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "diagnostics.list",
+      "title": "Read error logs",
+      "category": "Diagnostics",
+      "description": "Read up to 200 sanitized browser-tab entries; no credentials or request bodies.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "all",
+              "error",
+              "warning",
+              "info"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "level": "error"
+      }
+    },
+    {
+      "id": "diagnostics.export",
+      "title": "Export error logs",
+      "category": "Diagnostics",
+      "description": "Return sanitized error-log JSON for review. Does not upload or download.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "diagnostics.download",
+      "title": "Download error logs",
+      "category": "Diagnostics",
+      "description": "Download sanitized error-log JSON locally; no remote upload.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "diagnostics.clear",
+      "title": "Clear error logs",
+      "category": "Diagnostics",
+      "description": "Clear this account browser-tab error log.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "auth.inspect",
+      "title": "Inspect account",
+      "category": "Account",
+      "description": "Return the current account identity without credentials or session tokens.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "auth.verify",
+      "title": "Verify active account session",
+      "category": "Account",
+      "description": "Recheck the signed-in account against the server. Revoked/reset sessions return to the login gate; unchanged verified identity does not interrupt the workspace.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "auth.recover",
+      "title": "Request password recovery",
+      "category": "Account",
+      "description": "Request a one-time recovery email for an approved account. Returns the same response for unapproved or unknown addresses.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 254
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "email": "user@example.com"
+      }
+    },
+    {
+      "id": "auth.open",
+      "title": "Open account sign-in",
+      "category": "Account",
+      "description": "Open the account dialog for interactive sign-in. Does not complete sign-in; credentials must be entered by the user.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "auth.request_account",
+      "title": "Request an account",
+      "category": "Account",
+      "description": "Open an interactive account request form. Submitting requires user confirmation in the form.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "admin.open",
+      "title": "Open account administration",
+      "category": "Account",
+      "description": "Open administrator requests and approvals. Approval passwords are entered interactively.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "admin.approve",
+      "title": "Review account approval",
+      "category": "Account",
+      "description": "Open one account request for interactive approval. The administrator enters the initial password and confirms in the dialog.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "00000000-0000-0000-0000-000000000000"
+      }
+    },
+    {
+      "id": "admin.requests",
+      "title": "List account requests",
+      "category": "Account",
+      "description": "List account requests for a verified administrator.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "admin.reject",
+      "title": "Reject account request",
+      "category": "Account",
+      "description": "Reject one pending account request. Administrator authorization is checked on the server.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "00000000-0000-0000-0000-000000000000"
+      }
+    },
+    {
+      "id": "admin.users",
+      "title": "List user accounts",
+      "category": "Account",
+      "description": "List verified administrator account management entries, without credentials.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10000
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "page": 1
+      }
+    },
+    {
+      "id": "admin.revoke",
+      "title": "Revoke user access",
+      "category": "Account",
+      "description": "Explicitly revoke a non-administrator account and block old app sessions. Saved files remain owned by the user.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "id": "admin.restore",
+      "title": "Restore user access",
+      "category": "Account",
+      "description": "Explicitly restore a revoked account. Old app sessions stay invalid.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "id": "admin.reset_password",
+      "title": "Open password reset",
+      "category": "Account",
+      "description": "Open a verified administrator password reset form for a user. The administrator enters and confirms the password interactively; no password is accepted by commands or macros.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "id": "auth.sign_out",
+      "title": "Sign out",
+      "category": "Account",
+      "description": "Sign out of the current account and revoke its refresh session. Device files remain local.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.open",
+      "title": "Open packaging design",
+      "category": "Packaging",
+      "description": "Open interactive point-to-point cut/score drawing and board extrusion. Opening does not change the saved profile.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.draft.type",
+      "title": "Choose new path type",
+      "category": "Packaging",
+      "description": "Choose cut or score for the staged point-to-point path.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "cut",
+              "score"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "type": "score"
+      }
+    },
+    {
+      "id": "packaging.view.snap",
+      "title": "Set packaging grid snap",
+      "category": "Packaging",
+      "description": "Set grid spacing in display units or explicit mm; zero disables snapping.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "number",
+            "minimum": 0
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "display",
+              "mm"
+            ]
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "value": 5,
+        "units": "mm"
+      }
+    },
+    {
+      "id": "packaging.draft.point",
+      "title": "Add draft point",
+      "category": "Packaging",
+      "description": "Add one point to the staged interactive path. Drafts are discarded when the dialog closes. Finish explicitly to save.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "point": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "display",
+              "mm"
+            ]
+          }
+        },
+        "required": [
+          "point"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "point": [
+          10,
+          20
+        ],
+        "units": "mm"
+      }
+    },
+    {
+      "id": "packaging.draft.back",
+      "title": "Remove last draft point",
+      "category": "Packaging",
+      "description": "Remove the last staged point.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.draft.cancel",
+      "title": "Cancel draft path",
+      "category": "Packaging",
+      "description": "Discard the staged path without changing the saved design.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.draft.finish",
+      "title": "Finish draft path",
+      "category": "Packaging",
+      "description": "Commit the staged cut/score path. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "cut",
+              "score"
+            ]
+          },
+          "closed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "type",
+          "closed"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "type": "cut",
+        "closed": true
+      }
+    },
+    {
+      "id": "packaging.path.select",
+      "title": "Select packaging path",
+      "category": "Packaging",
+      "description": "Select a saved path for point editing and line assignment.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "path-id"
+      }
+    },
+    {
+      "id": "packaging.view.fit",
+      "title": "Fit packaging drawing",
+      "category": "Packaging",
+      "description": "Fit the two-dimensional drawing without changing geometry.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.inspect",
+      "title": "Inspect packaging profile",
+      "category": "Packaging",
+      "description": "Read canonical millimeter profile, board caliper and cut/score paths.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.path.add",
+      "title": "Draw packaging path",
+      "category": "Packaging",
+      "description": "Add a point-to-point cut or score path; closed cut contours can be extruded. Coordinates use display units unless units=mm. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2000,
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "cut",
+              "score"
+            ]
+          },
+          "closed": {
+            "type": "boolean"
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "display",
+              "mm"
+            ]
+          }
+        },
+        "required": [
+          "points",
+          "type",
+          "closed"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "points": [
+          [
+            0,
+            0
+          ],
+          [
+            100,
+            0
+          ],
+          [
+            100,
+            60
+          ],
+          [
+            0,
+            60
+          ]
+        ],
+        "type": "cut",
+        "closed": true,
+        "units": "mm"
+      }
+    },
+    {
+      "id": "packaging.path.edit",
+      "title": "Edit packaging path",
+      "category": "Packaging",
+      "description": "Edit points, closure or cut/score assignment of an existing path. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "points": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2000,
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "cut",
+              "score"
+            ]
+          },
+          "closed": {
+            "type": "boolean"
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "display",
+              "mm"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "path-id",
+        "type": "score"
+      }
+    },
+    {
+      "id": "packaging.path.delete",
+      "title": "Delete packaging path",
+      "category": "Packaging",
+      "description": "Remove an existing path. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "path-id"
+      }
+    },
+    {
+      "id": "packaging.board",
+      "title": "Set board caliper",
+      "category": "Packaging",
+      "description": "Set measured board thickness and grade label. Display units by default; nominal flute presets are editable approximations, not strength ratings. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "thickness": {
+            "type": "number",
+            "minimum": 0.000001
+          },
+          "grade": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "display",
+              "mm"
+            ]
+          }
+        },
+        "required": [
+          "thickness"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "thickness": 3,
+        "grade": "B flute",
+        "units": "mm"
+      }
+    },
+    {
+      "id": "packaging.name",
+      "title": "Name packaging profile",
+      "category": "Packaging",
+      "description": "Set the profile name used in downloaded filenames. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "name": "Tray blank"
+      }
+    },
+    {
+      "id": "packaging.extrude",
+      "title": "Extrude board profile",
+      "category": "Packaging",
+      "description": "Add a solid board from closed nonintersecting cut contours and holes, with caliper along Y. Uses declared scene units; unknown scene units must be resolved first. Score lines remain crease metadata. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.load_selected",
+      "title": "Edit selected board profile",
+      "category": "Packaging",
+      "description": "Load the canonical profile stored on the selected packaging board into the dieline editor. Undo supported. Does not resize the existing solid.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.export",
+      "title": "Export packaging vectors",
+      "category": "Packaging",
+      "description": "Return SVG or DXF contents in millimeters with separate CUT and SCORE layers. Does not download or publish.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "svg",
+              "dxf"
+            ]
+          }
+        },
+        "required": [
+          "format"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "format": "svg"
+      }
+    },
+    {
+      "id": "packaging.download",
+      "title": "Download packaging vectors",
+      "category": "Packaging",
+      "description": "Download a local SVG or DXF file at physical millimeter scale. No remote publication.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "svg",
+              "dxf"
+            ]
+          }
+        },
+        "required": [
+          "format"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "format": "dxf"
+      }
+    },
+    {
       "id": "scene.inspect",
       "title": "Inspect scene",
       "category": "Scene",
@@ -26,6 +910,12 @@
         "properties": {
           "objectId": {
             "type": "string"
+          },
+          "additive": {
+            "type": "boolean"
+          },
+          "single": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -39,7 +929,7 @@
       "id": "object.transform",
       "title": "Transform object",
       "category": "Objects",
-      "description": "Set position in model units, rotation in degrees, and scale. Omitted vectors stay unchanged. Undo supported.",
+      "description": "Set position in model units (or global display units when units=display), rotation in degrees, and scale. Omitted vectors stay unchanged. Undo supported.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -70,6 +960,13 @@
             "items": {
               "type": "number"
             }
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "model",
+              "display"
+            ]
           }
         },
         "required": [],
@@ -80,7 +977,8 @@
           0,
           0,
           0
-        ]
+        ],
+        "units": "display"
       }
     },
     {
@@ -127,6 +1025,9 @@
             "type": "number",
             "minimum": 1,
             "maximum": 20
+          },
+          "autoGroup": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -183,6 +1084,9 @@
           "value": {
             "type": "number",
             "minimum": 0.000001
+          },
+          "proportional": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -195,6 +1099,273 @@
         "dimension": "width",
         "value": 100
       }
+    },
+    {
+      "id": "object.scaling.proportional",
+      "title": "Set proportional scaling",
+      "category": "Objects",
+      "description": "Choose whether manual W/L/H edits preserve object proportions.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "enabled": true
+      }
+    },
+    {
+      "id": "object.scaling.percent",
+      "title": "Scale by percentage",
+      "category": "Objects",
+      "description": "Multiply current object dimensions uniformly by a positive percentage. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          },
+          "percent": {
+            "type": "number",
+            "minimum": 0.0001,
+            "maximum": 100000
+          }
+        },
+        "required": [
+          "percent"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "percent": 75
+      }
+    },
+    {
+      "id": "selection.transform",
+      "title": "Transform selected group",
+      "category": "Objects",
+      "description": "Set the active object transform and apply its transform delta to all selected objects. Position is in current global display units by default. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "position": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number"
+            }
+          },
+          "rotation": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number"
+            }
+          },
+          "scale": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number"
+            }
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "model",
+              "display"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "position": [
+          10,
+          0,
+          0
+        ],
+        "units": "display"
+      }
+    },
+    {
+      "id": "object.group",
+      "title": "Group selected objects",
+      "category": "Objects",
+      "description": "Group the selected objects for selection and transform controls. Group membership is saved in portable sessions. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "name": "Pallet load"
+      }
+    },
+    {
+      "id": "object.ungroup",
+      "title": "Ungroup selected objects",
+      "category": "Objects",
+      "description": "Remove group membership while preserving placement. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "polygon.preview",
+      "title": "Preview polygon optimization",
+      "category": "Objects",
+      "description": "Prepare seam-aware decimation for selected static objects without changing original geometry. Retained triangle percentage and relative error percentage are limits, not guaranteed reduction. Run polygon.apply explicitly to commit.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "retain": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 100
+          },
+          "error": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 5
+          }
+        },
+        "required": [
+          "retain"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "retain": 50,
+        "error": 0.1
+      }
+    },
+    {
+      "id": "polygon.preview_array",
+      "title": "Preview array decimation",
+      "category": "Objects",
+      "description": "Prepare selected source decimation and return the projected array triangle counts without creating copies. Apply and array creation remain explicit.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "width": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "length": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "height": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "retain": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "width",
+          "length",
+          "height",
+          "retain"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "width": 2,
+        "length": 3,
+        "height": 6,
+        "retain": 50
+      }
+    },
+    {
+      "id": "ui.array",
+      "title": "Open array preview tool",
+      "category": "Panels",
+      "description": "Open the interactive array and decimation preview dialog. Does not create copies or change geometry.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "polygon.apply",
+      "title": "Apply polygon optimization",
+      "category": "Objects",
+      "description": "Explicitly apply the prepared preview if the scene has not changed. Original geometry remains available through Undo.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "polygon.cancel",
+      "title": "Cancel polygon preview",
+      "category": "Objects",
+      "description": "Cancel background optimization and discard the staged preview.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ui.polygons",
+      "title": "Open polygon optimizer",
+      "category": "Panels",
+      "description": "Open interactive polygon preview and quality inspection. Opening the dialog does not change geometry.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
     },
     {
       "id": "object.user_data",
@@ -403,6 +1574,67 @@
         "horizon": true,
         "grid": true
       }
+    },
+    {
+      "id": "lighting.effects",
+      "title": "Set reflections and shadows",
+      "category": "Lighting",
+      "description": "Set scene reflection/shadow options using the same functions as the Lighting panel.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "environmentIntensity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "modelReflections": {
+            "type": "boolean"
+          },
+          "modelReflectionIntensity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1.5
+          },
+          "floorReflection": {
+            "type": "boolean"
+          },
+          "floorReflectionIntensity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "shadows": {
+            "type": "boolean"
+          },
+          "shadowIntensity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "shadows": true,
+        "modelReflections": true
+      }
+    },
+    {
+      "id": "lighting.shadow.inspect",
+      "title": "Inspect shadow visibility",
+      "category": "Lighting",
+      "description": "Diagnose the shadow pipeline, effective original-model visibility, floor depth state, WebGL context and shader errors without changing the scene.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
     },
     {
       "id": "lighting.inspect",
@@ -1056,6 +2288,47 @@
       }
     },
     {
+      "id": "macro.design.edit",
+      "title": "Edit visual macro",
+      "category": "Macros",
+      "description": "Add, update, remove or reorder a visual macro step without executing it. Existing step IDs are preserved. Index is zero-based.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "definition": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "add",
+              "update",
+              "remove",
+              "move"
+            ]
+          },
+          "step": {
+            "type": "string"
+          },
+          "index": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "definition",
+          "action",
+          "step"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "definition": "{\"version\":1,\"steps\":[]}",
+        "action": "add",
+        "step": "{\"command\":\"scene.inspect\",\"arguments\":{}}"
+      }
+    },
+    {
       "id": "macro.list",
       "title": "List saved macros",
       "category": "Macros",
@@ -1106,6 +2379,261 @@
         "additionalProperties": false
       },
       "example": {}
+    },
+    {
+      "id": "preferences.inspect",
+      "title": "Inspect preferences",
+      "category": "Preferences",
+      "description": "Return account theme and display units without private credentials.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "library.account.list",
+      "title": "List account Library",
+      "category": "Library",
+      "description": "List private models and sessions belonging to the signed-in account.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "library.account.save",
+      "title": "Save to account Library",
+      "category": "Library",
+      "description": "Explicitly upload the current session or selected model to the private account Library.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "category": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "session",
+              "model"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "name": "Concept",
+        "category": "Projects",
+        "kind": "session"
+      }
+    },
+    {
+      "id": "library.account.open",
+      "title": "Open account Library item",
+      "category": "Library",
+      "description": "Open or add an owned account archive to the editable workspace.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+          },
+          "append": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "append": false
+      }
+    },
+    {
+      "id": "library.account.rename",
+      "title": "Rename account Library item",
+      "category": "Library",
+      "description": "Rename an owned item without uploading another archive.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "name": "Updated concept"
+      }
+    },
+    {
+      "id": "library.account.move",
+      "title": "Move account Library item",
+      "category": "Library",
+      "description": "Move an owned item to a category/project folder.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+          },
+          "category": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "category"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "category": "Projects/Concepts"
+      }
+    },
+    {
+      "id": "library.account.delete",
+      "title": "Delete account Library item",
+      "category": "Library",
+      "description": "Explicitly delete an owned saved archive and preview.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "id": "library.account.folder.create",
+      "title": "Create account Library folder",
+      "category": "Library",
+      "description": "Create a private category/project folder.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "path": "Projects/Concepts"
+      }
+    },
+    {
+      "id": "library.account.folder.rename",
+      "title": "Rename account Library folder",
+      "category": "Library",
+      "description": "Rename a private folder and move its saved items. Multi-item changes may require retry after a network failure.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "next": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "path",
+          "next"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "path": "Projects",
+        "next": "Archive"
+      }
+    },
+    {
+      "id": "library.account.folder.delete",
+      "title": "Delete account Library folder",
+      "category": "Library",
+      "description": "Remove a private folder and move its files to the parent without deleting archives.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "path": "Projects/Concepts"
+      }
     },
     {
       "id": "ui.library",

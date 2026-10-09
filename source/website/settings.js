@@ -64,6 +64,7 @@ export class Settings
         CookieSetBoolVal ('ov_show_edges', this.edgeSettings.showEdges);
         CookieSetRGBColorVal ('ov_edge_color', this.edgeSettings.edgeColor);
         CookieSetIntVal ('ov_edge_threshold', this.edgeSettings.edgeThreshold);
+        this.onChange?.();
     }
 }
 
@@ -85,5 +86,6 @@ export class CameraSettings
     {
         CookieSetIntVal ('ov_navigation_mode', this.navigationMode);
         CookieSetIntVal ('ov_projection_mode', this.projectionMode);
+        this.onChange?.();
     }
 }

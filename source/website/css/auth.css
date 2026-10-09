@@ -1,0 +1,32 @@
+.auth_panel { width: min(360px, 82vw); margin: 22px auto 0; text-align: left; }
+.auth_panel h2 { font-size: 18px; margin: 0 0 14px; }
+.auth_panel form { display: grid; gap: 12px; }
+.auth_panel form[hidden] { display: none; }
+.auth_panel label { display: grid; gap: 6px; font-size: 13px; }
+.auth_panel input { box-sizing: border-box; width: 100%; padding: 10px 12px; border: 1px solid #547087; border-radius: 5px; background: #fff; color: #15202b; font: inherit; }
+.auth_panel button, .auth_header_button { padding: 10px 16px; border: 1px solid #398ab1; border-radius: 5px; background: #65c4ee; color: #071421; cursor: pointer; font: inherit; }
+.auth_panel button:disabled { opacity: .6; cursor: wait; }
+.auth_panel .auth_continue { width: 100%; margin-top: 12px; background: transparent; color: inherit; }
+.auth_hint { font-size: 12px; line-height: 1.5; opacity: .8; }
+.auth_status { font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.auth_header_button { margin: 0 8px; padding: 7px 12px; }
+.startup_splash { overflow-y: auto; }
+.startup_splash .splash_identity { box-sizing: border-box; max-height: 100%; }
+.startup_splash .splash_tour { z-index: 1; }
+@media (max-height: 650px) { .startup_splash { display: block; } .splash_identity { padding: 18px; } .splash_logo { width: min(280px, 65vw); } .splash_identity p { margin: 12px 0; } .startup_splash .splash_tour { position: relative; left: auto; bottom: auto; margin: 12px 18px; } }
+.account_request_row { border-bottom: 1px solid var(--ov_border_color); padding: 14px 0; display: grid; gap: 8px; }
+.account_request_row label { display: grid; gap: 6px; }
+.account_request_row p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.account_request_list { max-height: 60vh; overflow: auto; }
+
+.auth_locked #main, .auth_locked #header, .auth_locked #toolbar, .auth_locked #material_drawer, .auth_locked #advance_animation_panel, .auth_locked #startup_splash { visibility: hidden; pointer-events: none; }
+#auth_gate { position: fixed; inset: 0; z-index: 200000; overflow: auto; background: #101d2b; color: #eef5fb; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+#auth_gate[hidden] { display: none; }
+
+.password_input { position: relative; display: flex; align-items: center; }
+.auth_panel .password_input input { width: 100%; padding-right: 44px; box-sizing: border-box; }
+.auth_panel .password_eye { position: absolute; right: 4px; width: 34px; min-height: 30px; padding: 5px; margin: 0; border: 0; background: transparent; color: inherit; }
+.auth_header_button { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.auth_header_button { background: transparent; border: 0; color: #249dcf; box-shadow: none; }
+.auth_header_button:hover { background: var(--ov_hover_color); }

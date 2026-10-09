@@ -9,3 +9,4 @@ create index if not exists auto3d_members_org_role_idx
 
 create index if not exists auto3d_identities_user_idx
     on public.auto3d_user_identities (user_id);
+

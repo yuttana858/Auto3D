@@ -6,7 +6,7 @@ const output = 'build/pages';
 await mkdir (output, { recursive: true });
 await cp ('website', output, { recursive: true });
 await cp ('build/website', path.join (output, 'o3dv'), { recursive: true });
-const version = createHash ('sha256').update (await readFile ('build/website/o3dv.website.min.js')).update (await readFile ('build/website/o3dv.website.min.css')).digest ('hex').slice (0, 12);
+const version = createHash ('sha256').update (await readFile ('build/website/o3dv.website.min.js')).update (await readFile ('build/website/o3dv.website.min.css')).update (await readFile ('build/website/o3dv.optimize.js')).digest ('hex').slice (0, 12);
 for (const file of ['index.html', 'embed.html', 'info/index.html', 'info/cookies.html', 'info/faq.html']) {
     const target = path.join (output, file);
     const prefix = file.startsWith ('info/') ? '../' : '';

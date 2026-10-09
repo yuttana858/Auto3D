@@ -35,6 +35,14 @@ Run the workflow manually from **Actions → Deploy Cloudflare Pages → Run wor
 
 After the first successful deployment, Cloudflare assigns the project a `pages.dev` hostname. No purchased domain is required.
 
+## Library database configuration
+
+Set `SUPABASE_URL` and the encrypted `SUPABASE_SECRET_KEY` in the Pages project's production environment, and separately in preview if preview Library access is needed. Redeploy after changing configuration. Library and share Functions require both values and return 503 when configuration is missing or invalid; they no longer fall back to the prototype project or a publishable key. New `sb_secret_` keys use the upstream `apikey` header; legacy `service_role` JWT keys also use bearer authorization. These values stay in server Functions and must never enter static assets or browser configuration.
+
+`GET /api/health` now makes a bounded read-only query against `auto3d_library`. It returns HTTP 200 with `database: "ok"` when the table is accessible, or HTTP 503 with `database: "unavailable"` otherwise. It reports no model rows, credentials or upstream error details. This verifies metadata access only, not R2, share RPCs, schema migrations, or sign-in. The existing public published catalog remains read-only; per-user authorization is separate work.
+
+After deployment, check `/api/health`, then `/api/library/items`, and open an existing published model. Verify share access-code and download controls on an existing share. Never test database access by putting a secret into a browser URL.
+
 ## Security
 
 Do not commit Cloudflare API tokens. Keep the API token scoped only to Cloudflare Pages Edit for the intended account. Rotate or revoke it when this temporary hosting path is retired.
