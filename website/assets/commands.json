@@ -1935,6 +1935,177 @@
       }
     },
     {
+      "id": "camera.open",
+      "title": "Open camera settings",
+      "category": "Camera",
+      "description": "Open the left Camera panel with FOV and named session views.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "camera.inspect",
+      "title": "Inspect saved cameras",
+      "category": "Camera",
+      "description": "List named camera views saved in the current session.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "camera.fov",
+      "title": "Set camera field of view",
+      "category": "Camera",
+      "description": "Set current camera FOV in degrees and update view framing. Stops camera playback.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fov": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 120
+          }
+        },
+        "required": [
+          "fov"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "fov": 45
+      }
+    },
+    {
+      "id": "camera.create",
+      "title": "Save camera view",
+      "category": "Camera",
+      "description": "Save current position, target, orientation, projection and FOV as a named session camera. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "name": "Front view"
+      }
+    },
+    {
+      "id": "camera.activate",
+      "title": "Go to saved camera",
+      "category": "Camera",
+      "description": "Restore a saved camera view and stop timeline playback. Works in read-only viewers.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "camera-id"
+      }
+    },
+    {
+      "id": "camera.update",
+      "title": "Update saved camera",
+      "category": "Camera",
+      "description": "Replace a named camera with the current view, retaining its name and ID. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "camera-id"
+      }
+    },
+    {
+      "id": "camera.rename",
+      "title": "Rename saved camera",
+      "category": "Camera",
+      "description": "Rename a saved session camera. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "camera-id",
+        "name": "Overview"
+      }
+    },
+    {
+      "id": "camera.delete",
+      "title": "Delete saved camera",
+      "category": "Camera",
+      "description": "Remove a saved camera from this session. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "camera-id"
+      }
+    },
+    {
       "id": "animation.timeline.inspect",
       "title": "Inspect keyframe timeline",
       "category": "Animation",

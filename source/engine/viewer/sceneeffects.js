@@ -323,6 +323,10 @@ export class SceneEffects
         const size = bounds.getSize (new THREE.Vector3 ());
         const extent = Math.max (size.x, size.y, size.z, 1) * 1.5;
         light.userData.auto3dShadowExtent = extent;
+        const up = this.viewer.upVector;
+        const direction = [1, 1, 1];
+        direction[up.direction === Direction.X ? 0 : up.direction === Direction.Z ? 2 : 1] = up.isFlipped ? -2 : 2;
+        light.userData.auto3dShadowDirection = direction;
         light.shadow.camera.near = Math.max (0.000001, extent / 1000);
         light.shadow.normalBias = extent * 0.001;
         light.shadow.camera.left = -extent;

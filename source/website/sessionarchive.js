@@ -1,3 +1,4 @@
+import { ValidateCameraViews } from './sessioncameras.js';
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { Model } from '../engine/model/model.js';
 import { Mesh } from '../engine/model/mesh.js';
@@ -172,6 +173,7 @@ export function PackSession (document, view = {}, objects = document.objects, ki
 export function ReadSession (data)
 {
     data = MigrateSessionData (data);
+    if (data.view?.cameraViews !== undefined) { data.view.cameraViews = ValidateCameraViews (data.view.cameraViews); }
     if (!data.model || !Array.isArray (data.model.nodes) || !Array.isArray (data.model.materials) || !Array.isArray (data.model.meshes)) { throw new Error ('Invalid model data.'); }
     if (!Array.isArray (data.objects) || data.objects.length > 1000 || data.objects.length !== data.model.nodes.length) { throw new Error ('Invalid object list.'); }
     const document = new SceneDocument (); document.packaging = data.packaging ? ValidatePackaging (data.packaging) : null;

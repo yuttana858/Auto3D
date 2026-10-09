@@ -1,3 +1,4 @@
+import { SessionCameras } from './sessioncameras.js';
 import { CalculateVolume, CalculateSurfaceArea } from '../engine/model/quantities.js';
 import { IsTwoManifold } from '../engine/model/modelutils.js';
 import { PackagingWorkspace } from './packagingworkspace.js';
@@ -58,7 +59,7 @@ export class SessionEditor
     constructor (website)
     {
         this.website = website; this.document = new SceneDocument (); this.history = new SceneHistory (() => this.MarkDirty ()); this.selected = null; this.selectedIds = new Set (); this.selectionPivot = new THREE.Group (); website.viewer.scene.add (this.selectionPivot); this.mode = 'select'; this.busy = false; this.players = []; this.proportionalScaling = false; this.modelPreview = null;
-        this.packaging = new PackagingWorkspace (this); this.timeline = new SessionTimeline (this); this.polygonOptimizer = new PolygonOptimizer (this);
+        this.packaging = new PackagingWorkspace (this); this.timeline = new SessionTimeline (this); this.cameras = new SessionCameras (this); this.polygonOptimizer = new PolygonOptimizer (this);
         this.baseSizes = new WeakMap (); this.recoveryWriter = new RecoveryWriter (); this.recoveryRevision = 0;
         this.library = new ModelLibrary (this); this.buttons = new Map (); this.dirty = false; this.recoveryTimer = null; this.recoveryPromptOpen = false; this.recoveryPromptHandled = false;
         const viewer = website.viewer;
@@ -832,6 +833,9 @@ export class SessionEditor
         const cameraNow = CaptureCameraState (this.website.viewer);
         Element ('span', 'timeline_camera_readout', 'Cam ' + cameraNow.azimuth.toFixed (1) + '° az · ' + cameraNow.elevation.toFixed (1) + '° el', nativeHeader);
 
+        const cameraSettings = Element ('button', 'timeline_camera_settings', 'Camera settings', nativeHeader);
+        cameraSettings.addEventListener ('click', () => this.website.cameraPanel.Open ());
+
         const settings = Element ('div', 'timeline_settings', undefined, native);
         const durationLabel = Element ('label', null, 'Duration', settings); const duration = Element ('input', null, undefined, durationLabel); duration.type = 'number'; duration.min = '0.1'; duration.max = '3600'; duration.step = '0.1'; duration.value = String (timeline.duration); duration.setAttribute ('aria-label', 'Timeline duration in seconds');
         duration.disabled = this.readOnly;
@@ -1063,7 +1067,7 @@ export class SessionEditor
 
     CaptureView ()
     {
-        return { camera : this.website.viewer.GetCamera (), cameraState : CaptureCameraState (this.website.viewer), timeline : this.timeline.Serialize (), backgroundPreset : this.website.settings.backgroundPreset, horizonGradient : this.website.settings.horizonGradient, showGroundGrid : this.website.settings.showGroundGrid, lighting : this.website.lightingPanel.Capture () };
+        return { camera : this.website.viewer.GetCamera (), cameraState : CaptureCameraState (this.website.viewer), timeline : this.timeline.Serialize (), cameraViews : this.cameras.Inspect (), backgroundPreset : this.website.settings.backgroundPreset, horizonGradient : this.website.settings.horizonGradient, showGroundGrid : this.website.settings.showGroundGrid, lighting : this.website.lightingPanel.Capture () };
     }
     async ArchiveAsync (objects, kind, name)
     {
@@ -1085,7 +1089,7 @@ export class SessionEditor
                 const object = this.document.AddImported (model, source.name, Direction.Y, false); Object.assign (object, TransformState (source), { source : source.source, packagingProfile : source.packagingProfile, visible : source.visible, hiddenParts : [...source.hiddenParts], unit : source.unit, userData : { ...(source.userData || {}) }, castShadow : source.castShadow !== false, receiveShadow : source.receiveShadow !== false, keyframes : (source.keyframes || []).map ((keyframe) => ({ ...keyframe, position : [...keyframe.position], rotation : [...keyframe.rotation], scale : [...keyframe.scale] })), animationAsset : source.animationAsset, playback : source.playback }); this.document.ApplyTransform (object); added.push (object);
             }
             const firstIndex = this.document.objects.length - added.length; this.history.Push ({ undo : async () => { added.forEach ((object) => this.document.Remove (object)); this.selected = null; await this.Render (); }, redo : async () => { added.forEach ((object, index) => this.document.Restore (object, firstIndex + index)); this.selected = added[0]; await this.Render (); } }); this.selected = added[0];
-        } else { this.document = saved.document; this.history = new SceneHistory (() => this.MarkDirty ()); this.timeline.Load (saved.view.timeline); this.selected = this.document.objects[0] || null; if (this.website.hashHandler.HasHash ()) { this.website.hashHandler.SkipNextEventHandler (); this.website.hashHandler.ClearHash (); } }
+        } else { this.document = saved.document; this.history = new SceneHistory (() => this.MarkDirty ()); this.timeline.Load (saved.view.timeline); this.cameras.Load (saved.view.cameraViews); this.selected = this.document.objects[0] || null; if (this.website.hashHandler.HasHash ()) { this.website.hashHandler.SkipNextEventHandler (); this.website.hashHandler.ClearHash (); } }
         await this.Render (true);
         if (!append) {
             if (['standard', 'dark', 'light', 'sunset', 'outdoor', 'custom'].includes (saved.view.backgroundPreset)) { this.website.settings.backgroundPreset = saved.view.backgroundPreset; }
@@ -1099,6 +1103,7 @@ export class SessionEditor
             const camera = this.website.viewer.GetCamera (); const data = saved.view.camera;
             if (['eye', 'center', 'up'].every ((key) => data[key] && ['x', 'y', 'z'].every ((axis) => Number.isFinite (data[key][axis])))) { ['eye', 'center', 'up'].forEach ((key) => Object.assign (camera[key], data[key])); if (Number.isFinite (data.fov)) { camera.fov = data.fov; } this.website.viewer.SetCamera (camera); }
         }
+        this.website.cameraPanel?.Render ();
         this.Status ((append ? 'Added from ' : 'Opened ') + saved.document.name);
         if (!append) {
             if (recovered) { this.dirty = true; }
@@ -1171,3 +1176,4 @@ export class SessionEditor
         if (action) { event.preventDefault (); this.Run (action); }
     }
 }
+

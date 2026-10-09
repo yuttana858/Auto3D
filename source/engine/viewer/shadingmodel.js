@@ -110,11 +110,15 @@ export class ShadingModel
 
     UpdateByCamera (camera)
     {
-        const lightDir = SubCoord3D (camera.eye, camera.center);
-        this.directionalLight.position.set (lightDir.x, lightDir.y, lightDir.z);
         const extent = this.directionalLight.userData.auto3dShadowExtent;
         if (this.directionalLight.castShadow && Number.isFinite (extent)) {
-            this.directionalLight.position.normalize ().multiplyScalar (extent * 3).add (this.directionalLight.target.position);
+            // The world light (and HDRI rotation) determines shadow direction.
+            // Orbiting or playing a camera animation must not move the sun.
+            const direction = this.directionalLight.userData.auto3dShadowDirection || [1, 2, 1];
+            this.directionalLight.position.set (...direction).applyEuler (this.scene?.environmentRotation || new THREE.Euler ()).normalize ().multiplyScalar (extent * 3).add (this.directionalLight.target.position);
+            return;
         }
+        const lightDir = SubCoord3D (camera.eye, camera.center);
+        this.directionalLight.position.set (lightDir.x, lightDir.y, lightDir.z);
     }
 }

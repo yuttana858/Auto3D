@@ -71,6 +71,19 @@ describe ('Scene effects render state', () => {
         assert.deepEqual (light.target.position.toArray (), [10000, 5000, -2000]); assert.ok (Math.abs (light.position.distanceTo (light.target.position) - light.userData.auto3dShadowExtent * 3) < 0.0001); assert.ok (light.shadow.camera.near > 0);
         effects.Set ('shadows', false); assert.deepEqual (light.target.position.toArray (), [0, 0, 0]); effects.Dispose ();
     });
+    it ('Locks shadow direction to global lighting rather than orbiting cameras', () => {
+        const { effects, viewer } = fixture (); viewer.shadingModel.scene = viewer.scene;
+        effects.Set ('shadows', true);
+        const apply = camera => ShadingModel.prototype.UpdateByCamera.call (viewer.shadingModel, camera);
+        apply ({ eye : { x : 10, y : 5, z : 10 }, center : { x : 0, y : 0, z : 0 } });
+        const before = viewer.shadingModel.directionalLight.position.clone ();
+        apply ({ eye : { x : -10, y : 2, z : -15 }, center : { x : 0, y : 0, z : 0 } });
+        assert.ok (before.distanceTo (viewer.shadingModel.directionalLight.position) < 1e-9);
+        viewer.scene.environmentRotation.y = Math.PI / 2;
+        apply ({ eye : { x : -10, y : 2, z : -15 }, center : { x : 0, y : 0, z : 0 } });
+        assert.ok (before.distanceTo (viewer.shadingModel.directionalLight.position) > 1);
+        effects.Dispose ();
+    });
     it ('Uses additive Phong reflection and restores baseline combine and reflectivity', () => {
         const { effects, root } = fixture (); root.children[0].material = new THREE.MeshPhongMaterial (); const material = root.children[0].material; const combine = material.combine; const reflectivity = material.reflectivity;
         effects.settings.modelReflections = true; effects.UpdateDynamicReflection (); assert.equal (material.combine, THREE.AddOperation); effects.RestoreMaterialReflections (); assert.equal (material.combine, combine); assert.equal (material.reflectivity, reflectivity); effects.Dispose ();
