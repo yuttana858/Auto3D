@@ -911,17 +911,6 @@ export class Website
             });
         });
 
-        let selectedTheme = (this.settings.themeId === Theme.Light ? 1 : 0);
-        AddRadioButton (this.toolbar, ['dark_mode', 'light_mode'], [Loc ('Dark mode'), Loc ('Light mode')], selectedTheme, ['align_right'], (buttonIndex) => {
-            if (buttonIndex === 0) {
-                this.settings.themeId = Theme.Dark;
-            } else if (buttonIndex === 1) {
-                this.settings.themeId = Theme.Light;
-            }
-            HandleEvent ('theme_changed', this.settings.themeId === Theme.Light ? 'light' : 'dark');
-            this.SwitchTheme (this.settings.themeId, true);
-        });
-
         this.parameters.fileInput.addEventListener ('change', (ev) => {
             if (ev.target.files.length > 0) {
                 HandleEvent ('model_load_started', 'open_file');

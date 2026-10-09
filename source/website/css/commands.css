@@ -9,3 +9,22 @@
 .command_dialog h3 { font-size: 15px; margin: 0; }
 .macro_editor { border-top: 1px solid var(--ov_border_color); margin-top: 24px; padding-top: 20px; }
 @media (max-width: 650px) { .command_shell { grid-template-columns: 1fr; } .command_list { max-height: 160px; } }
+.command_dialog details { border: 1px solid var(--ov_border_color); border-radius: 6px; padding: 10px; margin-bottom: 8px; }
+.command_dialog summary { cursor: pointer; font-weight: bold; padding: 5px; }
+.command_list details details { border: 0; padding: 4px; margin: 0; }
+.command_list button { display: block; width: 100%; text-align: left; margin: 4px 0; }
+.command_field { display: grid; grid-template-columns: minmax(100px, 1fr) auto minmax(100px, 2fr); align-items: center; gap: 8px; margin: 10px 0; }
+.command_field input, .command_field select { min-width: 0; width: 100%; box-sizing: border-box; }
+.command_field input[type=checkbox] { width: auto; }
+.command_field input[hidden] { display: none; }
+.command_vector { display: flex; gap: 4px; }
+.command_dialog pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 200px; overflow: auto; }
+.macro_steps { display: flex; flex-direction: column; gap: 6px; }
+.macro_step button { margin: 4px; }
+.command_dialog .macro_editor { display: block; }
+.command_dialog .macro_editor > input, .command_dialog .macro_editor > select { margin: 8px 4px; max-width: 100%; }
+.command_dialog .macro_editor > button { margin: 8px 4px; }
+.command_dialog textarea { width: 100%; box-sizing: border-box; }
+.command_field { display: flex; flex-wrap: wrap; }
+.command_field > span { flex: 1 0 100px; }
+.command_field > input:not([type=checkbox]), .command_field > select, .command_field > .command_vector { flex: 2 1 140px; width: auto; }

@@ -1208,6 +1208,47 @@
       }
     },
     {
+      "id": "macro.design.edit",
+      "title": "Edit visual macro",
+      "category": "Macros",
+      "description": "Add, update, remove or reorder a visual macro step without executing it. Existing step IDs are preserved. Index is zero-based.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "definition": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "add",
+              "update",
+              "remove",
+              "move"
+            ]
+          },
+          "step": {
+            "type": "string"
+          },
+          "index": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "definition",
+          "action",
+          "step"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "definition": "{\"version\":1,\"steps\":[]}",
+        "action": "add",
+        "step": "{\"command\":\"scene.inspect\",\"arguments\":{}}"
+      }
+    },
+    {
       "id": "macro.list",
       "title": "List saved macros",
       "category": "Macros",

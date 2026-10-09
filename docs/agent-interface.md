@@ -51,3 +51,11 @@ The paper-packaging knowledge base separates box structure, board/material const
 ## MCP / plugin adapter contract
 
 This is an in-page execution API, not a deployed MCP server or a ChatGPT plugin connection. A future authenticated bridge should expose catalog search, execute, runMacro, and cancelMacro as MCP tools and relay them to a specific live viewer session. It must preserve schemas/results, session identity, read-only enforcement, and explicit authorization for publication. A remote server cannot directly reach a browser's `window` object without this bridge. Never expose arbitrary JavaScript execution or credentials as a command.
+
+## Visual command workspace
+
+Preferences contains the Light/Dark appearance selector; the main toolbar no longer duplicates it. Commands and macros has a searchable category/subcategory tree, collapsible account inspection and macro builder, and typed argument controls. Visual steps show plain-language array W/L/H counts and move/rotate/scale values. Expand a step to edit it, apply Update step, or reorder/remove it. JSON, result references and exports remain in Advanced. Changes entered in Advanced require Apply code to visual steps before running or saving.
+
+`macro.design.edit` and the UI share `EditMacro` in `macrodesign.js`. It edits a supplied definition without running commands and preserves existing step IDs/references. Reordering can make a reference point to a future step; the runtime rejects that reference instead of guessing. Actual runs still use CommandRegistry's preflight, authorization, read-only checks and sequential execution. Saved macros remain local to this browser.
+
+For an open → array → add pallet → move sequence, use `library.account.open` with an owned saved model, `object.array` (2 W, 3 L, 6 H), another Library open with Append enabled for a saved pallet, then `object.transform`. The Library selector lists owned item names. There is no built-in pallet generator. Commands opening interactive dialogs do not wait for the user's eventual file selection and should be run separately.

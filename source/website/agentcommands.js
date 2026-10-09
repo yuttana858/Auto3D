@@ -1,3 +1,4 @@
+import { EditMacro } from './macrodesign.js';
 import { CommandRegistry } from './commandregistry.js';
 import { Theme } from './settings.js';
 import { HexStringToRGBColor } from '../engine/model/color.js';
@@ -130,6 +131,7 @@ export function CreateAgentCommands (website)
         if (Number.isFinite (time)) { editor.timeline.time = Math.min (time, editor.timeline.duration); } if (interpolation) { editor.timeline.interpolation = interpolation; }
         const keyframe = editor.timeline.CaptureCamera (); editor.MarkDirty (); editor.AnimationUI (); return keyframe;
     }, { time : 0, interpolation : 'smooth' });
+    add ('macro.design.edit', 'Edit visual macro', 'Macros', 'Add, update, remove or reorder a visual macro step without executing it. Existing step IDs are preserved. Index is zero-based.', { definition : text, action : enumOf ('add', 'update', 'remove', 'move'), step : text, index : number }, ['definition', 'action', 'step'], false, ({ definition, action, step, index }) => ({ macro : EditMacro (JSON.parse (definition), action, JSON.parse (step), index) }), { definition : '{"version":1,"steps":[]}', action : 'add', step : '{"command":"scene.inspect","arguments":{}}' });
     add ('macro.list', 'List saved macros', 'Macros', 'Return macros stored in this browser.', {}, [], false, () => { const macros = JSON.parse (localStorage.getItem ('auto3d-macros-v1') || '[]'); if (!Array.isArray (macros)) { throw new Error ('Invalid macro storage.'); } return macros; });
     add ('macro.save', 'Save macro', 'Macros', 'Save a named version 1 macro locally. Definition is a JSON string; matching names are replaced.', { name : text, definition : text }, ['name', 'definition'], false, ({ name, definition }) => {
         const macro = JSON.parse (definition); if (!name.trim () || macro.version !== 1 || !Array.isArray (macro.steps) || !macro.steps.length || macro.steps.length > 100) { throw new Error ('Enter a name and a version 1 macro with 1–100 steps.'); }
