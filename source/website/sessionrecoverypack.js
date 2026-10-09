@@ -32,7 +32,7 @@ export function PackRecoverySnapshot (snapshot)
     }), children : node.children.map (packNode) });
     const nodes = snapshot.objects.map ((object) => packNode (object.node));
     return {
-        format : 'SW Auto3D', version : SessionVersion, metadata : { savedAt : new Date ().toISOString () }, kind : snapshot.kind || 'session', name : snapshot.name, view : snapshot.view,
+        format : 'SW Auto3D', version : SessionVersion, metadata : { savedAt : new Date ().toISOString () }, kind : snapshot.kind || 'session', name : snapshot.name, view : snapshot.view, packaging : snapshot.packaging || null,
         objects : snapshot.objects.map ((object) => {
             const { node, ...data } = object;
             return { ...data, animationAsset : object.animationAsset ? { main : object.animationAsset.main, files : object.animationAsset.files.map ((file) => ({ name : file.name, buffer : EncodeBuffer (file.buffer) })) } : null };

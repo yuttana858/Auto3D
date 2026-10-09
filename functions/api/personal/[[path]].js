@@ -18,7 +18,7 @@ export async function onRequest ({ request, env, data, params })
             if ([...form.keys ()].some ((key) => !allowed.includes (key)) || allowed.some ((key) => form.getAll (key).length !== 1)) { throw Failure ('Invalid upload fields.'); }
             const name = String (form.get ('name')).trim (); const category = Folder (form.get ('category')); const kind = form.get ('kind'); const objects = Number (form.get ('objects'));
             const archive = form.get ('archive'); const thumbnail = form.get ('thumbnail');
-            if (!name || name.length > 100 || !['session', 'model'].includes (kind) || !Number.isInteger (objects) || objects < 1 || objects > 1000 || !(archive instanceof Blob) || archive.size < 4 || archive.size > MaxArchive || !(thumbnail instanceof Blob) || thumbnail.size > 1024 * 1024) { throw Failure ('Invalid save or size exceeds account limits.'); }
+            if (!name || name.length > 100 || !['session', 'model'].includes (kind) || !Number.isInteger (objects) || objects < 0 || (objects === 0 && kind !== 'session') || objects > 1000 || !(archive instanceof Blob) || archive.size < 4 || archive.size > MaxArchive || !(thumbnail instanceof Blob) || thumbnail.size > 1024 * 1024) { throw Failure ('Invalid save or size exceeds account limits.'); }
             const zip = new Uint8Array (await archive.slice (0, 4).arrayBuffer ()); const png = new Uint8Array (await thumbnail.slice (0, 8).arrayBuffer ());
             if (zip.join (',') !== '80,75,3,4' || png.join (',') !== '137,80,78,71,13,10,26,10') { throw Failure ('Expected an Auto3D archive and PNG preview.'); }
             const id = crypto.randomUUID (); const prefix = 'users/' + owner + '/' + id;

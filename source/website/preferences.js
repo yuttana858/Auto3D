@@ -118,7 +118,7 @@ export class Preferences
             this.website.sidebar.AddObject3DProperties (this.website.model, this.website.model);
             this.website.sessionEditor.UnitsChanged ();
         }
-        this.website.measureTool?.UpdatePanel ();
+        this.website.measureTool?.UpdatePanel (); this.website.sessionEditor?.packaging?.Refresh ();
         return this.SaveAccount ();
     }
     async LoadAccount (id)
@@ -167,4 +167,3 @@ export class Preferences
         return this.pendingSave;
     }
 }
-

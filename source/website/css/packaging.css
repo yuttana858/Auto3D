@@ -1,0 +1,16 @@
+.packaging_dialog { width: min(1240px, 94vw); max-width: 94vw; height: min(850px, 90vh); }
+.packaging_body { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 16px; padding: 16px; min-height: 0; height: calc(100% - 92px); }
+.packaging_controls { display: flex; flex-direction: column; gap: 8px; overflow: auto; padding-right: 8px; }
+.packaging_controls label { display: grid; gap: 4px; font-size: 12px; }
+.packaging_controls input, .packaging_controls select, .packaging_controls button, .packaging_drawing button { background: var(--ov_background_color); color: var(--ov_foreground_color); border: 1px solid var(--ov_border_color); padding: 7px; border-radius: 4px; min-width: 0; font: inherit; }
+.packaging_controls button { cursor: pointer; font-size: 12px; }
+.packaging_controls button:hover, .packaging_drawing button:hover { border-color: var(--ov_button_color); }
+.packaging_actions { display: flex; gap: 6px; }
+.packaging_actions button { flex: 1; }
+.packaging_drawing { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
+.packaging_drawing_header { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; }
+.packaging_canvas { width: 100%; flex: 1; min-height: 200px; background: var(--ov_background_color); border: 1px solid var(--ov_border_color); cursor: crosshair; touch-action: none; }
+.packaging_status { min-height: 36px; font-size: 13px; }
+.packaging_vertices { max-height: 220px; overflow: auto; margin-top: 8px; }
+.packaging_vertex { display: grid; grid-template-columns: 18px 1fr 1fr; align-items: center; gap: 4px; margin-bottom: 4px; font-size: 12px; }
+@media (max-width: 700px) { .packaging_body { grid-template-columns: 185px minmax(0, 1fr); gap: 8px; padding: 8px; } .packaging_drawing_header { flex-direction: column; align-items: start; } }

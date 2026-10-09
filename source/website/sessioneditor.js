@@ -1,5 +1,6 @@
 import { CalculateVolume, CalculateSurfaceArea } from '../engine/model/quantities.js';
 import { IsTwoManifold } from '../engine/model/modelutils.js';
+import { PackagingWorkspace } from './packagingworkspace.js';
 import { PolygonOptimizer } from './polygonoptimizer.js';
 import * as THREE from 'three';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
@@ -41,6 +42,7 @@ export function DropToFloorDelta (box, upVector)
 }
 
 const Icons = {
+    packaging : '<path d="M3 4h18v16H3Z M8 4v16 M16 4v16 M3 10h18"/>',
     select : '<path d="m6 3 13 10-7 1-3 7Z"/>', move : '<path d="M12 2v20M2 12h20m-13-7 3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3m14-6 3 3-3 3"/>',
     rotate : '<path d="M20 8a9 9 0 1 0 1 8M20 3v6h-6"/>', scale : '<path d="M4 13v7h7M13 4h7v7M4 20l16-16"/>', duplicate : '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M15 8V4H4v11h4"/>',
     visible : '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>', remove : '<path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/>',
@@ -56,7 +58,7 @@ export class SessionEditor
     constructor (website)
     {
         this.website = website; this.document = new SceneDocument (); this.history = new SceneHistory (() => this.MarkDirty ()); this.selected = null; this.selectedIds = new Set (); this.selectionPivot = new THREE.Group (); website.viewer.scene.add (this.selectionPivot); this.mode = 'select'; this.busy = false; this.players = []; this.proportionalScaling = false; this.modelPreview = null;
-        this.timeline = new SessionTimeline (this); this.polygonOptimizer = new PolygonOptimizer (this);
+        this.packaging = new PackagingWorkspace (this); this.timeline = new SessionTimeline (this); this.polygonOptimizer = new PolygonOptimizer (this);
         this.baseSizes = new WeakMap (); this.recoveryWriter = new RecoveryWriter (); this.recoveryRevision = 0;
         this.library = new ModelLibrary (this); this.buttons = new Map (); this.dirty = false; this.recoveryTimer = null; this.recoveryPromptOpen = false; this.recoveryPromptHandled = false;
         const viewer = website.viewer;
@@ -97,6 +99,7 @@ export class SessionEditor
         window.addEventListener ('blur', cancelDrag);
         this.CreateUI ();
         const headerLibrary = Element ('button', 'header_library_button', undefined, document.getElementById ('header_buttons'));
+        const packagingButton = Element ('button', 'header_library_button', 'Packaging', document.getElementById ('header_buttons')); packagingButton.setAttribute ('aria-label', 'Packaging design'); packagingButton.addEventListener ('click', () => this.Run (() => this.packaging.Open ()));
         headerLibrary.title = 'Saved models and sessions'; headerLibrary.setAttribute ('aria-label', 'Library');
         headerLibrary.innerHTML = '<svg viewBox="0 0 26 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6">' + Icons.library + '</svg><span>Library</span>';
         headerLibrary.addEventListener ('click', () => this.library.Open ());
@@ -201,7 +204,7 @@ export class SessionEditor
     CreateUI ()
     {
         this.strip = Element ('div', 'scene_tools', undefined, this.website.parameters.rightContainerDiv); this.strip.setAttribute ('role', 'toolbar'); this.strip.setAttribute ('aria-label', 'Object tools');
-        const tools = [['select', 'Select (V)', () => this.SetMode ('select')], ['move', 'Move (W)', () => this.SetMode ('translate')], ['rotate', 'Rotate (E)', () => this.SetMode ('rotate')], ['scale', 'Scale (R)', () => this.SetMode ('scale')], ['duplicate', 'Duplicate object (Ctrl+D)', () => this.Duplicate ()], ['array', 'Array selected object', () => this.ArrayDialog ()], ['floor', 'Drop selected object to floor', () => this.DropToFloor ()], ['visible', 'Hide or show object (H)', () => this.ToggleVisibility ()], ['remove', 'Delete object', () => this.Delete ()], ['focus', 'Focus object (F)', () => this.Focus ()], ['fit', 'Fit all objects to screen', () => this.FitScene ()], ['update', 'Update selected model', () => this.UpdateModel ()], ['undo', 'Undo object edit (Ctrl+Z)', () => this.Undo ()], ['redo', 'Redo object edit (Ctrl+Shift+Z)', () => this.Redo ()], ['add', 'Add model', () => this.AddModel ()], ['save', 'Save or open session (Ctrl+S)', () => this.library.SaveDialog (true)], ['export', 'Export', () => this.Export ()], ['library', 'Model library', () => this.library.Open ()], ['ai', 'AI Generative', () => this.website.aiWorkspace?.Open ()]];
+        const tools = [['packaging', 'Packaging design', () => this.packaging.Open ()], ['select', 'Select (V)', () => this.SetMode ('select')], ['move', 'Move (W)', () => this.SetMode ('translate')], ['rotate', 'Rotate (E)', () => this.SetMode ('rotate')], ['scale', 'Scale (R)', () => this.SetMode ('scale')], ['duplicate', 'Duplicate object (Ctrl+D)', () => this.Duplicate ()], ['array', 'Array selected object', () => this.ArrayDialog ()], ['floor', 'Drop selected object to floor', () => this.DropToFloor ()], ['visible', 'Hide or show object (H)', () => this.ToggleVisibility ()], ['remove', 'Delete object', () => this.Delete ()], ['focus', 'Focus object (F)', () => this.Focus ()], ['fit', 'Fit all objects to screen', () => this.FitScene ()], ['update', 'Update selected model', () => this.UpdateModel ()], ['undo', 'Undo object edit (Ctrl+Z)', () => this.Undo ()], ['redo', 'Redo object edit (Ctrl+Shift+Z)', () => this.Redo ()], ['add', 'Add model', () => this.AddModel ()], ['save', 'Save or open session (Ctrl+S)', () => this.library.SaveDialog (true)], ['export', 'Export', () => this.Export ()], ['library', 'Model library', () => this.library.Open ()], ['ai', 'AI Generative', () => this.website.aiWorkspace?.Open ()]];
         for (const [key, label, action] of tools) {
             const button = Element ('button', 'scene_tool', undefined, this.strip); button.title = label; button.setAttribute ('aria-label', label); button.innerHTML = '<svg viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">' + Icons[key] + '</svg>';
             button.addEventListener ('click', () => this.Run (action)); this.buttons.set (key, button);
@@ -340,14 +343,14 @@ export class SessionEditor
         if (this.readOnly) { return; }
         this.dirty = true; this.recoveryRevision++;
         if (this.recoveryTimer) { clearTimeout (this.recoveryTimer); }
-        if (!this.document.objects.length) { this.recoveryWriter.Cancel (); this.library.deviceStorage.ClearRecovery ().catch (() => {}); return; }
+        if (!this.document.objects.length && !this.document.packaging?.paths?.length) { this.recoveryWriter.Cancel (); this.library.deviceStorage.ClearRecovery ().catch (() => {}); return; }
         this.recoveryTimer = setTimeout (() => this.SaveRecovery (), 1500);
     }
 
     async SaveRecovery ()
     {
         this.recoveryTimer = null;
-        if (!this.dirty || this.readOnly || !this.document.objects.length) { return; }
+        if (!this.dirty || this.readOnly || (!this.document.objects.length && !this.document.packaging?.paths?.length)) { return; }
         if (this.busy || this.controls.dragging || this.timeline.playing || this.players.some ((player) => player.state.playing) || this.recoverySaving) {
             this.recoveryTimer = setTimeout (() => this.SaveRecovery (), 1500); return;
         }
@@ -1079,7 +1082,7 @@ export class SessionEditor
             const added = [];
             for (const source of saved.document.objects) {
                 const model = saved.document.CompactModel ([source], true); model.root = model.root.GetChildNode (0);
-                const object = this.document.AddImported (model, source.name, Direction.Y, false); Object.assign (object, TransformState (source), { source : source.source, visible : source.visible, hiddenParts : [...source.hiddenParts], unit : source.unit, userData : { ...(source.userData || {}) }, castShadow : source.castShadow !== false, receiveShadow : source.receiveShadow !== false, keyframes : (source.keyframes || []).map ((keyframe) => ({ ...keyframe, position : [...keyframe.position], rotation : [...keyframe.rotation], scale : [...keyframe.scale] })), animationAsset : source.animationAsset, playback : source.playback }); this.document.ApplyTransform (object); added.push (object);
+                const object = this.document.AddImported (model, source.name, Direction.Y, false); Object.assign (object, TransformState (source), { source : source.source, packagingProfile : source.packagingProfile, visible : source.visible, hiddenParts : [...source.hiddenParts], unit : source.unit, userData : { ...(source.userData || {}) }, castShadow : source.castShadow !== false, receiveShadow : source.receiveShadow !== false, keyframes : (source.keyframes || []).map ((keyframe) => ({ ...keyframe, position : [...keyframe.position], rotation : [...keyframe.rotation], scale : [...keyframe.scale] })), animationAsset : source.animationAsset, playback : source.playback }); this.document.ApplyTransform (object); added.push (object);
             }
             const firstIndex = this.document.objects.length - added.length; this.history.Push ({ undo : async () => { added.forEach ((object) => this.document.Remove (object)); this.selected = null; await this.Render (); }, redo : async () => { added.forEach ((object, index) => this.document.Restore (object, firstIndex + index)); this.selected = added[0]; await this.Render (); } }); this.selected = added[0];
         } else { this.document = saved.document; this.history = new SceneHistory (() => this.MarkDirty ()); this.timeline.Load (saved.view.timeline); this.selected = this.document.objects[0] || null; if (this.website.hashHandler.HasHash ()) { this.website.hashHandler.SkipNextEventHandler (); this.website.hashHandler.ClearHash (); } }
@@ -1104,6 +1107,7 @@ export class SessionEditor
     }
     Thumbnail (objects)
     {
+        if (!objects.length && this.document.packaging?.paths?.length) { return this.packaging.Thumbnail (); }
         const viewer = this.website.viewer; const helperVisible = this.helper.visible; const camera = viewer.GetCamera ().Clone (); const states = this.document.objects.map ((object) => [object.threeObject, object.threeObject.visible]);
         try {
             this.helper.visible = false; viewer.SetMeshesHighlight (this.website.highlightColor, () => false); states.forEach (([root]) => { root.visible = objects.some ((object) => object.threeObject === root); });

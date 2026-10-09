@@ -112,5 +112,9 @@ export class ShadingModel
     {
         const lightDir = SubCoord3D (camera.eye, camera.center);
         this.directionalLight.position.set (lightDir.x, lightDir.y, lightDir.z);
+        const extent = this.directionalLight.userData.auto3dShadowExtent;
+        if (this.directionalLight.castShadow && Number.isFinite (extent)) {
+            this.directionalLight.position.normalize ().multiplyScalar (extent * 3).add (this.directionalLight.target.position);
+        }
     }
 }

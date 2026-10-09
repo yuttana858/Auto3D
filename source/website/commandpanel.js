@@ -1,3 +1,4 @@
+import { CaptureSummary } from './agentcapture.js';
 import { WorkspaceDialog } from './modellibrary.js';
 import { CommandGroup, StepSummary } from './macrodesign.js';
 
@@ -74,7 +75,12 @@ export function OpenCommandPanel (website)
     const list = Element ('div', '', catalog); list.className = 'command_list';
     const detail = Element ('div', '', shell); detail.className = 'command_detail';
     const output = Element ('p', '', dialog); output.className = 'command_output'; output.setAttribute ('role', 'status');
-    const resultDetails = Section ('Advanced: last command result', dialog); const resultCode = Element ('pre', '', resultDetails);
+    const resultDetails = Section ('Advanced: last command result', dialog); const resultCode = Element ('pre', '', resultDetails); const capturePreview = Element ('div', '', dialog); capturePreview.setAttribute ('data-capture-preview', '');
+    const showResult = (result) => {
+        resultCode.textContent = CaptureSummary (result); capturePreview.replaceChildren ();
+        const images = result.result?.content || result.completed?.flatMap ((step) => step.result?.content || []) || [];
+        for (const item of images) { if (item.type !== 'image' || item.mimeType !== 'image/png') { continue; } const image = Element ('img', '', capturePreview); image.src = 'data:image/png;base64,' + item.data; image.alt = 'Auto3D capture'; image.style.maxWidth = '100%'; const link = Element ('a', 'Download capture', capturePreview); link.href = image.src; link.download = 'auto3d-capture.png'; }
+    };
     const macros = Section ('Macro builder', dialog, true); macros.className = 'macro_editor';
     Element ('p', 'Build a sequence by adding commands. Edit each step below. Steps run in order and stop on failure; completed changes remain. Open Library item can open a model or add a saved pallet. Commands that open dialogs require separate user interaction.', macros);
     const name = Element ('input', '', macros); name.value = 'My macro'; name.setAttribute ('aria-label', 'Macro name');
@@ -113,7 +119,7 @@ export function OpenCommandPanel (website)
     const show = (command) => {
         selected = command; detail.replaceChildren (); Element ('h3', command.title, detail); Element ('p', command.description, detail);
         const form = Element ('div', '', detail); readArgs = ArgumentForm (command, command.example, form, website);
-        const run = Element ('button', 'Run command', detail); run.onclick = () => attempt (async () => { run.disabled = true; try { const result = await registry.Execute (selected.id, readArgs ()); resultCode.textContent = JSON.stringify (result, null, 2); output.textContent = result.ok ? 'Completed: ' + command.title : result.error.message; } finally { run.disabled = false; } });
+        const run = Element ('button', 'Run command', detail); run.onclick = () => attempt (async () => { run.disabled = true; try { const result = await registry.Execute (selected.id, readArgs ()); showResult (result); output.textContent = result.ok ? 'Completed: ' + command.title : result.error.message; } finally { run.disabled = false; } });
         Element ('button', 'Add to macro', detail).onclick = () => attempt (async () => { await edit ('add', { command : selected.id, arguments : readArgs () }); macros.open = true; });
         const technical = Section ('Advanced: command details', detail); Element ('pre', JSON.stringify ({ id : command.id, schema : command.inputSchema }, null, 2), technical);
     };
@@ -127,7 +133,7 @@ export function OpenCommandPanel (website)
     const refresh = async () => { const result = await registry.Execute ('macro.list'); library = result.ok ? result.result : []; saved.replaceChildren (new Option ('Choose a saved macro', '')); library.forEach ((item, index) => saved.add (new Option (item.name, String (index)))); };
     saved.onchange = () => { if (saved.value !== '') { const item = library[Number (saved.value)]; name.value = item.name; macro = JSON.parse (JSON.stringify (item.macro)); renderSteps (); } };
     Element ('button', 'Save macro on this device', macros).onclick = () => attempt (async () => { const result = await registry.Execute ('macro.save', { name : name.value, definition : JSON.stringify (macro) }); if (!result.ok) { throw new Error (result.error.message); } await refresh (); output.textContent = 'Macro saved on this device.'; });
-    const play = Element ('button', 'Run macro', macros); play.className = 'workspace_primary'; play.onclick = () => attempt (async () => { play.disabled = true; output.textContent = 'Running macro…'; try { const result = await registry.RunMacro (macro); resultCode.textContent = JSON.stringify (result, null, 2); output.textContent = result.ok ? 'Macro completed.' : result.error.message; } finally { play.disabled = false; } });
+    const play = Element ('button', 'Run macro', macros); play.className = 'workspace_primary'; play.onclick = () => attempt (async () => { play.disabled = true; output.textContent = 'Running macro…'; try { const result = await registry.RunMacro (macro); showResult (result); output.textContent = result.ok ? 'Macro completed.' : result.error.message; } finally { play.disabled = false; } });
     Element ('button', 'Stop after current step', macros).onclick = () => registry.Cancel ();
     search.oninput = render; show (commands.find ((command) => command.id === 'object.array') || commands[0]); render (); renderSteps (); refresh ();
 }

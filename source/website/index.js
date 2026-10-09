@@ -28,6 +28,7 @@ import './css/website.css';
 import './css/embed.css';
 import './css/workspace.css';
 import './css/session.css';
+import './css/packaging.css';
 import './css/welcome.css';
 import './css/commands.css';
 import './css/auth.css';

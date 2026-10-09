@@ -2,6 +2,36 @@
   "apiVersion": 1,
   "commands": [
     {
+      "id": "capture.image",
+      "title": "Capture app screenshot",
+      "category": "Capture",
+      "description": "Capture PNG image content for an agent to attach in chat. Viewport captures the 3D scene; workspace captures the visible app with account dialogs and input fields omitted. No upload or chat message is sent automatically.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "viewport",
+              "workspace"
+            ]
+          },
+          "maxSize": {
+            "type": "number",
+            "minimum": 256,
+            "maximum": 2048
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "scope": "workspace",
+        "maxSize": 1600
+      }
+    },
+    {
       "id": "auth.inspect",
       "title": "Inspect account",
       "category": "Account",
@@ -254,6 +284,510 @@
         "additionalProperties": false
       },
       "example": {}
+    },
+    {
+      "id": "packaging.open",
+      "title": "Open packaging design",
+      "category": "Packaging",
+      "description": "Open interactive point-to-point cut/score drawing and board extrusion. Opening does not change the saved profile.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.draft.type",
+      "title": "Choose new path type",
+      "category": "Packaging",
+      "description": "Choose cut or score for the staged point-to-point path.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "cut",
+              "score"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "type": "score"
+      }
+    },
+    {
+      "id": "packaging.view.snap",
+      "title": "Set packaging grid snap",
+      "category": "Packaging",
+      "description": "Set grid spacing in display units or explicit mm; zero disables snapping.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "number",
+            "minimum": 0
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "display",
+              "mm"
+            ]
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "value": 5,
+        "units": "mm"
+      }
+    },
+    {
+      "id": "packaging.draft.point",
+      "title": "Add draft point",
+      "category": "Packaging",
+      "description": "Add one point to the staged interactive path. Drafts are discarded when the dialog closes. Finish explicitly to save.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "point": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "display",
+              "mm"
+            ]
+          }
+        },
+        "required": [
+          "point"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "point": [
+          10,
+          20
+        ],
+        "units": "mm"
+      }
+    },
+    {
+      "id": "packaging.draft.back",
+      "title": "Remove last draft point",
+      "category": "Packaging",
+      "description": "Remove the last staged point.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.draft.cancel",
+      "title": "Cancel draft path",
+      "category": "Packaging",
+      "description": "Discard the staged path without changing the saved design.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.draft.finish",
+      "title": "Finish draft path",
+      "category": "Packaging",
+      "description": "Commit the staged cut/score path. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "cut",
+              "score"
+            ]
+          },
+          "closed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "type",
+          "closed"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "type": "cut",
+        "closed": true
+      }
+    },
+    {
+      "id": "packaging.path.select",
+      "title": "Select packaging path",
+      "category": "Packaging",
+      "description": "Select a saved path for point editing and line assignment.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "path-id"
+      }
+    },
+    {
+      "id": "packaging.view.fit",
+      "title": "Fit packaging drawing",
+      "category": "Packaging",
+      "description": "Fit the two-dimensional drawing without changing geometry.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.inspect",
+      "title": "Inspect packaging profile",
+      "category": "Packaging",
+      "description": "Read canonical millimeter profile, board caliper and cut/score paths.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.path.add",
+      "title": "Draw packaging path",
+      "category": "Packaging",
+      "description": "Add a point-to-point cut or score path; closed cut contours can be extruded. Coordinates use display units unless units=mm. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2000,
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "cut",
+              "score"
+            ]
+          },
+          "closed": {
+            "type": "boolean"
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "display",
+              "mm"
+            ]
+          }
+        },
+        "required": [
+          "points",
+          "type",
+          "closed"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "points": [
+          [
+            0,
+            0
+          ],
+          [
+            100,
+            0
+          ],
+          [
+            100,
+            60
+          ],
+          [
+            0,
+            60
+          ]
+        ],
+        "type": "cut",
+        "closed": true,
+        "units": "mm"
+      }
+    },
+    {
+      "id": "packaging.path.edit",
+      "title": "Edit packaging path",
+      "category": "Packaging",
+      "description": "Edit points, closure or cut/score assignment of an existing path. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "points": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2000,
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "cut",
+              "score"
+            ]
+          },
+          "closed": {
+            "type": "boolean"
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "display",
+              "mm"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "path-id",
+        "type": "score"
+      }
+    },
+    {
+      "id": "packaging.path.delete",
+      "title": "Delete packaging path",
+      "category": "Packaging",
+      "description": "Remove an existing path. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "path-id"
+      }
+    },
+    {
+      "id": "packaging.board",
+      "title": "Set board caliper",
+      "category": "Packaging",
+      "description": "Set measured board thickness and grade label. Display units by default; nominal flute presets are editable approximations, not strength ratings. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "thickness": {
+            "type": "number",
+            "minimum": 0.000001
+          },
+          "grade": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "display",
+              "mm"
+            ]
+          }
+        },
+        "required": [
+          "thickness"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "thickness": 3,
+        "grade": "B flute",
+        "units": "mm"
+      }
+    },
+    {
+      "id": "packaging.name",
+      "title": "Name packaging profile",
+      "category": "Packaging",
+      "description": "Set the profile name used in downloaded filenames. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "name": "Tray blank"
+      }
+    },
+    {
+      "id": "packaging.extrude",
+      "title": "Extrude board profile",
+      "category": "Packaging",
+      "description": "Add a solid board from closed nonintersecting cut contours and holes, with caliper along Y. Uses declared scene units; unknown scene units must be resolved first. Score lines remain crease metadata. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.load_selected",
+      "title": "Edit selected board profile",
+      "category": "Packaging",
+      "description": "Load the canonical profile stored on the selected packaging board into the dieline editor. Undo supported. Does not resize the existing solid.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.export",
+      "title": "Export packaging vectors",
+      "category": "Packaging",
+      "description": "Return SVG or DXF contents in millimeters with separate CUT and SCORE layers. Does not download or publish.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "svg",
+              "dxf"
+            ]
+          }
+        },
+        "required": [
+          "format"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "format": "svg"
+      }
+    },
+    {
+      "id": "packaging.download",
+      "title": "Download packaging vectors",
+      "category": "Packaging",
+      "description": "Download a local SVG or DXF file at physical millimeter scale. No remote publication.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "svg",
+              "dxf"
+            ]
+          }
+        },
+        "required": [
+          "format"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "format": "dxf"
+      }
     },
     {
       "id": "scene.inspect",
@@ -943,6 +1477,53 @@
       "example": {
         "horizon": true,
         "grid": true
+      }
+    },
+    {
+      "id": "lighting.effects",
+      "title": "Set reflections and shadows",
+      "category": "Lighting",
+      "description": "Set scene reflection/shadow options using the same functions as the Lighting panel.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "environmentIntensity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "modelReflections": {
+            "type": "boolean"
+          },
+          "modelReflectionIntensity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1.5
+          },
+          "floorReflection": {
+            "type": "boolean"
+          },
+          "floorReflectionIntensity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "shadows": {
+            "type": "boolean"
+          },
+          "shadowIntensity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "shadows": true,
+        "modelReflections": true
       }
     },
     {

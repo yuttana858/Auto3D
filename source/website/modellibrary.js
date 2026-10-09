@@ -242,10 +242,10 @@ export class ModelLibrary
 
     async SaveAccount (name, category = 'Uncategorized', kind = 'session')
     {
-        if (this.editor.readOnly || !this.editor.document.objects.length) { throw new Error ('Open an editable session to save.'); }
+        if (this.editor.readOnly || (!this.editor.document.objects.length && !this.editor.document.packaging?.paths?.length)) { throw new Error ('Open an editable session to save.'); }
         const owner = this.editor.website.auth.user?.id;
         const objects = kind === 'model' ? [this.editor.selected] : this.editor.document.objects;
-        if (!objects[0]) { throw new Error ('Select a model to save.'); }
+        if (kind === 'model' && !objects[0]) { throw new Error ('Select a model to save.'); }
         this.editor.Status ('Saving to account Library…');
         const archive = await this.editor.ArchiveAsync (objects, kind, name);
         if (!owner || this.editor.website.auth.user?.id !== owner) { throw new Error ('Sign in again before saving.'); }
@@ -351,7 +351,7 @@ export class ModelLibrary
                     ? 'Corporate publishing remains disabled while identity transitions. Save to Device library or a file.'
                     : destination.value === 'account' ? 'Private to your account · Available on your other devices · Up to 32 MB per save.' : 'Choose any category/project folder. Nested folders use paths such as Project A/Concepts.';
             submit.textContent = destination.value === 'file' ? 'Save session file' : destination.value === 'shared' ? 'Publishing unavailable' : 'Save to library';
-            submit.disabled = !this.editor.document.objects.length || destination.value === 'shared';
+            submit.disabled = (!this.editor.document.objects.length && !this.editor.document.packaging?.paths?.length) || destination.value === 'shared';
         };
         destination.addEventListener ('change', async () => { saveStorage = destination.value === 'device' ? this.deviceStorage : this.accountStorage; updateHint (); if (destination.value === 'file' || destination.value === 'shared') { return; } try { folders = await saveStorage.Folders (); populateFolders (); updateHint (); } catch (error) { status.textContent = error.message + ' You can save to File on disk instead.'; submit.disabled = true; } }); updateHint ();
 
@@ -486,7 +486,7 @@ export class ModelLibrary
         const status = document.createElement ('p'); status.setAttribute ('role', 'status'); status.className = 'section_hint';
         const grid = document.createElement ('div'); grid.className = 'library_grid'; grid.tabIndex = 0; grid.setAttribute ('role', 'region'); grid.setAttribute ('aria-label', 'Saved models and sessions');
         body.append (search, bulk, status, grid); shell.append (sidebar, body); dialog.appendChild (shell);
-        const save = document.createElement ('button'); save.className = 'workspace_primary'; save.textContent = 'Save current session'; save.disabled = !this.editor.document.objects.length;
+        const save = document.createElement ('button'); save.className = 'workspace_primary'; save.textContent = 'Save current session'; save.disabled = !this.editor.document.objects.length && !this.editor.document.packaging?.paths?.length;
         save.disabled = save.disabled || this.editor.readOnly;
         save.addEventListener ('click', () => { dialog.close (); this.SaveDialog (); }); dialog.appendChild (save);
 

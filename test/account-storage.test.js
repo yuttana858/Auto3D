@@ -42,6 +42,11 @@ describe ('Private account storage', () => {
         assert.equal ((await library (context (['items', item.id], 'PATCH', JSON.stringify ({ name : 'Revised', category : 'Archive' })))).status, 200);
         assert.equal (rows[0].name, 'Revised'); assert.equal ((await library (context (['items', item.id], 'DELETE'))).status, 200); assert.equal (files.size, 0); assert.equal (rows.length, 0);
     });
+    it ('saves profile-only sessions without relaxing model count or owner checks', async () => {
+        const flat = upload (); flat.set ('objects', '0'); const response = await library (context (['items'], 'POST', flat)); assert.equal (response.status, 201); const item = await response.json (); assert.equal (item.objects, 0);
+        assert.equal ((await library (context (['items', item.id, 'archive'], 'GET', undefined, B))).status, 404);
+        for (const [kind, count] of [['model', '0'], ['session', '-1'], ['session', '1001']]) { const invalid = upload (); invalid.set ('objects', count); invalid.set ('kind', kind); assert.equal ((await library (context (['items'], 'POST', invalid))).status, 400); }
+    });
     it ('cleans up a failed upload and never lists partial records', async () => {
         const put = env.AUTO3D_LIBRARY_R2.put; env.AUTO3D_LIBRARY_R2.put = async (key, data) => { if (key.endsWith ('.png')) { throw new Error ('R2 unavailable'); } return put (key, data); };
         assert.equal ((await library (context (['items'], 'POST', upload ()))).status, 503); assert.equal (files.size, 0); assert.equal (rows.length, 0);

@@ -753,13 +753,16 @@ export class Viewer
             this.renderer.setClearAlpha (0.0);
             this.scene.background = null;
         }
-        this.ResizeRenderer (renderWidth, renderHeight);
-        this.Render ();
-        let url = this.renderer.domElement.toDataURL ();
-        this.scene.background = originalBackground;
-        this.renderer.setClearAlpha (clearAlpha);
-        this.ResizeRenderer (originalSize.width, originalSize.height);
-        return url;
+        try {
+            this.ResizeRenderer (renderWidth, renderHeight);
+            this.Render ();
+            return this.renderer.domElement.toDataURL ();
+        } finally {
+            this.scene.background = originalBackground;
+            this.renderer.setClearAlpha (clearAlpha);
+            this.ResizeRenderer (originalSize.width, originalSize.height);
+            this.Render ();
+        }
     }
 
     Destroy ()
