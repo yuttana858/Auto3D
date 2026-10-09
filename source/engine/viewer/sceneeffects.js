@@ -31,6 +31,7 @@ export class SceneEffects
             shadowIntensity : 0.28
         };
         this.reflectionState = new Map ();
+        this.lastReflectionError = null;
         this.cubeTarget = null;
         this.cubeCamera = null;
         this.floorReflector = null;
@@ -146,7 +147,7 @@ export class SceneEffects
         });
         const renderer = this.viewer.renderer;
         const shaderErrors = (renderer.info?.programs || []).filter ((program) => program.diagnostics?.runnable === false).map ((program) => ({ name : program.name, log : program.diagnostics.programLog, vertex : program.diagnostics.vertexShader?.log, fragment : program.diagnostics.fragmentShader?.log }));
-        return { ambientFill : { intensity : this.settings.ambientIntensity, color : this.settings.ambientColor, specularRadiance : this.ambientRadiance.value, metallicMaterials : this.ambientMaterials.size }, enabled : this.settings.shadows, intensity : this.settings.shadowIntensity, pipeline : 'projected-color-mask', captureError : this.floorShadow?.lastError || null, mapType : renderer.shadowMap.type, mapEnabled : renderer.shadowMap.enabled, contextLost : renderer.getContext?.().isContextLost () ?? false, rootVisible : root?.visible ?? null, ...counts, floor : this.shadowFloor ? { visible : this.shadowFloor.visible, depthWrite : this.shadowFloor.material.depthWrite, depthTest : this.shadowFloor.material.depthTest, transparent : this.shadowFloor.material.transparent, renderOrder : this.shadowFloor.renderOrder, opacity : this.shadowFloor.material.opacity } : null, shaderErrors };
+        return { modelReflection : { enabled : this.settings.modelReflections, captureError : this.lastReflectionError }, ambientFill : { intensity : this.settings.ambientIntensity, color : this.settings.ambientColor, specularRadiance : this.ambientRadiance.value, metallicMaterials : this.ambientMaterials.size }, enabled : this.settings.shadows, intensity : this.settings.shadowIntensity, pipeline : 'projected-color-mask', captureError : this.floorShadow?.lastError || null, mapType : renderer.shadowMap.type, mapEnabled : renderer.shadowMap.enabled, contextLost : renderer.getContext?.().isContextLost () ?? false, rootVisible : root?.visible ?? null, ...counts, floor : this.shadowFloor ? { visible : this.shadowFloor.visible, depthWrite : this.shadowFloor.material.depthWrite, depthTest : this.shadowFloor.material.depthTest, transparent : this.shadowFloor.material.transparent, renderOrder : this.shadowFloor.renderOrder, opacity : this.shadowFloor.material.opacity } : null, shaderErrors };
     }
 
     ApplyObjectSettings (objects)
@@ -222,6 +223,7 @@ export class SceneEffects
     UpdateDynamicReflection ()
     {
         if (!this.settings.modelReflections) {
+            this.lastReflectionError = null;
             this.RestoreMaterialReflections ();
             if (this.cubeCamera) { this.cubeCamera.visible = false; }
             return;
@@ -237,6 +239,9 @@ export class SceneEffects
         const hidden = [this.floorReflector, this.shadowFloor, this.viewer.defaultDome, ...this.viewer.scene.children.filter ((item) => item !== root && !item.isLight && !item.isCamera && item !== this.cubeCamera)].filter (Boolean);
         const states = hidden.map ((item) => [item, item.visible]);
         const renderer = this.viewer.renderer; const shadowAutoUpdate = renderer.shadowMap.autoUpdate;
+        const target = renderer.getRenderTarget (); const face = renderer.getActiveCubeFace (); const mip = renderer.getActiveMipmapLevel ();
+        const xrEnabled = renderer.xr.enabled; const generateMipmaps = this.cubeTarget.texture.generateMipmaps;
+        let captureFailed = false;
         const size = bounds.getSize (new THREE.Vector3 ());
         // Capture outside closed geometry. A center capture sees the dark
         // backs of the receiving model instead of the surrounding scene.
@@ -246,9 +251,17 @@ export class SceneEffects
         try {
             states.forEach (([item]) => { item.visible = false; }); renderer.shadowMap.autoUpdate = false;
             this.cubeCamera.update (renderer, this.viewer.scene);
+            this.lastReflectionError = null;
+        } catch (error) {
+            captureFailed = true; this.lastReflectionError = error.message;
         } finally {
+            // CubeCamera only restores these on success. A failed optional
+            // capture must not strand subsequent renders on a cubemap face.
             states.forEach (([item, visible]) => { item.visible = visible; }); renderer.shadowMap.autoUpdate = shadowAutoUpdate;
+            renderer.xr.enabled = xrEnabled; this.cubeTarget.texture.generateMipmaps = generateMipmaps;
+            renderer.setRenderTarget (target, face, mip);
         }
+        if (captureFailed) { this.onDiagnostics?.(this.InspectShadows ()); return; }
         MeshMaterials (root, (material) => {
             if (!('envMap' in material) || this.reflectionState.has (material)) { return; }
             const strength = this.settings.modelReflectionIntensity * MaterialReflectionStrength (material);

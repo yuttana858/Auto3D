@@ -25,6 +25,15 @@ describe ('Browser diagnostics', () => {
         restored.BindAccount ('two'); assert.equal (restored.entries.length, 0); assert.equal (data.has ('auto3d-error-log-v1:one'), false); restored.Record ('warning', 'test', 'two'); restored.BindAccount (null); assert.equal (data.has ('auto3d-error-log-v1:two'), false);
         log.listeners.add (() => { throw new Error ('panel failed'); }); assert.doesNotThrow (() => log.Clear ());
     });
+    it ('Includes failed offscreen captures in the error filter even when the model remains visible', () => {
+        const { log } = Fixture ();
+        const baseline = { contextLost : false, shaderErrors : [], meshes : 1, visibleMeshes : 1 };
+        log.RecordShadow ({ ...baseline, captureError : 'floor capture failed' });
+        log.RecordShadow ({ ...baseline, modelReflection : { captureError : 'cube capture failed' } });
+        assert.equal (log.List ('error').entries.length, 2);
+        log.RecordShadow ({ ...baseline, captureError : null, modelReflection : { captureError : null } });
+        assert.equal (log.List ('info').entries.length, 1);
+    });
     it ('supports strict command execution and read-only review macros', async () => {
         const { log } = Fixture (); log.Record ('error', 'test', 'example'); const commands = CreateAgentCommands ({ sessionEditor : { readOnly : true, website : { errorLogs : log } }, errorLogs : log });
         const macro = await commands.RunMacro ({ version : 1, steps : [{ id : 'read', command : 'diagnostics.list', arguments : { level : 'error' } }, { id : 'export', command : 'diagnostics.export', arguments : {} }] }); assert.equal (macro.ok, true); assert.equal (macro.completed[0].result.entries.length, 1);

@@ -7,7 +7,7 @@ import { Direction } from '../source/engine/geometry/geometry.js';
 function fixture () {
     const scene = new THREE.Scene (); const root = new THREE.Group (); const material = new THREE.MeshPhysicalMaterial ({ color : '#b89261', envMapIntensity : 1.4 }); const environment = new THREE.Texture (); material.envMap = environment; material.envMapRotation.set (0, 0.7, 0); root.add (new THREE.Mesh (new THREE.BoxGeometry (10, 10, 10), material)); scene.add (root);
     const light = new THREE.DirectionalLight (); scene.add (light); const overlay = new THREE.Box3Helper (new THREE.Box3 (), 0xffffff); scene.add (overlay);
-    const viewer = { scene, renderer : { shadowMap : { enabled : false, autoUpdate : true } }, shadingModel : { directionalLight : light, hdriEnvironment : environment, UpdateShading : () => {} }, mainModel : { mainModel : { GetRootObject : () => root } }, upVector : { direction : Direction.Y, isFlipped : false }, canvas : { width : 800, height : 600 }, Render : () => {} };
+    const viewer = { scene, renderer : { shadowMap : { enabled : false, autoUpdate : true }, getRenderTarget : () => null, getActiveCubeFace : () => 0, getActiveMipmapLevel : () => 0, setRenderTarget : () => {}, xr : { enabled : false } }, shadingModel : { directionalLight : light, hdriEnvironment : environment, UpdateShading : () => {} }, mainModel : { mainModel : { GetRootObject : () => root } }, upVector : { direction : Direction.Y, isFlipped : false }, canvas : { width : 800, height : 600 }, Render : () => {} };
     const effects = new SceneEffects (viewer); effects.cubeCamera = new THREE.CubeCamera (0.01, 1000, new THREE.WebGLCubeRenderTarget (1)); effects.cubeCamera.update = () => {}; effects.cubeTarget = { texture : new THREE.Texture (), dispose : () => {} };
     return { viewer, effects, root, material, environment, overlay };
 }
@@ -46,7 +46,23 @@ describe ('Scene effects render state', () => {
     });
     it ('Restores hidden helpers and shadow update state if a cubemap capture fails', () => {
         const { effects, viewer, overlay, root } = fixture (); effects.settings.modelReflections = true; effects.cubeCamera.update = () => { assert.equal (overlay.visible, false); assert.equal (root.visible, true); assert.equal (viewer.renderer.shadowMap.autoUpdate, false); throw new Error ('capture failed'); };
-        assert.throws (() => effects.UpdateDynamicReflection (), /capture failed/); assert.equal (overlay.visible, true); assert.equal (root.visible, true); assert.equal (viewer.renderer.shadowMap.autoUpdate, true); effects.Dispose ();
+        effects.UpdateDynamicReflection (); assert.equal (effects.lastReflectionError, 'capture failed'); assert.equal (overlay.visible, true); assert.equal (root.visible, true); assert.equal (viewer.renderer.shadowMap.autoUpdate, true); effects.Dispose ();
+    });
+    it ('Restores the display target when reflection capture fails and leaves baseline materials usable', () => {
+        const { effects, viewer, overlay, material } = fixture ();
+        const display = new THREE.WebGLRenderTarget (8, 8); let active = display; let face = 2; let mip = 1;
+        Object.assign (viewer.renderer, { getRenderTarget : () => active, getActiveCubeFace : () => face, getActiveMipmapLevel : () => mip,
+            setRenderTarget : (target, nextFace, nextMip) => { active = target; face = nextFace; mip = nextMip; }, xr : { enabled : true } });
+        const baseline = material.onBeforeCompile; effects.settings.modelReflections = true;
+        effects.cubeTarget.texture.generateMipmaps = true;
+        effects.cubeCamera.update = () => { active = effects.cubeTarget; face = 4; mip = 0; viewer.renderer.xr.enabled = false; effects.cubeTarget.texture.generateMipmaps = false; throw new Error ('capture failed'); };
+        effects.UpdateDynamicReflection ();
+        assert.equal (active, display); assert.equal (face, 2); assert.equal (mip, 1); assert.equal (viewer.renderer.xr.enabled, true);
+        assert.equal (effects.cubeTarget.texture.generateMipmaps, true); assert.equal (overlay.visible, true); assert.equal (viewer.renderer.shadowMap.autoUpdate, true);
+        assert.equal (material.onBeforeCompile, baseline); assert.equal (effects.reflectionState.size, 0);
+        assert.equal (effects.InspectShadows ().modelReflection.captureError, 'capture failed');
+        effects.cubeCamera.update = () => {}; effects.UpdateDynamicReflection (); assert.equal (effects.lastReflectionError, null); assert.equal (effects.reflectionState.size, 1);
+        effects.Dispose (); display.dispose ();
     });
     it ('Prevents transparent shadow/reflection floors from writing depth over the model', () => {
         const { effects, root } = fixture (); effects.Set ('shadows', true); effects.Set ('floorReflection', true); assert.equal (effects.shadowFloor.material.depthWrite, false); assert.equal (effects.floorReflector.material.depthWrite, false); assert.equal (root.visible, true); effects.Set ('shadows', false); assert.equal (effects.shadowFloor, null); effects.Dispose ();

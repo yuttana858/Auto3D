@@ -302,7 +302,7 @@ export default function suite ()
             const light = new THREE.DirectionalLight (); scene.add (light);
             const viewer = {
                 scene,
-                renderer : { shadowMap : { enabled : false, type : null }, render : () => {} },
+                renderer : { shadowMap : { enabled : false, type : null }, render : () => {}, getRenderTarget : () => null, getActiveCubeFace : () => 0, getActiveMipmapLevel : () => 0, setRenderTarget : () => {}, xr : { enabled : false } },
                 shadingModel : { directionalLight : light, hdriEnvironment : null, UpdateShading : () => {} },
                 mainModel : { mainModel : { GetRootObject : () => root } },
                 upVector : { direction : Direction.Y, isFlipped : false },

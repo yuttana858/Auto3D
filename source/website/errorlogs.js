@@ -46,7 +46,7 @@ export class ErrorLogs
     }
     RecordShadow (diagnosis, message = 'Current shadow state')
     {
-        this.Record (diagnosis.contextLost || diagnosis.shaderErrors.length || (diagnosis.meshes > 0 && diagnosis.visibleMeshes === 0) ? 'error' : 'info', 'shadows', message, JSON.stringify (diagnosis));
+        this.Record (diagnosis.contextLost || diagnosis.captureError || diagnosis.modelReflection?.captureError || diagnosis.shaderErrors.length || (diagnosis.meshes > 0 && diagnosis.visibleMeshes === 0) ? 'error' : 'info', 'shadows', message, JSON.stringify (diagnosis));
         return diagnosis;
     }
     List (level = 'all') { return { entries : this.entries.filter ((entry) => level === 'all' || entry.level === level).map ((entry) => ({ ...entry })), limit : 200 }; }

@@ -57,6 +57,14 @@ Local verification for this consolidated work:
 
 Tests and sandbox assets belong in `work/`; they are not user Library data. Development URL: `http://127.0.0.1:8080/website/index.html`. The generated production artifact is `build/pages`; the local production test server uses port 8081. The sandbox mocks account APIs for browser tests; it does not modify live users, send recovery mail or apply database migrations.
 
+## Lighting visibility investigation — development branch
+
+The user reports that Reflect models and Shadows remove the model and disabling the toggles does not bring it back. A textured helmet remains visible in local Chromium during ordinary toggles; the user's browser/GPU failure is not yet reproduced directly.
+
+A verified reflection-capture failure path can leave the renderer targeting a cubemap face because Three.js CubeCamera restores its render target and XR/mipmap state only on success. The development fix restores these in a finally block, retains baseline materials after a failed capture, and exposes the capture error through existing lighting diagnostics. This prevents that failure from redirecting subsequent viewport draws. It is not yet proof that both reported toggles are resolved on the user's device.
+
+Regression coverage includes a failed cubemap pass while floor shadows are enabled, restored display output, successful retry, original model/material state, and actual UI toggles under Default and HDRI lighting. Validation: 456 unit tests, lint and website build pass; local Chromium passes UI combinations in Default and packaged HDRI lighting plus injected capture failure and tiled render checks. Captured offscreen errors are included in the Error logs error filter. Work remains on a review branch; no production deployment is authorized by this investigation.
+
 ## Immediate release checklist
 
 - [x] Confirm PR #21 merge and production deployment identity directly in GitHub/Cloudflare.
