@@ -1,3 +1,4 @@
+import { AccountLibrary } from './accountlibrary.js';
 import { LibraryCategories } from './sessionarchive.js';
 import { CloudLibrary } from './cloudlibrary.js';
 import { EnablePopupFade } from './popuptransition.js';
@@ -67,7 +68,7 @@ export class DeviceLibrary
     {
         if (!this.database) {
             this.database = new Promise ((resolve, reject) => {
-                const request = indexedDB.open ('sw-auto3d-library', 1);
+                const request = indexedDB.open (this.accountId ? 'sw-auto3d-library-' + this.accountId : 'sw-auto3d-library', 1);
                 request.onupgradeneeded = () => request.result.createObjectStore ('saves', { keyPath : 'id' });
                 request.onsuccess = () => resolve (request.result);
                 request.onerror = () => reject (new Error ('Device storage is unavailable. Download your session instead.'));
@@ -227,8 +228,30 @@ export class ModelLibrary
         this.editor = editor;
         this.deviceStorage = new DeviceLibrary ();
         this.sharedStorage = new CloudLibrary ();
+        this.accountStorage = new AccountLibrary (editor.website.auth);
         this.storage = this.deviceStorage;
         this.category = 'All sessions';
+    }
+
+    InitializeAccount (id)
+    {
+        if (this.deviceStorage.accountId === id) { return; }
+        this.deviceStorage = new DeviceLibrary (); this.deviceStorage.accountId = id;
+        this.storage = this.accountStorage; this.category = 'All sessions';
+    }
+
+    async SaveAccount (name, category = 'Uncategorized', kind = 'session')
+    {
+        if (this.editor.readOnly || !this.editor.document.objects.length) { throw new Error ('Open an editable session to save.'); }
+        const owner = this.editor.website.auth.user?.id;
+        const objects = kind === 'model' ? [this.editor.selected] : this.editor.document.objects;
+        if (!objects[0]) { throw new Error ('Select a model to save.'); }
+        this.editor.Status ('Saving to account Library…');
+        const archive = await this.editor.ArchiveAsync (objects, kind, name);
+        if (!owner || this.editor.website.auth.user?.id !== owner) { throw new Error ('Sign in again before saving.'); }
+        const item = await this.accountStorage.Save ({ name, category, kind, objects : objects.length, archive : new Blob ([archive]), thumbnail : this.editor.Thumbnail (objects) });
+        if (kind === 'session') { this.editor.document.name = item.name; this.editor.website.parameters.fileNameDiv.textContent = item.name; await this.editor.MarkClean (); }
+        this.editor.Status ('Saved to account Library: ' + item.name); return item;
     }
 
     FolderLabel (path)
@@ -239,7 +262,7 @@ export class ModelLibrary
 
     async ChooseFolder (title, current = '')
     {
-        const folders = await this.deviceStorage.Folders ();
+        const folders = await this.storage.Folders ();
         return new Promise ((resolve) => {
             const dialog = WorkspaceDialog (title);
             const form = document.createElement ('form'); form.className = 'workspace_save_form';
@@ -252,7 +275,7 @@ export class ModelLibrary
                 const value = window.prompt ('New category/project path', base);
                 if (value === null) { return; }
                 try {
-                    const path = await this.deviceStorage.AddFolder (value);
+                    const path = await this.storage.AddFolder (value);
                     select.add (new Option (this.FolderLabel (path), path)); select.value = path;
                 } catch (error) { window.alert (error.message); }
             });
@@ -268,7 +291,8 @@ export class ModelLibrary
     async SaveDialog (download = false)
     {
         if (this.editor.readOnly) { return; }
-        const folders = await this.deviceStorage.Folders ().catch (() => [...LibraryCategories, 'Uncategorized']);
+        let saveStorage = this.accountStorage;
+        let folders = await saveStorage.Folders ().catch (() => ['Uncategorized']);
         const dialog = WorkspaceDialog ('Save session');
         const form = document.createElement ('form'); form.className = 'workspace_save_form';
         const nameLabel = document.createElement ('label'); nameLabel.textContent = 'Name';
@@ -292,7 +316,7 @@ export class ModelLibrary
             const value = window.prompt ('New category/project path. Use / to create nested folders.', base);
             if (value === null) { populateFolders (); return; }
             try {
-                const path = await this.deviceStorage.AddFolder (value);
+                const path = await saveStorage.AddFolder (value);
                 if (!folders.includes (path)) { folders.push (path); }
                 let parent = LibraryPathParent (path);
                 while (parent) { if (!folders.includes (parent)) { folders.push (parent); } parent = LibraryPathParent (parent); }
@@ -309,10 +333,11 @@ export class ModelLibrary
 
         const destinationLabel = document.createElement ('label'); destinationLabel.textContent = 'Destination';
         const destination = document.createElement ('select'); destination.setAttribute ('aria-label', 'Save destination');
+        destination.add (new Option ('Account library (private cloud)', 'account'));
         destination.add (new Option ('Device library (this browser)', 'device'));
         destination.add (new Option ('File on disk (.auto3d)', 'file'));
         destination.add (new Option ('Shared library (publishing disabled)', 'shared'));
-        destination.value = download ? 'file' : 'device'; destinationLabel.appendChild (destination);
+        destination.value = download ? 'file' : 'account'; destinationLabel.appendChild (destination);
 
         const hint = document.createElement ('p'); hint.className = 'section_hint';
         const status = document.createElement ('p'); status.className = 'section_hint'; status.setAttribute ('role', 'status');
@@ -324,11 +349,11 @@ export class ModelLibrary
                 ? (typeof window.showSaveFilePicker === 'function' ? 'Choose a portable .auto3d filename and folder.' : 'Download a portable .auto3d session.')
                 : destination.value === 'shared'
                     ? 'Corporate publishing remains disabled while identity transitions. Save to Device library or a file.'
-                    : 'Choose any category/project folder. Nested folders use paths such as Project A/Concepts.';
+                    : destination.value === 'account' ? 'Private to your account · Available on your other devices · Up to 32 MB per save.' : 'Choose any category/project folder. Nested folders use paths such as Project A/Concepts.';
             submit.textContent = destination.value === 'file' ? 'Save session file' : destination.value === 'shared' ? 'Publishing unavailable' : 'Save to library';
             submit.disabled = !this.editor.document.objects.length || destination.value === 'shared';
         };
-        destination.addEventListener ('change', updateHint); updateHint ();
+        destination.addEventListener ('change', async () => { saveStorage = destination.value === 'device' ? this.deviceStorage : this.accountStorage; updateHint (); if (destination.value === 'file' || destination.value === 'shared') { return; } try { folders = await saveStorage.Folders (); populateFolders (); updateHint (); } catch (error) { status.textContent = error.message + ' You can save to File on disk instead.'; submit.disabled = true; } }); updateHint ();
 
         const open = document.createElement ('button'); open.type = 'button'; open.textContent = 'Open session file';
         open.addEventListener ('click', () => { dialog.close (); this.editor.OpenSessionFile (); });
@@ -346,6 +371,7 @@ export class ModelLibrary
                 if (destination.value === 'file' && typeof window.showSaveFilePicker === 'function') {
                     fileHandle = await window.showSaveFilePicker ({ suggestedName : name.value.trim () + '.auto3d', types : [{ description : 'Auto3D session', accept : { 'application/octet-stream' : ['.auto3d'] } }] });
                 }
+                const owner = this.editor.website.auth.user?.id;
                 const objects = kind.value === 'model' ? [this.editor.selected] : this.editor.document.objects;
                 const saved = await this.editor.ArchiveAsync (objects, kind.value, name.value.trim ());
                 if (destination.value === 'file') {
@@ -371,9 +397,11 @@ export class ModelLibrary
                         status.textContent = 'Download started successfully.'; progress.max = 1; progress.value = 1; this.editor.Status ('Session downloaded.');
                     }
                 } else {
-                    const folder = await this.deviceStorage.AddFolder (category.value || 'Uncategorized');
+                    if (!owner || this.editor.website.auth.user?.id !== owner) { throw new Error ('Account changed. Sign in before saving.'); }
+                    const folder = await saveStorage.AddFolder (category.value || 'Uncategorized');
+                    status.textContent = destination.value === 'account' ? 'Uploading to your account Library…' : 'Saving to device Library…';
                     const thumbnail = this.editor.Thumbnail (objects);
-                    await this.deviceStorage.Save ({
+                    await saveStorage.Save ({
                         id : crypto.randomUUID (), name : name.value.trim (), category : folder, kind : kind.value,
                         updatedAt : new Date ().toISOString (), thumbnail, objects : objects.length,
                         archive : new Blob ([saved], { type : 'application/octet-stream' })
@@ -459,12 +487,14 @@ export class ModelLibrary
         const grid = document.createElement ('div'); grid.className = 'library_grid'; grid.tabIndex = 0; grid.setAttribute ('role', 'region'); grid.setAttribute ('aria-label', 'Saved models and sessions');
         body.append (search, bulk, status, grid); shell.append (sidebar, body); dialog.appendChild (shell);
         const save = document.createElement ('button'); save.className = 'workspace_primary'; save.textContent = 'Save current session'; save.disabled = !this.editor.document.objects.length;
+        save.disabled = save.disabled || this.editor.readOnly;
         save.addEventListener ('click', () => { dialog.close (); this.SaveDialog (); }); dialog.appendChild (save);
 
         let items = []; let folders = []; let urls = []; let generation = 0;
         const selectedIds = new Set ();
         const clearUrls = () => { urls.forEach (URL.revokeObjectURL); urls = []; };
         const isDevice = () => this.storage === this.deviceStorage;
+        const isEditable = () => !this.editor.readOnly && (isDevice () || this.storage === this.accountStorage);
         const itemFolder = (item) => NormalizeLibraryPath (item.category) || 'Uncategorized';
         const isInCurrentFolder = (item) => {
             if (this.category === 'All sessions') { return true; }
@@ -475,9 +505,9 @@ export class ModelLibrary
 
         const updateBulk = () => {
             selectionCount.textContent = selectedIds.size + ' selected';
-            deleteSelected.disabled = !isDevice () || selectedIds.size === 0;
-            selectAll.disabled = !isDevice () || visibleItems ().length === 0;
-            bulk.hidden = !isDevice ();
+            deleteSelected.disabled = !isEditable () || selectedIds.size === 0;
+            selectAll.disabled = !isEditable () || visibleItems ().length === 0;
+            bulk.hidden = !isEditable ();
         };
 
         const renderCategories = () => {
@@ -495,8 +525,8 @@ export class ModelLibrary
                 });
                 categories.appendChild (button);
             }
-            const editable = isDevice () && this.category !== 'All sessions';
-            addFolder.hidden = !isDevice (); renameFolder.hidden = !isDevice (); deleteFolder.hidden = !isDevice ();
+            const editable = isEditable () && this.category !== 'All sessions';
+            addFolder.hidden = !isEditable (); renameFolder.hidden = !isEditable (); deleteFolder.hidden = !isEditable ();
             renameFolder.disabled = !editable || this.category === 'Uncategorized';
             deleteFolder.disabled = !editable || this.category === 'Uncategorized';
         };
@@ -508,7 +538,7 @@ export class ModelLibrary
             const next = value.trim ().slice (0, 100);
             if (!next || next === previous) { return; }
             item.name = next; item.updatedAt = new Date ().toISOString ();
-            await this.deviceStorage.Save (item);
+            await this.storage.Save (item);
             name.textContent = next; image.alt = next + ' preview';
             this.editor.Status ('Library item renamed: ' + next);
         };
@@ -520,7 +550,7 @@ export class ModelLibrary
             for (const item of filtered) {
                 const card = document.createElement ('article'); card.className = 'library_card';
                 if (selectedIds.has (item.id)) { card.classList.add ('selected'); }
-                if (isDevice ()) {
+                if (isEditable ()) {
                     const select = document.createElement ('label'); select.className = 'library_select_item';
                     const checkbox = document.createElement ('input'); checkbox.type = 'checkbox'; checkbox.checked = selectedIds.has (item.id); checkbox.setAttribute ('aria-label', 'Select ' + item.name);
                     checkbox.addEventListener ('change', () => {
@@ -531,11 +561,11 @@ export class ModelLibrary
                     select.append (checkbox); card.appendChild (select);
                 }
                 const image = document.createElement ('img'); image.alt = item.name + ' preview';
-                if (item.shared) {
-                    this.sharedStorage.Thumbnail (item).then ((blob) => { if (current === generation && dialog.isConnected) { const url = URL.createObjectURL (blob); urls.push (url); image.src = url; } }).catch (() => { image.alt = item.name + ' · Preview unavailable'; });
+                if (item.shared || item.personal) {
+                    (item.personal ? this.accountStorage : this.sharedStorage).Thumbnail (item).then ((blob) => { if (current === generation && dialog.isConnected) { const url = URL.createObjectURL (blob); urls.push (url); image.src = url; } }).catch (() => { image.alt = item.name + ' · Preview unavailable'; });
                 } else { image.src = item.thumbnail; }
-                const name = document.createElement ('h3'); name.textContent = item.name; name.className = isDevice () ? 'editable_name' : '';
-                if (isDevice ()) {
+                const name = document.createElement ('h3'); name.textContent = item.name; name.className = isEditable () ? 'editable_name' : '';
+                if (isEditable ()) {
                     name.title = 'Click to rename saved item'; name.tabIndex = 0; name.setAttribute ('role', 'button');
                     name.addEventListener ('click', () => renameItem (item, name, image));
                     name.addEventListener ('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault (); renameItem (item, name, image); } });
@@ -544,29 +574,31 @@ export class ModelLibrary
                 const actions = document.createElement ('div'); actions.className = 'library_actions';
                 for (const [title, append] of [['Open', false], ['Add', true]]) {
                     const button = document.createElement ('button'); button.textContent = title; button.setAttribute ('aria-label', title + ' ' + item.name);
+                    button.disabled = this.editor.readOnly;
                     button.addEventListener ('click', async () => {
                         button.disabled = true;
                         try {
-                            const archive = item.shared ? await this.sharedStorage.Archive (item) : await RecoveryArchiveBuffer (item.archive);
+                            const archive = item.personal ? await this.accountStorage.Archive (item) : item.shared ? await this.sharedStorage.Archive (item) : await RecoveryArchiveBuffer (item.archive);
+                            if (!this.editor.website.auth.user) { throw new Error ('Sign in again to open the Library.'); }
                             await this.editor.OpenArchive (archive, append); dialog.close ();
                         } catch (error) { status.textContent = error.message; button.disabled = false; }
                     });
                     actions.appendChild (button);
                 }
-                if (isDevice ()) {
+                if (isEditable ()) {
                     const move = document.createElement ('button'); move.textContent = 'Move';
                     move.addEventListener ('click', async () => {
                         const folder = await this.ChooseFolder ('Move ' + item.name, itemFolder (item));
                         if (!folder) { return; }
-                        await this.deviceStorage.MoveMany ([item.id], folder); await load ();
+                        await this.storage.MoveMany ([item.id], folder); await load ();
                     });
                     const remove = document.createElement ('button'); remove.textContent = 'Delete';
                     remove.addEventListener ('click', async () => {
-                        if (!window.confirm ('Delete “' + item.name + '” from this device library?')) { return; }
-                        await this.deviceStorage.Remove (item.id); selectedIds.delete (item.id); await load ();
+                        if (!window.confirm ('Delete “' + item.name + '” from this library?')) { return; }
+                        await this.storage.Remove (item.id); selectedIds.delete (item.id); await load ();
                     });
                     actions.append (move, remove);
-                } else {
+                } else if (item.shared) {
                     const share = document.createElement ('button'); share.textContent = 'Share'; share.addEventListener ('click', () => this.OpenShareDialog (item)); actions.appendChild (share);
                 }
                 card.append (image, name, info, actions); grid.appendChild (card);
@@ -578,21 +610,21 @@ export class ModelLibrary
             const base = this.category !== 'All sessions' && this.category !== 'Uncategorized' ? this.category + '/' : '';
             const value = window.prompt ('New category/project path. Use / to nest folders.', base);
             if (value === null) { return; }
-            try { this.category = await this.deviceStorage.AddFolder (value); folders = await this.deviceStorage.Folders (); renderCategories (); render (); }
+            try { this.category = await this.storage.AddFolder (value); folders = await this.storage.Folders (); renderCategories (); render (); }
             catch (error) { status.textContent = error.message; }
         });
         renameFolder.addEventListener ('click', async () => {
             if (this.category === 'All sessions' || this.category === 'Uncategorized') { return; }
             const value = window.prompt ('Rename category/project', this.category);
             if (value === null) { return; }
-            try { this.category = await this.deviceStorage.RenameFolder (this.category, value); folders = await this.deviceStorage.Folders (); renderCategories (); render (); }
+            try { this.category = await this.storage.RenameFolder (this.category, value); folders = await this.storage.Folders (); renderCategories (); render (); }
             catch (error) { status.textContent = error.message; }
         });
         deleteFolder.addEventListener ('click', async () => {
             if (this.category === 'All sessions' || this.category === 'Uncategorized') { return; }
             const destination = LibraryPathParent (this.category) || 'Uncategorized';
             if (!window.confirm ('Delete folder “' + this.category + '”? Saved models inside will be moved to “' + destination + '” and will not be deleted.')) { return; }
-            try { this.category = await this.deviceStorage.DeleteFolder (this.category); folders = await this.deviceStorage.Folders (); renderCategories (); await load (); }
+            try { this.category = await this.storage.DeleteFolder (this.category); folders = await this.storage.Folders (); renderCategories (); await load (); }
             catch (error) { status.textContent = error.message; }
         });
         selectAll.addEventListener ('click', () => {
@@ -602,8 +634,8 @@ export class ModelLibrary
             render ();
         });
         deleteSelected.addEventListener ('click', async () => {
-            if (!selectedIds.size || !window.confirm ('Delete ' + selectedIds.size + ' selected saved item(s) from this device library?')) { return; }
-            try { await this.deviceStorage.RemoveMany (selectedIds); selectedIds.clear (); await load (); }
+            if (!selectedIds.size || !window.confirm ('Delete ' + selectedIds.size + ' selected saved item(s) from this library?')) { return; }
+            try { await this.storage.RemoveMany (selectedIds); selectedIds.clear (); await load (); }
             catch (error) { status.textContent = error.message; }
         });
         search.addEventListener ('input', render);
@@ -611,16 +643,16 @@ export class ModelLibrary
         let loadGeneration = 0;
         const load = async () => {
             const request = ++loadGeneration; generation++; clearUrls (); grid.replaceChildren (); status.textContent = 'Loading saved models…';
-            hint.textContent = isDevice () ? 'Device library · Custom nested categories/projects are stored in this browser.' : 'Shared library · Read-only during corporate identity migration';
+            hint.textContent = this.storage === this.accountStorage ? 'Account library · Private files saved to your account.' : isDevice () ? 'Device library · Custom nested categories/projects are stored in this browser.' : 'Shared library · Read-only during corporate identity migration';
             try {
                 items = await this.storage.List ();
-                folders = isDevice () ? await this.deviceStorage.Folders () : Array.from (new Set (items.map (itemFolder))).sort ();
+                folders = isEditable () ? await this.storage.Folders () : Array.from (new Set (items.map (itemFolder))).sort ();
                 if (request !== loadGeneration || !dialog.isConnected) { return; }
                 renderCategories (); render ();
             } catch (error) { if (request === loadGeneration) { status.textContent = error.message; } }
         };
 
-        for (const [label, storage] of [['Device library', this.deviceStorage], ['Shared library', this.sharedStorage]]) {
+        for (const [label, storage] of [['Account library', this.accountStorage], ['Device library', this.deviceStorage], ['Shared library', this.sharedStorage]]) {
             const button = document.createElement ('button'); button.textContent = label; button.setAttribute ('aria-pressed', String (this.storage === storage));
             button.addEventListener ('click', async () => {
                 this.storage = storage; this.category = 'All sessions'; selectedIds.clear ();

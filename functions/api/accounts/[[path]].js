@@ -6,8 +6,8 @@ const message = 'Request received. An administrator will review it and contact y
 export async function onRequest (context)
 {
     const action = (context.params.path || []).join ('/');
-    if (!['request', 'admin', 'review'].includes (action)) { return AuthResponse ({ error : 'Not found.' }, 404); }
-    if (context.request.method !== (action === 'admin' ? 'GET' : 'POST')) { return AuthResponse ({ error : 'Method not allowed.' }, 405); }
+    if (!['request', 'desk-8b4f2d71c6', 'review'].includes (action)) { return AuthResponse ({ error : 'Not found.' }, 404); }
+    if (context.request.method !== (action === 'desk-8b4f2d71c6' ? 'GET' : 'POST')) { return AuthResponse ({ error : 'Method not allowed.' }, 405); }
     if (context.request.method === 'POST' && context.request.headers.get ('Origin') !== new URL (context.request.url).origin) { return AuthResponse ({ error : 'Requests must come from this application.' }, 403); }
     try {
         if (action === 'request') {
@@ -20,7 +20,7 @@ export async function onRequest (context)
         }
         const admin = await RequireAdmin (context);
         const columns = 'id,email,name,reason,status,created_at,reviewed_at,user_id';
-        if (action === 'admin') { return AuthResponse ({ isAdmin : true, requests : await DatabaseRequest (context.env, 'auto3d_access_requests?select=' + columns + '&order=created_at.desc&limit=100') }); }
+        if (action === 'desk-8b4f2d71c6') { return AuthResponse ({ isAdmin : true, requests : await DatabaseRequest (context.env, 'auto3d_access_requests?select=' + columns + '&order=created_at.desc&limit=100') }); }
         const body = await ReadBody (context.request);
         if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test (body?.id || '') || !['approve', 'reject'].includes (body?.decision) || Object.keys (body).some ((key) => !['id', 'decision', 'password'].includes (key))) { return AuthResponse ({ error : 'Invalid review.' }, 400); }
         if (body.decision === 'approve' && (typeof body.password !== 'string' || body.password.length < 12 || body.password.length > 1024)) { return AuthResponse ({ error : 'Enter an initial password of at least 12 characters.' }, 400); }

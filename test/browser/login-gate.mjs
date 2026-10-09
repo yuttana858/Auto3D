@@ -3,6 +3,7 @@ import { chromium } from 'playwright-core';
 const browser = await chromium.launch ({ executablePath : '/usr/bin/chromium', args : ['--no-sandbox', '--enable-unsafe-swiftshader'] });
 const context = await browser.newContext ({ viewport : { width : 1440, height : 1000 } });
 const user = { id : 'browser-user', email : 'user@example.com' }; let offlineLogout = false;
+await context.route ('**/api/preferences', (route) => route.fulfill ({ json : { preferences : { units : 'metric', theme : 1 }, folders : ['Uncategorized'] } }));
 await context.route ('**/api/auth/**', async (route) => {
     const action = route.request ().url ().split ('/').pop ();
     const cookie = (await route.request ().allHeaders ()).cookie || '';

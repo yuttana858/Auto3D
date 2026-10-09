@@ -50,6 +50,8 @@ export class AuthService
         return this.restoring;
     }
 
+    Recover (email) { return this.Request ('recover', { email }); }
+    ResetPassword (accessToken, password) { return this.Request ('reset-password', { accessToken, password }); }
     SignIn (email, password)
     {
         const generation = ++this.generation;

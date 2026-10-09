@@ -6,7 +6,8 @@ try {
     for (const viewport of [{ width : 1440, height : 1000 }, { width : 390, height : 844 }]) {
         const page = await browser.newPage ({ viewport }); const errors = []; let user = null; let attempts = 0;
         page.on ('pageerror', (error) => errors.push (error.message));
-        await page.route ('**/api/auth/**', async (route) => {
+        await page.route ('**/api/preferences', (route) => route.fulfill ({ json : { preferences : { units : 'metric', theme : 1 }, folders : ['Uncategorized'] } }));
+await page.route ('**/api/auth/**', async (route) => {
             const path = new URL (route.request ().url ()).pathname;
             if (path.endsWith ('login')) {
                 attempts++;

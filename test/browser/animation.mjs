@@ -1,17 +1,20 @@
 // Run with npm start in another terminal. Uses a fresh browser profile.
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright-core';
+import { OpenSessionArchive } from '../../source/website/sessionarchive.js';
 const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE || '/usr/bin/chromium',headless:true,args:['--no-sandbox','--enable-unsafe-swiftshader']});
 try {
-const page=await browser.newPage({viewport:{width:1440,height:1000}}); const errors=[];page.on('pageerror',e=>{errors.push(e.message);console.log('pageerror',e.message)});page.on('console',m=>{if(m.type()==='error'||m.type()==='warning')console.log(m.type(),m.text())});page.setDefaultTimeout(20000);
-await page.route ('**/api/auth/session', (route) => route.fulfill ({ json : { user : { id : 'browser-user', email : 'browser@example.com' } } }));
+const page=await browser.newPage({viewport:{width:1440,height:1000}}); const errors=[];page.on('pageerror',e=>{errors.push(e.message);console.log('pageerror',e.message)});page.on('console',m=>{if(m.type()==='error'||m.type()==='warning')console.log(m.type(),m.text())});page.setDefaultTimeout(60000);
+await page.route ('**/api/preferences', (route) => route.fulfill ({ json : { preferences : { units : 'metric', theme : 1 }, folders : ['Uncategorized'] } }));
+    await page.route ('**/api/personal/items', (route) => route.fulfill ({ json : [] }));
+    await page.route ('**/api/auth/session', (route) => route.fulfill ({ json : { user : { id : 'browser-user', email : 'browser@example.com' } } }));
 await page.goto(process.env.AUTO3D_TEST_URL || 'http://127.0.0.1:8080/website/index.html',{waitUntil:'domcontentloaded'}); await page.waitForFunction(()=>window.Auto3D);
 await page.waitForFunction (() => !document.body.classList.contains ('auth_locked'));
 await page.locator('#open_file').setInputFiles('test/testfiles/animation/animated.glb');
 
 const call=async(id,args={})=>{const r=await page.evaluate(({id,args})=>Auto3D.execute(id,args),{id,args});assert.equal(r.ok,true,JSON.stringify(r));return r.result;};
 await page.waitForFunction(()=>document.querySelector('.scene_status')?.textContent.startsWith('Added '));console.log('import status',await page.locator('.scene_status').textContent());const readRecovery = async () => page.evaluate (async () => {
-    const db = await new Promise ((resolve) => { const request = indexedDB.open ('sw-auto3d-library', 1); request.onsuccess = () => resolve (request.result); });
+    const db = await new Promise ((resolve) => { const request = indexedDB.open ('sw-auto3d-library-browser-user', 1); request.onsuccess = () => resolve (request.result); });
     const item = await new Promise ((resolve) => { const request = db.transaction ('saves').objectStore ('saves').get ('__auto3d_recovery__'); request.onsuccess = () => resolve (request.result); });
     db.close (); return item ? { updatedAt : item.updatedAt, bytes : Array.from (new Uint8Array (await item.archive.arrayBuffer ())) } : null;
 });
@@ -38,12 +41,12 @@ await call('object.transform',{objectId,position:[1,0,0]});
 let checkpoint = null;
 for (let attempt = 0; attempt < 40 && !checkpoint; attempt++) { await page.waitForTimeout (250); checkpoint = await readRecovery (); }
 assert.ok (checkpoint, 'Worker recovery must finish');
-const recovery=await page.evaluate(async()=>{const db=await new Promise(resolve=>{const r=indexedDB.open('sw-auto3d-library',1);r.onsuccess=()=>resolve(r.result);});const item=await new Promise(resolve=>{const r=db.transaction('saves').objectStore('saves').get('__auto3d_recovery__');r.onsuccess=()=>resolve(r.result);});db.close();return item?Array.from(new Uint8Array(await item.archive.arrayBuffer())):null;});
+const recovery=await page.evaluate(async()=>{const db=await new Promise(resolve=>{const r=indexedDB.open('sw-auto3d-library-browser-user',1);r.onsuccess=()=>resolve(r.result);});const item=await new Promise(resolve=>{const r=db.transaction('saves').objectStore('saves').get('__auto3d_recovery__');r.onsuccess=()=>resolve(r.result);});db.close();return item?Array.from(new Uint8Array(await item.archive.arrayBuffer())):null;});
 assert.ok(recovery?.length>0,'Recovery worker must create an archive');
 console.log('worker recovery saved',recovery.length,'bytes');
 await call('object.transform',{objectId,position:[1.25,0,0]});
 let nextCheckpoint = null;
-for (let attempt = 0; attempt < 40; attempt++) { await page.waitForTimeout (250); nextCheckpoint = await readRecovery (); if (nextCheckpoint && nextCheckpoint.updatedAt !== checkpoint.updatedAt) { break; } }
+for (let attempt = 0; attempt < 40; attempt++) { await page.waitForTimeout (250); nextCheckpoint = await readRecovery (); if (nextCheckpoint && nextCheckpoint.updatedAt !== checkpoint.updatedAt && OpenSessionArchive (new Uint8Array (nextCheckpoint.bytes)).document.objects[0].position[0] === 1.25) { break; } }
 assert.ok (nextCheckpoint && nextCheckpoint.updatedAt !== checkpoint.updatedAt, 'Cached geometry recovery must update');
 await call('ui.save');await page.getByLabel('Save name',{exact:true}).fill('Animation QA');await page.getByLabel('Save destination',{exact:true}).selectOption('device');
 await page.getByRole('button',{name:'Save to library',exact:true}).click();
@@ -52,9 +55,9 @@ console.log('Browser playback, timeline controls and library save passed');
 console.log('errors',errors);assert.deepEqual(errors,[]);
 console.log('status',await page.locator('.scene_status').textContent());
 // Inspect actual saved portable archive bytes and background recovery through IndexedDB.
-const records=await page.evaluate(async()=>{const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('sw-auto3d-library',1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});try{return await new Promise((resolve,reject)=>{const r=db.transaction('saves').objectStore('saves').getAll();r.onsuccess=()=>resolve(r.result.map(i=>({id:i.id,name:i.name,size:i.archive?.size})));r.onerror=()=>reject(r.error);});}finally{db.close();}}).catch(e=>({error:e.message}));console.log('stored records',records);
-const archive=await page.evaluate(async()=>{const db=await new Promise(resolve=>{const r=indexedDB.open('sw-auto3d-library',1);r.onsuccess=()=>resolve(r.result);});const items=await new Promise(resolve=>{const r=db.transaction('saves').objectStore('saves').getAll();r.onsuccess=()=>resolve(r.result);});db.close();const item=items.find(i=>i.name==='Animation QA');return Array.from(new Uint8Array(await item.archive.arrayBuffer()));});
-const {OpenSessionArchive}=await import('../../source/website/sessionarchive.js');
+const records=await page.evaluate(async()=>{const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('sw-auto3d-library-browser-user',1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});try{return await new Promise((resolve,reject)=>{const r=db.transaction('saves').objectStore('saves').getAll();r.onsuccess=()=>resolve(r.result.map(i=>({id:i.id,name:i.name,size:i.archive?.size})));r.onerror=()=>reject(r.error);});}finally{db.close();}}).catch(e=>({error:e.message}));console.log('stored records',records);
+const archive=await page.evaluate(async()=>{const db=await new Promise(resolve=>{const r=indexedDB.open('sw-auto3d-library-browser-user',1);r.onsuccess=()=>resolve(r.result);});const items=await new Promise(resolve=>{const r=db.transaction('saves').objectStore('saves').getAll();r.onsuccess=()=>resolve(r.result);});db.close();const item=items.find(i=>i.name==='Animation QA');return Array.from(new Uint8Array(await item.archive.arrayBuffer()));});
+
 const recovered = OpenSessionArchive (new Uint8Array (nextCheckpoint.bytes)); assert.equal (recovered.document.objects[0].position[0], 1.25); assert.equal (recovered.view.timeline.rangeEnd, 3.5);
 const saved=OpenSessionArchive(new Uint8Array(archive));
 assert.equal(saved.view.timeline.rangeStart,0.6);assert.equal(saved.view.timeline.rangeEnd,3.5);assert.equal(saved.view.timeline.cameraKeyframes.length,2); assert.notDeepEqual (saved.view.timeline.cameraKeyframes[0].center, saved.view.timeline.cameraKeyframes[1].center);assert.equal(saved.document.objects[0].keyframes.length,2);assert.ok(saved.document.objects[0].animationAsset.files[0].buffer.byteLength>0);

@@ -8,7 +8,7 @@
 .library_source_tabs { display: flex; gap: 8px; flex-wrap: wrap; }
 .library_source_tabs button[aria-pressed="true"] { border-color: var(--ov_button_color); background: var(--ov_hover_color); }
 .shared_view #toolbar, .shared_view .header_library_button:not(.header_fullscreen_button), .shared_view #upload_slot, .shared_view #intro, .shared_view #materials_section, .shared_view #material_drawer, .shared_view #session_objects > .section_content > .mode_buttons, .shared_view .session_object_row button:not(.object_name), .shared_view .scene_tool:not([aria-label="Select (V)"]):not([aria-label="Focus object (F)"]) { display: none !important; }
-.scene_tools { position: absolute; top: 12px; right: 10px; bottom: 12px; z-index: 5; display: flex; flex-direction: column; gap: 3px; width: 36px; padding: 5px; box-sizing: border-box; overflow: auto; max-height: fit-content; background: var(--ov_background_color); border: 1px solid var(--ov_border_color); border-radius: 7px; box-shadow: 0 3px 14px #0002; }
+.scene_tools { position: absolute; top: 49px; right: 0; bottom: 0; z-index: 5; display: flex; flex-direction: column; gap: 3px; width: 40px; padding: 5px; box-sizing: border-box; overflow: auto; max-height: none; background: var(--ov_background_color); border: 1px solid var(--ov_border_color); border-radius: 7px; box-shadow: 0 3px 14px #0002; }
 .scene_tool { flex: 0 0 29px; width: 25px; height: 29px; border: 0; background: transparent; color: var(--ov_foreground_color); padding: 3px; cursor: pointer; border-radius: 4px; }
 .scene_tool svg { width: 100%; height: 100%; }
 .scene_tool:hover, .scene_tool[aria-pressed="true"] { background: var(--ov_hover_color); }
@@ -907,3 +907,7 @@ div.main_viewer
 .animation_key_marker { top: 6px; color: #5aaee6 !important; }
 .animation_range_marker { top: -5px; color: #daa520 !important; cursor: ew-resize; touch-action: none; z-index: 2; }
 @media (max-width: 650px) { .advance_animation_panel { padding: 10px; } .advance_animation_track { grid-template-columns: 90px 1fr; gap: 8px; } }
+
+#main_right_container { position: relative; }
+#main_right_container:not(.collapsed) #data_panel_content { margin-right: 40px; }
+.header_fullscreen_button { order: 100; }

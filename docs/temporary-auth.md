@@ -8,7 +8,7 @@ Production Pages Functions use the existing `SUPABASE_URL` and encrypted `SUPABA
 
 In Supabase **Authentication → Sign In / Providers**, enable Email authentication and disable **Allow new users to sign up**. The application exposes no signup endpoint, but disabling provider signup is necessary to prevent account creation via the direct Supabase API.
 
-In **Authentication → Users → Add user → Create new user**, create each approved email/password account and confirm the email using the administrative option. Supply account credentials to the user through your normal secure process. Password resets are administered through Supabase for this first version; no reset email flow is implemented in Auto3D. Do not put passwords into repository files, chat, or command macros.
+In **Authentication → Users → Add user → Create new user**, create each approved email/password account and confirm the email using the administrative option. Supply account credentials to the user through your normal secure process. Auto3D now has an approved-account recovery flow; see the SMTP delivery status below. Until delivery is configured, administrators handle resets through Supabase. Do not put passwords into repository files, chat, or command macros.
 
 At implementation time, the inspected project `iesepcoxqochycckbwoh` contained zero auth users. No account was created automatically. The connected Supabase tools do not expose auth-provider settings, so the signup-disable setting must be checked in the dashboard.
 
@@ -21,7 +21,7 @@ Sign-in is separate from cloud publication. This implementation establishes acco
 ## API and security
 
 - `POST /api/auth/login`: JSON email/password; exchanges credentials with Supabase and verifies the resulting identity through `/auth/v1/user`.
-- `GET /api/auth/session`: verifies the access cookie with the provider and returns only user ID/email. Visitors receive a null user; expired credentials receive 401.
+- `GET /api/auth/session`: verifies the access cookie with the provider and returns user ID/email and optional display name. Visitors receive a null user; expired credentials receive 401.
 - `POST /api/auth/refresh`: rotates provider tokens using the HTTP-only refresh cookie and verifies the resulting identity. AuthService serializes session restore within a page.
 - `POST /api/auth/logout`: revokes the current refresh session and clears both browser cookies. If provider revocation fails, cookies still clear and the UI reports the failure. Other devices remain signed in.
 
@@ -43,7 +43,7 @@ Run `npm test`, `npm run lint`, and `npm run build_website`. With `npm start` ru
 
 Sign-in now includes **Request an account** (name, email, reason). Requests require approval; the endpoint does not create an Auth user or accept passwords. Approved accounts are created through the server-side Supabase admin API. No email is sent automatically. The reviewer enters an initial password (at least 12 characters) and supplies it through the organization’s secure process.
 
-The first administrator allowlist entry is `yuttana.chiaravalloti@smurfitwestrock.com`. Create that account in [Supabase Authentication → Users](https://supabase.com/dashboard/project/iesepcoxqochycckbwoh/auth/users), set its password, and confirm its email. Then sign into Auto3D and open **Preferences → Administrator → Account administration — requests and approvals**. The direct application link is `https://auto3d-5av.pages.dev/?admin=accounts`. The interface also links to Supabase user administration.
+The first administrator allowlist entry is `yuttana.chiaravalloti@smurfitwestrock.com`. Create that account in [Supabase Authentication → Users](https://supabase.com/dashboard/project/iesepcoxqochycckbwoh/auth/users), set its password, and confirm its email. Then sign into Auto3D and open **Preferences → Administrator → Account administration — requests and approvals**. The direct application link is `https://auto3d-5av.pages.dev/?console=desk-8b4f2d71c6`. The interface also links to Supabase user administration.
 
 Authorization verifies the provider identity and confirmed email on each admin request, then checks the server-only `auto3d_admin_emails` allowlist. Browser metadata and user-editable provider metadata cannot grant admin access. Additional admin emails must be explicitly added through the trusted database administration process. The user cannot grant themselves admin privileges in the application.
 
@@ -62,3 +62,17 @@ The workspace now requires login. There is no guest Continue button or splash/ba
 Every verified access token is checked against its still-active Supabase `auth.sessions` row via the service-only, SECURITY INVOKER `auto3d_session_active` RPC. The migration `database/session-gate.sql` grants the server only the session ID/user ID columns and grants no public RPC execution. This prevents a signed access token from remaining usable after its session is revoked.
 
 Logout locks immediately, notifies other tabs using a non-secret local logout marker, and calls provider logout to revoke the current session and clear token cookies. A persistent HttpOnly logout cookie also blocks protected routes and refresh if an earlier refresh response writes stale tokens. Only an explicit successful password login clears that cookie; refresh responses cannot clear it. Browser restoration cannot override logout, including a logout request that fails offline. The local marker contains no tokens or credentials. `test/browser/login-gate.mjs` covers saved-cookie reopening, cross-tab logout, click/Escape bypass attempts, failed logout, and explicit reauthentication.
+
+## Recovery and account navigation
+
+Login has an accessible Show/Hide password eye control and Forgot Password. `POST /api/auth/recover` accepts only email, returns a generic response, hashes identifiers for cooldown/rate limits, and sends a Supabase recovery email only when the server-only eligibility RPC confirms an existing, email-confirmed, non-banned approved user or allowlisted administrator. Requests never create accounts. The recovery redirect is fixed to the application origin `/?password=recovery`; browser-provided redirects are rejected.
+
+`CaptureRecovery` removes recovery fragments (including refresh tokens) from the address bar before loading the workspace. The access token is retained only in memory for the reset form. `POST /api/auth/reset-password` verifies the provider identity, active server session and approval before updating the password. On success it revokes sessions and sets the logout tombstone; the user then signs in with the new password. Recovery does not unlock the workspace. Expired/incomplete links display an error and require another request. `auth.recover` is available to agents without collecting a password.
+
+Automatic recovery email delivery is pending authorized SMTP setup. Temporary help contact: `yuttana.chiaravalloti@smurfitkappa.com`. That address is a contact, not an SMTP credential or a new admin grant. Requested eventual sender: `auto3d@smurfitwestrock.com`; changing a sender address does not authorize sending from its domain. Supabase default mail is restricted to permitted recipients and is not sufficient for arbitrary approved users.
+
+To enable production delivery, configure IT-approved custom SMTP in Supabase Authentication → Email (sender name Auto3D; sender address authorized by the provider), and Authentication → URL Configuration: Site URL `https://auto3d-5av.pages.dev`, allowed redirect `https://auto3d-5av.pages.dev/?password=recovery`. Test a full received-link/password-reset/sign-in round trip with an approved user. Never paste SMTP passwords, recovery links or JWTs into chat/logs. No live recovery email was sent during development.
+
+The account header shows the user's name, using verified provider identity for display only; authorization remains server-side. Full screen is the final header button. Model Data starts collapsed on desktop/mobile, and its tool strip sits below the panel toggle. Account administration uses `?console=desk-8b4f2d71c6` and `/api/accounts/desk-8b4f2d71c6`. The previous `?admin=accounts` trigger is removed and `/api/accounts/admin` returns not found. The opaque route remains protected by verified session and admin allowlist checks; it is not an authorization mechanism.
+
+See `docs/account-storage.md` for automatic account initialization, preference synchronization, private R2 Library and per-user device recovery.

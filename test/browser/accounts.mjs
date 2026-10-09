@@ -7,6 +7,7 @@ try {
     let signedIn = false; const submissions = []; const reviews = [];
     const user = { id : 'admin', email : 'yuttana.chiaravalloti@smurfitwestrock.com' };
     const request = { id : '12345678-1234-1234-1234-123456789abc', name : 'New User', email : 'new@example.com', reason : 'Project access', status : 'pending' };
+    await page.route ('**/api/preferences', (route) => route.fulfill ({ json : { preferences : { units : 'metric', theme : 1 }, folders : ['Uncategorized'] } }));
     await page.route ('**/api/auth/**', async (route) => {
         console.log ('auth request', route.request ().url ());
         if (route.request ().url ().endsWith ('/login')) { signedIn = true; }
@@ -35,6 +36,7 @@ try {
     const login = page.getByRole ('dialog', { name : 'Auto3D account', exact : true }); await login.getByLabel ('Email', { exact : true }).fill (user.email); await login.getByLabel ('Password', { exact : true }).fill ('browser-test-only');
     await login.getByRole ('button', { name : 'Sign in', exact : true }).click ();
     await page.waitForFunction (async () => (await Auto3D.execute ('auth.inspect')).result?.signedIn);
+    await page.waitForFunction (() => !document.body.classList.contains ('auth_locked'));
     console.log ('Signed in');
     await page.keyboard.press ('Escape'); await page.getByRole ('button', { name : 'Preferences', exact : true }).click ();
     await page.getByRole ('link', { name : 'Account administration — requests and approvals' }).click ();

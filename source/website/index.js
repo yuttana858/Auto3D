@@ -10,7 +10,7 @@ import { ButtonDialog, ProgressDialog } from './dialog.js';
 import { ShowMessageDialog } from './dialogs.js';
 import { CreateAgentCommands } from './agentcommands.js';
 import { AuthService } from './authservice.js';
-import { AuthPanel } from './authpanel.js';
+import { AuthPanel, CaptureRecovery } from './authpanel.js';
 
 import * as Engine from '../engine/main.js';
 export { Engine };
@@ -70,6 +70,8 @@ export function StartWebsite ()
         document.getElementById ('intro_dragdrop_text').innerHTML = Loc ('Drop model files here');
         document.getElementById ('upload_slot').appendChild (document.getElementById ('intro'));
 
+        const recovery = CaptureRecovery ();
+        const address = new URL (window.location.href); if (address.searchParams.has ('admin')) { address.searchParams.delete ('admin'); window.history.replaceState (null, '', address); }
         let website = new Website ({
             headerDiv : document.getElementById ('header'),
             headerButtonsDiv : document.getElementById ('header_buttons'),
@@ -89,9 +91,7 @@ export function StartWebsite ()
         website.auth = new AuthService ();
         website.Load ();
         website.accountAdmin = new AccountAdmin (website.auth);
-        website.authPanel = new AuthPanel (website.auth, website.accountAdmin);
-        let adminLinkOpened = false;
-        website.auth.Subscribe ((user) => { if (user && !adminLinkOpened && new URLSearchParams (window.location.search).get ('admin') === 'accounts') { adminLinkOpened = true; website.accountAdmin.Open ().catch ((error) => website.sessionEditor.Status (error.message)); } });
+        website.authPanel = new AuthPanel (website.auth, website.accountAdmin); website.authPanel.recovery = recovery;
         const refreshAccount = () => { if (document.visibilityState === 'visible') { website.auth.Restore ().catch (() => {}); } };
         document.addEventListener ('visibilitychange', refreshAccount);
         window.setInterval (refreshAccount, 240000);

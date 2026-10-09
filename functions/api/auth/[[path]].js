@@ -1,3 +1,4 @@
+import { Recover, ResetPassword } from '../../_lib/recovery.js';
 import { AccessCookie, RefreshCookie, LoggedOutCookie, AuthCookies, AuthRequest, AuthResponse, VerifiedUser } from '../../_lib/auth.js';
 
 export async function ReadBody (request)
@@ -77,10 +78,12 @@ async function Logout (context)
 export async function onRequest (context)
 {
     const path = context.params.path || [];
-    if (path.length !== 1 || !['session', 'login', 'refresh', 'logout'].includes (path[0])) { return AuthResponse ({ error : 'Not found.' }, 404); }
+    if (path.length !== 1 || !['session', 'login', 'refresh', 'logout', 'recover', 'reset-password'].includes (path[0])) { return AuthResponse ({ error : 'Not found.' }, 404); }
     if (context.request.method !== (path[0] === 'session' ? 'GET' : 'POST')) { return AuthResponse ({ error : 'Method not allowed.' }, 405); }
     if (context.request.method === 'POST' && context.request.headers.get ('Origin') !== new URL (context.request.url).origin) { return AuthResponse ({ error : 'Sign-in requests must come from this application.' }, 403); }
     try {
+        if (path[0] === 'recover') { return await Recover (context, await ReadBody (context.request)); }
+        if (path[0] === 'reset-password') { return await ResetPassword (context, await ReadBody (context.request)); }
         if (path[0] === 'session') { return await Session (context); }
         if (path[0] === 'login') { return await Login (context); }
         if (path[0] === 'logout') { return await Logout (context); }

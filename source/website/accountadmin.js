@@ -1,3 +1,4 @@
+import { AccountConsole } from './accountpaths.js';
 import { WorkspaceDialog } from './modellibrary.js';
 
 function Element (tag, text, parent)
@@ -23,7 +24,7 @@ export class AccountAdmin
     {
         if (!this.auth.user) { this.isAdmin = false; return { isAdmin : false, requests : [] }; }
         const id = this.auth.user.id;
-        try { const data = await this.Request ('admin'); if (this.auth.user?.id !== id) { return { isAdmin : false, requests : [] }; } this.isAdmin = data.isAdmin; return data; }
+        try { const data = await this.Request (AccountConsole); if (this.auth.user?.id !== id) { return { isAdmin : false, requests : [] }; } this.isAdmin = data.isAdmin; return data; }
         catch (error) { this.isAdmin = false; if ([401, 403].includes (error.status)) { return { isAdmin : false, requests : [] }; } throw error; }
     }
     Review (id, decision, password) { return this.Request ('review', { id, decision, ...(password ? { password } : {}) }); }
@@ -52,6 +53,8 @@ export class AccountAdmin
         if (!data.isAdmin) { throw new Error ('Sign in with an approved administrator account.'); }
         if (this.dialog?.isConnected) { this.dialog.focus (); return { opened : true }; }
         const dialog = WorkspaceDialog ('Account administration'); this.dialog = dialog;
+        const address = new URL (window.location.href); address.searchParams.delete ('admin'); address.searchParams.set ('console', AccountConsole); window.history.replaceState (null, '', address);
+        dialog.addEventListener ('close', () => { const address = new URL (window.location.href); if (address.searchParams.get ('console') === AccountConsole) { address.searchParams.delete ('console'); window.history.replaceState (null, '', address); } });
         const status = Element ('p', 'Approve or reject account requests. Share initial passwords through your secure process.', dialog); status.setAttribute ('role', 'status');
         const dashboard = Element ('a', 'Supabase user administration', dialog); dashboard.href = 'https://supabase.com/dashboard/project/iesepcoxqochycckbwoh/auth/users'; dashboard.target = '_blank'; dashboard.rel = 'noopener noreferrer';
         const refresh = Element ('button', 'Refresh requests', dialog);

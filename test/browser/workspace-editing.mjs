@@ -5,6 +5,8 @@ try {
     const page = await browser.newPage ({ viewport : { width : 1440, height : 1000 } });
     page.setDefaultTimeout (20000);
     const errors = []; page.on ('pageerror', (error) => errors.push (error.stack));
+    await page.route ('**/api/preferences', (route) => route.fulfill ({ json : { preferences : { units : 'metric', theme : 1 }, folders : ['Uncategorized'] } }));
+    await page.route ('**/api/personal/items', (route) => route.fulfill ({ json : [] }));
     await page.route ('**/api/auth/session', (route) => route.fulfill ({ json : { user : { id : 'browser-user', email : 'browser@example.com' } } }));
 await page.goto ('http://127.0.0.1:8080/website/index.html', { waitUntil : 'domcontentloaded' });
     await page.waitForFunction (() => window.Auto3D);

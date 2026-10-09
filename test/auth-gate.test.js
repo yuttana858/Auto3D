@@ -13,7 +13,7 @@ describe ('Mandatory login and logout protection', () => {
     let originalFetch;
     beforeEach (() => { originalFetch = global.fetch; }); afterEach (() => { global.fetch = originalFetch; });
     it ('blocks every resource API when unsigned, while allowing login and account requests', async () => {
-        for (const path of ['library', 'share', 'ai', 'environments', 'knowledge/paper-packaging', 'accounts/admin', 'health']) { assert.equal ((await middleware (context ('/api/' + path))).status, 401); }
+        for (const path of ['library', 'share', 'ai', 'environments', 'knowledge/paper-packaging', 'accounts/desk-8b4f2d71c6', 'health']) { assert.equal ((await middleware (context ('/api/' + path))).status, 401); }
         for (const path of ['/api/auth/login', '/api/auth/session', '/api/accounts/request']) { assert.equal ((await middleware (context (path))).status, 200); }
     });
     it ('protects direct model and embedded-viewer URLs while retaining public login assets', async () => {

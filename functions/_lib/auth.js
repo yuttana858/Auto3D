@@ -42,7 +42,8 @@ export function PublicUser (user)
 {
     if (!user?.id || user.is_anonymous === true) { throw Object.assign (new Error ('Authentication required.'), { status : 401 }); }
     // Identity is verified by the provider, never taken from browser metadata.
-    return { id : user.id, email : typeof user.email === 'string' ? user.email : null };
+    const name = user.user_metadata?.name || user.user_metadata?.full_name;
+    return { id : user.id, email : typeof user.email === 'string' ? user.email : null, ...(typeof name === 'string' && name.trim () ? { name : name.trim ().slice (0, 100) } : {}) };
 }
 
 export async function VerifiedUser (env, token)

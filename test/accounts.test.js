@@ -7,7 +7,7 @@ const env = { SUPABASE_URL : 'https://configured.supabase.co', SUPABASE_SECRET_K
 const id = '12345678-1234-1234-1234-123456789abc';
 const admin = { id : 'admin-id', email : 'admin@example.com', email_confirmed_at : '2026-10-08' };
 const pending = { id, email : 'request@example.com', name : 'Requester', status : 'pending' };
-const context = (action, body, headers = {}) => ({ env, params : { path : [action] }, request : new Request ('https://app.example/api/accounts/' + action, { method : action === 'admin' ? 'GET' : 'POST', headers : { Origin : 'https://app.example', 'Content-Type' : 'application/json', Cookie : AccessCookie + '=verified', ...headers }, ...(body ? { body : JSON.stringify (body) } : {}) }) });
+const context = (action, body, headers = {}) => ({ env, params : { path : [action] }, request : new Request ('https://app.example/api/accounts/' + action, { method : action === 'desk-8b4f2d71c6' ? 'GET' : 'POST', headers : { Origin : 'https://app.example', 'Content-Type' : 'application/json', Cookie : AccessCookie + '=verified', ...headers }, ...(body ? { body : JSON.stringify (body) } : {}) }) });
 describe ('Account requests and administration', () => {
     let originalFetch;
     beforeEach (() => { originalFetch = global.fetch; }); afterEach (() => { global.fetch = originalFetch; });
@@ -33,13 +33,13 @@ describe ('Account requests and administration', () => {
         assert.equal (response.status, 202); assert.ok ((await response.json ()).message);
     });
     it ('requires authentication and ignores user-editable admin metadata', async () => {
-        assert.equal ((await onRequest (context ('admin', null, { Cookie : '' }))).status, 401);
+        assert.equal ((await onRequest (context ('desk-8b4f2d71c6', null, { Cookie : '' }))).status, 401);
         global.fetch = async (url) => url.endsWith ('/user') ? Response.json ({ ...admin, user_metadata : { role : 'admin' } }) : Response.json ([]);
-        assert.equal ((await onRequest (context ('admin'))).status, 403);
+        assert.equal ((await onRequest (context ('desk-8b4f2d71c6'))).status, 403);
     });
     it ('does not grant admin access to an unconfirmed allowlisted email', async () => {
         global.fetch = async () => Response.json ({ ...admin, email_confirmed_at : null });
-        assert.equal ((await onRequest (context ('admin'))).status, 403);
+        assert.equal ((await onRequest (context ('desk-8b4f2d71c6'))).status, 403);
     });
     function provider (claim = [pending], createStatus = 200) {
         const calls = [];
@@ -54,7 +54,7 @@ describe ('Account requests and administration', () => {
         }; return calls;
     }
     it ('lists requests only after provider identity and allowlist checks', async () => {
-        const calls = provider (); const response = await onRequest (context ('admin')); assert.equal (response.status, 200);
+        const calls = provider (); const response = await onRequest (context ('desk-8b4f2d71c6')); assert.equal (response.status, 200);
         assert.equal ((await response.json ()).isAdmin, true); assert.equal (calls.length, 3);
     });
     it ('claims approval once and creates a confirmed non-admin account, without returning credentials', async () => {

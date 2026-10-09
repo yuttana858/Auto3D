@@ -16,6 +16,30 @@
       "example": {}
     },
     {
+      "id": "auth.recover",
+      "title": "Request password recovery",
+      "category": "Account",
+      "description": "Request a one-time recovery email for an approved account. Returns the same response for unapproved or unknown addresses.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 254
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "email": "user@example.com"
+      }
+    },
+    {
       "id": "auth.open",
       "title": "Open account sign-in",
       "category": "Account",
@@ -1234,6 +1258,261 @@
         "additionalProperties": false
       },
       "example": {}
+    },
+    {
+      "id": "preferences.inspect",
+      "title": "Inspect preferences",
+      "category": "Preferences",
+      "description": "Return account theme and display units without private credentials.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "library.account.list",
+      "title": "List account Library",
+      "category": "Library",
+      "description": "List private models and sessions belonging to the signed-in account.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "library.account.save",
+      "title": "Save to account Library",
+      "category": "Library",
+      "description": "Explicitly upload the current session or selected model to the private account Library.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "category": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "session",
+              "model"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "name": "Concept",
+        "category": "Projects",
+        "kind": "session"
+      }
+    },
+    {
+      "id": "library.account.open",
+      "title": "Open account Library item",
+      "category": "Library",
+      "description": "Open or add an owned account archive to the editable workspace.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+          },
+          "append": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "append": false
+      }
+    },
+    {
+      "id": "library.account.rename",
+      "title": "Rename account Library item",
+      "category": "Library",
+      "description": "Rename an owned item without uploading another archive.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "name": "Updated concept"
+      }
+    },
+    {
+      "id": "library.account.move",
+      "title": "Move account Library item",
+      "category": "Library",
+      "description": "Move an owned item to a category/project folder.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+          },
+          "category": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "category"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "category": "Projects/Concepts"
+      }
+    },
+    {
+      "id": "library.account.delete",
+      "title": "Delete account Library item",
+      "category": "Library",
+      "description": "Explicitly delete an owned saved archive and preview.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "id": "library.account.folder.create",
+      "title": "Create account Library folder",
+      "category": "Library",
+      "description": "Create a private category/project folder.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "path": "Projects/Concepts"
+      }
+    },
+    {
+      "id": "library.account.folder.rename",
+      "title": "Rename account Library folder",
+      "category": "Library",
+      "description": "Rename a private folder and move its saved items. Multi-item changes may require retry after a network failure.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "next": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "path",
+          "next"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "path": "Projects",
+        "next": "Archive"
+      }
+    },
+    {
+      "id": "library.account.folder.delete",
+      "title": "Delete account Library folder",
+      "category": "Library",
+      "description": "Remove a private folder and move its files to the parent without deleting archives.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "path": "Projects/Concepts"
+      }
     },
     {
       "id": "ui.library",

@@ -1,4 +1,6 @@
-import { Theme } from './settings.js';
+import { RGBAColor, RGBColor } from '../engine/model/color.js';
+import { AccountConsole } from './accountpaths.js';
+import { Theme, Settings, CameraSettings } from './settings.js';
 import { WorkspaceDialog } from './modellibrary.js';
 import { Unit } from '../engine/model/unit.js';
 import { OpenCommandPanel } from './commandpanel.js';
@@ -43,10 +45,7 @@ export class Preferences
     {
         this.website = website;
         this.units = 'metric';
-        try {
-            const profile = JSON.parse (localStorage.getItem ('auto3d-user-preferences-v1') || '{}');
-            this.units = profile.units === 'standard' || localStorage.getItem ('sw-auto3d-units') === 'standard' ? 'standard' : 'metric';
-        } catch { /* Storage can be disabled. */ }
+        this.accountId = null; this.applying = false; this.pendingSave = Promise.resolve ();
         website.sidebar.detailsPanel.unitSystem = this.units;
         const badge = document.createElement ('span'); badge.className = 'version_badge'; badge.textContent = 'v' + AppVersion;
         document.querySelector ('.title_left').appendChild (badge);
@@ -60,16 +59,16 @@ export class Preferences
         const dialog = WorkspaceDialog ('Preferences');
         const form = document.createElement ('div'); form.className = 'workspace_save_form';
         const adminArea = document.createElement ('section'); form.appendChild (adminArea);
-        const adminLink = document.createElement ('a'); adminLink.href = '?admin=accounts'; adminLink.textContent = 'Account administration — requests and approvals';
+        const adminLink = document.createElement ('a'); adminLink.href = '?console=' + AccountConsole; adminLink.textContent = 'Account administration — requests and approvals';
         adminLink.addEventListener ('click', async (event) => { event.preventDefault (); try { await this.website.accountAdmin.Open (); dialog.close (); } catch (error) { adminLink.textContent = error.message; } });
         this.website.accountAdmin?.Refresh ().then ((data) => { if (data.isAdmin && dialog.isConnected) { const title = document.createElement ('strong'); title.textContent = 'Administrator'; adminArea.append (title, document.createElement ('br'), adminLink); } }).catch ((error) => { if (dialog.isConnected && this.website.auth?.user) { const message = document.createElement ('p'); message.setAttribute ('role', 'status'); message.textContent = error.message; adminArea.replaceChildren (message); } });
         const appearance = document.createElement ('label'); appearance.textContent = 'Appearance';
         const theme = document.createElement ('select'); theme.setAttribute ('aria-label', 'Appearance'); theme.add (new Option ('Light', String (Theme.Light))); theme.add (new Option ('Dark', String (Theme.Dark))); theme.value = String (this.website.settings.themeId);
-        theme.addEventListener ('change', () => this.website.SwitchTheme (Number (theme.value), true)); appearance.appendChild (theme);
+        theme.addEventListener ('change', () => { this.website.SwitchTheme (Number (theme.value), true); }); appearance.appendChild (theme);
         const unitLabel = document.createElement ('label'); unitLabel.textContent = 'Units';
         const units = document.createElement ('select'); units.setAttribute ('aria-label', 'Units'); units.add (new Option ('Metric (mm)', 'metric')); units.add (new Option ('Standard (in)', 'standard')); units.value = this.units;
         units.addEventListener ('change', () => {
-            this.SetUnits (units.value);
+            this.SetUnits (units.value).catch ((error) => { syncStatus.textContent = error.message; });
         }); unitLabel.appendChild (units);
         const aiHeading = document.createElement ('strong'); aiHeading.textContent = 'AI connections';
         const aiProviderLabel = document.createElement ('label'); aiProviderLabel.textContent = 'Provider';
@@ -99,24 +98,66 @@ export class Preferences
         clearAI.addEventListener ('click', () => { aiKey.value = ''; this.website.aiWorkspace?.ClearKey (); aiStatus.textContent = 'API key cleared.'; });
         aiProvider.addEventListener ('change', () => { if (aiProvider.value === 'meshy' && (!aiBase.value || aiBase.value.includes ('meshy.ai'))) { aiBase.value = '/api/ai'; } });
         aiActions.append (saveAI, testAI, clearAI);
+        const syncStatus = document.createElement ('p'); syncStatus.setAttribute ('role', 'status'); syncStatus.textContent = 'Theme and units are saved automatically to your account.'; this.syncStatus = syncStatus;
         const about = document.createElement ('p'); about.className = 'preferences_about';
         about.textContent = 'SW Auto3D v' + AppVersion + ' — A browser workspace for inspecting, arranging and reviewing 3D models, materials, lighting and reusable layouts. Dimensions use the units declared by the source model; unspecified units remain model units.';
         const commands = document.createElement ('button'); commands.textContent = 'Commands and macros'; commands.className = 'workspace_primary'; commands.addEventListener ('click', () => { dialog.close (); OpenCommandPanel (this.website); });
-        const heading = document.createElement ('strong'); heading.textContent = 'About'; form.append (appearance, unitLabel, commands, aiHeading, aiProviderLabel, aiBaseLabel, aiKeyLabel, rememberLabel, aiNote, aiActions, aiStatus, heading, about); dialog.appendChild (form);
+        const heading = document.createElement ('strong'); heading.textContent = 'About'; form.append (appearance, unitLabel, syncStatus, commands, aiHeading, aiProviderLabel, aiBaseLabel, aiKeyLabel, rememberLabel, aiNote, aiActions, aiStatus, heading, about); dialog.appendChild (form);
     }
 
     SetUnits (units)
     {
         this.units = units; this.website.sidebar.detailsPanel.unitSystem = units;
-        try {
-            const profile = JSON.parse (localStorage.getItem ('auto3d-user-preferences-v1') || '{}');
-            profile.units = units;
-            localStorage.setItem ('auto3d-user-preferences-v1', JSON.stringify (profile));
-            localStorage.setItem ('sw-auto3d-units', units);
-        } catch { /* Keep this session preference. */ }
         if (this.website.model) {
             this.website.sidebar.AddObject3DProperties (this.website.model, this.website.model);
             this.website.sessionEditor.UnitsChanged ();
         }
+        return this.SaveAccount ();
+    }
+    async LoadAccount (id)
+    {
+        if (this.accountId === id) { return; }
+        const response = await fetch ('/api/preferences', { credentials : 'same-origin', headers : { 'X-Auto3D-Account' : id } });
+        if (!response.ok) { throw new Error ('Could not load account preferences. Retry saved sign-in.'); }
+        const data = await response.json ();
+        if (this.website.auth.user?.id !== id) { throw new Error ('Account changed. Sign in again.'); }
+        this.applying = true;
+        try { this.units = data.preferences?.units === 'standard' ? 'standard' : 'metric'; this.website.sidebar.detailsPanel.unitSystem = this.units; this.website.SwitchTheme (data.preferences?.theme === 2 ? 2 : 1, true);
+            const settings = this.website.settings; const camera = this.website.cameraSettings; const defaults = new Settings (settings.themeId); const cameraDefaults = new CameraSettings ();
+            for (const key of ['environmentMapName', 'backgroundIsEnvMap', 'horizonGradient', 'backgroundPreset', 'showGroundGrid', 'backgroundColor', 'defaultLineColor', 'defaultColor', 'edgeSettings']) { settings[key] = defaults[key]; }
+            camera.navigationMode = cameraDefaults.navigationMode; camera.projectionMode = cameraDefaults.projectionMode;
+            const view = data.preferences?.view;
+            if (view) {
+                for (const key of ['environmentMapName', 'backgroundIsEnvMap', 'horizonGradient', 'backgroundPreset', 'showGroundGrid']) { settings[key] = view[key]; }
+                settings.backgroundColor = new RGBAColor (...view.backgroundColor); settings.defaultLineColor = new RGBColor (...view.defaultLineColor); settings.defaultColor = new RGBColor (...view.defaultColor);
+                settings.edgeSettings.showEdges = view.showEdges; settings.edgeSettings.edgeColor = new RGBColor (...view.edgeColor); settings.edgeSettings.edgeThreshold = view.edgeThreshold;
+                camera.navigationMode = view.navigationMode; camera.projectionMode = view.projectionMode;
+            }
+            this.website.viewer.SetNavigationMode (camera.navigationMode); this.website.viewer.SetProjectionMode (camera.projectionMode); this.website.viewer.SetEdgeSettings (settings.edgeSettings);
+            this.website.UpdateEnvironmentMap (); this.website.UpdateViewport (); this.website.sidebar.UpdateControlsStatus ();
+            settings.onChange = camera.onChange = () => this.ScheduleSave ();
+            this.website.sessionEditor.UnitsChanged (); this.website.sessionEditor.library.InitializeAccount (id); this.website.aiWorkspace?.InitializeAccount (id); this.accountId = id; }
+        finally { this.applying = false; }
+    }
+    ViewPreferences ()
+    {
+        const s = this.website.settings; const camera = this.website.cameraSettings;
+        const rgb = (color) => [color.r, color.g, color.b];
+        return { environmentMapName : s.environmentMapName, backgroundIsEnvMap : s.backgroundIsEnvMap, horizonGradient : s.horizonGradient, backgroundPreset : s.backgroundPreset, showGroundGrid : s.showGroundGrid, backgroundColor : [...rgb (s.backgroundColor), s.backgroundColor.a], defaultLineColor : rgb (s.defaultLineColor), defaultColor : rgb (s.defaultColor), showEdges : s.edgeSettings.showEdges, edgeColor : rgb (s.edgeSettings.edgeColor), edgeThreshold : s.edgeSettings.edgeThreshold, navigationMode : camera.navigationMode, projectionMode : camera.projectionMode };
+    }
+    ScheduleSave () { this.SaveAccount ().catch ((error) => { this.website.sessionEditor.Status (error.message); if (this.syncStatus?.isConnected) { this.syncStatus.textContent = error.message; } }); }
+    SaveAccount ()
+    {
+        if (this.applying || !this.accountId || this.website.auth.user?.id !== this.accountId) { return Promise.resolve (); }
+        const owner = this.accountId; const preferences = { units : this.units, theme : this.website.settings.themeId, view : this.ViewPreferences () };
+        this.pendingSave = this.pendingSave.catch (() => {}).then (async () => {
+            if (this.website.auth.user?.id !== owner) { return; }
+            if (this.syncStatus?.isConnected) { this.syncStatus.textContent = 'Saving account preferences…'; }
+            const response = await fetch ('/api/preferences', { method : 'PUT', credentials : 'same-origin', headers : { 'Content-Type' : 'application/json', 'X-Auto3D-Account' : owner }, body : JSON.stringify ({ preferences }) });
+            if (!response.ok) { throw new Error ('Account preferences could not be saved. Retry the change.'); }
+            if (this.website.auth.user?.id === owner && this.syncStatus?.isConnected) { this.syncStatus.textContent = 'Account preferences saved.'; }
+        });
+        return this.pendingSave;
     }
 }
+

@@ -26,12 +26,18 @@ export class AIWorkspace
         this.CreatePanel ();
     }
 
+    InitializeAccount (id)
+    {
+        this.storageKey = AIStorageKey + ':' + id; this.settings = this.LoadSettings (); this.RefreshConnection (); this.RefreshActions ();
+    }
+
     LoadSettings ()
     {
         const fallback = { provider : 'meshy', baseUrl : '/api/ai', apiKey : '', remember : false };
         try {
-            const session = JSON.parse (sessionStorage.getItem (AIStorageKey) || 'null');
-            const local = JSON.parse (localStorage.getItem (AIStorageKey) || 'null');
+            if (!this.storageKey) { return fallback; }
+            const session = JSON.parse (sessionStorage.getItem (this.storageKey) || 'null');
+            const local = JSON.parse (localStorage.getItem (this.storageKey) || 'null');
             const settings = { ...fallback, ...(session || local || {}) };
             if (settings.provider === 'meshy' && String (settings.baseUrl || '').includes ('meshy.ai')) { settings.baseUrl = '/api/ai'; }
             return settings;
@@ -52,10 +58,11 @@ export class AIWorkspace
             remember : settings.remember === true
         };
         try {
-            sessionStorage.removeItem (AIStorageKey);
-            localStorage.removeItem (AIStorageKey);
+            sessionStorage.removeItem (this.storageKey);
+            localStorage.removeItem (this.storageKey);
             const target = this.settings.remember ? localStorage : sessionStorage;
-            target.setItem (AIStorageKey, JSON.stringify (this.settings));
+            if (!this.storageKey) { throw new Error ('Sign in first.'); }
+            target.setItem (this.storageKey, JSON.stringify (this.settings));
         } catch { /* Connection remains available for this page lifetime. */ }
         this.RefreshConnection ();
     }
