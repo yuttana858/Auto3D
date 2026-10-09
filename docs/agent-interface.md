@@ -67,3 +67,5 @@ Packaging commands share `PackagingWorkspace` with the dieline UI: `packaging.op
 ## Screenshots for agent chat
 
 `capture.image` returns PNG image content for the viewport or visible workspace. Forward `result.content` as image blocks to the chat tool result. The Commands panel provides preview/download. See [agent-screen-capture.md](agent-screen-capture.md) for the authorized Playwright adapter, privacy filters, limits and connection requirements.
+
+`lighting.shadow.inspect` reports effective model visibility (including hidden parents), cast/receive counts, floor opacity/depth writes, WebGL context loss and failed shader diagnostics. It is read-only and accepts no arguments. Use it before/after a shadow toggle when investigating device-specific rendering failures.
