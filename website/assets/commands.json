@@ -382,6 +382,158 @@
       "example": {}
     },
     {
+      "id": "packaging.fefco.catalog",
+      "title": "Read FEFCO catalog",
+      "category": "Packaging",
+      "description": "Read the initial 02 slotted styles (0200 HSC, 0201 RSC, 0202 OSC, 0203 FOL) and planned families. Includes reference and generation availability.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.fefco.inspect",
+      "title": "Inspect FEFCO dimensions",
+      "category": "Packaging",
+      "description": "Read the currently configured internal dimensions and caliper in canonical mm; W=X, L=Z, H=Y.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.fefco.configure",
+      "title": "Configure FEFCO box",
+      "category": "Packaging",
+      "description": "Select a supported style or change draft generation parameters in millimeters. Length must be at least width. Does not change scene geometry; generate explicitly.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "0200",
+              "0201",
+              "0202",
+              "0203"
+            ]
+          },
+          "length": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 10000
+          },
+          "width": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 10000
+          },
+          "height": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 10000
+          },
+          "thickness": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 15
+          },
+          "overlap": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "closure": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "code": "0200",
+        "length": 400,
+        "width": 300,
+        "height": 250
+      }
+    },
+    {
+      "id": "packaging.fefco.generate",
+      "title": "Generate folded FEFCO box",
+      "category": "Packaging",
+      "description": "Create a textured, thick-walled corrugated box using internal dimensions in mm and known scene units. Uses current configured values for omitted fields. 0200 has no top flaps; other styles support open/closed. 0202 requires overlap > 0 and < width. Stores parameters and editable concept dieline, replaces current profile, supports Undo. No upload or publication.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "0200",
+              "0201",
+              "0202",
+              "0203"
+            ]
+          },
+          "length": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 10000
+          },
+          "width": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 10000
+          },
+          "height": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 10000
+          },
+          "thickness": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 15
+          },
+          "overlap": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "closure": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "code": "0201",
+        "length": 400,
+        "width": 300,
+        "height": 250,
+        "thickness": 3,
+        "closure": "open"
+      }
+    },
+    {
       "id": "packaging.open",
       "title": "Open packaging design",
       "category": "Packaging",

@@ -1,6 +1,6 @@
 # Packaging workspace
 
-The **Packaging** header button and object tool open a flat dieline editor. Draw point to point on a snapped grid or enter exact X/Y values, finish open paths, or close outlines. Select paths to assign cut/score and edit individual vertices. Red means cut; blue dashed means score. Mouse wheel zooms; Fit drawing frames the complete design. Enter finishes an open path, Shift+Enter closes an outline, and Escape cancels the staged path before closing the dialog.
+The right panel’s **Packaging** tab contains the FEFCO catalog and **Open packaging designer**. The model tool strip and right-click Packaging action open this tab. The designer opens a flat dieline editor. Draw point to point on a snapped grid or enter exact X/Y values, finish open paths, or close outlines. Select paths to assign cut/score and edit individual vertices. Red means cut; blue dashed means score. Mouse wheel zooms; Fit drawing frames the complete design. Enter finishes an open path, Shift+Enter closes an outline, and Escape cancels the staged path before closing the dialog.
 
 All design data is canonical millimeters. UI coordinates, caliper, snap input and path lengths use account display units (mm or inches). SVG always has physical `mm` width/height and an unscaled millimeter viewBox with separate CUT/SCORE groups; Y is flipped only for display. DXF is ASCII R2000 (`AC1015`), `LWPOLYLINE`, `$INSUNITS=4` and separate CUT/SCORE layers. DXF SCORE is a separate blue layer; CAD clients may assign their crease linetype. Exports contain vectors, not a raster image or 3D mesh. Machine software must map layers to its operations.
 
@@ -10,7 +10,7 @@ Board caliper presets are approximate nominal flute values, not ECT/burst streng
 
 Extrude board adds a new independent solid. Closed cut contours define its outline; containment uses the even/odd rule for holes and islands. Multiple disconnected blanks are supported. Open cut paths, self-crossing outlines and touching/intersecting contours are refused before scene mutation. Internal score paths remain crease metadata and export lines: they neither remove material nor fold geometry. The profile lies on X/Z with thickness along Y; profile positive Y maps to negative world Z. Coordinates and thickness are converted into the existing scene's declared unit. Empty scenes begin in millimeters. Existing unknown scene units cause an explicit error rather than an assumed physical conversion.
 
-A design supports at most 100 paths and 2000 points, bounded coordinates ±100000 mm, and positive caliper up to 100 mm. Straight segments are implemented; curves, vector import, bend allowance, fold simulation, fluted cross-sections and FEFCO generators are future work. Rendering uses a solid board surface, not individual paper/flute meshes.
+A design supports at most 100 paths and 2000 points, bounded coordinates ±100000 mm, and positive caliper up to 100 mm. Straight segments are implemented; curves, vector import, bend allowance, fold simulation, individual fluted cross-sections and general fold simulation remain future work. Rendering uses a solid board surface, not individual paper/flute meshes.
 
 Original profiles remain attached to extruded boards. **Load selected board profile** restores that design for editing; subsequent extrusion creates a new solid. It does not silently resize an existing board or bake later object transforms/scaling back into the manufacturing dieline. W/L/H scaling remains the generic model transform tool.
 
@@ -50,3 +50,23 @@ PR #21 replaced the floor shadow-map path with independent caster copies and an 
 ## Validation
 
 `test/packaging.test.js` checks physical caliper, watertight solids, holes/disconnected contours, invalid geometry, SVG/DXF scale/layers, unit conversion, schema/read-only handling, archive/recovery round trips and Undo/Redo. `test/scene-effects.test.js` checks diffuse/environment preservation, shader restoration, capture failure state cleanup, floor depth and Phong response. `test/browser/packaging-effects.mjs` exercises drawing, point editing, vector downloads, extrusion, units and default/studio/night HDRI visibility plus shader errors.
+
+## FEFCO first set — v0.28.0
+
+The categorized catalog provides original thumbnails and generators for **0201 RSC**, **0200 HSC**, **0202 OSC**, and **0203 FOL**, following identifiers in the [FEFCO 12th edition](https://www.fefco.org/technical-information/fefco-code). RSC and HSC are priority entries; regular, half-slotted and overlap designs have separate groups. Family 02 is available; other families are marked coming later. This is a curated first set, not a complete imported FEFCO database. Drawings and textures are generated locally with original code, with no dependency on an AI provider.
+
+Internal dimensions use **L × W × H**, with W=X, L=Z and H=Y. Fields display account units; command parameters always use millimeters. Dimensions are bounded to 20–10000 mm, length must be at least width, and measured caliper is 0.5–15 mm and at most one eighth of width/height. 0202 overlap must be positive and smaller than width. RSC flap depth is width/2; OSC is (width+overlap)/2; FOL is width. HSC has base flaps and no top flaps. Other styles allow open or closed top flaps.
+
+Generation adds a complete selectable model with separate watertight board panels, layered closure flaps, an inside glue joint, deterministic embedded PNG kraft grain and a corrugated edge texture. Edge texture represents visible flute detail; it is not individually modeled flute geometry. Scene units must be known; an empty scene begins in mm. The generated box is one arrayable session object.
+
+Generation replaces the active dieline with a connected cut outline and crease paths. The profile is a concept drawing: supplier bend, slot, joint and tooling allowances must be confirmed before manufacturing. Editing that profile does not refold the generated box. Generation parameters are saved as bounded JSON in object.userData._auto3dFefco, and the validated profile is attached as packagingProfile. Normal session, selected-model, duplicate/instance and recovery paths preserve them and embedded textures. **Load selected board profile** restores the profile and its generator settings; generating again creates a new box. Undo/Redo adds/removes the model and restores the previous active drawing together.
+
+Shared commands: packaging.fefco.catalog, packaging.fefco.inspect, packaging.fefco.configure (draft settings only), and packaging.fefco.generate. Example:
+
+```json
+{"id":"packaging.fefco.generate","args":{"code":"0201","length":400,"width":300,"height":250,"thickness":3,"closure":"open"}}
+```
+
+The bottom command bar accepts `generate rsc 400x300x250 mm` and `create hsc 400x300x250`. Explicit 0200–0203 codes are also accepted. Other generator settings use the currently configured draft values. The same generator runs from UI, commands and macros with authentication, busy, read-only and object-limit checks. No remote upload is triggered.
+
+Validation: test/fefco.test.js covers style identity, watertight panels, crease outlines, flap closure geometry, units, invalid parameters, command/macro access, rollback, archive/recovery textures and Undo/Redo. test/browser/fefco.mjs covers catalog thumbnails, HSC/RSC generation, open/closed flaps, saved archive data, input validation, inches and the mobile panel.

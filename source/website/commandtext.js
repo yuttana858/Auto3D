@@ -23,10 +23,15 @@ export function ParseCommandText (input)
         let command; let args = {};
         const array = normalized.match (/^array(?: model)?\s+(\d+)\s*[x×]\s*(\d+)\s*[x×]\s*(\d+)$/);
         const tool = normalized.match (/^(select|move|rotate|scale)(?: model)?$/);
+        const box = normalized.match (/^(?:generate|create)\s+(rsc|hsc|0200|0201|0202|0203)\s+(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)(?:\s+mm)?$/);
         if (array) {
             const counts = array.slice (1).map (Number);
             if (counts.some (count => count < 1 || count > 20) || counts.reduce ((a, b) => a * b) > 1000) { throw new Error ('Array counts must be 1–20 with at most 1,000 objects.'); }
             command = 'object.array'; args = { width : counts[0], length : counts[1], height : counts[2] };
+        } else if (box) {
+            const codes = { rsc : '0201', hsc : '0200' }; const values = box.slice (2).map (Number);
+            if (values.some (value => value < 20 || value > 10000) || values[0] < values[1]) { throw new Error ('Box dimensions are internal L×W×H in mm, 20–10000; length must be at least width.'); }
+            command = 'packaging.fefco.generate'; args = { code : codes[box[1]] || box[1], length : values[0], width : values[1], height : values[2] };
         } else if (tool) {
             command = 'object.tool'; args = { mode : tool[1] === 'move' ? 'translate' : tool[1] };
         } else if (/^(hide|show)(?: model)?$/.test (normalized)) {
