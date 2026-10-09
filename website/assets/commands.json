@@ -32,6 +32,102 @@
       }
     },
     {
+      "id": "diagnostics.shadow",
+      "title": "Record shadow state",
+      "category": "Diagnostics",
+      "description": "Append a sanitized visibility, floor and shader diagnostic snapshot to the browser-tab error log.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "diagnostics.open",
+      "title": "Open error logs",
+      "category": "Diagnostics",
+      "description": "Open recent error and rendering logs in Preferences.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "diagnostics.list",
+      "title": "Read error logs",
+      "category": "Diagnostics",
+      "description": "Read up to 200 sanitized browser-tab entries; no credentials or request bodies.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "all",
+              "error",
+              "warning",
+              "info"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "level": "error"
+      }
+    },
+    {
+      "id": "diagnostics.export",
+      "title": "Export error logs",
+      "category": "Diagnostics",
+      "description": "Return sanitized error-log JSON for review. Does not upload or download.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "diagnostics.download",
+      "title": "Download error logs",
+      "category": "Diagnostics",
+      "description": "Download sanitized error-log JSON locally; no remote upload.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "diagnostics.clear",
+      "title": "Clear error logs",
+      "category": "Diagnostics",
+      "description": "Clear this account browser-tab error log.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
       "id": "auth.inspect",
       "title": "Inspect account",
       "category": "Account",

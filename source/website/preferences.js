@@ -1,3 +1,4 @@
+import { OpenErrorLog } from './errorlogpanel.js';
 import { RGBAColor, RGBColor } from '../engine/model/color.js';
 import { AccountConsole } from './accountpaths.js';
 import { Theme, Settings, CameraSettings } from './settings.js';
@@ -108,7 +109,8 @@ export class Preferences
         const about = document.createElement ('p'); about.className = 'preferences_about';
         about.textContent = 'SW Auto3D v' + AppVersion + ' — A browser workspace for inspecting, arranging and reviewing 3D models, materials, lighting and reusable layouts. Dimensions use the units declared by the source model; unspecified units remain model units.';
         const commands = document.createElement ('button'); commands.textContent = 'Commands and macros'; commands.className = 'workspace_primary'; commands.addEventListener ('click', () => { dialog.close (); OpenCommandPanel (this.website); });
-        const heading = document.createElement ('strong'); heading.textContent = 'About'; form.append (appearance, unitLabel, syncStatus, commands, aiHeading, aiProviderLabel, aiBaseLabel, aiKeyLabel, rememberLabel, aiNote, aiActions, aiStatus, heading, about); dialog.appendChild (form);
+        const errorLogs = document.createElement ('button'); errorLogs.textContent = 'Error logs'; errorLogs.addEventListener ('click', () => { dialog.close (); OpenErrorLog (this.website); });
+        const heading = document.createElement ('strong'); heading.textContent = 'About'; form.append (appearance, unitLabel, syncStatus, commands, errorLogs, aiHeading, aiProviderLabel, aiBaseLabel, aiKeyLabel, rememberLabel, aiNote, aiActions, aiStatus, heading, about); dialog.appendChild (form);
     }
 
     SetUnits (units)

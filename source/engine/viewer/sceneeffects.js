@@ -66,6 +66,7 @@ export class SceneEffects
         if (Object.keys (data).every ((key) => key === 'shadows' || key === 'shadowIntensity')) {
             this.UpdateShadows ();
             this.viewer.Render ();
+            this.onDiagnostics?.(this.InspectShadows ());
             return;
         }
         this.Update ();
@@ -79,10 +80,11 @@ export class SceneEffects
             this.settings.shadowIntensity = Math.max (0, Math.min (1, Number (value)));
             this.UpdateShadowFloor ();
             this.viewer.Render ();
+            this.onDiagnostics?.(this.InspectShadows ());
             return;
         }
         this.settings[key] = typeof this.settings[key] === 'boolean' ? Boolean (value) : Math.max (0, Math.min (3, Number (value)));
-        if (key === 'shadows') { this.UpdateShadows (); this.viewer.Render (); return; }
+        if (key === 'shadows') { this.UpdateShadows (); this.viewer.Render (); this.onDiagnostics?.(this.InspectShadows ()); return; }
         this.Update ();
     }
 

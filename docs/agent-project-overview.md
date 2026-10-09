@@ -206,3 +206,7 @@ The October 9 workspace update adds administrator revoke/restore/password reset 
 ## Packaging and lighting follow-up
 
 `docs/packaging-module.md` describes the flat dieline workspace, strict agent commands, canonical millimeter design, CUT/SCORE SVG/DXF exports, measured board caliper and closed-profile extrusion. The optional session/profile fields are validated in both regular and worker archives. Profile-only sessions can be saved through existing account/device Library flows. Keep original manufacturing profiles distinct from later 3D scaling. Shadows/reflections now retain HDRI diffuse lighting, restore capture state and avoid transparent-floor depth occlusion; test translated scenes and all three lighting modes when changing scene effects.
+
+### Browser error review
+
+Preferences → Error logs provides bounded per-account browser-tab diagnostics, JSON export and shadow snapshots. See `docs/error-logs.md` for redaction, persistence and agent commands. These logs are local to the tab; agents need an authorized browser connection or an exported log to inspect a user's runtime errors.

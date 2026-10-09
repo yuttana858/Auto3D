@@ -1,3 +1,4 @@
+import { ErrorLogs } from './errorlogs.js';
 import { InstallAuthGate } from './authgate.js';
 import { AccountAdmin } from './accountadmin.js';
 import { Loc } from '../engine/core/localization.js';
@@ -58,6 +59,8 @@ export function RegisterToolbarPlugin (plugin)
 
 export function StartWebsite ()
 {
+    let storage = null; try { storage = window.sessionStorage; } catch { /* Logging works in memory. */ }
+    const errorLogs = new ErrorLogs (window, storage).Install ();
     window.addEventListener ('load', () => {
         if (window.self !== window.top) {
             let noEmbeddingDiv = AddDiv (document.body, 'noembed');
@@ -89,8 +92,11 @@ export function StartWebsite ()
             viewerDiv : document.getElementById ('main_viewer'),
             fileInput : document.getElementById ('open_file')
         });
+        website.errorLogs = errorLogs;
         website.auth = new AuthService ();
+        website.auth.Subscribe ((user) => errorLogs.BindAccount (user?.id || null));
         website.Load ();
+        website.sceneEffects.onDiagnostics = (diagnosis) => errorLogs.RecordShadow (diagnosis, 'Shadow controls updated');
         website.accountAdmin = new AccountAdmin (website.auth);
         website.authPanel = new AuthPanel (website.auth, website.accountAdmin); website.authPanel.recovery = recovery;
         const refreshAccount = () => { if (document.visibilityState === 'visible') { website.auth.Restore ().catch (() => {}); } };
