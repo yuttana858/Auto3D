@@ -279,7 +279,7 @@ export class Website
                 toggle.setAttribute ('aria-label', (collapsed ? 'Expand ' : 'Collapse ') + (side === 'left' ? 'model upload panel' : 'model data panel'));
                 toggle.querySelector ('.panel_chevron').textContent = (side === 'left') === collapsed ? '›' : '‹';
             };
-            apply (true);
+            apply (side !== 'left');
             toggle.addEventListener ('click', () => {
                 const collapsed = !container.classList.contains ('collapsed');
                 if (!collapsed && window.innerWidth < 800) {

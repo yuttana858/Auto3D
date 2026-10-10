@@ -145,7 +145,7 @@ export class AIWorkspace
         this.packagingSummary = Element ('p', 'ai_packaging_summary', '', this.packagingPane);
         this.packagingActions = [];
         for (const [label, action] of [['Open packaging designer', () => {
-            const editor = this.website.sessionEditor; const result = editor.packaging.Open (); editor.packaging.dialog?.addEventListener ('close', () => this.RefreshPackaging (), { once : true }); return result;
+            const editor = this.website.sessionEditor; const result = editor.selected?.packagingProfile ? editor.packaging.OpenSelected () : editor.packaging.Open (); editor.packaging.dialog?.addEventListener ('close', () => this.RefreshPackaging (), { once : true }); return result;
         }], ['Download SVG', () => this.website.sessionEditor.packaging.Download ('svg')], ['Download DXF', () => this.website.sessionEditor.packaging.Download ('dxf')]]) {
             const button = Element ('button', 'ai_packaging_action', label, this.packagingPane); button.addEventListener ('click', () => this.website.sessionEditor.Run (action)); this.packagingActions.push (button);
         }
@@ -182,6 +182,7 @@ export class AIWorkspace
 
     async Open (tab = 'ai')
     {
+        if (window.innerWidth < 800 && !this.website.parameters.leftContainerDiv.classList.contains ('collapsed')) { document.getElementById ('upload_panel_toggle').click (); }
         const right = this.website.parameters.rightContainerDiv;
         right.classList.remove ('collapsed');
         document.getElementById ('data_panel_content').hidden = true;

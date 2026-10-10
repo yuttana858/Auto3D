@@ -1,4 +1,4 @@
-# Packaging module v1.2.0
+# Packaging module v1.3.0
 
 A separate package for FEFCO 0200–0203 boxes, canonical-mm dielines, physical board extrusion, kraft textures, catalog controls and flat-sheet unfolding. It can be developed or copied to a separate repository without Auto3D source. Its only runtime dependencies are Three.js and fflate, under MIT licenses.
 
@@ -59,3 +59,9 @@ Optional API-v1 panel capabilities add dimensions(), dimensionMode(), updateDime
 The four equal-size preset cards form a two-column grid, retaining style categories inside each card. Clicking a card immediately generates its style using current draft dimensions and caliper. FefcoPreset(input, code) validates the preset and repairs OSC overlap when necessary; the optional panel host preset(code) capability shares this action with Auto3D commands. Legacy hosts use configure + generate.
 
 The single **Animate** button uses FefcoAnimationPlan(parameters, state) to choose its current/target poses. Closed top flaps open; open flaps close; flat sheets assemble into a box. HSC alternates between assembled/open-top and flat because it has no top flaps. The optional animation() host capability supplies the button tooltip. Pause/Resume/Cancel retain the existing playback contract. Auto3D still exposes explicit unfolding through its shared command and typed phrase.
+
+## CAD unfolding and dimension-first presets in v1.3.0
+
+Generation dimensions appear before the catalog cards, enabled before a model exists. Input is staged until generation, so users can change L and W together without rejecting a temporarily invalid pair or losing typed values during refresh. Cards pass preset(code, changes) with the complete canonical-mm dimension/caliper/closure set; OSC overlap repair validates the target style. New hosts accept optional changes in generate(changes); legacy hosts without preset use configure with the complete values followed by generate(). The initial RSC is closed and its thumbnail shows a closed box. The selected-object inside/outside/tolerance editor appears after generation.
+
+FefcoAnimationPlan now toggles every supported style between assembled and flat. An open-top-flap box starts from its saved open pose; the next animation assembles a closed RSC/OSC/FOL or open-top HSC. The rig and flat endpoint use the selected object's original saved cut/score profile. Hosts frame the whole sequence to keep the blank visible. Optional designer() opens the saved drawing in the host CAD editor; standalone preview omits this host-only control. In Auto3D, cancellation restores the prior drawing, and completion/Undo/Redo synchronize drawing, geometry and metadata together. API v1 is retained.

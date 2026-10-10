@@ -6,7 +6,7 @@ Auto3D is a branded, self-hostable browser 3D viewer based on [Online3DViewer](h
 
 Auto3D supports temporary email/password sign-in with administrator-created Supabase Auth accounts. The login appears below the logo after the startup animation and remains available through the header's Sign in / Account button. Device and file workflows can be used without signing in. Setup and security details are in [docs/temporary-auth.md](docs/temporary-auth.md). Cloud Library publishing remains disabled pending ownership/authorization implementation.
 
-Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.31.0**.
+Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.32.0**.
 
 ## Hosting
 
@@ -114,6 +114,6 @@ Run `npm test` for session, animation, range, command-validation and interaction
 
 ## Packaging module
 
-Packaging v1.2.0 is an independent package in [modules/packaging](modules/packaging/README.md). Its generators, textures and catalog UI load on demand. Use `npm run preview_packaging` for the standalone preview at http://localhost:8082, `npm run build_packaging` for its own build, and `npm run test_packaging` for its independent tests. Select a generated box in Auto3D and type `unfold box` to view the flat kraft dieline. Preset cards generate immediately; **Animate** opens or closes the selected box based on its current state.
+Packaging v1.3.0 is an independent package in [modules/packaging](modules/packaging/README.md). Its generators, textures and catalog UI load on demand. Use `npm run preview_packaging` for the standalone preview at http://localhost:8082, `npm run build_packaging` for its own build, and `npm run test_packaging` for its independent tests. Select a generated box in Auto3D and type `unfold box` to view the flat kraft dieline. Enter new-box dimensions above the preset cards, then click a card to generate immediately. **Animate** unfolds the selected box to its saved CAD dieline or assembles its flat sheet. **View dieline in CAD** opens that exact cut/score drawing.
 
 Auto3D v0.30.0 starts Dark appearance with a dark viewer even if a conflicting Light preset was saved. Custom colors and HDRI remain explicit choices. Packaging v1.1.0 adds selected-box **Box dimensions** above its FEFCO catalog: edit Inside/Outside L/W/H, board caliper and tolerance to regenerate the box or flat sheet with Undo. **Animate** provides visible progress, Pause/Resume and Cancel; HSC remains open at the top. These concept folds and fit reserves require converter-specific tooling checks before production.

@@ -49,6 +49,6 @@ describe ('Account viewport preferences and unsaved recovery', () => {
         assert.equal ((await commands.Execute ('session.recovery.inspect', {})).ok, true);
         assert.equal ((await commands.Execute ('session.recovery.restore', { arbitrary : true })).ok, false);
         const result = await commands.RunMacro ({ version : 1, steps : [{ id : 'restore', command : 'session.recovery.restore', arguments : {} }] }); assert.equal (result.ok, true, JSON.stringify (result));
-        assert.equal (AppBuildInfo ().version, '0.31.0');
+        assert.equal (AppBuildInfo ().version, '0.32.0');
     });
 });
