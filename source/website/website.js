@@ -645,6 +645,7 @@ export class Website
     SwitchTheme (newThemeId, resetColors)
     {
         this.settings.themeId = newThemeId;
+        this.settings.AlignBackgroundWithTheme ();
         this.themeHandler.SwitchTheme (this.settings.themeId);
         if (resetColors) {
             let defaultSettings = new Settings (this.settings.themeId);

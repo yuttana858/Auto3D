@@ -16,7 +16,7 @@ function Editor () { const website = { preferences : { units : 'metric' }, auth 
 describe ('Packaging adapter and unfolding', () => {
     it ('Keeps generator geometry, texture creation and catalog UI out of the Auto3D startup bundle', async () => {
         const result = await build ({ entryPoints : ['source/website/index.js'], bundle : true, write : false, outdir : 'work/boundary', metafile : true, define : { 'import.meta.url' : 'document.currentScript.src' }, loader : { '.ttf' : 'file', '.woff' : 'file', '.svg' : 'file' } });
-        const names = Object.keys (result.metafile.inputs); for (const file of ['geometry.js', 'mesh.js', 'material.js', 'panel.js', 'index.js']) { assert.equal (names.includes ('modules/packaging/src/' + file), false, file + ' must be loaded separately'); }
+        const names = Object.keys (result.metafile.inputs); for (const file of ['geometry.js', 'mesh.js', 'material.js', 'panel.js', 'index.js', 'folding.js', 'foldplayback.js']) { assert.equal (names.includes ('modules/packaging/src/' + file), false, file + ' must be loaded separately'); }
         assert.equal (names.includes ('source/website/packagingadapter.js'), true); assert.equal (names.includes ('modules/packaging/src/profile.js'), true);
     });
     it ('Unfolds to a watertight physical sheet and preserves the current edited liner and edge material', async () => {

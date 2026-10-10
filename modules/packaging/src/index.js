@@ -1,7 +1,10 @@
-export const PackagingModuleVersion = '1.0.0';
+export const PackagingModuleVersion = '1.1.0';
 export const PackagingAPIVersion = 1;
 export * from './profile.js';
 export * from './fefco.js';
 export * from './catalog.js';
 export * from './geometry.js';
+export * from './folding.js';
+export * from './dimensions.js';
+export { FoldPlayback } from './foldplayback.js';
 export { FefcoPanel } from './panel.js';

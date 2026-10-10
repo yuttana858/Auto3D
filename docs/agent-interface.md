@@ -82,3 +82,16 @@ FEFCO v0.28.0 adds `packaging.fefco.catalog/inspect/configure/generate`. Configu
 
 
 Auto3D v0.29.0 adds `packaging.fefco.unfold` with optional objectId. It replaces a generated folded box with its stored concept dieline, current dominant board/edge material and CUT/SCORE guides. Undo/Redo restores both scene object and active profile; archives preserve flat state. Scaled objects, arbitrary imported meshes and already-flat objects are rejected. `unfold box` and `unfold model` use this same command; generation and unfolding can be sequential macro steps using result objectId references. Packaging implementation now lives in the independently built modules/packaging package (v1.0.0), loaded on demand.
+
+Auto3D v0.30.0 / Packaging v1.1.0 adds these strict shared commands:
+
+| Command | Input and behavior |
+| --- | --- |
+| packaging.dimensions.inspect | Reports selected box dimensions, nominal values, allowances and tolerance in mm |
+| packaging.dimensions.basis | `{basis: "inside"}` or `"outside"`; changes displayed measurement basis |
+| packaging.dimensions.update | Optional objectId, basis, length/width/height, thickness and tolerance; regenerates selected geometry with stable ID and Undo |
+| packaging.fefco.animate | Optional objectId and duration (1–30 seconds); starts flat → open → closed playback and returns started/objectId/duration/stages |
+| packaging.fefco.playback | `{action: "pause"}`, `"resume"` or `"cancel"`; controls active playback |
+| packaging.fefco.playback.inspect | Reports state, progress, stage and objectId; poll for completed/cancelled/failed |
+
+`animate box` and `fold box` invoke the same action. Inside values are minimum usable dimensions; outside values are maximum assembled envelope after explicit tolerance reserve. Board caliper and actual flap-layer stacks are accounted for; open flap sweep is excluded. Generic scaling must be reset. Animation does not block its command until completion, so a subsequent ordinary mutating macro step is rejected as busy until playback finishes. Playback control and inspection remain available while busy, with authorization enforced. Completed folding records one Undo step; cancellation restores the original. See packaging-module.md for concept/tooling limits.

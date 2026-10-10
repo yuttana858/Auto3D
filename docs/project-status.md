@@ -2,9 +2,19 @@
 
 Updated 2026-10-09. This is the starting point for project status, completed work, open issues and the next release. Architecture: [agent-project-overview.md](agent-project-overview.md).
 
-## Current development release: Auto3D v0.29.0 / Packaging v1.0.0
+## Current development release: Auto3D v0.30.0 / Packaging v1.1.0
 
-Remote main includes PR #25 (f810d84), the initial FEFCO catalog release v0.28.0. The next release is prepared on feat/packaging-module-unfold. Every PR reports the app version and PR number; Packaging now has its own module version as well. This branch has not deployed production.
+Remote main includes PR #26 (c33b202), the independent Packaging/unfold release v0.29.0 / module v1.0.0. The next release is prepared on feat/packaging-fold-dimensions-dark-viewer. Every PR reports both versions and its PR number. This branch has not deployed production.
+
+Dark startup and account preference restoration align a conflicting built-in Light viewer preset with Dark appearance. Explicit custom colors, scenic presets and HDRI remain selected. Browser verification checks actual viewer pixels on startup and reload.
+
+The Packaging panel places editable selected-box dimensions above the FEFCO catalog. Inside minimum usable dimensions and outside maximum envelope are reversible inputs, accounting for caliper, actual flap layer counts and an explicit tolerance reserve. Edits regenerate the selected box or flat sheet after a short debounce, preserving ID, placement, board materials and Undo/Redo; tolerance survives archives. Dimensions are canonical millimeters, displayed using account units. Generic object scaling must be reset first.
+
+The independent module adds rigid score-hinge folding from flat sheet through open box to closed box, with progress, Pause/Resume and Cancel controls. HSC remains open at the top. Ordinary editing and saving are blocked during transient playback. Completion commits a dimensionally generated box as one Undo step; cancellation or failure restores the original with no history entry. The hinge preview is a concept sequence, without collision detection, bend radii or converter-specific tooling allowances; custom edited paths and scaled objects are rejected.
+
+Validation for v0.30.0: 502 unit/module tests and lint pass; website/Pages and independent module builds pass. Chromium verifies dark startup/reload, custom color retention, editable dimensions, folding stages and controls, Undo/Redo, cancellation, HSC and mobile layout. Preference/recovery browser coverage also passes. The generated Pages artifact passes the new browser workflow and release verification for app/module versions and served JS/CSS hashes. The standalone preview passes generation, unfolding, editable dimensions, folding pause/cancel/completion without Auto3D/account API requests; lazy-loading and fetch failure/retry also pass. Engine and backend code are unchanged.
+
+## Previous release: Auto3D v0.29.0 / Packaging v1.0.0
 
 The generator, extrusion, material textures, catalog UI and styles now live in the independent modules/packaging package. Its neutral mesh/profile/material API has no Auto3D imports, and it has its own build, tests and standalone preview (localhost:8082). Auto3D retains a scene/history/auth adapter and lightweight archive validation, loading module geometry/UI on demand. Saved scenes use ordinary engine geometry/materials. Build cache identity and release verification include the separate module JS/CSS.
 

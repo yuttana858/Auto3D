@@ -6,7 +6,7 @@ import { WorkspaceDialog } from './modellibrary.js';
 import { Unit } from '../engine/model/unit.js';
 import { OpenCommandPanel } from './commandpanel.js';
 
-export const AppVersion = '0.29.0';
+export const AppVersion = '0.30.0';
 
 export function AppBuildInfo ()
 {
@@ -27,6 +27,7 @@ export function AccountPreferenceState (preferences = {})
     if (typeof view.showEdges === 'boolean') { settings.edgeSettings.showEdges = view.showEdges; }
     if (Number.isFinite (view.edgeThreshold) && view.edgeThreshold >= 0 && view.edgeThreshold <= 180) { settings.edgeSettings.edgeThreshold = view.edgeThreshold; }
     for (const key of ['navigationMode', 'projectionMode']) { if ([1, 2].includes (view[key])) { camera[key] = view[key]; } }
+    settings.AlignBackgroundWithTheme ();
     return { settings, camera, units : preferences?.units === 'standard' ? 'standard' : 'metric' };
 }
 
