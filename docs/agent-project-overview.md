@@ -113,3 +113,7 @@ The v1.3.0 module stages generation dimensions before preset cards, validates co
 ## Surface texture editing (v0.33.0 / Packaging v1.4.0)
 
 MaterialPanel shares a combined thumbnail/slider drawer and large preview dialogs with stable material commands. materialtextures.js coordinates auth, asynchronous source sampling, lazy module loading, atomic map/UV updates and one-step history. Pure PNG/height/normal generation and board texture definitions live in modules/packaging; AI/Packaging version labels import only lightweight version metadata at startup. Original engine materials retain separate roughness and metalness maps and normal/bump/off relief choice for archives and renderer rebuilds. Texture replacement preserves placement and original downloadable bytes. Generated AI imports fill missing maps through the same service.
+
+## CAD-derived solid folds (v0.34.0 / Packaging v1.5.0)
+
+The independent module now owns convex finite-caliper panel detection in solid.js. folding.js keeps the original CAD partition, outside-face wall hinges and sequential flap-stack clearances. CreateFefcoBox bakes the same route endpoint instead of constructing a different box geometry. Both hosts preflight the full sampled route before replacement and FefcoFoldPose refuses intersecting displayed poses. The nonmutating packaging.fefco.folding.check command exposes the same audit. Existing history, material/UV, archive, cancellation and lazy-loading boundaries remain in place; collision checks cover only the generated box’s panels.

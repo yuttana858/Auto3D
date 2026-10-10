@@ -1,4 +1,4 @@
-# Packaging module v1.3.0
+# Packaging module v1.5.0
 
 A separate package for FEFCO 0200–0203 boxes, canonical-mm dielines, physical board extrusion, kraft textures, catalog controls and flat-sheet unfolding. It can be developed or copied to a separate repository without Auto3D source. Its only runtime dependencies are Three.js and fflate, under MIT licenses.
 
@@ -20,7 +20,7 @@ For a standalone checkout of this folder, install Node.js 22+, run `npm install`
 | src/fefco.js | FEFCO dimensions, validation and original concept layouts |
 | src/geometry.js, mesh.js | Folded boxes, connected flat boards and neutral mesh data |
 | src/dimensions.js | Inside/outside fit reserve and caliper/layer math |
-| src/folding.js, foldplayback.js | Neutral rigid panel poses and pausable playback clock |
+| src/folding.js, solid.js, foldplayback.js | CAD-mapped rigid panel poses, finite-caliper surface checks and pausable playback clock |
 | src/material.js | Embedded PNG kraft grain and corrugated-edge textures |
 | src/catalog.js, panel.js, packaging.css | Categories, original thumbnails and host-driven controls |
 | preview/ | Independent Three.js viewer and module host |
@@ -44,13 +44,13 @@ Both package.json and PackagingModuleVersion in src/index.js must identify the s
 
 ## Scope
 
-These are original parametric concept layouts using FEFCO identifiers, not an imported complete database or supplier-certified tooling drawings. Unfolding and rigid score-hinge playback support generated FEFCO boxes. They do not infer folds from arbitrary imported meshes or calculate collisions, bend radii or converter-specific production allowances. Corrugation is an edge texture; individual flute geometry is not modeled. The current neutral-material API is designed for the common kraft liner/edge roles.
+These are original parametric concept layouts using FEFCO identifiers, not an imported complete database or supplier-certified tooling drawings. Unfolding and rigid score-hinge playback support generated FEFCO boxes. They do not infer folds from arbitrary imported meshes or calculate bend radii or converter-specific production allowances. Corrugation is an edge texture; individual flute geometry is not modeled. The current neutral-material API is designed for the common kraft liner/edge roles.
 
 ## Dimensions and folding in v1.1.0
 
 FefcoDimensions(parameters, tolerance) reports nominalInside, nominalOutside, inside minimum and outside maximum in mm. The tolerance is an explicit fit reserve per overall dimension: inside = nominalInside − tolerance; outside = nominalOutside + tolerance. Length/width add two board calipers; height adds actual base/top flap layer stacks. ResolveFefcoDimensions(parameters, target, basis, tolerance) reverses this math and validates the result. The assembled envelope excludes open flap sweep.
 
-CreateFefcoFoldRig(parameters, savedProfile) partitions the original blank into rigid board panels. FefcoFoldPose(rig, progress) returns neutral matrices and stages; FefcoFoldFrame can bake the frame into neutral geometry. FoldPlayback provides Start, Pause, Resume, Stop and Inspect with an injectable clock. Hosts apply matrices during playback and commit CreateFefcoBox with the target closure on completion for the generated physical cavity/envelope. HSC keeps its open top. The nominal hinge preview may need caliper corrections at this endpoint.
+CreateFefcoFoldRig(parameters, savedProfile) partitions the original blank into rigid board panels. FefcoFoldPose(rig, progress) returns neutral matrices and stages; FefcoFoldFrame can bake the frame into neutral geometry. FoldPlayback provides Start, Pause, Resume, Stop and Inspect with an injectable clock. Hosts apply matrices during playback and commit CreateFefcoBox with the target closure on completion for the generated physical cavity/envelope. HSC keeps its open top. As of v1.5.0, generation uses the same CAD-derived endpoint solids as playback.
 
 Optional API-v1 panel capabilities add dimensions(), dimensionMode(), updateDimensions(), dimensionsBlocked(), animate(), playback(), control() and canAnimate(). Existing hosts remain compatible with these controls disabled. Dimension edits debounce for 250 ms; Auto3D serializes regeneration, preserves selected IDs/materials/placement, and records Undo. Its transient fold preview blocks saving/editing; cancellation restores the original, and completion records one Undo step. Geometry, UI and playback remain independent of the Auto3D engine.
 
@@ -67,3 +67,13 @@ Generation dimensions appear before the catalog cards, enabled before a model ex
 FefcoAnimationPlan now toggles every supported style between assembled and flat. An open-top-flap box starts from its saved open pose; the next animation assembles a closed RSC/OSC/FOL or open-top HSC. The rig and flat endpoint use the selected object's original saved cut/score profile. Hosts frame the whole sequence to keep the blank visible. Optional designer() opens the saved drawing in the host CAD editor; standalone preview omits this host-only control. In Auto3D, cancellation restores the prior drawing, and completion/Undo/Redo synchronize drawing, geometry and metadata together. API v1 is retained.
 
 Surface map generation (v1.4.0): GenerateSurfaceTextureSet derives eight embedded PNGs from RGB surface pixels. ProceduralSurfacePixels provides a local fallback. BoardMaterials supplies matte liner/flute defaults with editable roughness, metalness, specular-color, normal, bump, AO and height maps. Displacement defaults to zero. The maps approximate surface detail locally and preserve the independent module boundary.
+
+## Solid surface folding in v1.5.0
+
+All implemented styles (0200 HSC, 0201 RSC, 0202 OSC, 0203 FOL) map to the original CAD cut/score blank. HSC has no roof flaps. Generation and animation use the same rigid finite-caliper solids and assembled endpoint. Each panel carries a convex collision prism; canonical coordinates are restored after extrusion to avoid float32 drift on long fractional-mm blanks.
+
+Outside score-face hinges wrap the sleeve, with one caliper reserved for its glue seam. Inner flaps close before outer flaps. Overlap layers are reserved before rotation; outward-open roof flaps first lift and stand upright before switching hinge faces and folding inward. These caliper-sized score/stack translations approximate crushed/flexible crease regions; individual paper bending is not simulated.
+
+`FefcoFoldContacts(rig, pose)` reports positive-volume intersections in mm, permitting touching surfaces within 0.00001 mm. `FefcoFoldPose` checks its resulting pose and throws with the offending pair before a host displays intersecting panels. `await InspectFefcoFold(rig, optionalYieldCallback)` audits 3,601 poses covering the complete route (maximum one degree per hinge between samples), returning `{clear, code, samples, angularStep, units, tolerance, intersections}` plus the first blocked progress/stage if necessary. Auto3D and the standalone preview audit before replacing the original, yield processing feedback, and restore the original on playback failures. Auto3D exposes the same audit through `packaging.fefco.folding.check`.
+
+Detection covers this generated box’s panels, including its trapezoidal joint. It does not test unrelated scene objects, renderer displacement or arbitrary edited/imported meshes. The route audit is sampled, with exact checks at displayed poses; it is not a continuous collision solver or certified tooling calculation. Original CAD paths and unscaled parameters remain required for folding.

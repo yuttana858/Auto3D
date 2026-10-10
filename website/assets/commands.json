@@ -466,6 +466,24 @@
       "example": {}
     },
     {
+      "id": "packaging.fefco.folding.check",
+      "title": "Check board folding clearance",
+      "category": "Packaging",
+      "description": "Audit the selected generated FEFCO box or dieline full fold/unfold route with finite-caliper solid surface detection, at no more than one degree per hinge between samples. Returns clear, checked samples, mm tolerance and intersecting panel pairs. Does not mutate the model. Original generated paths and unscaled geometry required; checks this box panels, not other scene objects.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
       "id": "packaging.dimensions.inspect",
       "title": "Inspect box dimensions",
       "category": "Packaging",

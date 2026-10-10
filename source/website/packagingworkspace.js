@@ -49,7 +49,7 @@ export class PackagingWorkspace
         if (!this.foldOperation) { return this.lastFold || { state : 'idle', progress : 0 }; }
         const operation = this.foldOperation; const playback = operation.player?.Inspect () || { state : 'preparing', progress : 0 };
         const state = { completed : 'finishing', cancelled : 'cancelling', failed : 'restoring' }[playback.state] || playback.state;
-        return { ...playback, state, stage : operation.stage, action : operation.action, objectId : operation.source.id };
+        return { ...playback, state, stage : operation.stage, action : operation.action, objectId : operation.source.id, clearance : operation.clearance || null };
     }
     FoldControl (action)
     {
@@ -60,6 +60,17 @@ export class PackagingWorkspace
         this.editor.website.aiWorkspace?.fefcoPanel?.RefreshPlayback (); return this.FoldInspect ();
     }
     AnimationInspect () { try { const source = this.editor.selected; return source?.userData?._auto3dFefco ? FefcoAnimationPlan (JSON.parse (source.userData._auto3dFefco), source.userData._auto3dPackagingState || 'folded') : null; } catch { return null; } }
+    async CheckFolds (objectId = null)
+    {
+        const editor = this.editor; const target = editor.document; const account = editor.website.auth?.user?.id; const source = objectId ? target.objects.find (item => item.id === objectId) : editor.selected;
+        if (!account || editor.website.accountReady === false || !source?.userData?._auto3dFefco) { throw new Error ('Select a generated FEFCO box or dieline in your workspace.'); }
+        if (source.scale.some (v => Math.abs (v - 1) > 1e-6)) { throw new Error ('Reset object scaling before checking the saved dieline.'); }
+        const serialized = source.userData._auto3dFefco; const parameters = ValidateFefco (JSON.parse (serialized)); const profile = ValidatePackaging (source.packagingProfile || FefcoProfile (parameters)); const profileBefore = JSON.stringify (profile); const module = await LoadPackagingModule ();
+        const unchanged = () => { if (editor.document !== target || !target.objects.includes (source) || source.userData._auto3dFefco !== serialized || JSON.stringify (source.packagingProfile || FefcoProfile (parameters)) !== profileBefore || source.scale.some (v => Math.abs (v - 1) > 1e-6) || editor.website.auth?.user?.id !== account || editor.website.accountReady === false) { throw new Error ('The workspace or account changed while checking folding.'); } };
+        unchanged (); const rig = module.CreateFefcoFoldRig (parameters, profile); const report = await module.InspectFefcoFold (rig, async progress => { unchanged (); editor.Status ('Checking folding surfaces · ' + Math.round (progress * 100) + '%'); await new Promise (resolve => setTimeout (resolve, 0)); }); unchanged ();
+        editor.Status (report.clear ? 'FEFCO ' + parameters.code + ' · full fold/unfold route checked · no board intersections' : 'Fold blocked · ' + report.intersections[0].panels.join (' / '));
+        return { ...report, objectId : source.id };
+    }
     async AnimateFold (objectId = null, duration = 6)
     {
         this.Editable (); if (!Number.isFinite (duration) || duration < 1 || duration > 30) { throw new Error ('Animation duration must be 1–30 seconds.'); }
@@ -67,13 +78,20 @@ export class PackagingWorkspace
         if (!source?.userData?._auto3dFefco || !source.visible) { throw new Error ('Select a visible generated FEFCO box or its flat dieline.'); }
         if (source.scale.some (v => Math.abs (v - 1) > 1e-6)) { throw new Error ('Reset object scaling before animating the saved dieline.'); }
         const parameters = ValidateFefco (JSON.parse (source.userData._auto3dFefco)); const profile = ValidatePackaging (source.packagingProfile || FefcoProfile (parameters));
-        const module = await LoadPackagingModule (); this.Editable ();
+        const module = await LoadPackagingModule (); this.Editable (); const accountId = editor.website.auth.user.id;
         if (editor.document !== target || !target.objects.includes (source)) { throw new Error ('The workspace changed before folding.'); }
-        const plan = FefcoAnimationPlan (parameters, source.userData._auto3dPackagingState || 'folded'); const rig = module.CreateFefcoFoldRig (parameters, profile); const surfaces = FefcoSurfaces (target.CompactModel ([source], true)); const unit = target.model.GetUnit ();
+        const plan = FefcoAnimationPlan (parameters, source.userData._auto3dPackagingState || 'folded'); const rig = module.CreateFefcoFoldRig (parameters, profile);
+        // Audit while the original is still in the scene. Keep saving/editing
+        // blocked during this preparation, and recheck account/scene on yields.
+        let clearance; this.foldOperation = { source, action : plan.action, stage : 'checking surfaces' }; editor.busy = true; editor.RefreshButtons?.();
+        try { clearance = await module.InspectFefcoFold (rig, async progress => { if (editor.document !== target || !target.objects.includes (source) || editor.website.auth?.user?.id !== accountId || editor.website.accountReady === false || editor.readOnly) { throw new Error ('The workspace or account changed while checking folding.'); } editor.Status ('Processing · checking fold surfaces · ' + Math.round (progress * 100) + '%'); editor.website.aiWorkspace?.fefcoPanel?.RefreshPlayback (); await new Promise (resolve => setTimeout (resolve, 0)); }); }
+        finally { this.foldOperation = null; editor.busy = false; editor.RefreshButtons?.(); }
+        this.Editable (); if (!clearance.clear) { throw new Error ('Fold blocked: ' + clearance.intersections[0].panels.join (' / ') + ' intersect.'); }
+        const surfaces = FefcoSurfaces (target.CompactModel ([source], true)); const unit = target.model.GetUnit ();
         const before = target.packaging; const previous = editor.selected; const index = target.objects.indexOf (source); const account = editor.website.auth.user.id; const cameraBefore = editor.website.viewer?.GetCamera?.().Clone (); let preview; let final;
         const restore = async () => { if (preview) { target.Remove (preview); } if (final) { target.Remove (final); } if (!target.objects.includes (source)) { target.Restore (source, index); } target.packaging = before; if (editor.document === target) { editor.selected = previous; await editor.Render (); if (cameraBefore) { editor.website.viewer.SetCamera (cameraBefore.Clone ()); } } };
         const assign = (object, state, data = parameters) => { object.packagingProfile = profile; object.userData = { ...source.userData, _auto3dFefco : JSON.stringify (data), _auto3dPackagingState : state }; object.position = [...source.position]; object.rotation = [...source.rotation]; object.visible = source.visible; object.castShadow = source.castShadow !== false; object.receiveShadow = source.receiveShadow !== false; target.ApplyTransform (object); };
-        const operation = { source, action : plan.action, stage : plan.stages[0] }; this.foldOperation = operation;
+        const operation = { source, action : plan.action, stage : plan.stages[0], clearance }; this.foldOperation = operation;
         try {
             preview = target.AddImported (PackagingModel (rig, unit, surfaces), source.name + ' · Folding'); assign (preview, 'flat'); target.packaging = profile; this.Refresh (); target.Remove (preview); target.Remove (source); target.Restore (preview, index); editor.selected = preview;
             editor.busy = true; editor.RefreshButtons?.(); await editor.Render (); editor.busy = true; editor.RefreshButtons?.();
@@ -98,7 +116,7 @@ export class PackagingWorkspace
                 const apply = async forward => { target.Remove (forward ? source : final); target.Restore (forward ? final : source, index); target.packaging = forward ? profile : before; editor.selected = forward ? final : previous; await editor.Render (true); this.Refresh (); editor.website.aiWorkspace?.RefreshPackaging (); };
                 editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); this.lastFold = { state : 'completed', progress : 1, stage : plan.stages.at (-1), action : plan.action, objectId : final.id }; editor.Status ('Folding complete · ' + plan.stages.at (-1) + ' · Undo available');
             }).catch (async error => { try { await restore (); } catch { /* Retain the playback error. */ } this.lastFold = { state : 'failed', progress : 0, error : error.message }; editor.website.errorLogs?.Record ('error', 'packaging-fold', error.message); editor.Status (error.message); }).finally (() => { this.foldOperation = null; editor.busy = false; editor.RefreshButtons?.(); this.Refresh (); editor.website.aiWorkspace?.RefreshPackaging (); });
-            editor.website.aiWorkspace?.fefcoPanel?.RefreshPlayback (); return { started : true, objectId : source.id, duration, action : plan.action, stages : plan.stages };
+            editor.website.aiWorkspace?.fefcoPanel?.RefreshPlayback (); return { started : true, objectId : source.id, duration, action : plan.action, stages : plan.stages, clearance };
         } catch (error) { try { await restore (); } finally { this.foldOperation = null; editor.busy = false; editor.RefreshButtons?.(); } throw error; }
     }
     CanUnfold () { return Boolean (this.editor.selected?.userData?._auto3dFefco) && this.editor.selected.userData._auto3dPackagingState !== 'flat'; }
