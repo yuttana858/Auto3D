@@ -1,0 +1,99 @@
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { PhysicalMaterial, TextureMap } from '../source/engine/model/material.js';
+import { DisposeThreeObjects } from '../source/engine/threejs/threeutils.js';
+import { Model } from '../source/engine/model/model.js';
+import { ThreeMaterialHandler } from '../source/engine/threejs/threeconverter.js';
+import { AIWorkspace } from '../source/website/aiworkspace.js';
+import { MaterialPanel } from '../source/website/materialpanel.js';
+import { AutoGenerateTextures } from '../source/website/materialtextures.js';
+import { SceneDocument, SceneHistory } from '../source/website/scenedocument.js';
+import { CreateAgentCommands } from '../source/website/agentcommands.js';
+import { CreateFefcoModel } from '../source/website/packagingadapter.js';
+import { CreateSessionArchive, PackSession, OpenSessionArchive } from '../source/website/sessionarchive.js';
+function Panel () {
+    const original = new PhysicalMaterial (); const model = new Model (); model.AddMaterial (original);
+    const entry = { index : 0, original, material : new THREE.MeshPhysicalMaterial (), meshes : [] };
+    const website = { auth : { user : { id : 'account' } }, accountReady : true, viewer : {}, model };
+    const editor = { website, document : { model, objects : [] }, history : new SceneHistory (), Render : async () => {}, Status : () => {}, MarkDirty : () => {}, RefreshButtons : () => {} };
+    editor.PushHistory = (undo, redo) => editor.history.Push ({ undo, redo }); website.sessionEditor = editor;
+    const panel = Object.create (MaterialPanel.prototype); Object.assign (panel, { website, AllEntries : () => [entry], SampleSurfaceImage : async () => null, Update : () => {} }); website.materialPanel = panel;
+    return { panel, editor, original, entry };
+}
+describe ('Editable generated surface maps', () => {
+    it ('Keeps independent roughness through reversed asynchronous load order and retains both relief maps', () => {
+        for (const mode of ['normal', 'bump', 'off']) {
+            const original = new PhysicalMaterial (); original.reliefMode = mode; original.name = 'Board';
+            for (const key of ['metalnessMap', 'roughnessMap', 'normalMap', 'bumpMap', 'specularMap']) { original[key] = Object.assign (new TextureMap (), { name : key }); }
+            const model = new Model (); model.AddMaterial (original); const handler = new ThreeMaterialHandler (model, {}, {}, { defaultMaterials : [] }); const callbacks = [];
+            handler.LoadFaceTexture = (material, map, callback) => { if (map) { callbacks.push ([map.name, callback]); } };
+            const result = handler.CreateThreeFaceMaterial (0); for (const [name, callback] of callbacks.reverse ()) { callback (Object.assign (new THREE.Texture (), { name })); }
+            assert.equal (result.name, 'Board'); assert.equal (result.specularColorMap.name, 'specularMap'); assert.equal (result.specularMap, undefined); assert.equal (result.roughnessMap.name, 'roughnessMap'); assert.equal (result.metalnessMap.name, 'metalnessMap'); assert.equal (result.auto3dNormalMap.name, 'normalMap');
+            assert.equal (!!result.normalMap, mode === 'normal'); assert.equal (!!result.bumpMap, mode !== 'off');
+        }
+        const { original } = Panel (); original.metalnessMap = new TextureMap (); const model = new Model (); model.AddMaterial (original);
+        const handler = new ThreeMaterialHandler (model, {}, {}, { defaultMaterials : [] }); handler.LoadFaceTexture = (m, map, callback) => { if (map) { callback (new THREE.Texture ()); } };
+        const packed = handler.CreateThreeFaceMaterial (0); assert.equal (packed.roughnessMap, packed.metalnessMap);
+    });
+    it ('Releases shared and inactive surface images once when rebuilding a model, without disposing the viewer environment', () => {
+        const image = new THREE.Texture (); const inactive = new THREE.Texture (); const environment = new THREE.Texture (); let images = 0; let normals = 0; let environments = 0;
+        image.addEventListener ('dispose', () => images++); inactive.addEventListener ('dispose', () => normals++); environment.addEventListener ('dispose', () => environments++);
+        const material = new THREE.MeshPhysicalMaterial ({ map : image, roughnessMap : image, envMap : environment }); material.auto3dNormalMap = inactive;
+        const group = new THREE.Group (); group.add (new THREE.Mesh (new THREE.BoxGeometry (), material), new THREE.Mesh (new THREE.BoxGeometry (), material)); DisposeThreeObjects (group);
+        assert.equal (images, 1); assert.equal (normals, 1); assert.equal (environments, 0);
+    });
+    it ('Generates missing maps as one reversible operation while retaining authored maps and their UV placement', async () => {
+        const { panel, editor, original } = Panel (); original.diffuseMap = Object.assign (new TextureMap (), { name : 'artwork.png', buffer : new Uint8Array ([1, 2, 3]).buffer }); original.diffuseMap.scale.x = 3;
+        const result = await AutoGenerateTextures (panel, { index : 0 }); assert.equal (result.generated, true); assert.equal (editor.history.undo.length, 1); assert.equal (original.diffuseMap.name, 'artwork.png'); assert.equal (original.normalMap.scale.x, 3);
+        const normalBytes = original.normalMap.buffer; await editor.history.Undo (); assert.equal (original.normalMap, null); assert.equal (original.diffuseMap.name, 'artwork.png'); await editor.history.Redo (); assert.deepEqual (original.normalMap.buffer, normalBytes);
+        assert.equal ((await AutoGenerateTextures (panel, { index : 0 })).generated, false); assert.equal (editor.history.undo.length, 1);
+        await AutoGenerateTextures (panel, { index : 0, overwrite : true }); assert.equal (original.diffuseMap.name, 'artwork.png'); assert.equal (editor.history.undo.length, 2);
+    });
+    it ('Generates for all surface materials owned by a generated object ID', async () => {
+        const { panel, editor } = Panel (); const doc = new SceneDocument (); const object = doc.AddImported (await CreateFefcoModel ({}), 'Generated object'); editor.document = doc; panel.website.model = doc.model;
+        for (const material of doc.model.materials) { material.normalMap = null; }
+        panel.AllEntries = () => doc.model.materials.map ((original, index) => ({ original, index, meshes : [], material : new THREE.MeshPhysicalMaterial () }));
+        const result = await AutoGenerateTextures (panel, { objectId : object.id }); assert.equal (result.generated, true); assert.equal (result.materials.length, 2); assert.equal (editor.history.undo.length, 1); assert.ok (doc.model.materials.every (m => m.normalMap));
+        await editor.history.Undo (); assert.ok (doc.model.materials.every (m => !m.normalMap));
+    });
+    it ('Retains solid material tint, rejects stale-account results and rolls back renderer failures', async () => {
+        const { panel, editor, original } = Panel (); await AutoGenerateTextures (panel, { index : 0 }); assert.equal (original.multiplyDiffuseMap, true);
+        const stale = Panel (); stale.panel.SampleSurfaceImage = async () => { stale.panel.website.auth.user = { id : 'different' }; return null; };
+        await assert.rejects (() => AutoGenerateTextures (stale.panel, { index : 0 }), /account changed/); assert.equal (stale.original.normalMap, null); assert.equal (stale.editor.busy, false);
+        const failed = Panel (); let calls = 0; failed.editor.Render = async () => { if (!calls++) { throw new Error ('Renderer failed'); } };
+        await assert.rejects (() => AutoGenerateTextures (failed.panel, { index : 0 }), /Renderer failed/); assert.equal (failed.original.diffuseMap, null); assert.equal (failed.editor.history.undo.length, 0); assert.equal (failed.editor.busy, false);
+        assert.equal (editor.busy, false);
+    });
+    it ('Shares strict generator, removal and relief commands with macros and blocks read-only or signed-out mutations', async () => {
+        const { panel, editor, original } = Panel (); const registry = CreateAgentCommands (panel.website);
+        for (const args of [{}, { index : .5 }, { index : 0, objectId : 'x' }, { index : 0, overwrite : 'yes' }, { index : 0, extra : true }]) { assert.equal ((await registry.Execute ('material.textures.generate', args)).ok, false); }
+        assert.equal (editor.history.undo.length, 0);
+        const macro = await registry.RunMacro ({ version : 1, steps : [{ id : 'maps', command : 'material.textures.generate', arguments : { index : 0 } }, { id : 'relief', command : 'material.relief', arguments : { index : 0, mode : 'bump' } }] });
+        assert.equal (macro.ok, true); assert.equal (original.reliefMode, 'bump'); assert.ok (original.normalMap); assert.equal ((await registry.Execute ('material.set', { index : 0, property : 'emissiveIntensity', value : .6 })).ok, true); assert.equal (original.emissiveIntensity, .6); assert.equal ((await registry.Execute ('material.set', { index : 0, property : 'emissiveIntensity', value : -1 })).ok, false); await editor.history.Undo (); assert.equal (original.reliefMode, 'normal');
+        assert.equal ((await registry.Execute ('material.texture.remove', { index : 0, slot : 'roughnessMap' })).ok, true); assert.equal (original.roughnessMap, null); await editor.history.Undo (); assert.ok (original.roughnessMap);
+        editor.readOnly = true; assert.equal ((await registry.Execute ('material.textures.generate', { index : 0 })).ok, false); await assert.rejects (() => panel.GenerateTextures ({ index : 0 }), /editable/);
+        editor.readOnly = false; panel.website.auth.user = null; assert.equal ((await registry.Execute ('material.relief', { index : 0, mode : 'off' })).ok, false);
+    });
+    it ('Adds maps after AI import, keeps imported models if map derivation fails and does not texture an old selection after a failed import', async () => {
+        const fetch = globalThis.fetch; globalThis.fetch = async () => new Response (new Uint8Array ([1, 2, 3]), { headers : { 'Content-Type' : 'model/gltf-binary' } });
+        try {
+            for (const mode of ['success', 'texture-failure', 'import-failure']) {
+                const old = { id : 'old' }; const added = { id : 'generated' }; const editor = { document : { objects : [old] }, selected : old }; const calls = [];
+                const workspace = Object.create (AIWorkspace.prototype); Object.assign (workspace, { settings : { baseUrl : '/api/ai' }, Headers : () => ({}), status : { textContent : '' }, website : { sessionEditor : editor,
+                    LoadModelFromFileList : async () => { if (mode !== 'import-failure') { editor.document.objects.push (added); editor.selected = added; } },
+                    materialPanel : { GenerateTextures : async (args) => { calls.push (args); if (mode === 'texture-failure') { throw new Error ('Image unavailable'); } } }
+                } });
+                await workspace.ImportTask ({ id : 'result', modelUrl : 'https://example.com/result.glb' });
+                if (mode === 'import-failure') { assert.deepEqual (calls, []); assert.match (workspace.status.textContent, /Import failed/); }
+                else { assert.deepEqual (calls, [{ objectId : added.id }]); assert.equal (editor.selected, added); assert.match (workspace.status.textContent, mode === 'success' ? /editable surface maps/ : /Surface maps: Image unavailable/); }
+            }
+        } finally { globalThis.fetch = fetch; }
+    });
+    it ('Preserves every automatic box map, independent tiling and selected relief in portable archives', async () => {
+        const doc = new SceneDocument (); doc.AddImported (await CreateFefcoModel ({}), 'RSC'); const material = doc.model.materials[0]; material.reliefMode = 'bump'; material.emissiveIntensity = .65; material.roughnessMap.scale.x = 2.5; material.normalMap.offset.y = .125;
+        const saved = OpenSessionArchive (CreateSessionArchive (PackSession (doc))).document.model.materials.find (item => item.name === material.name);
+        for (const key of ['diffuseMap', 'roughnessMap', 'metalnessMap', 'normalMap', 'bumpMap', 'aoMap', 'specularMap', 'displacementMap']) { assert.deepEqual (saved[key].buffer, material[key].buffer); }
+        assert.equal (saved.emissiveIntensity, .65); assert.equal (saved.reliefMode, 'bump'); assert.equal (saved.roughnessMap.scale.x, 2.5); assert.equal (saved.normalMap.offset.y, .125);
+        const invalid = PackSession (doc); invalid.model.materials[0].reliefMode = 'invalid'; assert.throws (() => OpenSessionArchive (CreateSessionArchive (invalid)), /relief/);
+    });
+});

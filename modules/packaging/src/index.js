@@ -1,4 +1,4 @@
-export const PackagingModuleVersion = '1.3.0';
+export { PackagingModuleVersion } from './version.js';
 export const PackagingAPIVersion = 1;
 export * from './profile.js';
 export * from './fefco.js';
@@ -8,3 +8,4 @@ export * from './folding.js';
 export * from './dimensions.js';
 export { FoldPlayback } from './foldplayback.js';
 export { FefcoPanel } from './panel.js';
+export * from './surfacetextures.js';

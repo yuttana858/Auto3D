@@ -2182,6 +2182,7 @@
           "property": {
             "type": "string",
             "enum": [
+              "emissiveIntensity",
               "opacity",
               "roughness",
               "metalness",
@@ -2299,13 +2300,14 @@
         "type": "object",
         "properties": {
           "index": {
-            "type": "number",
+            "type": "integer",
             "minimum": 0
           },
           "slot": {
             "type": "string",
             "enum": [
               "map",
+              "roughnessMap",
               "normalMap",
               "bumpMap",
               "emissiveMap",
@@ -2331,6 +2333,229 @@
         "additionalProperties": false
       },
       "example": {}
+    },
+    {
+      "id": "material.textures.generate",
+      "title": "Auto texture generator",
+      "category": "Materials",
+      "description": "Derive missing local surface maps from base color, or a procedural surface. Preserves existing maps by default; overwrite regenerates auxiliary maps while retaining base color. One Undo step; fills wholly missing UVs.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "objectId": {
+            "type": "string"
+          },
+          "overwrite": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "index": 0
+      }
+    },
+    {
+      "id": "material.texture.preview",
+      "title": "Preview texture",
+      "category": "Materials",
+      "description": "Open an interactive large texture preview with Save and Replace controls.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "slot": {
+            "type": "string",
+            "enum": [
+              "map",
+              "roughnessMap",
+              "normalMap",
+              "bumpMap",
+              "emissiveMap",
+              "specularMap",
+              "aoMap",
+              "displacementMap",
+              "metalnessMap"
+            ]
+          }
+        },
+        "required": [
+          "index",
+          "slot"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "index": 0,
+        "slot": "map"
+      }
+    },
+    {
+      "id": "material.texture.save",
+      "title": "Save texture",
+      "category": "Materials",
+      "description": "Download the original embedded image bytes. Does not upload.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "slot": {
+            "type": "string",
+            "enum": [
+              "map",
+              "roughnessMap",
+              "normalMap",
+              "bumpMap",
+              "emissiveMap",
+              "specularMap",
+              "aoMap",
+              "displacementMap",
+              "metalnessMap"
+            ]
+          }
+        },
+        "required": [
+          "index",
+          "slot"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "index": 0,
+        "slot": "map"
+      }
+    },
+    {
+      "id": "material.texture.remove",
+      "title": "Remove texture",
+      "category": "Materials",
+      "description": "Remove one texture map; Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "slot": {
+            "type": "string",
+            "enum": [
+              "map",
+              "roughnessMap",
+              "normalMap",
+              "bumpMap",
+              "emissiveMap",
+              "specularMap",
+              "aoMap",
+              "displacementMap",
+              "metalnessMap"
+            ]
+          }
+        },
+        "required": [
+          "index",
+          "slot"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "index": 0,
+        "slot": "bumpMap"
+      }
+    },
+    {
+      "id": "material.relief",
+      "title": "Select relief mode",
+      "category": "Materials",
+      "description": "Choose normal, bump or no relief without discarding either texture. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "bump",
+              "off"
+            ]
+          }
+        },
+        "required": [
+          "index",
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "index": 0,
+        "mode": "bump"
+      }
+    },
+    {
+      "id": "material.uv.preview",
+      "title": "Preview UV layout",
+      "category": "Materials",
+      "description": "Open an interactive UV triangle layout dialog.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "index"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "index": 0
+      }
+    },
+    {
+      "id": "material.uv.generate",
+      "title": "Generate missing box UVs",
+      "category": "Materials",
+      "description": "Fill wholly unmapped meshes using box projection; preserve authored coordinates. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "index"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "index": 0
+      }
     },
     {
       "id": "knowledge.paper_packaging",

@@ -259,14 +259,17 @@ export function DisposeThreeObjects (mainObject)
         return;
     }
 
+    const disposedMaterials = new Set (); const disposedTextures = new Set ();
     mainObject.traverse ((obj) => {
         if (obj.isMesh || obj.isLineSegments) {
-            if (Array.isArray (obj.material)) {
-                for (let material of obj.material) {
-                    material.dispose ();
+            const materials = [...(Array.isArray (obj.material) ? obj.material : [obj.material]), ...(obj.userData?.threeMaterials || [])];
+            for (const material of materials) {
+                if (!material || disposedMaterials.has (material)) { continue; }
+                for (const [key, texture] of Object.entries (material)) {
+                    // Surface images belong to this model; environment maps belong to the viewer.
+                    if (key !== 'envMap' && (key === 'map' || key.endsWith ('Map')) && texture?.isTexture && !disposedTextures.has (texture)) { texture.dispose (); disposedTextures.add (texture); }
                 }
-            } else {
-                obj.material.dispose ();
+                material.dispose (); disposedMaterials.add (material);
             }
             obj.userData = null;
             obj.geometry.dispose ();

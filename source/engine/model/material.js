@@ -118,6 +118,7 @@ export class FaceMaterial extends MaterialBase
         super (type);
 
         this.emissive = new RGBColor (0, 0, 0);
+        this.emissiveIntensity = 1.0;
 
         this.opacity = 1.0; // 0.0 .. 1.0
         this.transparent = false;
@@ -131,6 +132,7 @@ export class FaceMaterial extends MaterialBase
         this.doubleSided = true;
         this.bumpScale = 1.0;
         this.normalScale = 1.0;
+        this.reliefMode = 'normal';
         this.aoIntensity = 1.0;
         this.displacementScale = 0.0;
         this.displacementBias = 0.0;
@@ -165,7 +167,7 @@ export class FaceMaterial extends MaterialBase
         if (!TextureMapIsEqual (this.emissiveMap, rhs.emissiveMap)) {
             return false;
         }
-        for (const key of ['doubleSided', 'bumpScale', 'normalScale', 'aoIntensity', 'displacementScale', 'displacementBias']) {
+        for (const key of ['doubleSided', 'emissiveIntensity', 'bumpScale', 'normalScale', 'aoIntensity', 'displacementScale', 'displacementBias', 'reliefMode']) {
             if (this[key] !== rhs[key]) { return false; }
         }
         for (const key of ['aoMap', 'displacementMap']) {
@@ -223,6 +225,7 @@ export class PhysicalMaterial extends FaceMaterial
         this.metalness = 0.0; // 0.0 .. 1.0
         this.roughness = 1.0; // 0.0 .. 1.0
         this.metalnessMap = null;
+        this.roughnessMap = null;
         this.specularIntensity = 1.0;
         this.specularMap = null;
     }
@@ -242,6 +245,7 @@ export class PhysicalMaterial extends FaceMaterial
             return false;
         }
         if (!IsEqual (this.specularIntensity, rhs.specularIntensity)) { return false; }
+        if (!TextureMapIsEqual (this.roughnessMap, rhs.roughnessMap)) { return false; }
         if (!TextureMapIsEqual (this.metalnessMap, rhs.metalnessMap)) {
             return false;
         }

@@ -1,3 +1,5 @@
+import { AppVersion } from './preferences.js';
+import { PackagingModuleVersion } from '../../modules/packaging/src/version.js';
 import { LoadPackagingModule } from './packagingadapter.js';
 
 const AIStorageKey = 'auto3d-ai-connections-v1';
@@ -94,7 +96,7 @@ export class AIWorkspace
         const tabs = Element ('div', 'ai_workspace_tabs', undefined, panel); tabs.setAttribute ('role', 'tablist'); tabs.setAttribute ('aria-label', 'AI and Packaging');
         this.tabButtons = new Map ();
         for (const [id, label] of [['ai', 'AI'], ['packaging', 'Packaging']]) {
-            const button = Element ('button', null, label, tabs); button.id = 'workspace_tab_' + id; button.setAttribute ('role', 'tab'); button.setAttribute ('aria-controls', 'workspace_pane_' + id);
+            const button = Element ('button', null, label, tabs); Element ('span', 'module_version', 'v' + (id === 'ai' ? AppVersion : PackagingModuleVersion), button); button.setAttribute ('aria-label', label); button.id = 'workspace_tab_' + id; button.setAttribute ('role', 'tab'); button.setAttribute ('aria-controls', 'workspace_pane_' + id);
             button.addEventListener ('click', () => this.website.sessionEditor.Run (() => this.SetTab (id)));
             button.addEventListener ('keydown', event => { if (['ArrowLeft', 'ArrowRight'].includes (event.key)) { event.preventDefault (); const next = id === 'ai' ? 'packaging' : 'ai'; this.website.sessionEditor.Run (() => this.SetTab (next)); this.tabButtons.get (next).focus (); } });
             this.tabButtons.set (id, button);
@@ -380,8 +382,10 @@ export class AIWorkspace
             }
             const blob = await response.blob ();
             const file = new File ([blob], 'meshy-' + item.id + '.glb', { type : blob.type || 'model/gltf-binary' });
+            const previousObjects = [...this.website.sessionEditor.document.objects];
             await this.website.LoadModelFromFileList ([file]);
-            this.status.textContent = 'Generated GLB imported into the current Auto3D session.';
+            if (!this.website.sessionEditor.selected || previousObjects.includes (this.website.sessionEditor.selected)) { throw new Error ('Generated model was not added to the session.'); }
+            try { await this.website.materialPanel.GenerateTextures ({ objectId : this.website.sessionEditor.selected.id }); this.status.textContent = 'Generated GLB imported with editable surface maps.'; } catch (error) { this.status.textContent = 'Generated GLB imported. Surface maps: ' + error.message; }
         } catch (error) {
             this.status.textContent = 'Import failed: ' + error.message;
         }

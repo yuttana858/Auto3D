@@ -11,7 +11,7 @@ function Validate (value, schema, path = 'arguments')
         if (!Array.isArray (value) || (schema.minItems !== undefined && value.length < schema.minItems) || (schema.maxItems !== undefined && value.length > schema.maxItems)) { throw new Error (path + ' has an invalid array length.'); }
         value.forEach ((item, index) => Validate (item, schema.items, path + '[' + index + ']'));
     } else {
-        if (typeof value !== schema.type || (schema.type === 'number' && !Number.isFinite (value))) { throw new Error (path + ' must be a finite ' + schema.type + '.'); }
+        if (schema.type === 'integer' ? !Number.isInteger (value) : typeof value !== schema.type || (schema.type === 'number' && !Number.isFinite (value))) { throw new Error (path + ' must be a finite ' + schema.type + '.'); }
         if (schema.minimum !== undefined && value < schema.minimum || schema.maximum !== undefined && value > schema.maximum) { throw new Error (path + ' is out of range.'); }
         if (schema.enum && !schema.enum.includes (value)) { throw new Error (path + ' must be one of: ' + schema.enum.join (', ')); }
     }
@@ -71,7 +71,7 @@ export class CommandRegistry
         if (id === 'polygon.cancel') { return this.Invoke (id, args).then ((result) => ({ ok : true, command : id, result })).catch ((error) => ({ ok : false, command : id, error : { code : 'COMMAND_FAILED', message : error.message } })); }
         return this.Queue (async () => {
             try { return { ok : true, command : id, result : await this.Invoke (id, args) }; }
-            catch (error) { this.context?.website?.errorLogs?.Record ('error', 'command', id + ': ' + error.message); return { ok : false, command : id, error : { code : 'COMMAND_FAILED', message : error.message } }; }
+            catch (error) { this.context?.website?.errorLogs?.Record ('error', 'command', id + ': ' + error.message, error.stack || ''); return { ok : false, command : id, error : { code : 'COMMAND_FAILED', message : error.message } }; }
         });
     }
     Cancel () { if (this.running) { this.running.cancelled = true; } return { requested : !!this.running }; }

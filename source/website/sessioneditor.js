@@ -522,7 +522,7 @@ export class SessionEditor
             this.document.objects.forEach ((object) => { object.threeObject.visible = object.visible; }); this.website.UpdateMeshesVisibility ();
             this.website.sceneEffects?.ApplyObjectSettings (this.document.objects);
             this.RefreshUI (); this.Select (this.selected); this.website.sceneEffects?.Refresh (); this.website.viewer.Render ();
-        } finally { this.busy = false; this.RefreshButtons (); }
+        } finally { this.busy = false; this.RefreshButtons (); this.website.materialPanel?.Update (); }
     }
 
     ApplyTransform (object)

@@ -2,7 +2,19 @@
 
 Updated 2026-10-10. This is the starting point for project status, completed work, open issues and the next release. Architecture: [agent-project-overview.md](agent-project-overview.md).
 
-## Current development release: Auto3D v0.32.0 / Packaging v1.3.0
+## Current development release: Auto3D v0.33.0 / Packaging v1.4.0
+
+Remote main includes PR #29 (425ba26), Auto3D v0.32.0 / Packaging v1.3.0. This update is on feat/material-surface-textures. Report both versions and the new PR number; merge and production deployment remain user actions.
+
+AI and Packaging tabs display their respective versions. New board objects receive embedded base-color, roughness, metalness, specular-color, normal, bump, AO and height PNGs automatically, including flat sheets and the independent preview. Matte/nonmetallic defaults and zero displacement retain the board shape; sliders can change their effect. Surface and Texture are combined into one compact editor with property cards arranged across the drawer, each pairing an image thumbnail and its controls. Thumbnail dialogs provide a larger preview, original-byte Save, Replace, Remove and collapsed UV mapping controls. A single UV summary opens the detailed layout; normal/bump/off relief selection keeps both source maps.
+
+**Auto texture generator** derives missing maps locally from a base image, or procedural grain when none is present. Regenerate maps rebuilds auxiliary maps while preserving the base image; authored maps and UV placement are preserved by default. AI-generated GLB imports use the same service. Generated maps are adjustable starter approximations, not measurements of a material's physical properties. Existing GLB packed metal/rough maps remain supported; independently generated roughness maps render separately. Reflection images use the physical shader's specular-color slot, avoiding a renderer exception from the older Phong slot. Model rebuilds release shared/inactive surface images without disposing viewer environment maps.
+
+Generation, relief selection, replacement, removal and missing-UV generation support Undo/Redo. Portable archives/recovery retain all source maps, their transforms and relief mode; GLB export packs independent metal/rough maps and includes active normal, AO, specular-color plus existing bump/height extras. New stable material commands share these services with the UI, with strict inputs, mutation/read-only/account guards, examples and structured results. The command validator supports integer material indices.
+
+Validation: 521 unit/module tests, 17 independent module tests, 11 backend tests and lint pass. Website/Pages, standalone and both engine distribution builds pass; production license checks and the audit high-severity threshold pass (the existing moderate fflate advisory remains; dependency versions are unchanged). Chromium verifies version labels, all automatic box maps, live relief/sliders, combined cards, large preview/save/replace, original-byte downloads, independent roughness/metalness, UV placement, Undo/Redo, portable archives, GLB texture export and dark/mobile layouts. The Packaging browser suite verifies deferred module loading, unfolding, archives/typed commands, mobile, fetch retry and independent standalone HSC dimension edits and folding. Local release verification checks served app/module JS/CSS identity. Production has not been deployed.
+
+## Previous release: Auto3D v0.32.0 / Packaging v1.3.0
 
 Remote main includes PR #28 (01ee6d2), Auto3D v0.31.0 / Packaging v1.2.0. This update is on feat/packaging-cad-unfold; report both versions and the PR number. Production is unchanged until the PR is merged and Pages deploys it.
 
