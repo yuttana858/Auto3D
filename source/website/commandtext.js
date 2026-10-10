@@ -8,7 +8,8 @@ const aliases = {
     library : 'ui.library', save : 'ui.save', commands : 'ui.commands', macros : 'ui.commands',
     ai : 'ui.ai', packaging : 'ui.ai.packaging', array : 'ui.array', 'array model' : 'ui.array',
     'add model' : 'ui.add_model', 'update model' : 'ui.update_model', export : 'ui.export',
-    'unfold box' : 'packaging.fefco.unfold', 'unfold model' : 'packaging.fefco.unfold'
+    'unfold box' : 'packaging.fefco.unfold', 'unfold model' : 'packaging.fefco.unfold',
+    'animate box' : 'packaging.fefco.animate', 'fold box' : 'packaging.fefco.animate'
 };
 
 export function ParseCommandText (input)

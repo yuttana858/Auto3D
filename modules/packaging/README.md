@@ -1,4 +1,4 @@
-# Packaging module v1.0.0
+# Packaging module v1.1.0
 
 A separate package for FEFCO 0200–0203 boxes, canonical-mm dielines, physical board extrusion, kraft textures, catalog controls and flat-sheet unfolding. It can be developed or copied to a separate repository without Auto3D source. Its only runtime dependencies are Three.js and fflate, under MIT licenses.
 
@@ -10,7 +10,7 @@ npm run test_packaging
 npm run preview_packaging
 ```
 
-For a standalone checkout of this folder, install Node.js 22+, run `npm install`, then `npm run build`, `npm test` or `npm run preview`. Preview serves localhost:8082, watches source/CSS changes and has no login, backend, cloud storage or Auto3D dependency. The standalone UI supports generating a box and unfolding it. Auto3D provides history/saving through its host adapter.
+For a standalone checkout of this folder, install Node.js 22+, run `npm install`, then `npm run build`, `npm test` or `npm run preview`. Preview serves localhost:8082, watches source/CSS changes and has no login, backend, cloud storage or Auto3D dependency. The standalone UI supports generating, unfolding, dimension editing and folding playback. Auto3D provides history/saving through its host adapter.
 
 ## Source and build
 
@@ -19,6 +19,8 @@ For a standalone checkout of this folder, install Node.js 22+, run `npm install`
 | src/profile.js | Archive-safe profile validation, contours, bounds, calipers and SVG/DXF |
 | src/fefco.js | FEFCO dimensions, validation and original concept layouts |
 | src/geometry.js, mesh.js | Folded boxes, connected flat boards and neutral mesh data |
+| src/dimensions.js | Inside/outside fit reserve and caliper/layer math |
+| src/folding.js, foldplayback.js | Neutral rigid panel poses and pausable playback clock |
 | src/material.js | Embedded PNG kraft grain and corrugated-edge textures |
 | src/catalog.js, panel.js, packaging.css | Categories, original thumbnails and host-driven controls |
 | preview/ | Independent Three.js viewer and module host |
@@ -42,4 +44,12 @@ Both package.json and PackagingModuleVersion in src/index.js must identify the s
 
 ## Scope
 
-These are original parametric concept layouts using FEFCO identifiers, not an imported complete database or supplier-certified tooling drawings. Unfolding produces the flat saved design for supported generated boxes. It does not infer folds from arbitrary imported meshes, simulate all panel hinges, or calculate converter-specific production allowances. Corrugation is an edge texture; individual flute geometry is not modeled. The current neutral-material API is designed for the common kraft liner/edge roles.
+These are original parametric concept layouts using FEFCO identifiers, not an imported complete database or supplier-certified tooling drawings. Unfolding and rigid score-hinge playback support generated FEFCO boxes. They do not infer folds from arbitrary imported meshes or calculate collisions, bend radii or converter-specific production allowances. Corrugation is an edge texture; individual flute geometry is not modeled. The current neutral-material API is designed for the common kraft liner/edge roles.
+
+## Dimensions and folding in v1.1.0
+
+FefcoDimensions(parameters, tolerance) reports nominalInside, nominalOutside, inside minimum and outside maximum in mm. The tolerance is an explicit fit reserve per overall dimension: inside = nominalInside − tolerance; outside = nominalOutside + tolerance. Length/width add two board calipers; height adds actual base/top flap layer stacks. ResolveFefcoDimensions(parameters, target, basis, tolerance) reverses this math and validates the result. The assembled envelope excludes open flap sweep.
+
+CreateFefcoFoldRig(parameters, savedProfile) partitions the original blank into rigid board panels. FefcoFoldPose(rig, progress) returns neutral matrices and stages; FefcoFoldFrame can bake the frame into neutral geometry. FoldPlayback provides Start, Pause, Resume, Stop and Inspect with an injectable clock. Hosts apply matrices during playback and commit CreateFefcoBox with closed closure on completion for the generated physical cavity/envelope. HSC keeps its open top. The nominal hinge preview may need caliper corrections at this endpoint.
+
+Optional API-v1 panel capabilities add dimensions(), dimensionMode(), updateDimensions(), dimensionsBlocked(), animate(), playback(), control() and canAnimate(). Existing hosts remain compatible with these controls disabled. Dimension edits debounce for 250 ms; Auto3D serializes regeneration, preserves selected IDs/materials/placement, and records Undo. Its transient fold preview blocks saving/editing; cancellation restores the original, and completion records one Undo step. Geometry, UI and playback remain independent of the Auto3D engine.

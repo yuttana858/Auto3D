@@ -8,8 +8,20 @@ export class FefcoPanel
 {
     constructor (workspace, parent)
     {
-        this.host = workspace; this.fields = new Map (); this.cards = new Map (); this.controls = [];
-        const root = Element ('section', parent, undefined, 'fefco_catalog'); Element ('strong', root, 'FEFCO catalog');
+        this.host = workspace; this.fields = new Map (); this.cards = new Map (); this.controls = []; this.dimensionFields = new Map ();
+        const root = Element ('section', parent, undefined, 'fefco_catalog');
+        const dimensionsPanel = Element ('section', root, undefined, 'fefco_selected_dimensions'); dimensionsPanel.setAttribute ('aria-label', 'Selected box dimensions'); Element ('strong', dimensionsPanel, 'Box dimensions');
+        this.dimensionName = Element ('p', dimensionsPanel, 'Generate or select a box.', 'section_hint');
+        const modeLabel = Element ('label', dimensionsPanel, 'Measure', 'fefco_field'); this.dimensionMode = Element ('select', modeLabel); this.dimensionMode.setAttribute ('aria-label', 'Box dimension basis'); this.dimensionMode.add (new Option ('Inside · minimum usable', 'inside')); this.dimensionMode.add (new Option ('Outside · maximum envelope', 'outside')); this.dimensionMode.addEventListener ('change', () => workspace.dimensionMode (this.dimensionMode.value));
+        const sizeFields = Element ('div', dimensionsPanel, undefined, 'fefco_dimensions');
+        for (const [key, label] of [['length', 'Length (L)'], ['width', 'Width (W)'], ['height', 'Height (H)'], ['thickness', 'Board caliper'], ['tolerance', 'Tolerance ±']]) {
+            const field = Element ('label', sizeFields, label, 'fefco_field'); const input = Element ('input', field); input.type = 'number'; input.step = 'any'; input.min = key === 'tolerance' ? '0' : '0.001'; input.setAttribute ('aria-label', 'Box ' + label); this.dimensionFields.set (key, input);
+            input.addEventListener ('input', () => { clearTimeout (this.dimensionTimer); const objectId = workspace.dimensions ()?.objectId; const value = input.valueAsNumber; if (!Number.isFinite (value)) { return; } this.dimensionChanges = { ...this.dimensionChanges, [key] : value * workspace.factor (), basis : this.dimensionMode.value }; this.dimensionTimer = setTimeout (() => { this.dimensionTimer = null; const changes = this.dimensionChanges; this.dimensionChanges = null; this.dimensionWork = (this.dimensionWork || Promise.resolve ()).then (() => { if (workspace.dimensions ()?.objectId === objectId) { return workspace.run (() => workspace.updateDimensions (changes)); } }); }, 250); });
+            input.addEventListener ('blur', () => { if (!this.dimensionTimer) { this.RefreshDimensions (); } });
+        }
+        this.dimensionSummary = Element ('p', dimensionsPanel, undefined, 'section_hint');
+        Element ('p', dimensionsPanel, 'Tolerance reserves ± per overall dimension: Inside gives the minimum usable size; Outside gives the maximum assembled envelope. Open flaps are excluded. Confirm production allowances with your converter.', 'section_hint');
+        Element ('strong', root, 'FEFCO catalog');
         const family = Element ('label', root, 'Box family', 'fefco_field'); const select = Element ('select', family); select.setAttribute ('aria-label', 'FEFCO box family');
         for (const item of FefcoFamilies) { const option = new Option (item.id + ' · ' + item.name + (item.available ? '' : ' · coming later'), item.id); option.disabled = !item.available; select.add (option); } select.value = '02';
         Element ('p', root, '0200 series · first set', 'section_hint');
@@ -38,6 +50,12 @@ export class FefcoPanel
         this.generate = Element ('button', root, 'Generate 3D box', 'workspace_primary fefco_generate'); this.generate.type = 'button'; this.controls.push (this.generate);
         this.generate.addEventListener ('click', () => workspace.run (() => workspace.generate ()));
         this.unfold = Element ('button', root, 'Unfold selected box', 'fefco_unfold'); this.unfold.type = 'button'; this.controls.push (this.unfold); this.unfold.addEventListener ('click', () => workspace.run (() => workspace.unfold ()));
+        this.animate = Element ('button', root, 'Animate flat → open → closed', 'fefco_animate'); this.animate.type = 'button'; this.controls.push (this.animate); this.animate.addEventListener ('click', () => workspace.run (() => workspace.animate ()));
+        const playback = Element ('div', root, undefined, 'fefco_playback');
+        this.foldStatus = Element ('p', playback, 'Select a box or dieline to animate.', 'section_hint'); this.foldStatus.setAttribute ('role', 'status');
+        this.foldProgress = Element ('progress', playback); this.foldProgress.max = 1; this.foldProgress.value = 0; this.foldProgress.setAttribute ('aria-label', 'Box folding progress');
+        this.pause = Element ('button', playback, 'Pause folding'); this.pause.type = 'button'; this.pause.addEventListener ('click', () => { try { workspace.control (workspace.playback ().state === 'paused' ? 'resume' : 'pause'); } catch (error) { this.foldStatus.textContent = error.message; } });
+        this.cancel = Element ('button', playback, 'Cancel folding'); this.cancel.type = 'button'; this.cancel.addEventListener ('click', () => { try { workspace.control ('cancel'); } catch (error) { this.foldStatus.textContent = error.message; } });
         Element ('p', root, 'Kraft board, folded flaps and exposed corrugated edges. The generated profile replaces the current drawing. Dielines are design previews; verify production allowances with your converter.', 'section_hint');
         const source = Element ('a', root, 'FEFCO reference · 12th edition', 'fefco_reference'); source.href = FefcoSource; source.target = '_blank'; source.rel = 'noopener noreferrer'; this.Refresh ();
     }
@@ -48,7 +66,18 @@ export class FefcoPanel
         for (const [key, field] of this.fields) { field.input.value = String (Number ((data[key] / factor).toFixed (6))); field.input.min = String ((key === 'thickness' ? 0.5 : key === 'overlap' ? 0 : 20) / factor); field.input.max = String ((key === 'thickness' ? 15 : 10000) / factor); }
         this.fields.get ('overlap').label.hidden = data.code !== '0202'; this.closureLabel.hidden = data.code === '0200'; this.closure.value = data.closure;
         for (const [code, button] of this.cards) { button.setAttribute ('aria-pressed', String (code === data.code)); }
-        this.generate.textContent = 'Generate ' + style.acronym + ' · 3D box'; this.SetDisabled ();
+        this.generate.textContent = 'Generate ' + style.acronym + ' · 3D box'; this.RefreshDimensions (); this.SetDisabled ();
     }
-    SetDisabled () { const blocked = this.host.blocked (); for (const control of this.controls) { control.disabled = blocked; } this.unfold.disabled = blocked || !this.host.canUnfold (); }
+    RefreshDimensions ()
+    {
+        const data = this.host.dimensions?.(); const factor = this.host.factor (); const changed = this.dimensionObjectId !== data?.objectId; this.dimensionObjectId = data?.objectId;
+        if (changed) { clearTimeout (this.dimensionTimer); this.dimensionTimer = null; this.dimensionChanges = null; }
+        this.dimensionName.textContent = data ? data.name + ' · FEFCO ' + data.code + ' · ' + (factor === 25.4 ? 'inches' : 'mm') + (data.editable === false ? ' · reset object scaling to edit' : '') : 'Generate or select a box.'; this.dimensionMode.value = data?.basis || 'inside';
+        const format = size => ['length', 'width', 'height'].map (key => Number ((size[key] / factor).toFixed (3))).join (' × ');
+        this.dimensionSummary.textContent = data ? 'Inside ' + format (data.inside) + ' · Outside ' + format (data.outside) + ' · flap layers ' + data.allowance.baseLayers + ' base / ' + data.allowance.topLayers + ' top' : '';
+        for (const [key, input] of this.dimensionFields) { input.disabled = !data || data.editable === false || this.host.dimensionsBlocked (); if (changed || document.activeElement !== input) { input.value = data ? String (Number (((data[data.basis][key] ?? data[key]) / factor).toFixed (6))) : ''; } }
+        this.dimensionMode.disabled = !data || this.host.dimensionsBlocked ();
+    }
+    RefreshPlayback () { const state = this.host.playback?.() || { state : 'idle', progress : 0 }; const active = ['playing', 'paused'].includes (state.state); this.pause.disabled = this.cancel.disabled = !active; this.pause.textContent = state.state === 'paused' ? 'Resume folding' : 'Pause folding'; this.foldProgress.value = state.progress || 0; this.foldStatus.textContent = state.state === 'idle' ? 'Select a box or dieline to animate.' : state.state + ' · ' + (state.stage || 'folding') + ' · ' + Math.round ((state.progress || 0) * 100) + '%'; }
+    SetDisabled () { const blocked = this.host.blocked (); for (const control of this.controls) { control.disabled = blocked; } this.unfold.disabled = blocked || !this.host.canUnfold (); this.animate.disabled = blocked || !this.host.canAnimate?.(); this.RefreshDimensions (); this.RefreshPlayback (); }
 }

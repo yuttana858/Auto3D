@@ -48,6 +48,12 @@ export class Settings
         this.edgeSettings.showEdges = CookieGetBoolVal ('ov_show_edges', false);
         this.edgeSettings.edgeColor = CookieGetRGBColorVal ('ov_edge_color', new RGBColor (0, 0, 0));
         this.edgeSettings.edgeThreshold = CookieGetIntVal ('ov_edge_threshold', 1);
+        this.AlignBackgroundWithTheme ();
+    }
+
+    AlignBackgroundWithTheme ()
+    {
+        if (!this.backgroundIsEnvMap && (this.themeId === Theme.Dark && this.backgroundPreset === 'light' || this.themeId === Theme.Light && this.backgroundPreset === 'dark')) { this.backgroundPreset = 'standard'; }
     }
 
     SaveToCookies ()

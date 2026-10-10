@@ -17,4 +17,8 @@
 .fefco_catalog .section_hint { font-size: 11px; line-height: 1.6; color: var(--packaging-muted, #777); overflow-wrap: anywhere; }
 .fefco_catalog button { color: inherit; font: inherit; }
 .fefco_catalog button:disabled { cursor: default; opacity: .55; }
-.fefco_unfold { padding: 10px; border: 1px solid var(--packaging-border, #d8d8d8); border-radius: 6px; cursor: pointer; background: var(--packaging-background, #fff); }
+.fefco_unfold, .fefco_animate { padding: 10px; border: 1px solid var(--packaging-border, var(--ov_border_color, #d8d8d8)); border-radius: 6px; cursor: pointer; background: var(--packaging-background, var(--ov_background_color, #fff)); }
+.fefco_playback { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.fefco_playback p, .fefco_playback progress { grid-column: 1 / -1; margin: 0; width: 100%; }
+.fefco_playback button { padding: 7px; border: 1px solid var(--packaging-border, var(--ov_border_color, #d8d8d8)); border-radius: 4px; cursor: pointer; background: var(--packaging-background, var(--ov_background_color, #fff)); }
+.fefco_selected_dimensions { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--packaging-border, var(--ov_border_color, #d8d8d8)); border-radius: 6px; }

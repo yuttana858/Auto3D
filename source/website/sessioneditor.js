@@ -634,7 +634,7 @@ export class SessionEditor
     }
     RefreshButtons ()
     {
-        this.processing?.Sync (this.busy); this.commandBar?.SetBusy (this.busy);
+        this.processing?.Sync (this.busy && !this.packaging?.foldOperation && !this.packaging?.dimensionUpdating); this.commandBar?.SetBusy (this.busy);
         this.website?.aiWorkspace?.fefcoPanel?.SetDisabled ();
         for (const [key, button] of this.buttons) {
             button.disabled = this.ToolDisabled (key);
@@ -1139,16 +1139,19 @@ export class SessionEditor
     }
     async ArchiveAsync (objects, kind, name)
     {
+        if (this.packaging?.foldOperation) { throw new Error ('Finish or cancel folding before saving the session.'); }
         const writer = new RecoveryWriter ();
         try { return await writer.Create ({ ...this.document, objects }, this.CaptureView (), kind, name); }
         finally { writer.Cancel (); }
     }
     Archive (objects, kind, name)
     {
+        if (this.packaging?.foldOperation) { throw new Error ('Finish or cancel folding before saving the session.'); }
         const data = PackSession (this.document, this.CaptureView (), objects, kind); data.name = name; return CreateSessionArchive (data);
     }
     async OpenArchive (buffer, append, recovered = false)
     {
+        if (this.packaging?.foldOperation) { throw new Error ('Finish or cancel folding before opening a session.'); }
         const saved = OpenSessionArchive (buffer); // Validate everything before replacing the current document.
         if (append) {
             const added = [];
@@ -1203,6 +1206,7 @@ export class SessionEditor
     }
     Export ()
     {
+        if (this.packaging?.foldOperation) { this.Status ('Finish or cancel folding before exporting.'); return; }
         const dialog = WorkspaceDialog ('Export session'); const form = Element ('div', 'workspace_save_form', undefined, dialog);
         Element ('p', 'section_hint', 'GLB/glTF includes embedded animation. Hidden objects are excluded.', form);
         for (const binary of [true, false]) {
@@ -1210,6 +1214,7 @@ export class SessionEditor
             button.addEventListener ('click', async () => {
                 button.disabled = true;
                 try {
+                    if (this.packaging?.foldOperation) { throw new Error ('Finish or cancel folding before exporting.'); }
                     this.website.viewer.SetMeshesHighlight (this.website.highlightColor, () => false);
                     const root = this.website.viewer.mainModel.mainModel.GetRootObject (); const animations = this.players.filter ((player) => player.object.visible).flatMap ((player) => player.ExportClips ());
                     const metadata = []; root.traverse ((item) => { metadata.push ([item, item.userData]); item.userData = {}; });

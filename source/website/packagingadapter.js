@@ -8,6 +8,7 @@ import { PhysicalMaterial, TextureMap } from '../engine/model/material.js';
 import { RGBColor } from '../engine/model/color.js';
 import { Unit } from '../engine/model/unit.js';
 import { CloneSurface } from './scenedocument.js';
+import { Matrix4 } from 'three';
 
 export const PackagingUnitMM = { [Unit.Millimeter] : 1, [Unit.Centimeter] : 10, [Unit.Meter] : 1000, [Unit.Inch] : 25.4, [Unit.Foot] : 304.8 };
 const inBrowser = typeof document !== 'undefined';
@@ -52,6 +53,12 @@ export function PackagingModel (data, unit = Unit.Millimeter, surfaces = {})
 }
 export async function CreateFefcoModel (input, unit = Unit.Millimeter) { const module = await LoadPackagingModule (); return PackagingModel (module.CreateFefcoBox (input), unit); }
 export async function CreatePackagingModel (profile, unit = Unit.Millimeter) { const module = await LoadPackagingModule (); return PackagingModel (module.CreateBoard (profile), unit); }
+
+export function ApplyFefcoFoldPose (root, rig, pose, unit)
+{
+    const factor = PackagingUnitMM[unit]; const matrices = new Map (rig.panels.map ((panel, index) => { const values = [...pose.matrices[index]]; for (const axis of [12, 13, 14]) { values[axis] /= factor; } return [panel.name, values]; }));
+    root.traverse (item => { if (item.isMesh && matrices.has (item.name)) { item.matrixAutoUpdate = false; item.matrix.copy (new Matrix4 ().fromArray (matrices.get (item.name))); } }); root.updateMatrixWorld (true);
+}
 
 export function FefcoSurfaces (model)
 {

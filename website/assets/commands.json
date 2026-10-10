@@ -400,6 +400,168 @@
       "example": {}
     },
     {
+      "id": "packaging.fefco.animate",
+      "title": "Animate box folding",
+      "category": "Packaging",
+      "description": "Start the selected generated box or original dieline folding from flat to upright/open to closed. Returns when playback starts; inspect completion with packaging.fefco.playback.inspect. Preserves board materials; completion adds one Undo step. Cancel restores the original without a history step. HSC remains open at the top. Original generated paths and unscaled geometry required.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 30
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "duration": 6
+      }
+    },
+    {
+      "id": "packaging.fefco.playback",
+      "title": "Control box folding",
+      "category": "Packaging",
+      "description": "Pause, resume or cancel active folding playback. Available while playback blocks ordinary editing. Cancel restores the original object.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "pause",
+              "resume",
+              "cancel"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "action": "pause"
+      }
+    },
+    {
+      "id": "packaging.fefco.playback.inspect",
+      "title": "Inspect box folding",
+      "category": "Packaging",
+      "description": "Read folding playback state, progress and stage. Completion produces a normal savable scene object.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.dimensions.inspect",
+      "title": "Inspect box dimensions",
+      "category": "Packaging",
+      "description": "Read the selected box nominal/minimum inside and nominal/maximum outside dimensions in mm, board caliper, flap-layer allowances and dimensional tolerance. Open flap sweep is excluded from outside envelope.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.dimensions.basis",
+      "title": "Choose box dimension basis",
+      "category": "Packaging",
+      "description": "Switch the selected-box editable dimension panel between minimum usable inside and maximum assembled outside dimensions. Does not change geometry.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "enum": [
+              "inside",
+              "outside"
+            ]
+          }
+        },
+        "required": [
+          "basis"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "basis": "outside"
+      }
+    },
+    {
+      "id": "packaging.dimensions.update",
+      "title": "Update box dimensions",
+      "category": "Packaging",
+      "description": "Update a generated unscaled box or dieline immediately using inside or outside dimensions in mm. Caliper and actual flap-layer count determine the assembled envelope. Tolerance is a ± reserve per overall dimension, not a supplier-certified production allowance. Preserves current materials, placement and object ID; regenerates the profile; supports Undo.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "inside",
+              "outside"
+            ]
+          },
+          "length": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 11000
+          },
+          "width": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 11000
+          },
+          "height": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 11000
+          },
+          "thickness": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 15
+          },
+          "tolerance": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 50
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "basis": "inside",
+        "length": 450,
+        "width": 320,
+        "height": 260,
+        "tolerance": 1
+      }
+    },
+    {
       "id": "packaging.fefco.catalog",
       "title": "Read FEFCO catalog",
       "category": "Packaging",
