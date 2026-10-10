@@ -403,7 +403,7 @@
       "id": "packaging.fefco.animate",
       "title": "Animate box folding",
       "category": "Packaging",
-      "description": "Animate the selected box based on saved state: closed top flaps open, open top flaps close, and a flat dieline folds into a box. HSC alternates assembled/flat because it has no top flaps. Returns when playback starts; inspect completion with packaging.fefco.playback.inspect. Preserves board materials; completion adds one Undo step. Cancel restores the original without a history step. Original generated paths and unscaled geometry required.",
+      "description": "Animate the selected assembled box completely flat along its saved CAD cut/score paths; animate a flat dieline to assemble it. Supports RSC, HSC, OSC and FOL. HSC keeps its open top. Returns when playback starts; inspect completion with packaging.fefco.playback.inspect. Preserves board materials; completion adds one Undo step. Cancel restores the original without a history step. Original generated paths and unscaled geometry required.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -565,7 +565,7 @@
       "id": "packaging.fefco.preset",
       "title": "Generate box preset",
       "category": "Packaging",
-      "description": "Immediately generate a supported FEFCO preset using current draft dimensions and caliper. Repairs partial-overlap settings when switching to OSC. Adds and selects a new box with Undo; uses the same service as catalog cards.",
+      "description": "Immediately generate a supported FEFCO preset using current draft dimensions and caliper, optionally overridden together in canonical mm. Validates the complete dimension set before generation. Repairs partial-overlap settings when switching to OSC. Adds and selects a new box with Undo; uses the same service as catalog cards.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -578,6 +578,38 @@
               "0202",
               "0203"
             ]
+          },
+          "length": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 10000
+          },
+          "width": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 10000
+          },
+          "height": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 10000
+          },
+          "thickness": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 15
+          },
+          "overlap": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "closure": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ]
           }
         },
         "required": [
@@ -586,7 +618,11 @@
         "additionalProperties": false
       },
       "example": {
-        "code": "0201"
+        "code": "0201",
+        "length": 500,
+        "width": 350,
+        "height": 200,
+        "thickness": 4
       }
     },
     {
@@ -740,6 +776,20 @@
         "thickness": 3,
         "closure": "open"
       }
+    },
+    {
+      "id": "packaging.open_selected",
+      "title": "Open selected packaging dieline",
+      "category": "Packaging",
+      "description": "Open the Packaging Designer CAD with the selected box or board saved cut/score profile. Loading a different profile adds one Undo step; opening the matching drawing adds none. Opens an interactive dialog; does not change the 3D solid.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
     },
     {
       "id": "packaging.open",

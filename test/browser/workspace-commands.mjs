@@ -11,7 +11,7 @@ try {
     await page.goto (process.env.AUTO3D_TEST_URL || 'http://127.0.0.1:8080/website/index.html');
     await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
     const call = async (id, args = {}) => { const result = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (result.ok, true, JSON.stringify (result)); return result.result; };
-    assert.equal (await page.locator ('.workspace_panel.collapsed').count (), 2);
+    assert.equal (await page.locator ('.workspace_panel.collapsed').count (), 1); assert.equal (await page.locator ('#upload_panel_toggle').getAttribute ('aria-expanded'), 'true');
     assert.equal (await page.locator ('.workspace_section[open]').count (), 0);
     assert.equal (await page.locator ('#header_buttons button[aria-label="Packaging design"]').count (), 0);
     await page.screenshot ({ path : 'work/workspace-clean-start.png' });

@@ -2,9 +2,21 @@
 
 Updated 2026-10-10. This is the starting point for project status, completed work, open issues and the next release. Architecture: [agent-project-overview.md](agent-project-overview.md).
 
-## Current development release: Auto3D v0.31.0 / Packaging v1.2.0
+## Current development release: Auto3D v0.32.0 / Packaging v1.3.0
 
-Remote main includes PR #27 (573dc0e), Auto3D v0.30.0 / Packaging v1.1.0. This update is on feat/packaging-preset-animate and has not deployed production. Report both versions and the PR number.
+Remote main includes PR #28 (01ee6d2), Auto3D v0.31.0 / Packaging v1.2.0. This update is on feat/packaging-cad-unfold; report both versions and the PR number. Production is unchanged until the PR is merged and Pages deploys it.
+
+The left upload/model panel is open on startup; the right begins collapsed. Mobile AI/Packaging opening closes the left panel to preserve usable viewer space. The RSC thumbnail shows a closed shipping box and the initial generator draft is closed.
+
+New-box L/W/H/caliper inputs are enabled before generation and appear before the two-column preset grid. Values stage until a preset or Generate is clicked, validating the full dimension set together. Typed drafts survive refreshes and display-unit changes. All four cards generate using those entered dimensions; strict packaging.fefco.preset accepts the same optional canonical-mm overrides. The selected-object inside/outside/tolerance editor appears when a box is selected and retains live regeneration.
+
+**Animate** now alternates all four selected styles between assembled and the exact saved CAD blank. It reverses top flaps, base and walls, then assembles on the next click. HSC remains open at the top. The camera frames the full sequence so the sheet stays visible. **View dieline in CAD** and selected-profile Open packaging designer use the shared packaging.open_selected action; loading a different drawing is undoable, and opening an already matching drawing adds no history step. Playback synchronizes the active CAD drawing with the selected saved profile; cancellation/failure/Undo restore the previous drawing. Current board materials, physical caliper, tolerance, placement and portable metadata are retained. Geometry stays in the independent module and API v1 remains supported. The existing original-path, unscaled-object and concept-manufacturing limits apply.
+
+Validation: 509 unit/module tests and lint pass; all 13 independent module tests pass. Website/Pages and standalone builds pass. Chromium against the generated Pages artifact verifies all four dimension-first presets, closed RSC defaults/thumbnail, equal desktop/mobile card layouts, left-open startup, exact saved CAD paths in the unfolded endpoint and CAD dialog, reassembly, Pause/Resume, cancellation, busy guards and Undo/Redo. A second browser suite verifies deferred module loading, flat-board textures/guides in portable archives, typed unfolding, mobile layout, module-fetch failure/retry, and standalone HSC unfolding/editing/assembly without Auto3D/account requests. Local release verification confirms v0.32.0 / module v1.3.0 and served app/module JS/CSS hashes (asset digest 2701eaabb025). Production identity was not rechecked and no deployment was performed.
+
+## Previous release: Auto3D v0.31.0 / Packaging v1.2.0
+
+This release merged as PR #28 (01ee6d2), Auto3D v0.31.0 / Packaging v1.2.0. Production identity has not been rechecked during the v0.32.0 task.
 
 All four preset cards share a uniform two-column grid, with style categories shown on each card. Clicking RSC, HSC, OSC or FOL immediately adds and selects a box using the current draft dimensions/caliper. OSC overlap is normalized when necessary. The shared packaging.fefco.preset command uses the same service and records one Undo step per generated box.
 

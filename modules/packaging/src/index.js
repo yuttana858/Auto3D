@@ -1,4 +1,4 @@
-export const PackagingModuleVersion = '1.2.0';
+export const PackagingModuleVersion = '1.3.0';
 export const PackagingAPIVersion = 1;
 export * from './profile.js';
 export * from './fefco.js';

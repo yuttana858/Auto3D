@@ -21,3 +21,5 @@
 .fefco_playback p, .fefco_playback progress { grid-column: 1 / -1; margin: 0; width: 100%; }
 .fefco_playback button { padding: 7px; border: 1px solid var(--packaging-border, var(--ov_border_color, #d8d8d8)); border-radius: 4px; cursor: pointer; background: var(--packaging-background, var(--ov_background_color, #fff)); }
 .fefco_selected_dimensions { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--packaging-border, var(--ov_border_color, #d8d8d8)); border-radius: 6px; }
+
+.fefco_selected_dimensions[hidden] { display: none; }
