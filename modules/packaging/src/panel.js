@@ -25,18 +25,18 @@ export class FefcoPanel
         const family = Element ('label', root, 'Box family', 'fefco_field'); const select = Element ('select', family); select.setAttribute ('aria-label', 'FEFCO box family');
         for (const item of FefcoFamilies) { const option = new Option (item.id + ' · ' + item.name + (item.available ? '' : ' · coming later'), item.id); option.disabled = !item.available; select.add (option); } select.value = '02';
         Element ('p', root, '0200 series · first set', 'section_hint');
-        for (const category of [...new Set (FefcoStyles.map (item => item.category))]) {
-            const group = Element ('div', root, undefined, 'fefco_group'); Element ('strong', group, category); const grid = Element ('div', group, undefined, 'fefco_cards');
-            for (const style of FefcoStyles.filter (item => item.category === category)) {
-                const button = Element ('button', grid, undefined, 'fefco_card'); button.type = 'button'; button.setAttribute ('aria-label', 'FEFCO ' + style.code + ' ' + style.acronym); button.title = style.description;
-                const image = Element ('img', button); image.alt = ''; image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent (FefcoThumbnail (style.code)); image.width = 176; image.height = 140;
-                Element ('strong', button, style.code + ' · ' + style.acronym); Element ('span', button, style.name); if (style.priority) { Element ('small', button, 'Priority'); }
-                button.addEventListener ('click', () => workspace.run (() => {
-                    const data = workspace.inspect (); const changes = { code : style.code };
-                    if (style.code === '0202' && (data.overlap <= 0 || data.overlap >= data.width)) { changes.overlap = Math.min (25, data.width / 4); }
-                    return workspace.configure (changes);
-                })); this.cards.set (style.code, button); this.controls.push (button);
-            }
+        const grid = Element ('div', root, undefined, 'fefco_cards');
+        for (const style of FefcoStyles) {
+            const button = Element ('button', grid, undefined, 'fefco_card'); button.type = 'button'; button.setAttribute ('aria-label', 'FEFCO ' + style.code + ' ' + style.acronym); button.title = style.description;
+            const image = Element ('img', button); image.alt = ''; image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent (FefcoThumbnail (style.code)); image.width = 176; image.height = 140;
+            Element ('strong', button, style.code + ' · ' + style.acronym); Element ('span', button, style.name); Element ('small', button, style.category + (style.priority ? ' · Priority' : ''));
+            button.addEventListener ('click', () => workspace.run (async () => {
+                if (workspace.preset) { return workspace.preset (style.code); }
+                const data = workspace.inspect (); const changes = { code : style.code };
+                if (style.code === '0202' && (data.overlap <= 0 || data.overlap >= data.width)) { changes.overlap = Math.min (25, data.width / 4); }
+                await workspace.configure (changes);
+                return workspace.generate ();
+            })); this.cards.set (style.code, button); this.controls.push (button);
         }
         this.description = Element ('p', root, undefined, 'section_hint');
         const dimensions = Element ('div', root, undefined, 'fefco_dimensions');
@@ -49,8 +49,7 @@ export class FefcoPanel
         this.closure.addEventListener ('change', () => workspace.run (() => workspace.configure ({ closure : this.closure.value })));
         this.generate = Element ('button', root, 'Generate 3D box', 'workspace_primary fefco_generate'); this.generate.type = 'button'; this.controls.push (this.generate);
         this.generate.addEventListener ('click', () => workspace.run (() => workspace.generate ()));
-        this.unfold = Element ('button', root, 'Unfold selected box', 'fefco_unfold'); this.unfold.type = 'button'; this.controls.push (this.unfold); this.unfold.addEventListener ('click', () => workspace.run (() => workspace.unfold ()));
-        this.animate = Element ('button', root, 'Animate flat → open → closed', 'fefco_animate'); this.animate.type = 'button'; this.controls.push (this.animate); this.animate.addEventListener ('click', () => workspace.run (() => workspace.animate ()));
+        this.animate = Element ('button', root, 'Animate', 'fefco_animate'); this.animate.type = 'button'; this.controls.push (this.animate); this.animate.addEventListener ('click', () => workspace.run (() => workspace.animate ()));
         const playback = Element ('div', root, undefined, 'fefco_playback');
         this.foldStatus = Element ('p', playback, 'Select a box or dieline to animate.', 'section_hint'); this.foldStatus.setAttribute ('role', 'status');
         this.foldProgress = Element ('progress', playback); this.foldProgress.max = 1; this.foldProgress.value = 0; this.foldProgress.setAttribute ('aria-label', 'Box folding progress');
@@ -79,5 +78,5 @@ export class FefcoPanel
         this.dimensionMode.disabled = !data || this.host.dimensionsBlocked ();
     }
     RefreshPlayback () { const state = this.host.playback?.() || { state : 'idle', progress : 0 }; const active = ['playing', 'paused'].includes (state.state); this.pause.disabled = this.cancel.disabled = !active; this.pause.textContent = state.state === 'paused' ? 'Resume folding' : 'Pause folding'; this.foldProgress.value = state.progress || 0; this.foldStatus.textContent = state.state === 'idle' ? 'Select a box or dieline to animate.' : state.state + ' · ' + (state.stage || 'folding') + ' · ' + Math.round ((state.progress || 0) * 100) + '%'; }
-    SetDisabled () { const blocked = this.host.blocked (); for (const control of this.controls) { control.disabled = blocked; } this.unfold.disabled = blocked || !this.host.canUnfold (); this.animate.disabled = blocked || !this.host.canAnimate?.(); this.RefreshDimensions (); this.RefreshPlayback (); }
+    SetDisabled () { const blocked = this.host.blocked (); for (const control of this.controls) { control.disabled = blocked; } this.animate.disabled = blocked || !this.host.canAnimate?.(); this.animate.title = this.host.animation?.()?.stages.join (' → ') || 'Animate selected box or dieline'; this.RefreshDimensions (); this.RefreshPlayback (); }
 }

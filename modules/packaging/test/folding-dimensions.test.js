@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { CreateFefcoBox, CreateFefcoFoldRig, FefcoFoldPose, FefcoFoldFrame, FefcoProfile, FefcoDimensions, ResolveFefcoDimensions, FoldPlayback } from '../src/index.js';
+import { CreateFefcoBox, CreateFefcoFoldRig, FefcoFoldPose, FefcoFoldFrame, FefcoProfile, FefcoDimensions, ResolveFefcoDimensions, FoldPlayback, FefcoPreset, FefcoAnimationPlan } from '../src/index.js';
 
 describe ('Independent folding and physical dimensions', () => {
+    it ('Selects animation endpoints from saved box state without inventing HSC top flaps', () => { for (const code of ['0201', '0202', '0203']) { const open = FefcoAnimationPlan ({ code, closure : 'closed' }); const close = FefcoAnimationPlan ({ code, closure : 'open' }); assert.equal (open.action, 'open'); assert.equal (open.targetClosure, 'open'); assert.equal (open.from, close.to); assert.equal (open.to, close.from); assert.equal (FefcoAnimationPlan ({ code }, 'flat').from, 0); } assert.equal (FefcoAnimationPlan ({ code : '0200' }).targetState, 'flat'); assert.equal (FefcoAnimationPlan ({ code : '0200' }, 'flat').targetClosure, 'open'); assert.throws (() => FefcoAnimationPlan ({}, 'unknown')); });
+    it ('Preserves preset dimensions while fixing OSC overlap and rejects unsupported presets', () => { const data = { code : '0200', length : 520, width : 350, overlap : 0 }; const preset = FefcoPreset (data, '0202'); assert.equal (preset.length, 520); assert.equal (preset.overlap, 25); assert.equal (data.overlap, 0); assert.throws (() => FefcoPreset (data, '0000')); });
     it ('Uses the original dieline and preserves rigid panel dimensions at every fold stage', () => {
         for (const code of ['0200', '0201', '0202', '0203']) {
             const rig = CreateFefcoFoldRig ({ code }); const flat = FefcoFoldFrame (rig, 0); assert.deepEqual (flat.meshes.map (m => m.vertices), rig.meshes.map (m => m.vertices));

@@ -1,4 +1,4 @@
-# Packaging module v1.1.0
+# Packaging module v1.2.0
 
 A separate package for FEFCO 0200–0203 boxes, canonical-mm dielines, physical board extrusion, kraft textures, catalog controls and flat-sheet unfolding. It can be developed or copied to a separate repository without Auto3D source. Its only runtime dependencies are Three.js and fflate, under MIT licenses.
 
@@ -50,6 +50,12 @@ These are original parametric concept layouts using FEFCO identifiers, not an im
 
 FefcoDimensions(parameters, tolerance) reports nominalInside, nominalOutside, inside minimum and outside maximum in mm. The tolerance is an explicit fit reserve per overall dimension: inside = nominalInside − tolerance; outside = nominalOutside + tolerance. Length/width add two board calipers; height adds actual base/top flap layer stacks. ResolveFefcoDimensions(parameters, target, basis, tolerance) reverses this math and validates the result. The assembled envelope excludes open flap sweep.
 
-CreateFefcoFoldRig(parameters, savedProfile) partitions the original blank into rigid board panels. FefcoFoldPose(rig, progress) returns neutral matrices and stages; FefcoFoldFrame can bake the frame into neutral geometry. FoldPlayback provides Start, Pause, Resume, Stop and Inspect with an injectable clock. Hosts apply matrices during playback and commit CreateFefcoBox with closed closure on completion for the generated physical cavity/envelope. HSC keeps its open top. The nominal hinge preview may need caliper corrections at this endpoint.
+CreateFefcoFoldRig(parameters, savedProfile) partitions the original blank into rigid board panels. FefcoFoldPose(rig, progress) returns neutral matrices and stages; FefcoFoldFrame can bake the frame into neutral geometry. FoldPlayback provides Start, Pause, Resume, Stop and Inspect with an injectable clock. Hosts apply matrices during playback and commit CreateFefcoBox with the target closure on completion for the generated physical cavity/envelope. HSC keeps its open top. The nominal hinge preview may need caliper corrections at this endpoint.
 
 Optional API-v1 panel capabilities add dimensions(), dimensionMode(), updateDimensions(), dimensionsBlocked(), animate(), playback(), control() and canAnimate(). Existing hosts remain compatible with these controls disabled. Dimension edits debounce for 250 ms; Auto3D serializes regeneration, preserves selected IDs/materials/placement, and records Undo. Its transient fold preview blocks saving/editing; cancellation restores the original, and completion records one Undo step. Geometry, UI and playback remain independent of the Auto3D engine.
+
+## Presets and Animate in v1.2.0
+
+The four equal-size preset cards form a two-column grid, retaining style categories inside each card. Clicking a card immediately generates its style using current draft dimensions and caliper. FefcoPreset(input, code) validates the preset and repairs OSC overlap when necessary; the optional panel host preset(code) capability shares this action with Auto3D commands. Legacy hosts use configure + generate.
+
+The single **Animate** button uses FefcoAnimationPlan(parameters, state) to choose its current/target poses. Closed top flaps open; open flaps close; flat sheets assemble into a box. HSC alternates between assembled/open-top and flat because it has no top flaps. The optional animation() host capability supplies the button tooltip. Pause/Resume/Cancel retain the existing playback contract. Auto3D still exposes explicit unfolding through its shared command and typed phrase.

@@ -1,6 +1,6 @@
 # Auto3D: agent project overview
 
-Updated 2026-10-09. Start with [project-status.md](project-status.md) for the development log, deployed commit, local release, validation and TODO list. This document describes the current application; earlier proposed R2/auth architecture has been superseded by the implemented account routes.
+Updated 2026-10-10. Start with [project-status.md](project-status.md) for the development log, deployed commit, local release, validation and TODO list. This document describes the current application; earlier proposed R2/auth architecture has been superseded by the implemented account routes.
 
 ## Product and stack
 
@@ -102,8 +102,10 @@ Production host: `https://auto3d-5av.pages.dev`. Pages deploys `main`. Release 0
 
 [Temporary authentication](temporary-auth.md) · [Account storage/preferences](account-storage.md) · [PR16 reconciliation](pr16-reconciliation.md) · [Agent commands](agent-interface.md) · [Agent capture](agent-screen-capture.md) · [Error logs](error-logs.md) · [Polygon optimization](polygon-optimization.md) · [Packaging](packaging-module.md) · [Cameras](session-cameras.md) · [Rendering](rendering.md) · [Cloudflare deployment](cloudflare-pages.md)
 
-## Independent Packaging development — v0.30.0
+## Independent Packaging development — v0.31.0
 
-Packaging module v1.1.0 lives under modules/packaging and can be copied into a separate checkout with its own package.json, source, tests, build and standalone preview. Run npm run build_packaging, npm run test_packaging or npm run preview_packaging from the repo root, or the corresponding build/test/preview scripts inside that package. This is a separate package within the current Git repository; no new external repository or deployment is created. The app owns authentication, scene conversion, history, archives and display units. Lightweight pure profile validation and dimension math are shared at startup. The module returns canonical-mm mesh/material/profile data and neutral panel matrices, with no Auto3D engine imports. Folding geometry and its playback clock remain in the lazy module. PackagingWorkspace owns temporary previews, account checks, atomic cancellation and completed-object history.
+Packaging module v1.2.0 lives under modules/packaging and can be copied into a separate checkout with its own package.json, source, tests, build and standalone preview. Run npm run build_packaging, npm run test_packaging or npm run preview_packaging from the repo root, or the corresponding build/test/preview scripts inside that package. This is a separate package within the current Git repository; no new external repository or deployment is created. The app owns authentication, scene conversion, history, archives and display units. Lightweight pure profile validation and dimension math are shared at startup. The module returns canonical-mm mesh/material/profile data and neutral panel matrices, with no Auto3D engine imports. Folding geometry and its playback clock remain in the lazy module. PackagingWorkspace owns temporary previews, account checks, atomic cancellation and completed-object history.
 
 The main application loads packaging.module.js and packaging.module.css only when its Packaging tab or a geometry action is used. Build artifact hashing and deployment verification include both files. Saved scenes retain ordinary engine geometry and textures, so opening them does not require the generator. See modules/packaging/README.md for the API and host contract.
+
+The v1.2.0 module uses pure preset validation and an animation plan derived from saved flat/folded and open/closed metadata. Preset cards generate immediately in a single two-column grid; the single Animate action opens/closes supported top flaps or folds a flat sheet. HSC alternates assembled/flat, preserving its flap-free top. PackagingWorkspace and the standalone host share these module helpers. The Auto3D explicit unfold command remains available.

@@ -403,7 +403,7 @@
       "id": "packaging.fefco.animate",
       "title": "Animate box folding",
       "category": "Packaging",
-      "description": "Start the selected generated box or original dieline folding from flat to upright/open to closed. Returns when playback starts; inspect completion with packaging.fefco.playback.inspect. Preserves board materials; completion adds one Undo step. Cancel restores the original without a history step. HSC remains open at the top. Original generated paths and unscaled geometry required.",
+      "description": "Animate the selected box based on saved state: closed top flaps open, open top flaps close, and a flat dieline folds into a box. HSC alternates assembled/flat because it has no top flaps. Returns when playback starts; inspect completion with packaging.fefco.playback.inspect. Preserves board materials; completion adds one Undo step. Cancel restores the original without a history step. Original generated paths and unscaled geometry required.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -559,6 +559,34 @@
         "width": 320,
         "height": 260,
         "tolerance": 1
+      }
+    },
+    {
+      "id": "packaging.fefco.preset",
+      "title": "Generate box preset",
+      "category": "Packaging",
+      "description": "Immediately generate a supported FEFCO preset using current draft dimensions and caliper. Repairs partial-overlap settings when switching to OSC. Adds and selects a new box with Undo; uses the same service as catalog cards.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "0200",
+              "0201",
+              "0202",
+              "0203"
+            ]
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "code": "0201"
       }
     },
     {
