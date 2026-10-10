@@ -37,8 +37,8 @@ export function PackagingModel (data, unit = Unit.Millimeter, surfaces = {})
     for (const definition of data.materials) {
         if (surfaces[definition.role]) { model.AddMaterial (CloneSurface (surfaces[definition.role])); continue; }
         const material = new PhysicalMaterial (); material.name = definition.name; material.color = new RGBColor (...definition.color);
-        for (const key of ['roughness', 'metalness', 'specularIntensity']) { if (definition[key] !== undefined) { material[key] = definition[key]; } }
-        if (definition.diffuseMap) { material.diffuseMap = Object.assign (new TextureMap (), definition.diffuseMap); }
+        for (const key of ['roughness', 'metalness', 'specularIntensity', 'bumpScale', 'normalScale', 'aoIntensity', 'displacementScale']) { if (definition[key] !== undefined) { material[key] = definition[key]; } }
+        for (const [key, map] of Object.entries (definition)) { if (key.endsWith ('Map') && map) { material[key] = Object.assign (new TextureMap (), map); } }
         model.AddMaterial (material);
     }
     for (const definition of data.meshes) {

@@ -10,7 +10,7 @@ try {
     for (const path of ['accounts/**', 'personal/items', 'environments']) { await page.route ('**/api/' + path, route => route.fulfill ({ json : path.startsWith ('accounts') ? { isAdmin : false } : [] })); }
     console.log ('Loading local site'); await page.goto (process.env.AUTO3D_TEST_URL || 'http://127.0.0.1:8080/website/index.html'); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'), null, { timeout : 20000 });
     const call = async (id, args = {}) => { const result = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (result.ok, true, JSON.stringify (result)); return result.result; };
-    assert.equal ((await call ('app.version.inspect')).version, '0.32.0'); console.log ('Opening catalog'); await call ('ui.ai.packaging'); assert.equal (await page.locator ('.fefco_card').count (), 4);
+    assert.equal ((await call ('app.version.inspect')).version, '0.33.0'); console.log ('Opening catalog'); await call ('ui.ai.packaging'); assert.equal (await page.locator ('.fefco_card').count (), 4);
     await page.waitForFunction (() => [...document.querySelectorAll ('.fefco_card img')].every (img => img.complete && img.naturalWidth > 0), null, { timeout : 20000 });
     assert.equal (await page.locator ('.fefco_card img').evaluateAll (images => images.every (img => img.complete && img.naturalWidth > 0)), true);
     await page.screenshot ({ path : 'work/fefco-catalog.png' });
@@ -34,5 +34,5 @@ try {
     await page.getByLabel ('FEFCO Flap overlap').fill ('300'); await page.getByRole ('button', { name : 'Generate OSC · 3D box', exact : true }).click (); await page.waitForFunction (() => /overlap must/.test (document.querySelector ('.scene_status')?.textContent || '')); assert.equal ((await call ('packaging.fefco.inspect')).overlap, 25);
     await call ('preferences.units', { units : 'standard' }); assert.ok (Math.abs (Number (await page.getByLabel ('FEFCO Length (L)').inputValue ()) - 400 / 25.4) < 0.000001); await call ('preferences.units', { units : 'metric' });
     await page.setViewportSize ({ width : 390, height : 844 }); await call ('ui.ai.packaging'); assert.equal (await page.locator ('.ai_workspace_panel').evaluate (node => node.scrollWidth <= node.clientWidth + 1), true); await page.screenshot ({ path : 'work/fefco-mobile.png' });
-    assert.deepEqual (errors, []); console.log ('v0.32.0: FEFCO thumbnails, real HSC/RSC generation, open/closed flaps, archive textures, Undo/Redo, validation, inches and mobile panel passed.');
+    assert.deepEqual (errors, []); console.log ('v0.33.0: FEFCO thumbnails, real HSC/RSC generation, open/closed flaps, archive textures, Undo/Redo, validation, inches and mobile panel passed.');
 } finally { await browser.close (); }

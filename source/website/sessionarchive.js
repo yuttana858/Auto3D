@@ -67,6 +67,7 @@ function ReadMaterial (data)
         else if (typeof material[key] === 'number' && !Number.isFinite (value)) { throw new Error ('Invalid material value.'); }
         else if (typeof material[key] !== 'object' || value === null) { material[key] = value; }
     }
+    if (!['normal', 'bump', 'off'].includes (material.reliefMode)) { throw new Error ('Invalid material relief mode.'); }
     return material;
 }
 

@@ -127,3 +127,26 @@ div.intro div.intro_dragdrop_text { font-size: 13.33px; line-height: 1.5; margin
 @media (max-width: 600px) { div.workspace_panel:not(.collapsed) { flex-basis: min(230px, calc(100vw - 100px)); width: min(230px, calc(100vw - 100px)); } }
 
 div.main_viewer.hdri_background_visible .viewer_empty { background: transparent; }
+
+/* Compact shared Surface + Texture editor. */
+.material_drawer { height: min(225px, 32vh); }
+.surface_tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 7px; font-size: 10px; }
+.surface_tools select { background: var(--ov_background_color); color: inherit; border: 1px solid var(--ov_border_color); border-radius: 4px; font-size: 10px; padding: 3px; }
+.surface_uv_info { background: transparent; border: 0; color: inherit; cursor: pointer; font: inherit; opacity: .75; padding: 0; }
+.surface_map_cards { display: grid; grid-template-columns: repeat(8, minmax(130px, 1fr)); gap: 8px; }
+.surface_map_card { min-width: 0; border: 1px solid var(--ov_border_color); border-radius: 5px; padding: 6px; }
+.surface_map_preview { display: flex; align-items: center; gap: 7px; width: 100%; min-width: 0; padding: 0; margin-bottom: 4px; background: transparent; color: inherit; border: 0; cursor: pointer; text-align: left; font-size: 10px; }
+.surface_map_preview span { overflow-wrap: anywhere; }
+.surface_map_card .texture_map_thumbnail { width: 40px; height: 40px; flex-basis: 40px; }
+.surface_map_card .editor_control { font-size: 9px; gap: 3px; }
+.surface_map_card .editor_control > span { flex-basis: 49px; }
+.surface_map_card .editor_control output { flex-basis: 25px; font-size: 8px; }
+.surface_texture_dialog { width: min(650px, 90vw); box-sizing: border-box; }
+.surface_texture_large { display: block; width: min(100%, 480px); height: auto; aspect-ratio: 1; margin: 12px auto; background: repeating-conic-gradient(#aaa 0% 25%, #ddd 0% 50%) 0 / 16px 16px; }
+.surface_texture_actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.surface_texture_dialog details { font-size: 11px; }
+.surface_texture_dialog .editor_control { font-size: 11px; }
+.surface_texture_dialog .editor_control > span { flex-basis: 130px; }
+.module_version { margin-left: 5px; font-size: 9px; opacity: .65; white-space: nowrap; }
+@media (max-width: 1150px) { .surface_map_cards { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 650px) { .surface_map_cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } .surface_tools { gap: 6px; } .surface_texture_dialog { padding: 12px; } .surface_texture_dialog .editor_control > span { flex-basis: 110px; } }
