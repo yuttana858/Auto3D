@@ -1,45 +1,17 @@
 import * as THREE from 'three';
-import { ValidateFefco, FlapDepth, FefcoProfile } from './fefco.js';
+import { ValidateFefco, FefcoProfile } from './fefco.js';
+import { CreateFefcoFoldRig, FefcoFoldFrame } from './folding.js';
 import { BoardMaterials } from './material.js';
 import { PackagingContours, ValidatePackaging } from './profile.js';
 import { MeshData } from './mesh.js';
 
 export function CreateFefcoBox (input)
 {
-    const data = ValidateFefco (input);
-    const { width : w, length : l, height : h, thickness : t } = data; const depth = FlapDepth (data); const gap = Math.min (t * 0.4, 1); const model = { apiVersion : 1, units : 'mm', state : 'folded', materials : BoardMaterials (), meshes : [], profile : FefcoProfile (data), parameters : data };
-    const innerLayers = 2 * depth > l ? 2 : 1; const outerLayers = data.code === '0202' || data.code === '0203' ? 2 : 1;
-    const layers = innerLayers + outerLayers; const floor = layers * t; const wallHeight = h + floor;
-    const panel = (name, width, height, center, rotation = [0, 0, 0]) => {
-        const geometry = new THREE.BoxGeometry (width, height, t);
-        const transform = new THREE.Matrix4 ().compose (new THREE.Vector3 (...center), new THREE.Quaternion ().setFromEuler (new THREE.Euler (...rotation)), new THREE.Vector3 (1, 1, 1)); geometry.applyMatrix4 (transform);
-        model.meshes.push (MeshData (geometry, name, index => index >= 4 ? 0 : 1, (i, uv) => { const face = Math.floor (i / 4); return [uv.getX (i) * (face >= 4 ? width / 50 : (face < 2 ? height : width) / (t * 2)), uv.getY (i) * (face >= 4 ? height / 50 : 1)]; })); geometry.dispose ();
-    };
-    // Internal dimensions are W=X, L=Z, H=Y; thickness extends outside the cavity.
-    panel ('Front wall', w + 2 * t, wallHeight, [0, wallHeight / 2, -l / 2 - t / 2]);
-    panel ('Back wall', w + 2 * t, wallHeight, [0, wallHeight / 2, l / 2 + t / 2]);
-    panel ('Left wall', l - gap, wallHeight, [-w / 2 - t / 2, wallHeight / 2, 0], [0, Math.PI / 2, 0]);
-    panel ('Right wall', l - gap, wallHeight, [w / 2 + t / 2, wallHeight / 2, 0], [0, Math.PI / 2, 0]);
-    panel ('Inside glued joint', Math.min (35, w / 5), wallHeight - 4 * t, [-w / 2 + Math.min (35, w / 5) / 2, wallHeight / 2, -l / 2 + t / 2]);
-    const flaps = (top) => {
-        // Closed flaps occupy separate board layers. Open top flaps hinge outward.
-        const angle = top && data.closure === 'open' ? 110 * Math.PI / 180 : 0;
-        const majorDepth = depth - gap; const minorDepth = Math.min (depth, l - gap); const rise = top ? wallHeight : 0;
-        const hinge = (name, span, flapDepth, cx, cz, inwardX, inwardZ, layer) => {
-            const cy = rise + (top ? (layer + 0.5) * t : (layers - layer - 0.5) * t) + Math.sin (angle) * flapDepth / 2;
-            const center = [cx + inwardX * Math.cos (angle) * flapDepth / 2, cy, cz + inwardZ * Math.cos (angle) * flapDepth / 2];
-            const normal = new THREE.Vector3 (-inwardX * Math.sin (angle), Math.cos (angle), -inwardZ * Math.sin (angle)); const vertical = new THREE.Vector3 (inwardX * Math.cos (angle), Math.sin (angle), inwardZ * Math.cos (angle)); const horizontal = new THREE.Vector3 ().crossVectors (vertical, normal); const basis = new THREE.Matrix4 ().makeBasis (horizontal, vertical, normal); const rotation = new THREE.Euler ().setFromRotationMatrix (basis);
-            panel ((top ? 'Top ' : 'Base ') + name, span - gap * 2, flapDepth, center, [rotation.x, rotation.y, rotation.z]);
-        };
-        hinge ('front inner flap', w, minorDepth, 0, -l / 2, 0, 1, 0);
-        hinge ('back inner flap', w, minorDepth, 0, l / 2, 0, -1, innerLayers - 1);
-        hinge ('left outer flap', l, majorDepth, -w / 2, 0, 1, 0, innerLayers);
-        hinge ('right outer flap', l, majorDepth, w / 2, 0, -1, 0, layers - 1);
-    };
-    // Long side walls lie on X = +/- W/2: their L-wide flaps close across W.
-    // Keep these outer flaps uppermost, and the end-wall flaps underneath.
-    flaps (false); if (data.code !== '0200') { flaps (true); }
-    return model;
+    // Generation and animation use exactly the same finite board solids.
+    // No shape/caliper jump when playback completes.
+    const rig = CreateFefcoFoldRig (input); const p = rig.parameters;
+    const frame = FefcoFoldFrame (rig, p.code === '0200' || p.closure === 'closed' ? 1 : 0.72);
+    return { ...frame, parameters : p };
 }
 
 export function CreateBoard (input, { textured = false, guides = false } = {})

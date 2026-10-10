@@ -16,7 +16,7 @@ export const FefcoStyles = [
     { code : '0202', acronym : 'OSC', name : 'Overlap slotted container', category : 'Overlap slotted', description : 'Longer equal-depth flaps give a configurable partial overlap.' },
     { code : '0203', acronym : 'FOL', name : 'Full overlap slotted container', category : 'Overlap slotted', description : 'Equal-depth flaps reach the full box width for overlapping closure.' }
 ];
-export function FefcoCatalog () { return { source : FefcoSource, edition : '12th (2022)', families : FefcoFamilies.map (item => ({ ...item })), styles : FefcoStyles.map (item => ({ ...item, family : '02', available : true })) }; }
+export function FefcoCatalog () { return { source : FefcoSource, edition : '12th (2022)', families : FefcoFamilies.map (item => ({ ...item })), styles : FefcoStyles.map (item => ({ ...item, family : '02', available : true, folding : { supported : true, cadMapped : true, solidCaliper : true, top : item.code === '0200' ? 'open' : 'flaps' } })) }; }
 export function FefcoThumbnail (code)
 {
     if (code === '0201') { return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 176 140"><ellipse cx="90" cy="121" rx="65" ry="10" fill="#000" opacity=".08"/><g stroke="#87633f" stroke-width="1.4" stroke-linejoin="round"><path d="M24 48L82 29 145 52 87 76Z" fill="#d6b183"/><path d="M24 48L87 76 87 124 24 94Z" fill="#c7a071"/><path d="M87 76L145 52 145 99 87 124Z" fill="#ad8150"/><path d="M53 38.5L116 64" fill="none" stroke="#87633f" stroke-width="2"/><path d="M28 50L87 78 141 55" fill="none" stroke="#edd2a5" stroke-width="3"/></g></svg>'; }

@@ -5,6 +5,7 @@ export * from './fefco.js';
 export * from './catalog.js';
 export * from './geometry.js';
 export * from './folding.js';
+export * from './solid.js';
 export * from './dimensions.js';
 export { FoldPlayback } from './foldplayback.js';
 export { FefcoPanel } from './panel.js';

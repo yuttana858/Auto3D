@@ -31,7 +31,7 @@ describe ('FEFCO folded packaging', async () => {
         const rsc = await CreateFefcoModel ({ closure : 'closed' }); const left = rsc.meshes.find (mesh => mesh.GetName () === 'Top left outer flap'); const right = rsc.meshes.find (mesh => mesh.GetName () === 'Top right outer flap');
         const top = Math.min (...rsc.meshes.filter (m => m.GetName ().startsWith ('Top')).flatMap (m => m.vertices.map (p => p.y)));
         const base = Math.max (...rsc.meshes.filter (m => m.GetName ().startsWith ('Base')).flatMap (m => m.vertices.map (p => p.y)));
-        assert.equal (top - base, 250); assert.ok (Math.abs (Bounds (hsc).min[1]) < 1e-6);
+        assert.ok (Math.abs (top - base - 250) < 1e-6); assert.ok (Math.abs (Bounds (hsc).min[1]) < 1e-6);
         assert.ok (Math.abs (Math.max (...left.vertices.map (p => p.x))) < 1.1); assert.ok (Math.abs (Math.min (...right.vertices.map (p => p.x))) < 1.1);
         const open = Bounds (await CreateFefcoModel ({ closure : 'open' })); const closed = Bounds (rsc); assert.ok (open.max[1] > closed.max[1] + 100); assert.ok (open.max[0] > closed.max[0]);
         const overlap = await CreateFefcoModel ({ code : '0202', closure : 'closed', overlap : 40 }); const outer = overlap.meshes.find (mesh => mesh.GetName () === 'Top left outer flap'); assert.ok (Math.abs (Math.max (...outer.vertices.map (p => p.x)) - 20) < 1.1);

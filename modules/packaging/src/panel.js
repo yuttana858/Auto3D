@@ -53,7 +53,7 @@ export class FefcoPanel
         this.generate.addEventListener ('click', () => workspace.run (async () => { const changes = this.DraftParameters (); let result; if (workspace.preset) { result = await workspace.generate (changes); } else { await workspace.configure (changes); result = await workspace.generate (); } this.draftDirty.clear (); this.Refresh (); return result; }));
         this.animate = Element ('button', root, 'Animate', 'fefco_animate'); this.animate.type = 'button'; this.controls.push (this.animate); this.animate.addEventListener ('click', () => workspace.run (() => workspace.animate ()));
         if (workspace.designer) { this.designer = Element ('button', root, 'View dieline in CAD', 'fefco_animate'); this.designer.type = 'button'; this.controls.push (this.designer); this.designer.addEventListener ('click', () => workspace.run (() => workspace.designer ())); }
-        Element ('p', root, 'Animate unfolds the selected box to its saved CAD dieline. Click again to assemble it.', 'section_hint');
+        Element ('p', root, 'Animate unfolds the selected box to its saved CAD dieline. Click again to assemble it. Board surfaces are checked before playback; overlapping flaps fold in separate layers.', 'section_hint');
         const playback = Element ('div', root, undefined, 'fefco_playback');
         this.foldStatus = Element ('p', playback, 'Select a box or dieline to animate.', 'section_hint'); this.foldStatus.setAttribute ('role', 'status');
         this.foldProgress = Element ('progress', playback); this.foldProgress.max = 1; this.foldProgress.value = 0; this.foldProgress.setAttribute ('aria-label', 'Box folding progress');

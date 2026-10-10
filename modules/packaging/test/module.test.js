@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises';
 describe ('Independent Packaging module', () => {
     it ('Exposes a versioned neutral mesh API without importing Auto3D', async () => {
         const result = await build ({ entryPoints : [new URL ('../src/index.js', import.meta.url).pathname], bundle : true, format : 'esm', write : false, metafile : true });
-        assert.equal (PackagingModuleVersion, '1.4.0'); assert.equal (PackagingAPIVersion, 1);
+        assert.equal (PackagingModuleVersion, '1.5.0'); assert.equal (PackagingAPIVersion, 1);
         assert.equal (JSON.parse (await readFile (new URL ('../package.json', import.meta.url))).version, PackagingModuleVersion);
         assert.equal (Object.keys (result.metafile.inputs).some (name => /source\/(engine|website)/.test (name)), false);
         const box = CreateFefcoBox ({}); assert.equal (box.units, 'mm'); assert.equal (box.apiVersion, 1); assert.equal (box.meshes.length, 13); assert.ok (Array.isArray (box.meshes[0].vertices[0]));

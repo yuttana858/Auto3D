@@ -2,9 +2,21 @@
 
 Updated 2026-10-10. This is the starting point for project status, completed work, open issues and the next release. Architecture: [agent-project-overview.md](agent-project-overview.md).
 
-## Current development release: Auto3D v0.33.0 / Packaging v1.4.0
+## Current development release: Auto3D v0.34.0 / Packaging v1.5.0
 
-Remote main includes PR #29 (425ba26), Auto3D v0.32.0 / Packaging v1.3.0. This update is on feat/material-surface-textures. Report both versions and the new PR number; merge and production deployment remain user actions.
+Remote main includes PR #30 (ebf183d). This update is on feat/solid-fefco-folds; merge and production deployment remain user actions. Report both versions and the new PR number.
+
+HSC (0200), RSC (0201), OSC (0202) and FOL (0203) share CAD-derived finite-caliper panel geometry for both generation and fold/unfold playback. HSC keeps its open top. Outside-face wall hinges preserve cavity dimensions without cutting through adjacent walls. The glue tab receives a caliper clearance before sleeve wrapping. Inner and outer flap pairs fold sequentially; overlapping flaps reserve their separate stack layer before rotating. Open roof flaps lift, stand upright and shift hinge faces before closing, avoiding center-seam overlap. Panel volume, UVs, materials and the original cut/score profile remain intact.
+
+The independent module uses convex-prism solid intersection detection (including the trapezoidal glue tab), permitting surface contact but rejecting positive-volume intersections above 0.00001 mm. Both hosts audit 3,601 route poses before replacing the original (hinges move at most one degree between audit samples), yield for Processing feedback, and check every displayed pose. A detected collision blocks playback or restores the original. Preparation also blocks transient saving/editing and rechecks the account/scene. A nonmutating shared command, `packaging.fefco.folding.check`, returns the route audit and offending panel pairs. The catalog reports CAD/fold support for the four implemented styles; other families remain unavailable.
+
+This is a controlled rigid-panel route with score-compression/stack-clearance approximations. It is a sampled route audit plus per-frame checks, not continuous deformable-board physics or a manufacturing certificate. It checks panels within the generated box, not other scene objects; custom edited paths and generic scaling remain refused. Saved older generated boxes use their original parameters/profile to enter the updated route.
+
+Validation: 529 unit/module tests pass, including all four styles across six dimension/caliper/overlap cases, reverse-route frames, exact fractional-mm prism/mesh coordinates, endpoint equality, volume and cavity/envelope checks, intentional collision detection/blocking, command/schema/macro/read-only behavior, and preflight account-change rollback. Chromium verifies each preset’s solid audit, rendered fold/unfold, exact CAD profile, correct open/closed top and Undo/Redo with healthy WebGL contexts. Standalone HSC generation, dimension edits, folding and pause/cancel also pass. Auto3D deferred loading, current-material/guides archive saves, typed commands, mobile layout and failed-module fetch/retry pass against the built Pages artifact. Lint, 11 backend tests, production licenses, both engine builds, website/Pages and independent module builds pass; local release verification confirms app/module asset hashes and versions. Production audit passes its high-severity threshold, with the existing moderate fflate 0.8.2 advisory unchanged.
+
+## Previous release: Auto3D v0.33.0 / Packaging v1.4.0
+
+Merged as PR #30 (ebf183d), Auto3D v0.33.0 / Packaging v1.4.0.
 
 AI and Packaging tabs display their respective versions. New board objects receive embedded base-color, roughness, metalness, specular-color, normal, bump, AO and height PNGs automatically, including flat sheets and the independent preview. Matte/nonmetallic defaults and zero displacement retain the board shape; sliders can change their effect. Surface and Texture are combined into one compact editor with property cards arranged across the drawer, each pairing an image thumbnail and its controls. Thumbnail dialogs provide a larger preview, original-byte Save, Replace, Remove and collapsed UV mapping controls. A single UV summary opens the detailed layout; normal/bump/off relief selection keeps both source maps.
 
