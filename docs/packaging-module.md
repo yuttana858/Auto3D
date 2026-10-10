@@ -103,3 +103,11 @@ The explicit tolerance is a fit reserve per overall dimension: minimum inside = 
 The module owns neutral panel poses and a pausable clock; the host applies Three.js matrices, permissions and history. Playback uses nominal score hinges, without collision detection, bend radii or converter-specific crease allowances. Completion uses the physical box generator for its cavity/envelope. Arbitrary imported models, scaled objects and custom edited profiles are rejected.
 
 Shared commands: `packaging.dimensions.inspect/basis/update`, `packaging.fefco.animate`, `packaging.fefco.playback` and `packaging.fefco.playback.inspect`. Animation starts asynchronously; poll inspection for completion. Pause/resume/cancel bypass the ordinary busy queue but retain authentication/read-only checks.
+
+## Packaging v1.2.0: preset cards and automatic Animate
+
+Preset cards now form one equal-size, two-column grid, with RSC/HSC on the first row and OSC/FOL on the second. Style categories remain on the cards. Each click immediately generates and selects that preset with current draft dimensions/caliper and one Undo step; OSC overlap is repaired if the previous style had an incompatible value.
+
+The single **Animate** button replaces the separate unfold/fold controls. Saved box metadata determines the action: closed → open top flaps, open → closed top flaps, flat → assembled box. HSC has no top flaps, so it alternates assembled → flat → assembled. Undo/Redo and archives preserve the resulting state. Explicit `unfold box` / packaging.fefco.unfold remain available for a full dieline. UI and agent commands share PackagingWorkspace; the standalone host uses the same independent pure planning helpers.
+
+packaging.fefco.preset accepts a strict supported code and completes generation. packaging.fefco.animate now returns its selected action and stages on startup; playback.inspect reports the action while playing and after completion. Pause/Resume/Cancel remain available while ordinary edits and transient saves are blocked. No storage schema changes are needed.

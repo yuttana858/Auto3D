@@ -1,7 +1,6 @@
 
 .fefco_catalog { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; border-bottom: 1px solid var(--packaging-border, var(--ov_border_color, #d8d8d8)); margin-bottom: 12px; }
-.fefco_group { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
-.fefco_cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; }
+.fefco_cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; }
 .fefco_card { display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 8px; text-align: left; min-width: 0; border: 1px solid var(--packaging-border, var(--ov_border_color, #d8d8d8)); border-radius: 8px; background: var(--packaging-background, var(--ov_background_color, #fff)); color: var(--packaging-foreground, var(--ov_foreground_color, #252525)); cursor: pointer; }
 .fefco_card[aria-pressed="true"] { border-color: #bc8d52; box-shadow: inset 0 0 0 1px #bc8d52; }
 .fefco_card img { width: 100%; height: 90px; object-fit: contain; background: #f0e8dd; border-radius: 4px; }
@@ -17,7 +16,7 @@
 .fefco_catalog .section_hint { font-size: 11px; line-height: 1.6; color: var(--packaging-muted, #777); overflow-wrap: anywhere; }
 .fefco_catalog button { color: inherit; font: inherit; }
 .fefco_catalog button:disabled { cursor: default; opacity: .55; }
-.fefco_unfold, .fefco_animate { padding: 10px; border: 1px solid var(--packaging-border, var(--ov_border_color, #d8d8d8)); border-radius: 6px; cursor: pointer; background: var(--packaging-background, var(--ov_background_color, #fff)); }
+.fefco_animate { padding: 10px; border: 1px solid var(--packaging-border, var(--ov_border_color, #d8d8d8)); border-radius: 6px; cursor: pointer; background: var(--packaging-background, var(--ov_background_color, #fff)); }
 .fefco_playback { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .fefco_playback p, .fefco_playback progress { grid-column: 1 / -1; margin: 0; width: 100%; }
 .fefco_playback button { padding: 7px; border: 1px solid var(--packaging-border, var(--ov_border_color, #d8d8d8)); border-radius: 4px; cursor: pointer; background: var(--packaging-background, var(--ov_background_color, #fff)); }

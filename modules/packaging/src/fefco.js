@@ -2,6 +2,21 @@ import { FefcoStyles } from './catalog.js';
 import { ValidatePackaging } from './profile.js';
 
 export const DefaultFefco = { code : '0201', length : 400, width : 300, height : 250, thickness : 3, overlap : 25, closure : 'open' };
+export function FefcoPreset (input, code)
+{
+    const data = ValidateFefco (input); const changes = { code };
+    if (code === '0202' && (data.overlap <= 0 || data.overlap >= data.width)) { changes.overlap = Math.min (25, data.width / 4); }
+    return ValidateFefco ({ ...data, ...changes });
+}
+export function FefcoAnimationPlan (input, state = 'folded')
+{
+    const p = ValidateFefco (input);
+    if (!['flat', 'folded'].includes (state)) { throw new Error ('Choose a flat dieline or an assembled box.'); }
+    if (state === 'flat') { return { from : 0, to : 1, action : 'fold', targetState : 'folded', targetClosure : p.code === '0200' ? 'open' : 'closed', stages : ['flat', 'open box', p.code === '0200' ? 'open HSC' : 'closed box'] }; }
+    if (p.code === '0200') { return { from : 1, to : 0, action : 'unfold', targetState : 'flat', targetClosure : 'open', stages : ['open HSC', 'flat'] }; }
+    const opening = p.closure === 'closed';
+    return { from : opening ? 1 : 0.72, to : opening ? 0.72 : 1, action : opening ? 'open' : 'close', targetState : 'folded', targetClosure : opening ? 'open' : 'closed', stages : opening ? ['closed box', 'open box'] : ['open box', 'closed box'] };
+}
 export function ValidateFefco (input)
 {
     if (!input || typeof input !== 'object' || Array.isArray (input) || Object.keys (input).some (key => !Object.hasOwn (DefaultFefco, key))) { throw new Error ('Invalid FEFCO parameters.'); }

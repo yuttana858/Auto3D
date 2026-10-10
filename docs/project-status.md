@@ -1,10 +1,22 @@
 # Auto3D development log and handoff
 
-Updated 2026-10-09. This is the starting point for project status, completed work, open issues and the next release. Architecture: [agent-project-overview.md](agent-project-overview.md).
+Updated 2026-10-10. This is the starting point for project status, completed work, open issues and the next release. Architecture: [agent-project-overview.md](agent-project-overview.md).
 
-## Current development release: Auto3D v0.30.0 / Packaging v1.1.0
+## Current development release: Auto3D v0.31.0 / Packaging v1.2.0
 
-Remote main includes PR #26 (c33b202), the independent Packaging/unfold release v0.29.0 / module v1.0.0. The next release is prepared on feat/packaging-fold-dimensions-dark-viewer. Every PR reports both versions and its PR number. This branch has not deployed production.
+Remote main includes PR #27 (573dc0e), Auto3D v0.30.0 / Packaging v1.1.0. This update is on feat/packaging-preset-animate and has not deployed production. Report both versions and the PR number.
+
+All four preset cards share a uniform two-column grid, with style categories shown on each card. Clicking RSC, HSC, OSC or FOL immediately adds and selects a box using the current draft dimensions/caliper. OSC overlap is normalized when necessary. The shared packaging.fefco.preset command uses the same service and records one Undo step per generated box.
+
+The panel replaces the separate unfold/folding buttons with **Animate**. It reads the selected object metadata: a closed box opens its top flaps; an open box closes them; a flat dieline folds into a box. HSC has no top flaps, so its action alternates between the assembled open-top box and flat sheet. Pause/Resume/Cancel and one-step completion Undo remain available. Explicit unfolding is still supported by the shared command and `unfold box` phrase. State and material metadata survive archives; no backend or engine change is needed.
+
+The independent module exports pure FefcoPreset and FefcoAnimationPlan helpers. API v1 is retained; optional preset/animation host capabilities support the new controls with legacy-host generation fallback. Folding begins at the current pose, rather than resetting every assembled box to flat. Manufacturing and caliper corrections retain the prior concept limits.
+
+Validation: 507 unit/module tests and lint pass; 13 independent module tests also pass. Website/Pages and standalone builds pass. Chromium against the generated Pages artifact verifies all four preset cards generate immediately, equal-size desktop/mobile two-column layouts, automatic RSC opening/closing, pause/resume, edit busy guards, cancel restoration and Undo/Redo. Release verification confirms app/module versions and served JS/CSS hashes locally. Chromium also verifies deferred module requests, explicit unfolding, texture/guide archive round trips, typed commands, fetch failure/retry, and standalone HSC generation/unfolding/dimension edits/pausable folding without Auto3D or account APIs.
+
+## Previous release: Auto3D v0.30.0 / Packaging v1.1.0
+
+The v0.30.0 release was prepared against PR #26 (c33b202), the independent Packaging/unfold release v0.29.0 / module v1.0.0, on feat/packaging-fold-dimensions-dark-viewer. It merged as PR #27. Production identity has not been rechecked during the v0.31.0 task.
 
 Dark startup and account preference restoration align a conflicting built-in Light viewer preset with Dark appearance. Explicit custom colors, scenic presets and HDRI remain selected. Browser verification checks actual viewer pixels on startup and reload.
 
