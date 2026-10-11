@@ -13,7 +13,7 @@ try {
         const call = async (id, args = {}) => { const r = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (r.ok, true, JSON.stringify (r)); return r.result; };
         const finish = async () => page.evaluate (() => new Promise ((resolve, reject) => { const deadline = performance.now () + 60000; const check = async () => { const r = (await Auto3D.execute ('packaging.fefco.playback.inspect')).result; if (r.state === 'completed') { resolve (r); } else if (r.state === 'failed' || performance.now () > deadline) { reject (new Error (JSON.stringify (r))); } else { setTimeout (check, 50); } }; check (); }));
         const graphics = async () => { const state = await call ('lighting.shadow.inspect'); assert.equal (state.contextLost, false); assert.ok (state.visibleMeshes > 0); assert.deepEqual (state.shaderErrors, []); };
-        assert.equal ((await call ('app.version.inspect')).version, '0.34.0'); await call ('ui.ai.packaging');
+        assert.equal ((await call ('app.version.inspect')).version, '0.35.0'); await call ('ui.ai.packaging');
         const style = (await call ('packaging.fefco.catalog')).styles.find (s => s.code === code); assert.equal (style.folding.supported, true); assert.equal (style.folding.cadMapped, true);
         await call ('packaging.fefco.preset', { code, length : 320, width : 240, height : 180, thickness : 8, overlap : 100, closure : 'closed' });
         const cad = await call ('packaging.inspect'); const audit = await call ('packaging.fefco.folding.check'); assert.equal (audit.clear, true); assert.equal (audit.samples, 3601); assert.deepEqual (audit.intersections, []); console.log (code + ': generated and surface route checked.');

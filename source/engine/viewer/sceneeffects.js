@@ -383,6 +383,7 @@ export class SceneEffects
                 opacity : this.settings.shadowIntensity,
                 transparent : true,
                 side : THREE.DoubleSide,
+                forceSinglePass : true,
                 blending : THREE.CustomBlending,
                 blendEquation : THREE.AddEquation,
                 blendSrc : THREE.SrcAlphaFactor,

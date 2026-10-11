@@ -1,4 +1,5 @@
 import * as path from 'path';
+import { Blob as NativeBlob } from 'node:buffer';
 import { GetArrayBufferFileContent, GetTextFileContent } from './testutils.js';
 
 export function SetGlobals ()
@@ -7,9 +8,7 @@ export function SetGlobals ()
         return Buffer.from (base64String, 'base64').toString('binary');
     };
 
-    global.Blob = function () {
-
-    };
+    global.Blob = NativeBlob;
 
     global.FileObject = function (folderName, fileName, fileContent)
     {

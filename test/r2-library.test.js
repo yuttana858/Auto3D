@@ -11,6 +11,17 @@ describe ('Published R2 Library compatibility', () => {
     let original;
     beforeEach (() => { original = global.fetch; });
     afterEach (() => { global.fetch = original; });
+    it ('does not put share tokens or upstream response bodies in error logs', async () => {
+        const error = console.error; const messages = [];
+        global.fetch = async () => new Response ('private upstream detail', { status : 503 });
+        console.error = (...args) => messages.push (args.join (' '));
+        try {
+            const response = await share (ctx ([id]));
+            assert.equal (response.status, 502);
+            assert.ok (messages.length > 0);
+            assert.equal (messages.some (message => message.includes (id) || message.includes ('private upstream detail')), false);
+        } finally { console.error = error; }
+    });
     for (const type of ['archive', 'thumbnail']) {
         it ('streams the stored ' + type + ' key without public caching', async () => {
             let gets = 0;

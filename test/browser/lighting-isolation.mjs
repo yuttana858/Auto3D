@@ -15,7 +15,8 @@ window.checkLighting = async () => {
  const material=new THREE.MeshPhysicalMaterial({color:0x998866,metalness:1,roughness:0.4});const mesh=new THREE.Mesh(new THREE.BoxGeometry(2,2,2),material);mesh.position.y=1;mesh.castShadow=true;mesh.receiveShadow=true;root.add(mesh);
  const viewer={scene,renderer,camera,shadingModel:shading,mainModel:{mainModel:{GetRootObject:()=>root}},upVector:{direction:Direction.Y,isFlipped:false},canvas:renderer.domElement,Render:()=>{shading.UpdateByCamera({eye:{x:4,y:4,z:6},center:{x:0,y:0.8,z:0}});renderer.render(scene,camera);}};
  const effects=new SceneEffects(viewer);const target=new THREE.WebGLRenderTarget(400,400);renderer.setRenderTarget(target);
- const pixels=()=>{viewer.Render();const data=new Uint8Array(400*400*4);renderer.readRenderTargetPixels(target,0,0,400,400,data);return data;};
+ renderer.info.autoReset=false;
+ const pixels=()=>{renderer.info.reset();viewer.Render();const data=new Uint8Array(400*400*4);renderer.readRenderTargetPixels(target,0,0,400,400,data);return data;};
  const center=data=>{const i=(200*400+200)*4;return data[i]+data[i+1]+data[i+2];};
  effects.Update();const base=pixels();effects.Set('ambientIntensity',3);effects.ambientRadiance.value=0;const diffuseOnly=pixels();effects.ambientRadiance.value=3;const filled=pixels();
  if(center(filled)<center(base)+80||Math.abs(center(base)-center(diffuseOnly))>2)throw Error('metal fill failed');
@@ -23,6 +24,7 @@ window.checkLighting = async () => {
  for(const [name,m] of [['opaque',new THREE.MeshBasicMaterial({color:0x2266ff})],['transparent',new THREE.MeshBasicMaterial({color:0x2266ff,transparent:true,opacity:0.55,depthWrite:false})],['metal',material]]){
   mesh.material=m;effects.Update();effects.Set('shadows',false);const before=pixels();const alpha=m.opacity;const shader=m.onBeforeCompile;const light=shading.directionalLight.intensity;
   effects.Set('shadows',true);effects.Set('shadowIntensity',0.8);const after=pixels();let visible=0,changedModel=0,shadow=0;
+  if(renderer.info.render.triangles!==26||renderer.info.render.calls!==3)throw Error('Floor shadow must submit one caster pass and one floor pass: '+JSON.stringify(renderer.info.render));
   for(let i=0;i<before.length;i+=4){const model=before[i]<245||before[i+1]<245||before[i+2]<245;if(model){visible++;if(Math.max(...[0,1,2,3].map(c=>Math.abs(before[i+c]-after[i+c])))>2)changedModel++;}else if(after[i]<230&&after[i+1]<230&&after[i+2]<230){shadow++;}}
   if(visible<1000||(name!=='transparent'&&changedModel>10)||shadow<100||m.opacity!==alpha||m.onBeforeCompile!==shader||shading.directionalLight.intensity!==light||renderer.shadowMap.enabled)throw Error(JSON.stringify({name,visible,changedModel,shadow}));
   cases.push({name,visible,changedModel,shadow});effects.Set('shadows',false);

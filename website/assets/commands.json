@@ -2309,6 +2309,47 @@
       }
     },
     {
+      "id": "preferences.viewport.quality",
+      "title": "Set viewport quality",
+      "category": "Preferences",
+      "description": "Remember Auto, Fast or Quality display resolution. Original geometry and final render resolution are preserved.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "fast",
+              "quality"
+            ]
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "mode": "auto"
+      }
+    },
+    {
+      "id": "preferences.viewport.quality.inspect",
+      "title": "Inspect viewport quality",
+      "category": "Preferences",
+      "description": "Return effective display pixel ratio and interaction state without changing geometry.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
       "id": "material.texture",
       "title": "Replace texture image",
       "category": "Materials",

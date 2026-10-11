@@ -35,7 +35,9 @@ export class FloorShadow
     {
         let material = this.materials.get (source);
         if (!material) {
-            material = new THREE.MeshBasicMaterial ({ side : THREE.DoubleSide, depthTest : false, depthWrite : false, transparent : true, blending : THREE.NoBlending, toneMapped : false });
+            // The mask writes the same silhouette from either face. Drawing
+            // transparent DoubleSide casters twice doubles all model triangles.
+            material = new THREE.MeshBasicMaterial ({ side : THREE.DoubleSide, forceSinglePass : true, depthTest : false, depthWrite : false, transparent : true, blending : THREE.NoBlending, toneMapped : false });
             material.onBeforeCompile = shader => {
                 shader.uniforms.auto3dFloorProjection = this.projection;
                 shader.vertexShader = 'uniform mat4 auto3dFloorProjection;\n' + shader.vertexShader;

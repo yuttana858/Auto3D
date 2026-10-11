@@ -341,6 +341,7 @@ export class SessionEditor
 
     RequestInteractionRender ()
     {
+        this.website.viewer.viewportQuality?.Interact ();
         if (this.interactionFrame) { return; }
         this.interactionFrame = requestAnimationFrame (() => {
             this.interactionFrame = null;

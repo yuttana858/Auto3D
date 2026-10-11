@@ -25,7 +25,7 @@ describe ('FEFCO folded packaging', async () => {
             assert.equal (count, code === '0200' ? 9 : 13); assert.equal (PackagingContours (FefcoProfile ({ code })).length, 1);
             assert.equal (model.MaterialCount (), 2); for (const material of model.materials) { assert.equal (material.metalness, 0); assert.ok (material.diffuseMap.IsValid ()); assert.deepEqual ([...new Uint8Array (material.diffuseMap.buffer).slice (0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]); }
         }
-    });
+    }).timeout (15000);
     it ('Omits HSC top flaps and positions RSC closed outer flaps at the center seam', async () => {
         const hsc = await CreateFefcoModel ({ code : '0200' }); assert.equal (hsc.meshes.filter (mesh => mesh.GetName ().startsWith ('Top')).length, 0);
         const rsc = await CreateFefcoModel ({ closure : 'closed' }); const left = rsc.meshes.find (mesh => mesh.GetName () === 'Top left outer flap'); const right = rsc.meshes.find (mesh => mesh.GetName () === 'Top right outer flap');

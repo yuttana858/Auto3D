@@ -141,7 +141,7 @@ export default function suite ()
                         body : JSON.stringify ({ itemId, allowDownload : true, code : '1234' })
                     }),
                     params : { path : [] },
-                    env : databaseEnv
+                    env : { ...databaseEnv, AUTO3D_SHARE_PIN_THROTTLE_READY : 'true', AUTO3D_SHARE_RATE_SECRET : 'test-only-rate-secret' }
                 });
                 assert.equal (response.status, 201);
                 const result = await response.json ();

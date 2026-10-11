@@ -26,4 +26,16 @@ describe ('Production release verification', () => {
         await assert.rejects (VerifyDeployment ('https://fixture.example', sha, fetcher ({ stylesheetHash : hash ('old styles') })), /Packaging module stylesheet/);
         await assert.rejects (VerifyDeployment ('https://fixture.example', sha, fetcher ({ script : 'https://elsewhere.example/module.js' })), /module location/);
     });
+    it ('verifies the mini-viewer HTML and bundle against the release manifest', async () => {
+        const mini = { script : '/o3dv/o3dv.mini.js?v=0123456789ab', scriptHash : createHash ('sha256').update ('mini bundle').digest ('hex') };
+        const fetcher = (content = 'mini bundle', miniBuild = sha) => async url => {
+            if (url.pathname === '/version.json') { return Response.json ({ ...release, viewers : { mini } }); }
+            if (url.pathname === '/mini.html') { return new Response (`<meta content="${miniBuild}"><script src="${mini.script}"></script>`); }
+            if (url.pathname === '/o3dv/o3dv.mini.js') { return new Response (content); }
+            return fixture () (url);
+        };
+        assert.equal ((await VerifyDeployment ('https://fixture.example', sha, fetcher ())).verified, true);
+        await assert.rejects (VerifyDeployment ('https://fixture.example', sha, fetcher ('stale mini')), /Mini viewer bundle/);
+        await assert.rejects (VerifyDeployment ('https://fixture.example', sha, fetcher ('mini bundle', 'old')), /Mini viewer HTML/);
+    });
 });

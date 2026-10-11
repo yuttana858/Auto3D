@@ -1,9 +1,21 @@
 import { SupabaseConfig, SupabaseHeaders } from '../../_lib/supabase.js';
 import { LibraryFile } from '../../_lib/libraryfiles.js';
+import { LimitedBody } from '../../_lib/accountstorage.js';
 const LinkTable = 'auto3d_share_links';
 const LibraryTable = 'auto3d_library';
 const Uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const Code = /^\d{4}$/;
+
+async function shareBody (request, allowed)
+{
+    let body;
+    try { body = JSON.parse (await (await LimitedBody (request, 4096)).text ()); }
+    catch (error) { throw Object.assign (new Error (error.status === 413 ? 'Share request exceeds 4 KB.' : 'Invalid share request.'), { status : error.status === 413 ? 413 : 400 }); }
+    if (!body || Array.isArray (body) || typeof body !== 'object' || Object.keys (body).some (key => !allowed.includes (key)) || body.code !== undefined && (typeof body.code !== 'string' || body.code !== '' && !Code.test (body.code))) {
+        throw Object.assign (new Error ('Invalid share fields or access code.'), { status : 400 });
+    }
+    return body;
+}
 
 function json (data, status = 200)
 {
@@ -23,7 +35,8 @@ async function request (env, path, options = {})
     const headers = { ...options.headers, ...SupabaseHeaders (key) };
     const response = await fetch (url + path, { ...options, headers, signal : AbortSignal.timeout (10000) });
     if (!response.ok) {
-        console.error ('Auto3D share upstream error', response.status, path);
+        // Query strings contain share tokens and library identifiers.
+        console.error ('Auto3D share upstream error', response.status, path.split ('?')[0]);
         throw Object.assign (new Error ('Share service is unavailable.'), { status : 502 });
     }
     return response;
@@ -46,13 +59,14 @@ async function libraryItem (env, id)
 
 async function createShare (context)
 {
-    let body;
-    try { body = await context.request.json (); } catch { return json ({ error : 'Invalid share request.' }, 400); }
+    const body = await shareBody (context.request, ['itemId', 'allowDownload', 'code']);
+    if (body.allowDownload !== undefined && typeof body.allowDownload !== 'boolean') { return json ({ error : 'Invalid download permission.' }, 400); }
     const itemId = String (body.itemId || '');
     const allowDownload = body.allowDownload === true;
     const code = body.code ? String (body.code) : '';
     if (!Uuid.test (itemId)) { return json ({ error : 'Invalid library item.' }, 400); }
     if (code && !Code.test (code)) { return json ({ error : 'Access code must contain exactly four digits.' }, 400); }
+    if (code && (context.env.AUTO3D_SHARE_PIN_THROTTLE_READY !== 'true' || !context.env.AUTO3D_SHARE_RATE_SECRET)) { return json ({ error : 'Protected links are unavailable until access-code protection is configured.' }, 503); }
     if (!await libraryItem (context.env, itemId)) { return json ({ error : 'Library item not found.' }, 404); }
 
     const token = crypto.randomUUID ();
@@ -130,8 +144,7 @@ async function verifyShare (context, token, code)
 
 async function shareArchive (context, token, asDownload)
 {
-    let body = {};
-    try { body = await context.request.json (); } catch { /* Access code is optional. */ }
+    const body = await shareBody (context.request, ['code']);
     const code = body.code ? String (body.code) : '';
     if (code && !Code.test (code)) { return json ({ error : 'Access code must contain exactly four digits.' }, 400); }
     const grant = await verifyShare (context, token, code);

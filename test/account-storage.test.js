@@ -66,6 +66,8 @@ describe ('Private account storage', () => {
         const pref = (body) => preferences ({ ...context ([], 'PUT', JSON.stringify (body)), params : {} });
         assert.equal ((await pref ({ folders : ['Projects/Concepts'] })).status, 200); assert.deepEqual (profile.preferences, { units : 'standard', theme : 2 });
         assert.equal ((await pref ({ preferences : { units : 'metric', theme : 1 } })).status, 200); assert.ok (profile.folders.includes ('Projects/Concepts'));
+        assert.equal ((await pref ({ preferences : { units : 'metric', theme : 1, viewportQuality : 'fast' } })).status, 200); assert.equal (profile.preferences.viewportQuality, 'fast');
+        assert.equal ((await pref ({ preferences : { units : 'metric', theme : 1, viewportQuality : 'invalid' } })).status, 400); assert.equal (profile.preferences.viewportQuality, 'fast');
         for (const body of [{ user_id : B }, { preferences : { units : 'metric', theme : 1, apiKey : 'secret' } }, { folders : ['../other'] }]) { assert.equal ((await pref (body)).status, 400); }
         assert.ok (calls.filter ((call) => call.method === 'PATCH').every ((call) => call.url.includes ('user_id=eq.' + A)));
     });

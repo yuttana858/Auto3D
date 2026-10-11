@@ -80,6 +80,7 @@ import { SceneEffects } from './viewer/sceneeffects.js';
 import { EnvironmentSettings, ShadingModel } from './viewer/shadingmodel.js';
 import { CameraValidator, UpVector, Viewer, GetDefaultCamera, TraverseThreeObject, GetShadingTypeOfObject } from './viewer/viewer.js';
 import { ViewerModel, EdgeSettings, ViewerMainModel, SetThreeMeshPolygonOffset, IntersectionMode } from './viewer/viewermodel.js';
+import { ViewportQuality } from './viewer/viewportquality.js';
 
 export {
     IsDefined,
@@ -374,5 +375,6 @@ export {
     EdgeSettings,
     ViewerMainModel,
     SetThreeMeshPolygonOffset,
-    IntersectionMode
+    IntersectionMode,
+    ViewportQuality
 };

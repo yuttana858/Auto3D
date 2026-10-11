@@ -13,6 +13,14 @@ export async function VerifyDeployment (origin, expectedBuild, fetchImpl = fetch
     if (!html.includes ('content="' + expectedBuild + '"') || !html.includes ('src="' + release.script.slice (1) + '"')) { throw new Error ('HTML references a different release.'); }
     const buffer = await (await read (release.script)).arrayBuffer ();
     if (createHash ('sha256').update (Buffer.from (buffer)).digest ('hex') !== release.scriptHash) { throw new Error ('Served application bundle does not match the release.'); }
+    if (release.viewers?.mini) {
+        const mini = release.viewers.mini;
+        if (!/^\/o3dv\/o3dv\.mini\.js\?v=[a-f0-9]{12}$/.test (mini.script)) { throw new Error ('Invalid Mini viewer location.'); }
+        const html = await (await read ('/mini.html')).text ();
+        if (!html.includes ('content="' + expectedBuild + '"') || !html.includes ('src="' + mini.script + '"')) { throw new Error ('Mini viewer HTML references a different release.'); }
+        const bytes = await (await read (mini.script)).arrayBuffer ();
+        if (createHash ('sha256').update (Buffer.from (bytes)).digest ('hex') !== mini.scriptHash) { throw new Error ('Mini viewer bundle does not match the release.'); }
+    }
     if (release.modules?.packaging) {
         const module = release.modules.packaging;
         for (const [key, hash] of [['script', 'scriptHash'], ['stylesheet', 'stylesheetHash']]) {
