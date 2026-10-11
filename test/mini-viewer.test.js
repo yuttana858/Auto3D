@@ -9,6 +9,14 @@ describe ('Branded mini viewer access boundary', () => {
         assert.match (html, /external\.searchParams\.set\('view',token\)/);
         assert.doesNotMatch (html, /searchParams\.set\('code'/);
     });
+    it ('offers share QR preview and PNG export in the authenticated share dialog', () => {
+        const editor = readFileSync (new URL ('../source/website/modellibrary.js', import.meta.url), 'utf8');
+        assert.match (editor, /Show QR code/);
+        assert.match (editor, /Save QR as PNG/);
+        assert.match (editor, /\/assets\/vendor\/qrcode\.min\.js/);
+        assert.match (editor, /text : input\.value/);
+        assert.doesNotMatch (editor, /qrcode\.api|api\.qrserver\.com/);
+    });
     it ('does not embed the protected workspace or bypass sign-in', () => {
         assert.doesNotMatch (html, /createElement\('iframe'\)/);
         assert.match (html, /Sign in to Auto3D/);
