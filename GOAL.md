@@ -20,3 +20,7 @@ Historical PR #16 SQL is recorded in `database/history/pr16/`. These records are
 - Generate and download SVG/PNG QR with local or vetted bundled code; avoid sending capability URLs to a third-party QR-generating service.
 - Review QR library choices: `qrcode` (node-qrcode, browser/server support), `qr-code-styling` (branded styling), `qrcodejs` (simple browser implementation). Pin and vendor or bundle any selected dependency with its license, run license/security checks.
 - Gate eventual production publication behind corporate content classification, author consent and tested withdrawal semantics.
+
+### 4-digit protected external view — access rules
+
+The existing Share dialog can require a four-digit code; the server already hashes the code with the random share token and checks it before returning an archive. A four-digit code is a secondary challenge only (10,000 possibilities), not an account credential or sufficient standalone authorization. The mini landing identifies a code-protected link and routes it to the existing secure full viewer for code entry; never place the code in QR content or URL parameters. **Public anonymous view and even authenticated challenge attempts must remain blocked until atomic server-side attempt limits, temporary lockouts, revocation, share expiry, and abuse monitoring are implemented and tested.** The current mini landing is not an embedded mini canvas because Auto3D explicitly rejects iframe embedding; a standalone read-only viewer requires a distinct implementation and review.
