@@ -145,7 +145,7 @@ export default function suite ()
                 });
                 assert.equal (response.status, 201);
                 const result = await response.json ();
-                assert.match (result.url, /^https:\/\/auto3d\.example\/\?view=/);
+                assert.match (result.url, /^https:\/\/auto3d\.example\/mini\.html\?view=/);
                 assert.equal (result.allowDownload, true);
                 assert.equal (result.codeRequired, true);
                 assert.ok (calls[1].url.includes ('/rest/v1/rpc/auto3d_create_share'));
@@ -201,9 +201,19 @@ export default function suite ()
             const originalFetch = global.fetch;
             try {
                 let calls = 0;
-                global.fetch = async () => {
+                global.fetch = async (url) => {
                     calls++;
-                    return new Response (JSON.stringify ([{ item_id : itemId, allow_download : false }]), { status : 200, headers : { 'Content-Type' : 'application/json' } });
+                    const path = String (url);
+                    if (path.includes ('auto3d_share_links')) {
+                        return Response.json ([{ token, item_id : itemId, allow_download : false, code_required : false, created_at : '2026-10-05T00:00:00Z', expires_at : null }]);
+                    }
+                    if (path.includes ('auto3d_library')) {
+                        return Response.json ([{ id : itemId, name : 'Bottle', category : 'Primary products', kind : 'model', object_count : 1, status : 'published' }]);
+                    }
+                    if (path.includes ('rpc/auto3d_verify_share')) {
+                        return Response.json ([{ item_id : itemId, allow_download : false }]);
+                    }
+                    throw new Error ('Unexpected upstream API: ' + path);
                 };
                 const response = await onShareRequest ({
                     request : new Request ('https://auto3d.example/api/share/' + token + '/download', {
@@ -215,7 +225,7 @@ export default function suite ()
                     env : databaseEnv
                 });
                 assert.equal (response.status, 403);
-                assert.equal (calls, 1);
+                assert.equal (calls, 3);
             } finally { global.fetch = originalFetch; }
         });
 
