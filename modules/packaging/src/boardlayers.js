@@ -6,7 +6,7 @@ export function ValidateBoardStack (input)
     let total = 0;
     const layers = input.layers.map ((layer, index) => {
         const expected = index % 2 ? 'medium' : 'liner';
-        if (layer.type !== expected || !Number.isFinite (layer.caliperMm) || layer.caliperMm <= 0 || layer.caliperMm > 10) { throw new Error ('Invalid board layer sequence or caliper.'); }
+        if (layer.type !== expected || !Number.isFinite (layer.caliperMm) || layer.caliperMm <= 0 || layer.caliperMm > 15) { throw new Error ('Invalid board layer sequence or caliper.'); }
         total += layer.caliperMm;
         return { type : expected, id : String (layer.id || expected + index), caliperMm : layer.caliperMm, startMm : total - layer.caliperMm, endMm : total };
     });
