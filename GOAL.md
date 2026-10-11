@@ -53,3 +53,7 @@ The current texture/material PR #32 is a first rendering correction, not an impl
 9. Then: org roles → 100 MB+ resumable R2 → shared publishing → SMTP/security → Entra integration.
 
 Avoid editing historical applied Supabase migration records in this materials-only phase. Use the new CSV as a schema starter, not an engineering specification or production material master.
+
+### Renderable layered specimen milestone
+
+A standalone `CreateCorrugatedSample` engineering *visual prototype* now emits three closed mesh objects with real outside/inside liner thickness and an explicitly directional, thin, sinusoidally corrugated medium. Unlike the earlier material-stack reference, the flute amplitude leaves actual air gaps between liners. Triangle normals, cut-edge caps, non-repeating global artwork mapping metadata and basic regression tests are included. This is not yet the default CAD panel renderer, and is not a physically calibrated flute or crease solver. Integrate after mesh/UV and screenshot verification and supplier caliper input.
