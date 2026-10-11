@@ -10,3 +10,4 @@ export * from './dimensions.js';
 export { FoldPlayback } from './foldplayback.js';
 export { FefcoPanel } from './panel.js';
 export * from './surfacetextures.js';
+export * from './boardlayers.js';

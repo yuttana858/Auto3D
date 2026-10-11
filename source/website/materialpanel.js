@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { WorkspaceDialog } from './modellibrary.js';
-import { SetEmissionStrength, CaptureUVs, RestoreUVs, SurfaceTextureSlots, TextureForSlot, OriginalTexture, ApplyMaterialRelief, MaterialEntry, RequireMaterialEdit, SampleSurfaceImage, AutoGenerateTextures } from './materialtextures.js';
+import { SetEmissionStrength, CaptureUVs, RestoreUVs, SurfaceTextureSlots, TextureForSlot, OriginalTexture, ApplyMaterialRelief, EffectiveReliefMode, MaterialEntry, RequireMaterialEdit, SampleSurfaceImage, AutoGenerateTextures } from './materialtextures.js';
 import { CloneSurface } from './scenedocument.js';
 import { TextureMap } from '../engine/model/material.js';
 import { HexStringToRGBColor } from '../engine/model/color.js';
@@ -398,13 +398,14 @@ export class MaterialPanel
                 entry.original.specular = HexStringToRGBColor (material.specular.getHexString ());
             }
         });
+        const activeRelief = EffectiveReliefMode (entry.original.reliefMode, !!TextureForSlot (entry, 'normalMap'), !!TextureForSlot (entry, 'bumpMap'));
         for (const [key, originalKey, title, map, max] of [
             ['bumpScale', 'bumpScale', 'Bump', 'bumpMap', 2],
             ['normalScale', 'normalScale', 'Normal strength', 'normalMap', 2],
             ['aoMapIntensity', 'aoIntensity', 'AO intensity', 'aoMap', 1]
         ]) {
             const value = key === 'normalScale' ? material.normalScale.x : material[key];
-            this.Control (properties, title, 'range', value, { min : 0, max, step : 0.01, disabled : !TextureForSlot (entry, map) || (map === 'bumpMap' && entry.original.reliefMode !== 'bump') || (map === 'normalMap' && entry.original.reliefMode !== 'normal') }, (value) => {
+            this.Control (properties, title, 'range', value, { min : 0, max, step : 0.01, disabled : !TextureForSlot (entry, map) || (map === 'bumpMap' && activeRelief !== 'bump') || (map === 'normalMap' && activeRelief !== 'normal') }, (value) => {
                 if (key === 'normalScale') { material.normalScale.setScalar (Number (value)); }
                 else { material[key] = Number (value); }
                 entry.original[originalKey] = Number (value);
@@ -510,6 +511,7 @@ export class MaterialPanel
         const relief = document.createElement ('select'); relief.setAttribute ('aria-label', 'Surface relief');
         for (const [mode, title] of [['normal', 'Normal relief'], ['bump', 'Bump relief'], ['off', 'Relief off']]) { relief.add (new Option (title, mode)); }
         relief.value = entry.original.reliefMode || 'normal';
+        relief.title = 'Normal and bump maps are alternate surface-relief techniques; select Bump relief to edit bump strength. When no normal map exists, bump is used automatically.';
         relief.addEventListener ('change', () => this.website.sessionEditor.Run (() => this.SetRelief (entry.index, relief.value)));
         let count = 0; for (const { mesh, slot } of entry.meshes) { count += EnumerateUVTriangles (mesh, slot, () => {}); }
         const uv = document.createElement ('button'); uv.className = 'surface_uv_info'; uv.textContent = count ? 'UV0 · ' + count.toLocaleString () + ' triangles' : 'UV0 · none'; uv.title = 'View UV layout';

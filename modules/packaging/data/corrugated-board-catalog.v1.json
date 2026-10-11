@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "status": "reference-only-not-certified-design-input",
+  "units": { "height": "mm", "frequency": "flutes/m", "grammage": "g/m2", "ect": "lb/in" },
+  "provenance": {
+    "fefco": "https://www.fefco.org/node/1588",
+    "fba": "https://www.fibrebox.org/what-is-corrugated",
+    "iso3037": "https://www.iso.org/standard/80310.html",
+    "tappi": "https://www.tappi.org/menus/publications-standards/tappi-publications/standard-specific-interest-group/fiberboard-shipping-containers/",
+    "engview0201": "https://downloads.engview.com/online_help/7.3/packaging_library/en/Corrugated_Standards_Library/FEFCO_Standards_Library/F_0200/0201/0201_Main_Parameters.htm"
+  },
+  "fluteProfiles": [
+    { "id": "A", "heightMm": 4.8, "frequencyPerM": 110, "takeUpFactor": [1.50,1.55], "source": "fefco" },
+    { "id": "B", "heightMm": 2.4, "frequencyPerM": 150, "takeUpFactor": [1.30,1.35], "source": "fefco" },
+    { "id": "C", "heightMm": 3.6, "frequencyPerM": 130, "takeUpFactor": [1.40,1.45], "source": "fefco" },
+    { "id": "E", "heightMm": 1.2, "frequencyPerM": 290, "takeUpFactor": [1.20,1.35], "source": "fefco" },
+    { "id": "F", "heightMm": null, "frequencyPerM": null, "rangeGroup": "F_G_N", "source": "fefco", "requiresSupplierProfile": true },
+    { "id": "G", "heightMm": null, "frequencyPerM": null, "rangeGroup": "F_G_N", "source": "fefco", "requiresSupplierProfile": true },
+    { "id": "N", "heightMm": null, "frequencyPerM": null, "rangeGroup": "F_G_N", "source": "fefco", "requiresSupplierProfile": true }
+  ],
+  "fluteRangeGroups": { "F_G_N": { "heightMm": [0.5,0.8], "frequencyPerM": [400,550], "takeUpFactor": [1.15,1.25], "source": "fefco" } },
+  "constructions": [
+    { "id": "single-face", "liners": 1, "mediums": 1, "layerOrderOutsideToInside": ["outerLiner","medium"] },
+    { "id": "single-wall", "liners": 2, "mediums": 1, "layerOrderOutsideToInside": ["outerLiner","medium","innerLiner"] },
+    { "id": "double-wall", "liners": 3, "mediums": 2, "layerOrderOutsideToInside": ["outerLiner","medium1","intermediateLiner","medium2","innerLiner"] },
+    { "id": "triple-wall", "liners": 4, "mediums": 3, "layerOrderOutsideToInside": ["outerLiner","medium1","intermediateLiner1","medium2","intermediateLiner2","medium3","innerLiner"] }
+  ],
+  "paperCategories": [
+    { "id": "kraftliner", "role": "liner", "attributesRequired": ["grammage","caliperMm","machineDirection","crossDirection","surfaceFinish","supplier"] },
+    { "id": "testliner", "role": "liner", "attributesRequired": ["grammage","caliperMm","machineDirection","crossDirection","surfaceFinish","supplier"] },
+    { "id": "white-top-liner", "role": "liner", "attributesRequired": ["grammage","caliperMm","machineDirection","crossDirection","surfaceFinish","supplier"] },
+    { "id": "recycled-fluting", "role": "medium", "attributesRequired": ["grammage","caliperMm","machineDirection","crossDirection","supplier"] },
+    { "id": "semichemical-fluting", "role": "medium", "attributesRequired": ["grammage","caliperMm","machineDirection","crossDirection","supplier"] }
+  ],
+  "grades": {
+    "ect": { "unit": "lb/in", "designationExamples": [23,26,32,44,48,51,61,71], "note": "Common trade designations; verify each board-specific grade/specification with a supplier and applicable test method before using any rating for engineering decisions." },
+    "burst": { "unit": "psi", "designationExamples": [125,150,175,200,250,275,350], "note": "Illustrative trade designations, not calculated equivalents of ECT; supplier and jurisdiction-specific qualification required." },
+    "measuredPropertiesRequired": ["ect","burst","bendingStiffnessMD","bendingStiffnessCD","caliper","moistureContent","flatCrush","pinAdhesion","scoreCrush","bendMomentVsAngle"]
+  },
+  "tests": [
+    { "id": "ISO 3037:2022", "property": "edgewiseCrush", "source": "iso3037" },
+    { "id": "TAPPI T 810", "property": "burstStrength", "source": "tappi" },
+    { "id": "TAPPI T 811", "property": "edgewiseCrush", "source": "tappi" },
+    { "id": "TAPPI T 839", "property": "edgewiseCrush", "source": "tappi" },
+    { "id": "TAPPI T 829", "property": "scoreQuality", "source": "tappi" },
+    { "id": "TAPPI T 836", "property": "fourPointBendingStiffness", "source": "tappi" },
+    { "id": "TAPPI T 821", "property": "pinAdhesion", "source": "tappi" }
+  ],
+  "styleCodes": [
+    { "id": "FEFCO 0201", "name": "Regular Slotted Container", "source": "fba", "requires": ["length","width","height","dimensionalConvention","boardCaliper","jointWidth","flapAllowance","scoreAllowance"] }
+  ],
+  "notes": [
+    "Flute height excludes liner facings in FEFCO reference values.",
+    "Flute direction must remain consistent in sheet coordinates; do not independently tile flute phase per CAD panel.",
+    "A structural score is a continuous material hinge, not a cut; crushing and local bending require calibrated constitutive parameters.",
+    "Outside printed artwork stays registered to dieline/panel UVs and must never be auto-tiled. Raw fiber/medium appearance may tile only within its physical layer.",
+    "Combined thickness is not simply the published flute height; account for actual liner/medium caliper, crown glue, board crush and measured finished caliper.",
+    "Reference flute geometries are indicative. Use measured machine/supplier profile for fabrication-grade CAD."
+  ]
+}

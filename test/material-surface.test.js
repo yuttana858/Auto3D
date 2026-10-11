@@ -29,7 +29,7 @@ describe ('Editable generated surface maps', () => {
             handler.LoadFaceTexture = (material, map, callback) => { if (map) { callbacks.push ([map.name, callback]); } };
             const result = handler.CreateThreeFaceMaterial (0); for (const [name, callback] of callbacks.reverse ()) { callback (Object.assign (new THREE.Texture (), { name })); }
             assert.equal (result.name, 'Board'); assert.equal (result.specularColorMap.name, 'specularMap'); assert.equal (result.specularMap, undefined); assert.equal (result.roughnessMap.name, 'roughnessMap'); assert.equal (result.metalnessMap.name, 'metalnessMap'); assert.equal (result.auto3dNormalMap.name, 'normalMap');
-            assert.equal (!!result.normalMap, mode === 'normal'); assert.equal (!!result.bumpMap, mode !== 'off');
+            assert.equal (!!result.normalMap, mode === 'normal'); assert.equal (!!result.bumpMap, mode === 'bump');
         }
         const { original } = Panel (); original.metalnessMap = new TextureMap (); const model = new Model (); model.AddMaterial (original);
         const handler = new ThreeMaterialHandler (model, {}, {}, { defaultMaterials : [] }); handler.LoadFaceTexture = (m, map, callback) => { if (map) { callback (new THREE.Texture ()); } };

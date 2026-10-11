@@ -16,7 +16,7 @@ describe ('Local surface texture generation', () => {
         const input = { width : 4, height : 4, pixels : new Uint8Array (48).fill (200) }; const maps = GenerateSurfaceTextureSet (input, 'flat');
         assert.equal (Object.keys (maps).length, 8); assert.deepEqual (Pixels (maps.diffuseMap).pixels, [...input.pixels]);
         assert.deepEqual (Pixels (maps.normalMap).pixels, Array.from ({ length : 16 }, () => [128, 128, 255]).flat ());
-        assert.ok (Pixels (maps.metalnessMap).pixels.every (v => v === 255)); assert.ok (Pixels (maps.roughnessMap).pixels.every (v => v < 255 && v > 225));
+        assert.ok (Pixels (maps.metalnessMap).pixels.every (v => v === 0)); assert.ok (Pixels (maps.roughnessMap).pixels.every (v => v < 255 && v > 225));
         assert.notDeepEqual (maps.metalnessMap.buffer, maps.roughnessMap.buffer); assert.deepEqual (maps.bumpMap.buffer, maps.displacementMap.buffer);
     });
     it ('Derives directional normals and bounded roughness/AO without changing the source RGB', () => {

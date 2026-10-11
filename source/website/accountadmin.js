@@ -59,6 +59,21 @@ export class AccountAdmin
         dialog.addEventListener ('close', () => { const address = new URL (window.location.href); if (address.searchParams.get ('console') === AccountConsole) { address.searchParams.delete ('console'); window.history.replaceState (null, '', address); } });
         const status = Element ('p', 'Approve or reject account requests. Share initial passwords through your secure process.', dialog); status.setAttribute ('role', 'status');
         const dashboard = Element ('a', 'Supabase user administration', dialog); dashboard.href = 'https://supabase.com/dashboard/project/iesepcoxqochycckbwoh/auth/users'; dashboard.target = '_blank'; dashboard.rel = 'noopener noreferrer';
+        const catalog = Element ('details', null, dialog);
+        Element ('summary', 'Packaging materials and performance catalog', catalog);
+        Element ('p', 'Download the versioned corrugated materials CSV (reference grades, flute data and empty fields for laboratory results). Measurements are not certified until supplier-qualified.', catalog);
+        const downloadCatalog = Element ('button', 'Download material CSV', catalog);
+        downloadCatalog.addEventListener ('click', async () => {
+            downloadCatalog.disabled = true;
+            try {
+                const response = await fetch ('/api/material-catalog', { credentials : 'same-origin', cache : 'no-store' });
+                if (!response.ok) { throw new Error ('Administrator authorization or catalog service unavailable.'); }
+                const data = await response.blob (); const url = URL.createObjectURL (data);
+                const link = document.createElement ('a'); link.href = url; link.download = 'auto3d-corrugated-materials.v1.csv';
+                link.click (); URL.revokeObjectURL (url); status.textContent = 'Material catalog downloaded.';
+            } catch (error) { status.textContent = error.message; }
+            finally { downloadCatalog.disabled = false; }
+        });
         const refresh = Element ('button', 'Refresh requests', dialog);
         const list = Element ('div', null, dialog); list.className = 'account_request_list';
         const render = (requests) => {
