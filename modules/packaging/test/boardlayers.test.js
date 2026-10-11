@@ -1,5 +1,5 @@
 import * as assert from 'node:assert/strict';
-import { ValidateBoardStack, ReferenceSingleWallStack, FluteWaveAt, ScoreSurfaceAt, SampleConnectedScore, SheetArtworkUV } from '../src/index.js';
+import { ValidateBoardStack, ReferenceSingleWallStack, FluteWaveAt, ScoreSurfaceAt, SampleConnectedScore, SheetArtworkUV, CreateCorrugatedSample } from '../src/index.js';
 
 describe ('Corrugated layered CAD foundation', () => {
     it ('requires physically ordered liner and medium layers', () => {
@@ -33,5 +33,25 @@ describe ('Corrugated layered CAD foundation', () => {
         assert.ok (Math.abs (left.tangent[0] - 1) < 1e-9);
         assert.ok (Math.abs (right.tangent[1] - 1) < 1e-9);
         assert.throws (() => ScoreSurfaceAt (0, { widthMm : 0, angleRadians : 0 }), /width/);
+    });
+});
+
+describe ('Corrugated cutaway CAD specimen', () => {
+    it ('creates separate, closed outside/medium/inside solids with directional wave', () => {
+        const model = CreateCorrugatedSample ({ widthMm : 48, lengthMm : 40, caliperMm : 3, flutePitchMm : 8, samplesAcross : 32, samplesAlong : 8 });
+        assert.equal (model.meshes.length, 3);
+        assert.deepEqual (model.materials.map (item => item.role), ['outside-liner', 'fluted-medium', 'inside-liner']);
+        assert.equal (model.artworkMapping.repeat, false);
+        for (const mesh of model.meshes) {
+            assert.ok (mesh.triangles.length > 100);
+            assert.ok (mesh.triangles.every (t => t.vertices.length === 3 && t.vertices.every (i => i < mesh.vertices.length) && t.normals.every (i => i < mesh.normals.length)));
+        }
+        const medium = model.meshes[1];
+        const ys = medium.vertices.map (p => p[1]);
+        assert.ok (Math.max (...ys) - Math.min (...ys) > 1);
+        assert.ok (medium.vertices.every (p => p[1] > 0.24 && p[1] < 2.76));
+    });
+    it ('rejects impossible board stack thickness', () => {
+        assert.throws (() => CreateCorrugatedSample ({ caliperMm : 1, insideLinerMm : 0.5, outsideLinerMm : 0.5 }), /calipers/);
     });
 });
