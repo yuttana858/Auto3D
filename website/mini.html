@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="referrer" content="no-referrer">
+<title>Auto3D | Shared 3D Viewer</title>
+<link rel="icon" type="image/svg+xml" href="/assets/images/auto3d-mark.svg">
+<style>
+:root{color-scheme:dark;font:14px system-ui,-apple-system,Segoe UI,sans-serif;background:#081018;color:#eaf4ff}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;flex-direction:column}
+header{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid #2c3d4e;background:#111e2a}
+.brand{display:flex;align-items:center;gap:12px;font-weight:750;letter-spacing:.04em}
+.brand img{width:36px;height:36px}.sub{color:#91adbf;font-size:12px;font-weight:400;letter-spacing:0}
+.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}button,a.action{background:#1c3445;border:1px solid #3a596b;border-radius:8px;padding:9px 12px;color:#eaf4ff;text-decoration:none;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}.primary{background:#74cef4!important;color:#07131c!important;border-color:#74cef4!important}
+main{position:relative;flex:1;min-height:340px;background:radial-gradient(ellipse at center,#192735,#071019 75%)}
+iframe{border:0;width:100%;height:100%;position:absolute;inset:0}
+.empty{position:absolute;inset:0;display:grid;place-items:center;padding:24px;text-align:center;color:#c9dbe9}
+footer{padding:9px 24px;border-top:1px solid #283b4b;display:flex;align-items:center;justify-content:space-between;color:#93aabd;font-size:12px}
+dialog{border:1px solid #466277;border-radius:16px;background:#101d29;color:#eaf4ff;padding:24px;max-width:360px;width:calc(100vw - 30px)}
+dialog::backdrop{background:#000b}.qr{margin:15px auto;display:grid;place-items:center;background:white;padding:16px;width:max-content;border-radius:10px}
+#qr img,#qr canvas{width:210px!important;height:210px!important}.link{overflow-wrap:anywhere;font-size:12px;color:#a8c4d7}
+@media(max-width:600px){header{height:auto;gap:12px;padding:12px;align-items:flex-start}footer{padding:8px 12px}.actions{justify-content:flex-end}}
+</style>
+</head>
+<body>
+<header>
+ <div class="brand"><img src="/assets/images/auto3d-mark.svg" alt=""><div>Auto3D<div class="sub">Shared 3D Experience</div></div></div>
+ <div class="actions">
+ <button id="copy" disabled>Copy link</button><button id="qrButton" disabled>QR code</button>
+ <a class="action primary" id="full" href="/">Open in Auto3D</a>
+ </div>
+</header>
+<main id="stage"><div class="empty" id="notice">A valid shared-model link is required.</div></main>
+<footer><span>Powered by Auto3D · Interactive 3D viewer</span><span>Viewing is read-only · Sign-in may be required</span></footer>
+<dialog id="qrDialog"><h2>Scan to view in Auto3D</h2><div id="qr" class="qr" aria-label="QR code for shared model link"></div><p id="qrUrl" class="link"></p><button id="close">Close</button></dialog>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+(() => {
+ const token = new URLSearchParams(location.search).get('view') || '';
+ const valid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(token);
+ if(!valid) return;
+ const url = new URL('/',location.origin); url.searchParams.set('view',token);
+ const external = new URL('/mini.html',location.origin); external.searchParams.set('view',token);
+ document.getElementById('full').href=url.href;
+ const frame=document.createElement('iframe');
+ frame.title='Auto3D model viewer';frame.referrerPolicy='no-referrer';frame.src=url.href;
+ frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');document.getElementById('stage').replaceChildren(frame);
+ const copy=document.getElementById('copy'), qr=document.getElementById('qrButton'), dialog=document.getElementById('qrDialog');
+ copy.disabled=false; qr.disabled=false;
+ copy.onclick=async()=>{try{await navigator.clipboard.writeText(external.href);copy.textContent='Copied';}catch{copy.textContent='Copy unavailable';}};
+ qr.onclick=()=>{const target=document.getElementById('qr');target.replaceChildren();document.getElementById('qrUrl').textContent=external.href;
+ if(typeof QRCode==='function'){new QRCode(target,{text:external.href,width:210,height:210,colorDark:'#0a1420',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});}
+ else {const note=document.createElement('span');note.textContent='QR generator unavailable. Copy the link instead.';note.style.color='#142333';target.appendChild(note);}
+ dialog.showModal();};
+ document.getElementById('close').onclick=()=>dialog.close();
+})();
+</script>
+</body></html>
