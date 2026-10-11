@@ -447,18 +447,49 @@ export class ModelLibrary
         const input = document.createElement ('input'); input.readOnly = true; input.hidden = true; input.setAttribute ('aria-label', 'Shared viewer link'); input.addEventListener ('click', () => input.select ());
         const copy = document.createElement ('button'); copy.textContent = 'Copy link'; copy.hidden = true;
         const link = document.createElement ('a'); link.target = '_blank'; link.rel = 'noopener'; link.textContent = 'Open mini viewer'; link.hidden = true;
+        const qrButton = document.createElement ('button'); qrButton.textContent = 'Show QR code'; qrButton.hidden = true;
+        const qrContainer = document.createElement ('div'); qrContainer.hidden = true; qrContainer.className = 'share_qr_container';
+        qrContainer.style.cssText = 'width:max-content;max-width:100%;background:#fff;padding:16px;border-radius:12px;margin-top:8px;';
+        const qrStatus = document.createElement ('p'); qrStatus.className = 'section_hint'; qrStatus.hidden = true;
+        const qrSave = document.createElement ('button'); qrSave.textContent = 'Save QR as PNG'; qrSave.hidden = true;
+        const loadQRLibrary = async () => {
+            if (typeof window.QRCode === 'function') { return; }
+            await new Promise ((resolve, reject) => {
+                const script = document.createElement ('script'); script.src = '/assets/vendor/qrcode.min.js';
+                script.onload = resolve; script.onerror = () => reject (new Error ('The QR generator is unavailable.'));
+                document.head.appendChild (script);
+            });
+            if (typeof window.QRCode !== 'function') { throw new Error ('The QR generator is unavailable.'); }
+        };
+        qrButton.addEventListener ('click', async () => {
+            qrButton.disabled = true; qrStatus.hidden = false; qrStatus.textContent = 'Preparing local QR code…';
+            try {
+                await loadQRLibrary (); qrContainer.replaceChildren ();
+                new window.QRCode (qrContainer, { text : input.value, width : 224, height : 224, colorDark : '#102536', colorLight : '#ffffff', correctLevel : window.QRCode.CorrectLevel.H });
+                qrContainer.hidden = false; qrSave.hidden = false;
+                qrStatus.textContent = 'QR encodes the share link only. Share any separate access code securely.';
+            } catch (error) { qrStatus.textContent = error.message; }
+            finally { qrButton.disabled = false; }
+        });
+        qrSave.addEventListener ('click', () => {
+            const canvas = qrContainer.querySelector ('canvas');
+            const image = qrContainer.querySelector ('img');
+            const href = canvas?.toDataURL ('image/png') || image?.src;
+            if (!href) { qrStatus.hidden = false; qrStatus.textContent = 'QR image not ready yet.'; return; }
+            const anchor = document.createElement ('a'); anchor.href = href; anchor.download = 'auto3d-share-qr.png'; anchor.click ();
+        });
         generate.addEventListener ('click', async () => {
             if (requireCode.checked && !/^\d{4}$/.test (codeInput.value)) { shareStatus.textContent = 'Enter exactly four digits for the access code.'; codeInput.focus (); return; }
             generate.disabled = true; shareStatus.textContent = 'Creating secure viewer link…';
             try {
                 const result = await this.sharedStorage.CreateShare (item, allowDownload.checked, requireCode.checked ? codeInput.value : '');
-                input.value = result.url; input.hidden = false; copy.hidden = false; link.hidden = false; link.href = result.url;
+                input.value = result.url; input.hidden = false; copy.hidden = false; link.hidden = false; link.href = result.url; qrButton.hidden = false; qrContainer.hidden = true; qrSave.hidden = true;
                 shareStatus.textContent = (result.codeRequired ? 'Access code required · ' : 'No access code · ') + (result.allowDownload ? 'Download enabled.' : 'Download hidden.');
                 input.select ();
             } catch (error) { shareStatus.textContent = error.message; generate.disabled = false; }
         });
         copy.addEventListener ('click', async () => { try { await navigator.clipboard.writeText (input.value); copy.textContent = 'Copied'; } catch { input.select (); copy.textContent = 'Select and copy link'; } });
-        form.append (hint, downloadLabel, codeLabel, codeInput, generate, shareStatus, input, copy, link);
+        form.append (hint, downloadLabel, codeLabel, codeInput, generate, shareStatus, input, copy, link, qrButton, qrContainer, qrStatus, qrSave);
         shared.appendChild (form);
     }
 
