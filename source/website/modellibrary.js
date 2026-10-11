@@ -465,7 +465,8 @@ export class ModelLibrary
             qrButton.disabled = true; qrStatus.hidden = false; qrStatus.textContent = 'Preparing local QR code…';
             try {
                 await loadQRLibrary (); qrContainer.replaceChildren ();
-                new window.QRCode (qrContainer, { text : input.value, width : 224, height : 224, colorDark : '#102536', colorLight : '#ffffff', correctLevel : window.QRCode.CorrectLevel.H });
+                const renderedQR = new window.QRCode (qrContainer, { text : input.value, width : 224, height : 224, colorDark : '#102536', colorLight : '#ffffff', correctLevel : window.QRCode.CorrectLevel.H });
+                if (!renderedQR) { throw new Error ('QR rendering failed.'); }
                 qrContainer.hidden = false; qrSave.hidden = false;
                 qrStatus.textContent = 'QR encodes the share link only. Share any separate access code securely.';
             } catch (error) { qrStatus.textContent = error.message; }
