@@ -4,7 +4,7 @@ Updated 2026-10-11. This is the starting point for project status, completed wor
 
 ## Release candidate: Auto3D v0.35.0 / Packaging v1.5.0
 
-Main baseline is PR #34, commit `5ecde44`, Auto3D v0.34.0. This candidate is prepared in an isolated checkout; application deployment remains pending PR review/merge.
+Main baseline is PR #34, commit `5ecde44`, Auto3D v0.34.0. This candidate is prepared in an isolated checkout as [PR #35](https://github.com/yuttana858/Auto3D/pull/35); application deployment remains pending PR review/merge.
 
 The reviewed share-service permission migration was staged on PostgreSQL 17, applied to Supabase on 2026-10-11, and verified. Browser roles cannot call legacy share RPCs or access share-link/code metadata; the Pages service role retains access. Account-gated sharing remains in place. PIN/public sharing is not enabled: the throttle migration and server readiness configuration still need a separate verified rollout. The candidate rejects creation of unavailable PIN links, bounds share JSON requests to 4 KB, validates fields and excludes query tokens from upstream error logs. fflate is patched to 0.8.3 and production audits now gate moderate advisories.
 

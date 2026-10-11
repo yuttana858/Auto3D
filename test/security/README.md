@@ -6,7 +6,7 @@ with `psql -v ON_ERROR_STOP=1`:
 
 1. `test/security/share-bootstrap.sql`
 2. `supabase/migrations/20261005_share_links.sql`
-3. `supabase/migrations/20261011194620_share_service_access_hardening.sql`
+3. `supabase/migrations/20261011195039_share_service_access_hardening.sql`
 4. `test/security/share-access.sql`
 
 The regression checks effective function and column privileges, actual metadata

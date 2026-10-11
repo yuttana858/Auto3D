@@ -1,6 +1,6 @@
 # Stability and security candidate: Auto3D 0.35.0 / Packaging 1.5.0
 
-Prepared 2026-10-11 from main `5ecde44` (PR #34). Packaging is unchanged. The application candidate is pending review/merge/deployment; the narrow database permission fix was staged, applied and verified independently.
+Prepared 2026-10-11 from main `5ecde44` (PR #34). Packaging is unchanged. The application candidate is [PR #35](https://github.com/yuttana858/Auto3D/pull/35), pending review/merge/deployment; the narrow database permission fix was staged, applied and verified independently.
 
 ## Completed
 
