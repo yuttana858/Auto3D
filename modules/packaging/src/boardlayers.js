@@ -127,11 +127,18 @@ export function CreateCorrugatedSample (options = {})
                 for (const y of [low, high]) {
                     data.vertices.push ([x, y, -z]);
                     data.uvs.push ([x / widthMm, z / lengthMm]);
-                    data.normals.push ([0, 1, 0]);
                 }
             }
         }
-        const face = (a, b, c) => data.triangles.push ({ vertices : [a, b, c], normals : [a, b, c], uvs : [a, b, c], material });
+        const face = (a, b, c) => {
+            const p = data.vertices[a], q = data.vertices[b], r = data.vertices[c];
+            const u = q.map ((v, i) => v - p[i]), v = r.map ((n, i) => n - p[i]);
+            const cross = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+            const length = Math.hypot (...cross) || 1;
+            const index = data.normals.length;
+            for (let i = 0; i < 3; i++) { data.normals.push (cross.map (value => value / length)); }
+            data.triangles.push ({ vertices : [a, b, c], normals : [index, index + 1, index + 2], uvs : [a, b, c], material });
+        };
         const quad = (a, b, c, d) => { face (a, b, c); face (a, c, d); };
         for (let j = 0; j < samplesAlong; j++) {
             for (let i = 0; i < samplesAcross; i++) {
