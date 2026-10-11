@@ -67,3 +67,27 @@ export function SampleConnectedScore (board, score, { segments = 32, spanMm = nu
     }
     return { model : 'connected-score-visual-prototype', samples, layers : board.layers.map (layer => layer.id), artwork : { uvMode : 'global-dieline', repeat : false }, medium : { directional : true, pitchMm : board.flute.pitchMm } };
 }
+
+export function ReferenceSingleWallStack (caliperMm, { fluteHeightMm = null, pitchMm = 7.7, fluteAxisRadians = 0 } = {})
+{
+    if (!Number.isFinite (caliperMm) || caliperMm <= 0) { throw new Error ('Invalid measured board caliper.'); }
+    // Provisional layer spacing for CAD display only, not constituent paper caliper.
+    const facing = caliperMm * 0.08;
+    const core = caliperMm - 2 * facing;
+    return ValidateBoardStack ({
+        layers : [
+            { id : 'outside-liner', type : 'liner', caliperMm : facing },
+            { id : 'directional-medium', type : 'medium', caliperMm : core },
+            { id : 'inside-liner', type : 'liner', caliperMm : facing }
+        ],
+        flute : { pitchMm, heightMm : fluteHeightMm || core, axisRadians : fluteAxisRadians, phaseRadians : 0 }
+    });
+}
+
+export function SheetArtworkUV (xMm, yMm, artwork)
+{
+    const { originMm = [0,0], sizeMm, face = 'outside' } = artwork || {};
+    if (!Array.isArray (sizeMm) || sizeMm.length !== 2 || sizeMm.some (value => !Number.isFinite (value) || value <= 0)) { throw new Error ('Valid artwork dimensions required.'); }
+    if (!Number.isFinite (xMm) || !Number.isFinite (yMm) || !['outside','inside'].includes (face)) { throw new Error ('Invalid artwork registration.'); }
+    return { uv : [(xMm - originMm[0]) / sizeMm[0], (yMm - originMm[1]) / sizeMm[1]], face, wrap : 'clamp', repeat : false };
+}
