@@ -91,3 +91,70 @@ export function SheetArtworkUV (xMm, yMm, artwork)
     if (!Number.isFinite (xMm) || !Number.isFinite (yMm) || !['outside', 'inside'].includes (face)) { throw new Error ('Invalid artwork registration.'); }
     return { uv : [(xMm - originMm[0]) / sizeMm[0], (yMm - originMm[1]) / sizeMm[1]], face, wrap : 'clamp', repeat : false };
 }
+
+
+export function CreateCorrugatedSample (options = {})
+{
+    // A bounded, renderable specimen in the same X/Y/-Z frame as CAD board
+    // meshes. Air gaps remain empty; medium is a thin corrugated paper sheet.
+    const { widthMm = 80, lengthMm = 80, caliperMm = 3, outsideLinerMm = 0.24, insideLinerMm = 0.24, mediumPaperMm = 0.18, flutePitchMm = 7.7, fluteAxisRadians = 0, samplesAcross = 64, samplesAlong = 16 } = options;
+    const values = [widthMm, lengthMm, caliperMm, outsideLinerMm, insideLinerMm, mediumPaperMm, flutePitchMm, fluteAxisRadians];
+    if (values.some (v => !Number.isFinite (v)) || widthMm <= 0 || lengthMm <= 0 || widthMm > 1000 || lengthMm > 1000 || caliperMm < 0.5 || caliperMm > 15 || Math.min (outsideLinerMm, insideLinerMm, mediumPaperMm, flutePitchMm) <= 0 || outsideLinerMm + insideLinerMm + mediumPaperMm >= caliperMm || !Number.isInteger (samplesAcross) || !Number.isInteger (samplesAlong) || samplesAcross < 4 || samplesAcross > 512 || samplesAlong < 2 || samplesAlong > 128) {
+        throw new Error ('Use finite specimen dimensions, real paper calipers and bounded resolution.');
+    }
+    const inner = insideLinerMm;
+    const outer = caliperMm - outsideLinerMm;
+    const middle = (inner + outer) / 2;
+    const amplitude = (outer - inner - mediumPaperMm) / 2;
+    const flute = { pitchMm : flutePitchMm, heightMm : outer - inner, axisRadians : fluteAxisRadians, phaseRadians : 0 };
+    const board = { flute };
+    const materialDefinitions = [
+        { role : 'outside-liner', name : 'Outside liner', color : [204, 174, 131], roughness : 0.92, metalness : 0 },
+        { role : 'fluted-medium', name : 'Directional corrugating medium', color : [171, 133, 84], roughness : 0.98, metalness : 0 },
+        { role : 'inside-liner', name : 'Inside liner', color : [197, 165, 120], roughness : 0.94, metalness : 0 }
+    ];
+    const meshes = [];
+    const addLayer = (name, material, elevation) => {
+        const data = { name, vertices : [], normals : [], uvs : [], triangles : [], lines : [] };
+        // Each interface is a single, continuous indexed grid. The side caps
+        // are explicit and share vertices along the cut perimeter.
+        const index = (i, j, side) => (j * (samplesAcross + 1) + i) * 2 + side;
+        for (let j = 0; j <= samplesAlong; j++) {
+            for (let i = 0; i <= samplesAcross; i++) {
+                const x = widthMm * i / samplesAcross;
+                const z = lengthMm * j / samplesAlong;
+                const [low, high] = elevation (x, z);
+                for (const y of [low, high]) {
+                    data.vertices.push ([x, y, -z]);
+                    data.uvs.push ([x / widthMm, z / lengthMm]);
+                    data.normals.push ([0, 1, 0]);
+                }
+            }
+        }
+        const face = (a, b, c) => data.triangles.push ({ vertices : [a, b, c], normals : [a, b, c], uvs : [a, b, c], material });
+        const quad = (a, b, c, d) => { face (a, b, c); face (a, c, d); };
+        for (let j = 0; j < samplesAlong; j++) {
+            for (let i = 0; i < samplesAcross; i++) {
+                const a = index (i, j, 1), b = index (i + 1, j, 1), c = index (i + 1, j + 1, 1), d = index (i, j + 1, 1);
+                quad (a, d, c, b);
+                quad (index (i, j, 0), index (i + 1, j, 0), index (i + 1, j + 1, 0), index (i, j + 1, 0));
+            }
+        }
+        for (let i = 0; i < samplesAcross; i++) {
+            quad (index (i, 0, 0), index (i, 0, 1), index (i + 1, 0, 1), index (i + 1, 0, 0));
+            quad (index (i + 1, samplesAlong, 0), index (i + 1, samplesAlong, 1), index (i, samplesAlong, 1), index (i, samplesAlong, 0));
+        }
+        for (let j = 0; j < samplesAlong; j++) {
+            quad (index (0, j + 1, 0), index (0, j + 1, 1), index (0, j, 1), index (0, j, 0));
+            quad (index (samplesAcross, j, 0), index (samplesAcross, j, 1), index (samplesAcross, j + 1, 1), index (samplesAcross, j + 1, 0));
+        }
+        meshes.push (data);
+    };
+    addLayer ('Outside liner', 0, () => [outer, caliperMm]);
+    addLayer ('Fluted medium', 1, (x, z) => {
+        const center = middle + amplitude * FluteWaveAt (board, x, z).normalizedHeight;
+        return [center - mediumPaperMm / 2, center + mediumPaperMm / 2];
+    });
+    addLayer ('Inside liner', 2, () => [0, inner]);
+    return { apiVersion : 1, units : 'mm', materials : materialDefinitions, meshes, layerStructure : ['outside-liner', 'fluted-medium', 'inside-liner'], flute, artworkMapping : { coordinates : 'global-dieline-mm', repeat : false }, specimen : true, physicalValidation : 'visual-only-unqualified' };
+}
