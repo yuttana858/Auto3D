@@ -100,13 +100,29 @@ async function shareInfo (env, token)
     };
 }
 
-async function verifyShare (env, token, code)
+async function verifyShare (context, token, code)
 {
+    const info = await shareInfo (context.env, token);
+    if (!info) { return null; }
     const hash = await codeHash (token, code || '');
-    const response = await request (env, '/rest/v1/rpc/auto3d_verify_share', {
-        method : 'POST',
-        headers : { 'Content-Type' : 'application/json' },
-        body : JSON.stringify ({ p_token : token, p_code_hash : hash })
+    let endpoint = 'auto3d_verify_share';
+    let body = { p_token : token, p_code_hash : hash };
+    if (info.codeRequired) {
+        // Refuse unthrottled four-digit challenges until the proposed SQL and
+        // server-side secret/configuration have been applied and verified.
+        if (context.env.AUTO3D_SHARE_PIN_THROTTLE_READY !== 'true' || !context.env.AUTO3D_SHARE_RATE_SECRET) {
+            throw Object.assign (new Error ('Protected shared links are temporarily unavailable.'), { status : 503 });
+        }
+        const ip = context.request.headers.get ('CF-Connecting-IP') || 'unresolved';
+        const identifier = new TextEncoder ().encode (token + ':' + ip + ':' + context.env.AUTO3D_SHARE_RATE_SECRET);
+        const digest = await crypto.subtle.digest ('SHA-256', identifier);
+        const actor = Array.from (new Uint8Array (digest), byte => byte.toString (16).padStart (2, '0')).join ('');
+        endpoint = 'auto3d_verify_share_limited';
+        body = { ...body, p_actor_hash : actor };
+    }
+    const response = await request (context.env, '/rest/v1/rpc/' + endpoint, {
+        method : 'POST', headers : { 'Content-Type' : 'application/json' },
+        body : JSON.stringify (body)
     });
     const rows = await response.json ();
     return rows[0] || null;
@@ -118,7 +134,7 @@ async function shareArchive (context, token, asDownload)
     try { body = await context.request.json (); } catch { /* Access code is optional. */ }
     const code = body.code ? String (body.code) : '';
     if (code && !Code.test (code)) { return json ({ error : 'Access code must contain exactly four digits.' }, 400); }
-    const grant = await verifyShare (context.env, token, code);
+    const grant = await verifyShare (context, token, code);
     if (!grant) { return json ({ error : 'Incorrect access code or unavailable share link.' }, 401); }
     if (asDownload && !grant.allow_download) { return json ({ error : 'Downloads are disabled for this share link.' }, 403); }
 
