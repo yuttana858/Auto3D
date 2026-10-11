@@ -86,8 +86,8 @@ export function ReferenceSingleWallStack (caliperMm, { fluteHeightMm = null, pit
 
 export function SheetArtworkUV (xMm, yMm, artwork)
 {
-    const { originMm = [0,0], sizeMm, face = 'outside' } = artwork || {};
+    const { originMm = [0, 0], sizeMm, face = 'outside' } = artwork || {};
     if (!Array.isArray (sizeMm) || sizeMm.length !== 2 || sizeMm.some (value => !Number.isFinite (value) || value <= 0)) { throw new Error ('Valid artwork dimensions required.'); }
-    if (!Number.isFinite (xMm) || !Number.isFinite (yMm) || !['outside','inside'].includes (face)) { throw new Error ('Invalid artwork registration.'); }
+    if (!Number.isFinite (xMm) || !Number.isFinite (yMm) || !['outside', 'inside'].includes (face)) { throw new Error ('Invalid artwork registration.'); }
     return { uv : [(xMm - originMm[0]) / sizeMm[0], (yMm - originMm[1]) / sizeMm[1]], face, wrap : 'clamp', repeat : false };
 }
