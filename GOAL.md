@@ -20,3 +20,15 @@ Historical PR #16 SQL is recorded in `database/history/pr16/`. These records are
 6. Integrate Microsoft Entra ID with explicit verified identity linking while preserving stable account IDs.
 
 Do not replace existing RSC/CAD color, roughness, normal, bump, or UV data merely to fill an empty generated channel; generated maps should complement the source material and must not invent metallic response for paper or board.
+
+## Current priority: physically connected corrugated CAD engineering
+
+1. Catalog board constructions, liner/medium grades, flute orientation, FEFCO design references and test standards as provenance-tagged engineering data (reference dimensions are not manufacturing tolerances).
+2. Implement a common dieline graph: panels and flaps as faces; scores as shared, continuous hinge edges; cuts as free boundaries; slots, glue seams and artwork registration as explicit entities.
+3. Model material as outside liner + anisotropic fluted medium + inside liner (and intermediate liners for multiwall). Flute pitch, height, phase and axis are sheet-level directional properties. End-grain at cuts follows the real medium wave geometry, not a generic edge texture.
+4. Fold around score-centerline/neutral-axis with thickness compensation, configurable score crush and bend radius. Adjacent panels share hinge vertices with no gaps or duplicated inside/outside faces. Validate outside/inside liner continuity and orientation at every angle.
+5. Render cut edges showing actual layers and wave cross-sections. Preserve outside artwork registration over panels/flaps and through folds; only raw substrate patterns may tile/step-repeat by default. Never generate repeated printed artwork.
+6. Distinguish visually realistic crease deformation from predictive mechanics. Calibrate score stiffness, springback, local crushing and allowable fold angles against measured board grades before presenting physical predictions.
+7. Preserve imported CAD, dieline, artwork, per-layer material and fold definitions through session save/open and exports; add edge-on geometry, repeated-fold, print continuity and material mass tests.
+
+The current texture/material PR #32 is a first rendering correction, not an implementation of the hinge or physical layered board system.
