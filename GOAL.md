@@ -32,3 +32,24 @@ Do not replace existing RSC/CAD color, roughness, normal, bump, or UV data merel
 7. Preserve imported CAD, dieline, artwork, per-layer material and fold definitions through session save/open and exports; add edge-on geometry, repeated-fold, print continuity and material mass tests.
 
 The current texture/material PR #32 is a first rendering correction, not an implementation of the hinge or physical layered board system.
+
+## Materials database / CAD acceptance sequence
+
+**Implemented on current draft branch (not released):**
+- CSV starter catalog at `database/catalog/corrugated-materials.v1.csv` (39 reference rows; 59 fields, including blanks for future lab results), plus provenance-tagged JSON flute reference data.
+- Administrator-only CSV download from Preferences → Administrator → Account administration → Packaging materials and performance catalog. Endpoint requires existing server-side administrator authorization.
+- Reusable layered outside-liner/medium/inside-liner and flute direction/phase API, with a continuous score-strip sampling prototype and non-tiling sheet-space artwork UV helper. The current CreateBoard and FEFCO folding rig expose reference stack metadata.
+- Tests for layer order, flute continuity, registered UV and score-strip continuity.
+
+**Outstanding engineering and delivery work (do not mark complete prematurely):**
+1. Implement renderable physical liner, glue and directional sinusoidal/corrugated medium meshes using *measured* board caliper; correctly terminate and expose all layers at cuts and slots, including multiple-wall stock. Replace current provisional layer ratios.
+2. Replace rigid-prism score gaps with a shared watertight crease strip for adjacent panels (all folding stages). Validate liner topology, material area/mass, score crush and sheet-level flute phase throughout a 0–180° fold.
+3. Bind actual imported graphics to sheet-level outside/inside UVs; support printable inks, underprint, protective coating and spot-varnish mask in real units. Never step-repeat artwork; only unprinted substrate grain may tile.
+4. Add admin-only catalog browsing, authenticated edit/import, row validation, history, supplier/source attribution and eventual database-backed versions; current admin endpoint is a read-only versioned CSV download.
+5. Extend paper/flute construction data beyond the 39 starter templates with supplier-specific thickness/GSM, MD/CD properties and actual converted board grades. Separate design designation, nominal reference and measured test value.
+6. Calibrate bend moment, springback, compression/ECT/BCT, flat crush, moisture and environmental response with real lab measurements. Flag any simulation derived from unmeasured parameters as illustrative only.
+7. Build reference CAD/RSC specimens with plain substrate, printed artwork and spot gloss; automate tests for seam continuity, UV registration, bending, edge section, save/open and GLTF/CAD exchange.
+8. Complete review and CI, compare representative physical board samples, and deploy after approval.
+9. Then: org roles → 100 MB+ resumable R2 → shared publishing → SMTP/security → Entra integration.
+
+Avoid editing historical applied Supabase migration records in this materials-only phase. Use the new CSV as a schema starter, not an engineering specification or production material master.
