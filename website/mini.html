@@ -39,7 +39,6 @@ dialog::backdrop{background:#000b}.qr{margin:15px auto;display:grid;place-items:
 <main id="stage"><div class="empty"><section class="access" aria-label="Share access">
  <h1 id="heading">Shared 3D model</h1>
  <p id="notice" role="status">A valid shared-model link is required.</p>
- <form id="accessForm" hidden><label for="code">4-digit access code</label><input id="code" name="code" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required><button class="primary" type="submit">Continue to viewer</button></form>
  <a class="action primary" id="launch" href="/" hidden>Open secure 3D viewer</a>
  <p class="muted">Shared files are protected by the Auto3D service. A code does not replace account sign-in where required.</p>
  </section></div></main>
@@ -54,7 +53,7 @@ dialog::backdrop{background:#000b}.qr{margin:15px auto;display:grid;place-items:
  const url = new URL('/',location.origin); url.searchParams.set('view',token);
  const external = new URL('/mini.html',location.origin); external.searchParams.set('view',token);
  document.getElementById('full').href=url.href;
- const notice=document.getElementById('notice'),heading=document.getElementById('heading'),form=document.getElementById('accessForm'),launch=document.getElementById('launch');
+ const notice=document.getElementById('notice'),heading=document.getElementById('heading'),launch=document.getElementById('launch');
  // Do not place PINs in QR URLs, browser history, iframe URLs, or local storage.
  // The supported Auto3D viewer owns the challenge and server-verified archive request.
  async function showAccess(){
@@ -65,16 +64,11 @@ dialog::backdrop{background:#000b}.qr{margin:15px auto;display:grid;place-items:
    const info=await response.json();
    heading.textContent=info.name||'Shared 3D model';
    if(info.codeRequired){
-    notice.textContent='The owner protected this model with a four-digit access code. Continue in the secure viewer to enter it.';
-    form.hidden=false;
+    notice.textContent='The owner protected this model with a four-digit access code. Open the secure viewer to enter it. The code is never included in the QR link.';
+    launch.hidden=false;launch.href=url.href;
    }else{notice.textContent='The shared model is ready to open in the secure Auto3D viewer.';launch.hidden=false;launch.href=url.href;}
   }catch(error){notice.textContent=error.message;}
  }
- form.addEventListener('submit',event=>{event.preventDefault();const pin=document.getElementById('code');if(!/^[0-9]{4}$/.test(pin.value)){notice.textContent='Enter four digits.';return;}
-  // Existing main application prompts again and submits the PIN only in the archive POST body.
-  // Never forward this secret to a URL or an unverified embedded context.
-  pin.value='';notice.textContent='Enter your four-digit code in the secure Auto3D viewer after signing in.';form.hidden=true;launch.hidden=false;launch.href=url.href;
- });
  showAccess();
  const copy=document.getElementById('copy'), qr=document.getElementById('qrButton'), dialog=document.getElementById('qrDialog');
  copy.disabled=false; qr.disabled=false;
