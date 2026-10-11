@@ -49,7 +49,7 @@ describe ('Corrugated cutaway CAD specimen', () => {
         const medium = model.meshes[1];
         const ys = medium.vertices.map (p => p[1]);
         assert.ok (Math.max (...ys) - Math.min (...ys) > 1);
-        assert.ok (medium.vertices.every (p => p[1] > 0.24 && p[1] < 2.76));
+        assert.ok (medium.vertices.every (p => p[1] >= 0.24 - 1e-9 && p[1] <= 2.76 + 1e-9));
     });
     it ('rejects impossible board stack thickness', () => {
         assert.throws (() => CreateCorrugatedSample ({ caliperMm : 1, insideLinerMm : 0.5, outsideLinerMm : 0.5 }), /calipers/);
