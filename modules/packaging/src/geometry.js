@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { ValidateFefco, FefcoProfile } from './fefco.js';
 import { CreateFefcoFoldRig, FefcoFoldFrame } from './folding.js';
 import { BoardMaterials } from './material.js';
+import { ReferenceSingleWallStack } from './boardlayers.js';
 import { PackagingContours, ValidatePackaging } from './profile.js';
 import { MeshData } from './mesh.js';
 
@@ -47,7 +48,7 @@ export function CreateBoard (input, { textured = false, guides = false } = {})
         }
         meshes.push (cut, score);
     }
-    return { apiVersion : 1, units : 'mm', materials, meshes, profile, state : 'flat' };
+    return { apiVersion : 1, units : 'mm', materials, meshes, profile, state : 'flat', boardStack : ReferenceSingleWallStack (thickness), artworkMapping : { coordinates : 'global-dieline-mm', repeat : false } };
 }
 export function UnfoldFefco (input, savedProfile = null)
 {

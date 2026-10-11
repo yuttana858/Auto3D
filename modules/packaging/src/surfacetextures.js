@@ -37,7 +37,7 @@ export function GenerateSurfaceTextureSet (input = ProceduralSurfacePixels (), p
         const i = y * width + x; const h = heights[i]; const dx = (value (x + 1, y) - value (x - 1, y)) * 2; const dy = (value (x, y + 1) - value (x, y - 1)) * 2; const n = Math.hypot (dx, dy, 1);
         // PNG rows point downward; texture V points upward after the normal image flip.
         maps.normalMap.set ([Math.round ((-dx / n * 0.5 + 0.5) * 255), Math.round ((dy / n * 0.5 + 0.5) * 255), Math.round ((1 / n * 0.5 + 0.5) * 255)], i * 3);
-        for (const [key, v] of [['bumpMap', 96 + h * 64], ['roughnessMap', 225 + h * 30], ['metalnessMap', 255], ['specularMap', 235 + h * 20], ['aoMap', 240 + h * 15]]) { maps[key].fill (Math.round (v), i * 3, i * 3 + 3); }
+        for (const [key, v] of [['bumpMap', 96 + h * 64], ['roughnessMap', 225 + h * 30], ['metalnessMap', 0], ['specularMap', 235 + h * 20], ['aoMap', 240 + h * 15]]) { maps[key].fill (Math.round (v), i * 3, i * 3 + 3); }
     } }
     const result = { diffuseMap : EncodeRGBTexture (prefix + '-color.png', width, height, pixels) };
     for (const [key, rgb] of Object.entries (maps)) { result[key] = EncodeRGBTexture (prefix + '-' + key.replace ('Map', '').toLowerCase () + '.png', width, height, rgb); }

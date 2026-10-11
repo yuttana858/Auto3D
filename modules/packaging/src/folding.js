@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { ValidateFefco, FlapDepth, FefcoProfile } from './fefco.js';
 import { ValidatePackaging } from './profile.js';
 import { BoardMaterials } from './material.js';
+import { ReferenceSingleWallStack } from './boardlayers.js';
 import { MeshData } from './mesh.js';
 import { PanelSolid, SolidIntersections } from './solid.js';
 
@@ -36,7 +37,7 @@ export function CreateFefcoFoldRig (input, savedProfile = null)
         if (parameters.code !== '0200') { add ('Top ' + sides[i], rectangle (a, b, h, h + depth), 'top', i); }
     }
     add ('Inside glued joint', [[-joint, 2 * t], [0, 0], [0, h], [-joint, h - 2 * t]], 'joint', 0);
-    return { apiVersion : 1, units : 'mm', parameters, profile, materials : BoardMaterials (), meshes, panels, edges };
+    return { apiVersion : 1, units : 'mm', parameters, profile, materials : BoardMaterials (), meshes, panels, edges, boardStack : ReferenceSingleWallStack (t), artworkMapping : { coordinates : 'global-dieline-mm', repeat : false } };
 }
 
 function FoldPose (rig, progress)

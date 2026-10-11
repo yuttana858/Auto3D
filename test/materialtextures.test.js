@@ -1,6 +1,7 @@
 import * as assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { GetAssignedTextureSlots, DrawTextureThumbnail } from '../source/website/materialpanel.js';
+import { EffectiveReliefMode } from '../source/website/materialtextures.js';
 import { ImporterThreeDae } from '../source/engine/import/importerthree.js';
 import { SceneDocument } from '../source/website/scenedocument.js';
 import { Model } from '../source/engine/model/model.js';
@@ -43,5 +44,19 @@ describe ('Material texture previews', () => {
             const session = new SceneDocument (); session.AddImported (model, 'Bottle');
             assert.equal (session.model.GetMaterial (0).specularMap.name, 'specularMap.jpg');
         } finally { THREE.ImageUtils.getDataURL = getDataURL; }
+    });
+});
+
+describe ('Surface relief resolution', () => {
+    it ('falls back to bump for bump-only CAD materials', () => {
+        assert.equal (EffectiveReliefMode ('normal', false, true), 'bump');
+        assert.equal (EffectiveReliefMode ('bump', false, true), 'bump');
+        assert.equal (EffectiveReliefMode (undefined, false, true), 'bump');
+    });
+    it ('keeps normal and bump maps mutually exclusive', () => {
+        assert.equal (EffectiveReliefMode ('normal', true, true), 'normal');
+        assert.equal (EffectiveReliefMode ('bump', true, true), 'bump');
+        assert.equal (EffectiveReliefMode ('off', true, true), 'off');
+        assert.equal (EffectiveReliefMode ('normal', false, false), 'off');
     });
 });

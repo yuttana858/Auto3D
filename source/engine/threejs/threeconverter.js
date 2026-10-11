@@ -204,11 +204,16 @@ export class ThreeMaterialHandler
 			}
 			threeMaterial.map = threeTexture;
 		});
+		const activeRelief = material.reliefMode === 'off' ? 'off' :
+			(material.reliefMode === 'bump' && material.bumpMap || !material.normalMap && material.bumpMap) ? 'bump' :
+			material.normalMap ? 'normal' : material.bumpMap ? 'bump' : 'off';
 		this.LoadFaceTexture (threeMaterial, material.bumpMap, (threeTexture) => {
-			threeMaterial.auto3dBumpMap = threeTexture; if (material.reliefMode !== 'off') { threeMaterial.bumpMap = threeTexture; }
+			threeMaterial.auto3dBumpMap = threeTexture;
+			if (activeRelief === 'bump') { threeMaterial.bumpMap = threeTexture; }
 		});
 		this.LoadFaceTexture (threeMaterial, material.normalMap, (threeTexture) => {
-			threeMaterial.auto3dNormalMap = threeTexture; if (material.reliefMode !== 'bump' && material.reliefMode !== 'off') { threeMaterial.normalMap = threeTexture; }
+			threeMaterial.auto3dNormalMap = threeTexture;
+			if (activeRelief === 'normal') { threeMaterial.normalMap = threeTexture; }
 		});
 		this.LoadFaceTexture (threeMaterial, material.emissiveMap, (threeTexture) => {
 			threeMaterial.emissiveMap = threeTexture;
