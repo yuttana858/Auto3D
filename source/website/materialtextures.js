@@ -6,11 +6,19 @@ import { LoadPackagingModule } from './packagingadapter.js';
 export const SurfaceTextureSlots = [['map', 'Base color', 'diffuseMap'], ['roughnessMap', 'Gloss / roughness', 'roughnessMap'], ['specularMap', 'Reflective', 'specularMap'], ['metalnessMap', 'Metalness', 'metalnessMap'], ['bumpMap', 'Bump', 'bumpMap'], ['normalMap', 'Normal', 'normalMap'], ['aoMap', 'Ambient occlusion', 'aoMap'], ['displacementMap', 'Height', 'displacementMap'], ['emissiveMap', 'Emission', 'emissiveMap']];
 export function TextureForSlot (entry, key) { return (key === 'specularMap' && entry.material.isMeshPhysicalMaterial ? entry.material.specularColorMap : entry.material[key]) || (key === 'normalMap' ? entry.material.auto3dNormalMap : key === 'bumpMap' ? entry.material.auto3dBumpMap : null); }
 export function OriginalTexture (entry, key) { return entry.original[key === 'map' ? 'diffuseMap' : key] || (key === 'roughnessMap' ? entry.original.metalnessMap : null); }
+export function EffectiveReliefMode (mode, hasNormal, hasBump)
+{
+    if (mode === 'off') { return 'off'; }
+    if (mode === 'bump') { return hasBump ? 'bump' : hasNormal ? 'normal' : 'off'; }
+    return hasNormal ? 'normal' : hasBump ? 'bump' : 'off';
+}
+
 export function ApplyMaterialRelief (entry)
 {
     const m = entry.material; m.auto3dNormalMap ||= m.normalMap; m.auto3dBumpMap ||= m.bumpMap;
-    m.normalMap = entry.original.reliefMode === 'bump' || entry.original.reliefMode === 'off' ? null : m.auto3dNormalMap;
-    m.bumpMap = entry.original.reliefMode === 'off' ? null : m.auto3dBumpMap; m.needsUpdate = true;
+    const mode = EffectiveReliefMode (entry.original.reliefMode, !!m.auto3dNormalMap, !!m.auto3dBumpMap);
+    m.normalMap = mode === 'normal' ? m.auto3dNormalMap : null;
+    m.bumpMap = mode === 'bump' ? m.auto3dBumpMap : null; m.needsUpdate = true;
 }
 export function SetEmissionStrength (entry, value)
 {
