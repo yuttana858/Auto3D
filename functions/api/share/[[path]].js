@@ -72,7 +72,7 @@ async function createShare (context)
     const origin = new URL (context.request.url).origin;
     return json ({
         token,
-        url : origin + '/?view=' + encodeURIComponent (token),
+        url : origin + '/mini.html?view=' + encodeURIComponent (token),
         allowDownload,
         codeRequired : Boolean (code)
     }, 201);
