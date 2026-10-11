@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="referrer" content="no-referrer">
+<title>Auto3D | Shared 3D Viewer</title>
+<link rel="icon" type="image/svg+xml" href="/assets/images/auto3d-mark.svg">
+<style>
+:root{color-scheme:dark;font:14px system-ui,-apple-system,Segoe UI,sans-serif;background:#081018;color:#eaf4ff}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;flex-direction:column}
+header{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid #2c3d4e;background:#111e2a}
+.brand{display:flex;align-items:center;gap:12px;font-weight:750;letter-spacing:.04em}
+.brand img{width:36px;height:36px}.sub{color:#91adbf;font-size:12px;font-weight:400;letter-spacing:0}
+.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}button,a.action{background:#1c3445;border:1px solid #3a596b;border-radius:8px;padding:9px 12px;color:#eaf4ff;text-decoration:none;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}.primary{background:#74cef4!important;color:#07131c!important;border-color:#74cef4!important}
+main{position:relative;flex:1;min-height:340px;background:radial-gradient(ellipse at center,#192735,#071019 75%)}
+.model_canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
+.empty{position:absolute;inset:0;display:grid;place-items:center;padding:24px;text-align:center;color:#c9dbe9}
+.access{max-width:430px;margin:auto;display:grid;gap:15px;padding:28px;border:1px solid #35506a;border-radius:15px;background:#142535;text-align:left}
+.access h1{margin:0;font-size:24px}.access p{margin:0;line-height:1.5}.access input{font:inherit;letter-spacing:.24em;text-align:center;padding:13px;border-radius:8px;border:1px solid #55748a;background:#081725;color:white;width:100%}
+.access .muted{color:#9eb5c7;font-size:13px}
+footer{padding:9px 24px;border-top:1px solid #283b4b;display:flex;align-items:center;justify-content:space-between;color:#93aabd;font-size:12px}
+dialog{border:1px solid #466277;border-radius:16px;background:#101d29;color:#eaf4ff;padding:24px;max-width:360px;width:calc(100vw - 30px)}
+dialog::backdrop{background:#000b}.qr{margin:15px auto;display:grid;place-items:center;background:white;padding:16px;width:max-content;border-radius:10px}
+#qr img,#qr canvas{width:210px!important;height:210px!important}.link{overflow-wrap:anywhere;font-size:12px;color:#a8c4d7}
+@media(max-width:600px){header{height:auto;gap:12px;padding:12px;align-items:flex-start}footer{padding:8px 12px}.actions{justify-content:flex-end}}
+</style>
+</head>
+<body>
+<header>
+ <div class="brand"><img src="/assets/images/auto3d-mark.svg" alt=""><div>Auto3D<div class="sub">Shared 3D Experience</div></div></div>
+ <div class="actions">
+ <button id="copy" disabled>Copy link</button><button id="qrButton" disabled>QR code</button>
+ <button id="fullscreen" type="button">Fullscreen</button><a class="action primary" id="full" href="/">Open in Auto3D</a>
+ </div>
+</header>
+<main id="stage"><div class="empty"><section class="access" aria-label="Share access">
+ <h1 id="heading">Shared 3D model</h1>
+ <p id="notice" role="status">A valid shared-model link is required.</p>
+ <form id="accessForm" hidden><label for="code">4-digit access code</label><input id="code" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required><button class="primary" type="submit">Unlock model</button></form>
+ <a class="action primary" id="launch" href="/" hidden>Sign in to view</a>
+ <p class="muted">Shared files are protected by the Auto3D service. A code does not replace account sign-in where required.</p>
+ </section></div></main><div id="viewerControls" hidden style="padding:8px 24px;background:#101f2c"><button id="fit">Fit to view</button><button id="download" hidden>Download model</button><span style="margin-left:12px;color:#abc4d6">Drag to rotate · Scroll to zoom</span></div>
+<footer><span>Powered by Auto3D · Interactive 3D viewer</span><span>Viewing is read-only · Sign-in may be required</span></footer>
+<dialog id="qrDialog"><h2>Scan to view in Auto3D</h2><div id="qr" class="qr" aria-label="QR code for shared model link"></div><p id="qrUrl" class="link"></p><button id="close">Close</button></dialog>
+<script src="/assets/vendor/qrcode.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+(() => {
+ const token = new URLSearchParams(location.search).get('view') || '';
+ if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(token))return;
+ const link = new URL('/mini.html',location.origin);link.searchParams.set('view',token);
+ const copy=document.getElementById('copy'),qr=document.getElementById('qrButton'),dialog=document.getElementById('qrDialog');
+ copy.disabled=false;qr.disabled=false;
+ copy.onclick=async()=>{try{await navigator.clipboard.writeText(link.href);copy.textContent='Copied';}catch{copy.textContent='Copy unavailable';}};
+ qr.onclick=()=>{const target=document.getElementById('qr');target.replaceChildren();document.getElementById('qrUrl').textContent=link.href;
+ if(typeof QRCode==='function'){new QRCode(target,{text:link.href,width:210,height:210,colorDark:'#0a1420',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});}
+ dialog.showModal();};
+ document.getElementById('close').onclick=()=>dialog.close();
+})();
+</script>
+<script defer src="/o3dv/o3dv.mini.js"></script>
+</body></html>

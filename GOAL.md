@@ -57,3 +57,22 @@ Avoid editing historical applied Supabase migration records in this materials-on
 ### Renderable layered specimen milestone
 
 A standalone `CreateCorrugatedSample` engineering *visual prototype* now emits three closed mesh objects with real outside/inside liner thickness and an explicitly directional, thin, sinusoidally corrugated medium. Unlike the earlier material-stack reference, the flute amplitude leaves actual air gaps between liners. Triangle normals, cut-edge caps, non-repeating global artwork mapping metadata and basic regression tests are included. This is not yet the default CAD panel renderer, and is not a physically calibrated flute or crease solver. Integrate after mesh/UV and screenshot verification and supplier caliper input.
+
+## Branded external mini-viewer and QR sharing
+
+- Build branded `/mini.html?view=<share-token>` using the existing read-only Auto3D viewer, with link copy and QR generation in the browser. The QR stores a short share URL, never a raw R2 URL.
+- Current staged mini-viewer intentionally inherits mandatory login and current share authorization. It is NOT yet anonymous/external sharing.
+- For approved corporate sharing, use short-lived revocable bearer capabilities with hashed-at-rest tokens, expiry, audience scope, access code or stronger authentication, viewer-only and separate download permissions, server-side publication checks and R2 reads through the app API. Never use model UUID alone as authorization.
+- Add a public-capability / guest-only middleware carveout only after explicit authorization, rate limiting, abuse controls, audit logs and revocation tests. Existing account-private Library remains inaccessible from public tokens.
+- Preserve scene materials, HDRI and camera in external view; provide share thumbnail, brand logo, title, fullscreen, loading/error states and mobile sizing.
+- Generate and download SVG/PNG QR with local or vetted bundled code; avoid sending capability URLs to a third-party QR-generating service.
+- Review QR library choices: `qrcode` (node-qrcode, browser/server support), `qr-code-styling` (branded styling), `qrcodejs` (simple browser implementation). Pin and vendor or bundle any selected dependency with its license, run license/security checks.
+- Gate eventual production publication behind corporate content classification, author consent and tested withdrawal semantics.
+
+### 4-digit protected external view — access rules
+
+The existing Share dialog can require a four-digit code; the server already hashes the code with the random share token and checks it before returning an archive. A four-digit code is a secondary challenge only (10,000 possibilities), not an account credential or sufficient standalone authorization. The mini landing identifies a code-protected link and routes it to the existing secure full viewer for code entry; never place the code in QR content or URL parameters. **Public anonymous view and even authenticated challenge attempts must remain blocked until atomic server-side attempt limits, temporary lockouts, revocation, share expiry, and abuse monitoring are implemented and tested.** The current mini landing is not an embedded mini canvas because Auto3D explicitly rejects iframe embedding; a standalone read-only viewer requires a distinct implementation and review.
+
+### Share creator UX progress and release checks
+
+The authenticated Share model dialog now supports locally generated QR preview and downloadable PNG after link generation; the QR contains the share token URL but never the optional four-digit code. Verify the destination link and access scope before distributing the QR. Next stages: standalone isolated WebGL canvas with archive-safe session loading, permissioned guest share archive access (without granting Library access), migration-backed PIN lockout, token revocation/expiration and audit, browser security tests, and corporate publishing authorization. Confirm Cloudflare production deployment reflects the merged commit: deployment run 38141811078 uploaded a new build but failed commit-verification against a stale production response. Do not use a successful upload alone to assert release completion.
