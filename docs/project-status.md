@@ -1,6 +1,6 @@
 # Auto3D development log and handoff
 
-Updated 2026-10-11. This is the starting point for project status, completed work, open issues and the next release. Architecture: [agent-project-overview.md](agent-project-overview.md).
+Updated 2026-10-13. This is the starting point for project status, completed work, open issues and the next release. Architecture: [agent-project-overview.md](agent-project-overview.md).
 
 ## Release candidate: Auto3D v0.35.0 / Packaging v1.5.0
 
@@ -12,9 +12,11 @@ Preferences adds account-saved Auto/Fast/Quality viewport resolution. Auto uses 
 
 Single-pass shadow caster/floor materials remove redundant draws: the 80,000-triangle probe drops from 240,004 to 160,002 submitted triangles with shadows and 480,010 to 320,006 with shadows plus floor reflection. These are draw-work reductions, not an FPS guarantee. Browser checks confirm 200 camera updates use one display frame, Auto restores idle resolution, and Fast/Quality produce identical final PNG pixels. No automatic destructive decimation was introduced. Static mask caching and non-destructive preview LOD remain follow-up work.
 
-Deployment now runs lint, license, moderate production audit, unit and backend gates before publishing. The mini-viewer bundle joins the asset digest/version manifest and its HTML/bundle identity is verified. The intentionally heavy FEFCO generation test has a 15-second timeout; default timeouts remain unchanged. Packaging geometry/API/version are unchanged.
+The top bar adds Save immediately before Library, opening the existing save dialog with Account Library selected. `ui.save` accepts optional `destination: "account"` for the same flow; its existing file-default behavior is retained.
 
-Validation: 548 unit/module tests, 11 backend tests, lint, production audit/licenses and website/Pages/both engine builds pass. Desktop/mobile preferences/auth and original-geometry/final-PNG browser checks pass. Limitations: see [stability-security-release.md](stability-security-release.md). The live schema fix is complete; the viewer/UI/dependency/deployment changes take effect only after this candidate is merged and deployed.
+Deployment now runs lint, license, moderate production audit, unit and backend gates before publishing. The mini-viewer bundle joins the asset digest/version manifest and its HTML/bundle identity is verified. The intentionally heavy FEFCO generation test has a 15-second timeout; default timeouts remain unchanged. Packaging geometry/API/version are unchanged. Array adds W/L/H edge spacing in account display units (model units for unknown source units), shared by preview, alternating layers and `object.array`. OSC/FOL thumbnails now distinguish partial and full flap overlap. Box generation reports progress and errors in the catalog, prevents duplicate clicks, and texture notifications request a coalesced frame. The exact rounded inch defaults generate successfully; the reported production thumbnail failure has not been reproduced in a clean scene.
+
+Validation: 553 unit/module tests, 11 backend tests, lint, production audit/licenses and website/Pages/both engine builds pass. Desktop/mobile preferences/auth and original-geometry/final-PNG browser checks pass. Limitations: see [stability-security-release.md](stability-security-release.md). The live schema fix is complete; the viewer/UI/dependency/deployment changes take effect only after this candidate is merged and deployed.
 
 ## Previous release: Auto3D v0.34.0 / Packaging v1.5.0
 

@@ -2,6 +2,7 @@ import * as assert from 'node:assert/strict';
 import { CommandRegistry } from '../source/website/commandregistry.js';
 import { CreateAgentCommands } from '../source/website/agentcommands.js';
 import * as fs from 'node:fs';
+import { Unit } from '../source/engine/model/unit.js';
 
 function Registry (context = {}) {
     const registry = new CommandRegistry (context);
@@ -9,6 +10,26 @@ function Registry (context = {}) {
     return registry;
 }
 describe ('Agent commands and macros', () => {
+    it ('opens the same save service for account/file destinations and rejects invalid macro inputs', async () => {
+        const calls = [];
+        const commands = CreateAgentCommands ({ sessionEditor : { library : { SaveDialog : async file => { calls.push (file); } } } });
+        assert.equal ((await commands.Execute ('ui.save')).ok, true); assert.deepEqual (calls, [true]);
+        const macro = await commands.RunMacro ({ version : 1, steps : [{ id : 'save', command : 'ui.save', arguments : { destination : 'account' } }] });
+        assert.equal (macro.ok, true); assert.deepEqual (calls, [true, false]);
+        assert.equal ((await commands.Execute ('ui.save', { destination : 'invalid' })).ok, false); assert.deepEqual (calls, [true, false]);
+    });
+    it ('converts array gaps once, validates before mutation and supports macros', async () => {
+        const item = { id : 'box', unit : Unit.Millimeter }; const calls = [];
+        const editor = { document : { objects : [item] }, selected : item, Select : value => { editor.selected = value; }, CreateArray : async (...args) => { calls.push (args); return [{}]; } };
+        const registry = CreateAgentCommands ({ sessionEditor : editor, preferences : { units : 'standard' } });
+        assert.equal ((await registry.Execute ('object.array', { width : 2, length : 1, height : 1, gap : { width : 1, height : 2, length : 3 } })).ok, true);
+        assert.deepEqual (calls[0][3].gap, { x : 25.4, y : 50.8, z : 76.2 });
+        const macro = await registry.RunMacro ({ version : 1, steps : [{ id : 'array', command : 'object.array', arguments : { width : 2, length : 1, height : 1, gap : { width : 10 }, units : 'model' } }] });
+        assert.equal (macro.ok, true); assert.deepEqual (calls[1][3].gap, { x : 10, y : 0, z : 0 });
+        for (const gap of [{ width : -1 }, { width : Infinity }, { depth : 2 }]) { assert.equal ((await registry.Execute ('object.array', { width : 2, length : 1, height : 1, gap })).ok, false); }
+        assert.equal (calls.length, 2); editor.readOnly = true;
+        assert.equal ((await registry.Execute ('object.array', { width : 2, length : 1, height : 1 })).ok, false);
+    });
     it ('searches metadata without exposing handlers and matches published catalog', () => {
         const commands = CreateAgentCommands ({ sessionEditor : {} });
         assert.ok (commands.Catalog ('material').length > 0);
