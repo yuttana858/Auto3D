@@ -1459,7 +1459,7 @@
       "id": "object.array",
       "title": "Array object",
       "category": "Objects",
-      "description": "Create a touching W/L/H array of the selected object. W=X, L=Z, H=Y. Undo supported.",
+      "description": "Create a W/L/H array. Optional gap is edge spacing by width/length/height, in display units by default; unknown source units use model units. Zero gap makes copies touch. W=X, L=Z, H=Y. Undo supported.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -1481,6 +1481,34 @@
             "type": "number",
             "minimum": 1,
             "maximum": 20
+          },
+          "gap": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "length": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "height": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000
+              }
+            },
+            "additionalProperties": false
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "model",
+              "display"
+            ]
           },
           "autoGroup": {
             "type": "boolean"
@@ -2307,6 +2335,47 @@
       "example": {
         "units": "metric"
       }
+    },
+    {
+      "id": "preferences.viewport.quality",
+      "title": "Set viewport quality",
+      "category": "Preferences",
+      "description": "Remember Auto, Fast or Quality display resolution. Original geometry and final render resolution are preserved.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "fast",
+              "quality"
+            ]
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "mode": "auto"
+      }
+    },
+    {
+      "id": "preferences.viewport.quality.inspect",
+      "title": "Inspect viewport quality",
+      "category": "Preferences",
+      "description": "Return effective display pixel ratio and interaction state without changing geometry.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
     },
     {
       "id": "material.texture",
@@ -3765,15 +3834,25 @@
       "id": "ui.save",
       "title": "Open save dialog",
       "category": "Panels",
-      "description": "Ask the user where to save. This command opens a dialog; it does not publish.",
+      "description": "Ask the user where to save. Destination defaults to file; account matches the header Save button. This command opens a dialog; it does not publish.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
-        "properties": {},
+        "properties": {
+          "destination": {
+            "type": "string",
+            "enum": [
+              "file",
+              "account"
+            ]
+          }
+        },
         "required": [],
         "additionalProperties": false
       },
-      "example": {}
+      "example": {
+        "destination": "account"
+      }
     },
     {
       "id": "commands.text",

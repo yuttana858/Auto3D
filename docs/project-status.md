@@ -1,10 +1,26 @@
 # Auto3D development log and handoff
 
-Updated 2026-10-10. This is the starting point for project status, completed work, open issues and the next release. Architecture: [agent-project-overview.md](agent-project-overview.md).
+Updated 2026-10-13. This is the starting point for project status, completed work, open issues and the next release. Architecture: [agent-project-overview.md](agent-project-overview.md).
 
-## Current development release: Auto3D v0.34.0 / Packaging v1.5.0
+## Release candidate: Auto3D v0.35.0 / Packaging v1.5.0
 
-Remote main includes PR #30 (ebf183d). This update is on feat/solid-fefco-folds; merge and production deployment remain user actions. Report both versions and the new PR number.
+Main baseline is PR #34, commit `5ecde44`, Auto3D v0.34.0. This candidate is prepared in an isolated checkout as [PR #35](https://github.com/yuttana858/Auto3D/pull/35); application deployment remains pending PR review/merge.
+
+The reviewed share-service permission migration was staged on PostgreSQL 17, applied to Supabase on 2026-10-11, and verified. Browser roles cannot call legacy share RPCs or access share-link/code metadata; the Pages service role retains access. Account-gated sharing remains in place. PIN/public sharing is not enabled: the throttle migration and server readiness configuration still need a separate verified rollout. The candidate rejects creation of unavailable PIN links, bounds share JSON requests to 4 KB, validates fields and excludes query tokens from upstream error logs. fflate is patched to 0.8.3 and production audits now gate moderate advisories.
+
+Preferences adds account-saved Auto/Fast/Quality viewport resolution. Auto uses at most DPR 2 while idle and at most DPR 1 during camera movement/object dragging, restoring idle resolution after 250 ms without new movement. Fast uses at most DPR 1; Quality uses native DPR. Camera events coalesce into one requested display frame. All geometry, textures, saved files and final PNG render dimensions stay authoritative. Stable commands: `preferences.viewport.quality` and `preferences.viewport.quality.inspect`.
+
+Single-pass shadow caster/floor materials remove redundant draws: the 80,000-triangle probe drops from 240,004 to 160,002 submitted triangles with shadows and 480,010 to 320,006 with shadows plus floor reflection. These are draw-work reductions, not an FPS guarantee. Browser checks confirm 200 camera updates use one display frame, Auto restores idle resolution, and Fast/Quality produce identical final PNG pixels. No automatic destructive decimation was introduced. Static mask caching and non-destructive preview LOD remain follow-up work.
+
+The top bar adds Save immediately before Library, opening the existing save dialog with Account Library selected. `ui.save` accepts optional `destination: "account"` for the same flow; its existing file-default behavior is retained.
+
+Deployment now runs lint, license, moderate production audit, unit and backend gates before publishing. The mini-viewer bundle joins the asset digest/version manifest and its HTML/bundle identity is verified. The intentionally heavy FEFCO generation test has a 15-second timeout; default timeouts remain unchanged. Packaging geometry/API/version are unchanged. Array adds W/L/H edge spacing in account display units (model units for unknown source units), shared by preview, alternating layers and `object.array`. OSC/FOL thumbnails now distinguish partial and full flap overlap. Box generation reports progress and errors in the catalog, prevents duplicate clicks, and texture notifications request a coalesced frame. The exact rounded inch defaults generate successfully; the reported production thumbnail failure has not been reproduced in a clean scene.
+
+Validation: 553 unit/module tests, 11 backend tests, lint, production audit/licenses and website/Pages/both engine builds pass. Desktop/mobile preferences/auth and original-geometry/final-PNG browser checks pass. Limitations: see [stability-security-release.md](stability-security-release.md). The live schema fix is complete; the viewer/UI/dependency/deployment changes take effect only after this candidate is merged and deployed.
+
+## Previous release: Auto3D v0.34.0 / Packaging v1.5.0
+
+Merged through PR #34; baseline main is `5ecde44`. The following describes the v0.34.0 implementation and its original validation.
 
 HSC (0200), RSC (0201), OSC (0202) and FOL (0203) share CAD-derived finite-caliper panel geometry for both generation and fold/unfold playback. HSC keeps its open top. Outside-face wall hinges preserve cavity dimensions without cutting through adjacent walls. The glue tab receives a caliper clearance before sleeve wrapping. Inner and outer flap pairs fold sequentially; overlapping flaps reserve their separate stack layer before rotating. Open roof flaps lift, stand upright and shift hinge faces before closing, avoiding center-seam overlap. Panel volume, UVs, materials and the original cut/score profile remain intact.
 

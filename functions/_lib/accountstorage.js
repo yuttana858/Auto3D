@@ -30,8 +30,12 @@ export function Folder (value)
 }
 export function Preferences (value)
 {
-    if (!value || typeof value !== 'object' || Array.isArray (value) || Object.keys (value).some ((key) => !['units', 'theme', 'view'].includes (key)) || !['metric', 'standard'].includes (value.units) || ![1, 2].includes (value.theme)) { throw Failure ('Invalid account preferences.'); }
+    if (!value || typeof value !== 'object' || Array.isArray (value) || Object.keys (value).some ((key) => !['units', 'theme', 'view', 'viewportQuality'].includes (key)) || !['metric', 'standard'].includes (value.units) || ![1, 2].includes (value.theme)) { throw Failure ('Invalid account preferences.'); }
     const result = { units : value.units, theme : value.theme };
+    if (value.viewportQuality !== undefined) {
+        if (!['auto', 'fast', 'quality'].includes (value.viewportQuality)) { throw Failure ('Invalid viewport quality.'); }
+        result.viewportQuality = value.viewportQuality;
+    }
     if (value.view !== undefined) {
         const v = value.view; const allowed = ['environmentMapName', 'backgroundIsEnvMap', 'horizonGradient', 'backgroundPreset', 'showGroundGrid', 'backgroundColor', 'defaultLineColor', 'defaultColor', 'showEdges', 'edgeColor', 'edgeThreshold', 'navigationMode', 'projectionMode'];
         const color = (array, size) => Array.isArray (array) && array.length === size && array.every ((n) => Number.isInteger (n) && n >= 0 && n <= 255);

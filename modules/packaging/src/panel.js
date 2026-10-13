@@ -41,16 +41,17 @@ export class FefcoPanel
             const button = Element ('button', grid, undefined, 'fefco_card'); button.type = 'button'; button.setAttribute ('aria-label', 'FEFCO ' + style.code + ' ' + style.acronym); button.title = style.description;
             const image = Element ('img', button); image.alt = ''; image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent (FefcoThumbnail (style.code)); image.width = 176; image.height = 140;
             Element ('strong', button, style.code + ' · ' + style.acronym); Element ('span', button, style.name); Element ('small', button, style.category + (style.priority ? ' · Priority' : ''));
-            button.addEventListener ('click', () => workspace.run (async () => {
+            button.addEventListener ('click', () => this.RunGeneration (async () => {
                 const changes = this.DraftParameters ();
                 let result;
                 if (workspace.preset) { result = await workspace.preset (style.code, changes); } else { await workspace.configure (FefcoPreset (changes, style.code)); result = await workspace.generate (); }
                 this.draftDirty.clear (); this.Refresh (); return result;
             })); this.cards.set (style.code, button); this.controls.push (button);
         }
+        this.generationStatus = Element ('p', root, '', 'section_hint'); this.generationStatus.setAttribute ('role', 'status'); this.generationStatus.setAttribute ('aria-live', 'polite');
         this.description = Element ('p', root, undefined, 'section_hint');
         this.generate = Element ('button', root, 'Generate 3D box', 'workspace_primary fefco_generate'); this.generate.type = 'button'; this.controls.push (this.generate);
-        this.generate.addEventListener ('click', () => workspace.run (async () => { const changes = this.DraftParameters (); let result; if (workspace.preset) { result = await workspace.generate (changes); } else { await workspace.configure (changes); result = await workspace.generate (); } this.draftDirty.clear (); this.Refresh (); return result; }));
+        this.generate.addEventListener ('click', () => this.RunGeneration (async () => { const changes = this.DraftParameters (); let result; if (workspace.preset) { result = await workspace.generate (changes); } else { await workspace.configure (changes); result = await workspace.generate (); } this.draftDirty.clear (); this.Refresh (); return result; }));
         this.animate = Element ('button', root, 'Animate', 'fefco_animate'); this.animate.type = 'button'; this.controls.push (this.animate); this.animate.addEventListener ('click', () => workspace.run (() => workspace.animate ()));
         if (workspace.designer) { this.designer = Element ('button', root, 'View dieline in CAD', 'fefco_animate'); this.designer.type = 'button'; this.controls.push (this.designer); this.designer.addEventListener ('click', () => workspace.run (() => workspace.designer ())); }
         Element ('p', root, 'Animate unfolds the selected box to its saved CAD dieline. Click again to assemble it. Board surfaces are checked before playback; overlapping flaps fold in separate layers.', 'section_hint');
@@ -61,6 +62,17 @@ export class FefcoPanel
         this.cancel = Element ('button', playback, 'Cancel folding'); this.cancel.type = 'button'; this.cancel.addEventListener ('click', () => { try { workspace.control ('cancel'); } catch (error) { this.foldStatus.textContent = error.message; } });
         Element ('p', root, 'Kraft board, folded flaps and exposed corrugated edges. The generated profile replaces the current drawing. Dielines are design previews; verify production allowances with your converter.', 'section_hint');
         const source = Element ('a', root, 'FEFCO reference · 12th edition', 'fefco_reference'); source.href = FefcoSource; source.target = '_blank'; source.rel = 'noopener noreferrer'; this.Refresh ();
+    }
+    async RunGeneration (action)
+    {
+        if (this.generating || this.host.blocked ()) { return; }
+        this.generating = true; this.generationStatus.textContent = 'Generating box…'; this.SetDisabled ();
+        try {
+            return await this.host.run (async () => {
+                try { const result = await action (); this.generationStatus.textContent = 'Box added to scene.'; return result; }
+                catch (error) { this.generationStatus.textContent = 'Cannot generate box: ' + error.message; throw error; }
+            });
+        } finally { this.generating = false; this.SetDisabled (); }
     }
     DraftParameters () { const changes = { closure : this.closure.value }; for (const [key, field] of this.fields) { changes[key] = field.input.valueAsNumber * this.host.factor (); } return changes; }
     Refresh ()
@@ -84,5 +96,5 @@ export class FefcoPanel
         this.dimensionMode.disabled = !data || this.host.dimensionsBlocked ();
     }
     RefreshPlayback () { const state = this.host.playback?.() || { state : 'idle', progress : 0 }; const active = ['playing', 'paused'].includes (state.state); this.pause.disabled = this.cancel.disabled = !active; this.pause.textContent = state.state === 'paused' ? 'Resume folding' : 'Pause folding'; this.foldProgress.value = state.progress || 0; this.foldStatus.textContent = state.state === 'idle' ? 'Select a box or dieline to animate.' : state.state + ' · ' + (state.stage || 'folding') + ' · ' + Math.round ((state.progress || 0) * 100) + '%'; }
-    SetDisabled () { const blocked = this.host.blocked (); for (const control of this.controls) { control.disabled = blocked; } this.animate.disabled = blocked || !this.host.canAnimate?.(); if (this.designer) { this.designer.disabled = blocked || !this.host.canAnimate?.(); } this.animate.title = this.host.animation?.()?.stages.join (' → ') || 'Animate selected box or dieline'; this.RefreshDimensions (); this.RefreshPlayback (); }
+    SetDisabled () { const blocked = this.generating || this.host.blocked (); for (const control of this.controls) { control.disabled = blocked; } this.animate.disabled = blocked || !this.host.canAnimate?.(); if (this.designer) { this.designer.disabled = blocked || !this.host.canAnimate?.(); } this.animate.title = this.host.animation?.()?.stages.join (' → ') || 'Animate selected box or dieline'; this.RefreshDimensions (); this.RefreshPlayback (); }
 }

@@ -8,6 +8,7 @@ import { Navigation } from './navigation.js';
 import { ShadingModel } from './shadingmodel.js';
 import { ViewerModel, ViewerMainModel } from './viewermodel.js';
 import { BackgroundStops, GetBackgroundPreset } from './background.js';
+import { ViewportQuality } from './viewportquality.js';
 
 import * as THREE from 'three';
 
@@ -179,6 +180,8 @@ export class Viewer
         this.groundGridSettings = { show : false, dark : false };
         this.defaultDome = null;
         this.renderBatchDepth = 0;
+        this.pendingFrame = null;
+        this.viewportQuality = new ViewportQuality ({ requestDraw : () => this.RequestRender () });
         this.settings = {
             animationSteps : 40
         };
@@ -197,9 +200,7 @@ export class Viewer
         this.renderer = new THREE.WebGLRenderer (parameters);
         this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
 
-        if (window.devicePixelRatio) {
-            this.renderer.setPixelRatio (window.devicePixelRatio);
-        }
+        this.renderer.setPixelRatio (this.viewportQuality.Ratio ());
         this.renderer.setClearColor ('#ffffff', 1.0);
         this.renderer.setSize (this.canvas.width, this.canvas.height);
 
@@ -455,9 +456,7 @@ export class Viewer
 
     ResizeRenderer (width, height)
     {
-        if (window.devicePixelRatio) {
-            this.renderer.setPixelRatio (window.devicePixelRatio);
-        }
+        this.renderer.setPixelRatio (this.viewportQuality.Ratio ());
         this.renderer.setSize (width, height);
         this.cameraValidator.ForceUpdate ();
         this.Render ();
@@ -550,9 +549,21 @@ export class Viewer
     BeginRenderBatch () { this.renderBatchDepth++; }
     EndRenderBatch () { if (this.renderBatchDepth > 0) { this.renderBatchDepth--; if (this.renderBatchDepth === 0) { this.Render (); } } }
 
+    SetViewportQuality (mode) { return this.viewportQuality.SetMode (mode); }
+    RequestRender ()
+    {
+        if (!this.renderer || this.pendingFrame !== null) { return; }
+        this.pendingFrame = requestAnimationFrame (() => { this.pendingFrame = null; this.Render (); });
+    }
+
     Render ()
     {
         if (this.renderBatchDepth > 0) { return; }
+        if (this.pendingFrame !== null) { cancelAnimationFrame (this.pendingFrame); this.pendingFrame = null; }
+        if (!this.renderer.getRenderTarget () && this.renderer.getPixelRatio () !== this.viewportQuality.Ratio ()) {
+            this.renderer.setPixelRatio (this.viewportQuality.Ratio ());
+            this.cameraValidator.ForceUpdate ();
+        }
         let navigationCamera = this.navigation.GetCamera ();
 
         this.camera.position.set (navigationCamera.eye.x, navigationCamera.eye.y, navigationCamera.eye.z);
@@ -702,7 +713,8 @@ export class Viewer
         let canvasElem = this.renderer.domElement;
         this.navigation = new Navigation (canvasElem, camera, {
             onUpdate : () => {
-                this.Render ();
+                this.viewportQuality.Interact ();
+                this.RequestRender ();
             }
         });
 

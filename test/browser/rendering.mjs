@@ -23,7 +23,7 @@ try {
     await percent.fill ('150'); assert.ok (Math.abs ((await call ('scene.inspect')).objects[0].scale[0] - 2.25) < 0.001); await percent.press ('Tab');
     assert.equal (await page.getByRole ('button', { name : 'Apply scale', exact : true }).count (), 0);
     assert.equal (await page.getByText ('Cast + Receive enables self-shadowing.', { exact : false }).count (), 0);
-    await call ('ui.array'); const fields = await page.locator ('.array_counts input').evaluateAll (inputs => inputs.map (input => ({ y : input.getBoundingClientRect ().top, x : input.getBoundingClientRect ().left })));
+    await call ('ui.array'); const fields = await page.locator ('.array_counts').first ().locator ('input').evaluateAll (inputs => inputs.map (input => ({ y : input.getBoundingClientRect ().top, x : input.getBoundingClientRect ().left })));
     assert.equal (new Set (fields.map (field => field.y)).size, 1); assert.ok (fields[0].x < fields[1].x && fields[1].x < fields[2].x);
     await page.getByLabel ('Height count (H)', { exact : true }).fill ('2'); await page.getByLabel ('Alternate layer rotation', { exact : true }).selectOption ('90');
     await page.getByRole ('button', { name : 'Create array', exact : true }).click (); await page.waitForFunction (() => /^Created/.test (document.querySelector ('.scene_status')?.textContent || ''));

@@ -1,6 +1,6 @@
 import { CommandBar } from './commandbar.js';
 import { ProcessingFeedback } from './processingfeedback.js';
-import { ArrayPlacement } from './arraylayout.js';
+import { ArrayPlacement, ArrayCellSize } from './arraylayout.js';
 import { SessionCameras } from './sessioncameras.js';
 import { CalculateVolume, CalculateSurfaceArea } from '../engine/model/quantities.js';
 import { IsTwoManifold } from '../engine/model/modelutils.js';
@@ -102,6 +102,10 @@ export class SessionEditor
         viewer.renderer.domElement.addEventListener ('lostpointercapture', cancelDrag);
         window.addEventListener ('blur', cancelDrag);
         this.CreateUI ();
+        const headerSave = Element ('button', 'header_library_button header_save_button', undefined, document.getElementById ('header_buttons'));
+        headerSave.type = 'button'; headerSave.title = 'Save current session'; headerSave.setAttribute ('aria-label', 'Save current session');
+        headerSave.innerHTML = '<svg viewBox="0 0 26 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 3h15l3 3v15H4Z M8 3v6h10V3 M8 21v-8h10v8"/></svg><span>Save</span>';
+        headerSave.addEventListener ('click', () => this.library.SaveDialog ().catch (error => this.Status (error.message)));
         const headerLibrary = Element ('button', 'header_library_button', undefined, document.getElementById ('header_buttons'));
         headerLibrary.title = 'Saved models and sessions'; headerLibrary.setAttribute ('aria-label', 'Library');
         headerLibrary.innerHTML = '<svg viewBox="0 0 26 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6">' + Icons.library + '</svg><span>Library</span>';
@@ -341,6 +345,7 @@ export class SessionEditor
 
     RequestInteractionRender ()
     {
+        this.website.viewer.viewportQuality?.Interact ();
         if (this.interactionFrame) { return; }
         this.interactionFrame = requestAnimationFrame (() => {
             this.interactionFrame = null;
@@ -503,7 +508,7 @@ export class SessionEditor
         try {
             if (!this.document.objects.length) { this.selectionBox.visible = false; this.DisposeModelPreview (); this.website.ClearModel (); this.website.SetUIState (1); this.RefreshUI (); return; }
             const output = new ModelToThreeConversionOutput ();
-            const root = await new Promise ((resolve) => ConvertModelToThreeObject (this.document.model, new ModelToThreeConversionParams (), output, { onTextureLoaded : () => this.website.viewer.Render (), onModelLoaded : resolve }));
+            const root = await new Promise ((resolve) => ConvertModelToThreeObject (this.document.model, new ModelToThreeConversionParams (), output, { onTextureLoaded : () => this.website.viewer.RequestRender (), onModelLoaded : resolve }));
             for (let index = 0; index < this.document.objects.length; index++) {
                 const object = this.document.objects[index]; object.threeObject = root.children[index]; object.threeObject.name = object.name;
                 if (object.animationAsset) {
@@ -1000,27 +1005,42 @@ export class SessionEditor
         dialog.classList.add ('array_dialog');
         const form = Element ('form', 'workspace_save_form', undefined, dialog);
         const countRow = Element ('div', 'array_counts', undefined, form);
-        Element ('p', 'section_hint', 'Create touching copies using the selected model bounding box. W = X · L = Z · H = Y.', form);
+        Element ('p', 'section_hint', 'Copy the selected model. W = X · L = Z · H = Y. Zero spacing makes copies touch.', form);
         const fields = {};
         for (const [key, title] of [['w', 'W'], ['l', 'L'], ['h', 'H']]) {
             const label = Element ('label', null, title, countRow);
             const input = Element ('input', null, undefined, label); input.type = 'number'; input.setAttribute ('aria-label', { w : 'Width count (W)', l : 'Length count (L)', h : 'Height count (H)' }[key]); input.min = '1'; input.max = '20'; input.step = '1'; input.value = '1'; input.required = true;
             fields[key] = input;
         }
+        const gapFactor = UnitFactor (this.selected.unit, this.website.preferences.units);
+        Element ('strong', null, 'Spacing between copies (' + (gapFactor === null ? 'model units' : DisplayUnitLabel (this.website.preferences.units)) + ')', form);
+        const gapRow = Element ('div', 'array_counts', undefined, form); const gaps = {};
+        for (const [key, title] of [['w', 'W'], ['l', 'L'], ['h', 'H']]) {
+            const label = Element ('label', null, title, gapRow); const input = Element ('input', null, undefined, label);
+            input.type = 'number'; input.min = '0'; input.max = '1000000'; input.step = 'any'; input.value = '0'; input.required = true;
+            input.setAttribute ('aria-label', { w : 'Width spacing (W)', l : 'Length spacing (L)', h : 'Height spacing (H)' }[key]); gaps[key] = input;
+        }
+        const gap = () => {
+            const values = ['w', 'h', 'l'].map (axis => gaps[axis].valueAsNumber);
+            if (values.some (value => !Number.isFinite (value) || value < 0 || value > 1000000)) { throw new Error ('Use nonnegative spacing up to 1,000,000.'); }
+            return new THREE.Vector3 (...values.map (value => value / (gapFactor ?? 1)));
+        };
         const layerLabel = Element ('label', null, 'Rotate every other layer', form); const layerRotation = Element ('select', null, undefined, layerLabel); layerRotation.setAttribute ('aria-label', 'Alternate layer rotation'); [0, 45, 90, 180].forEach (angle => layerRotation.add (new Option (angle ? angle + '°' : 'None', String (angle))));
         const groupLabel = Element ('label', null, 'Automatically group array', form); const group = Element ('input', null, undefined, groupLabel); group.type = 'checkbox'; group.checked = true; group.setAttribute ('aria-label', 'Automatically group array');
         const optimizeLabel = Element ('label', null, 'Retain triangles (%)', form); const retain = Element ('input', null, undefined, optimizeLabel); retain.type = 'number'; retain.min = '5'; retain.max = '100'; retain.value = '100'; retain.setAttribute ('aria-label', 'Array retained triangles percentage');
         Element ('p', 'section_hint', 'Optional polygon reduction: preview quality before creating.', form);
         const host = Element ('div', 'array_polygon_preview', undefined, form); let dispose = null; let previewKey = null; const source = this.selected; const originalSize = new THREE.Box3 ().setFromObject (source.threeObject, true).getSize (new THREE.Vector3 ());
         const preview = Element ('button', null, 'Preview optimized array', form); preview.type = 'button';
-        const key = () => [fields.w.value, fields.l.value, fields.h.value, retain.value, layerRotation.value].join (':');
+        const key = () => [fields.w.value, fields.l.value, fields.h.value, gaps.w.value, gaps.l.value, gaps.h.value, retain.value, layerRotation.value].join (':');
         const invalidate = () => { previewKey = null; this.polygonOptimizer.Cancel (); dispose?.(); dispose = null; };
-        Object.values (fields).forEach ((input) => input.addEventListener ('input', invalidate)); retain.addEventListener ('input', invalidate); layerRotation.addEventListener ('change', invalidate);
+        [...Object.values (fields), ...Object.values (gaps)].forEach ((input) => input.addEventListener ('input', invalidate)); retain.addEventListener ('input', invalidate); layerRotation.addEventListener ('change', invalidate);
         preview.onclick = async () => {
+            const requestedKey = key ();
+            if (this.selected !== source) { status.textContent = 'Selection changed. Close this dialog and reopen it.'; return; }
             const counts = ['w', 'l', 'h'].map ((axis) => Number (fields[axis].value)); const ratio = Number (retain.value) / 100;
             if (counts.some ((value) => !Number.isInteger (value) || value < 1 || value > 20) || counts.reduce ((a, b) => a * b, 1) + this.document.objects.length - 1 > 1000 || !Number.isFinite (ratio) || ratio < 0.05 || ratio > 1) { status.textContent = 'Use valid counts within the 1,000-object limit and 5–100% retained triangles.'; return; }
             preview.disabled = true; create.disabled = true; status.textContent = 'Preparing array decimation preview…'; dispose?.();
-            try { const result = await this.polygonOptimizer.PreviewArray (counts, ratio); dispose = await this.polygonOptimizer.ShowPreview (host, counts, Number (layerRotation.value)); previewKey = key (); status.textContent = 'Array preview: ' + (result.before * counts.reduce ((a, b) => a * b, 1)).toLocaleString () + ' → ' + (result.after * counts.reduce ((a, b) => a * b, 1)).toLocaleString () + ' triangles. Inspect quality before creating.'; }
+            try { const spacing = gap (); const result = await this.polygonOptimizer.PreviewArray (counts, ratio); dispose = await this.polygonOptimizer.ShowPreview (host, counts, Number (layerRotation.value), spacing, originalSize); if (this.selected !== source || requestedKey !== key ()) { dispose?.(); dispose = null; throw new Error ('Array settings changed. Preview again before creating.'); } previewKey = requestedKey; status.textContent = 'Array preview: ' + (result.before * counts.reduce ((a, b) => a * b, 1)).toLocaleString () + ' → ' + (result.after * counts.reduce ((a, b) => a * b, 1)).toLocaleString () + ' triangles. Inspect quality before creating.'; }
             catch (error) { status.textContent = error.message; } finally { preview.disabled = false; create.disabled = false; }
         };
         dialog.addEventListener ('close', () => { this.polygonOptimizer.Cancel (); dispose?.(); }, { once : true });
@@ -1036,8 +1056,9 @@ export class SessionEditor
             if (!Number.isFinite (ratio) || ratio < 0.05 || ratio > 1) { status.textContent = 'Retain 5–100% of triangles.'; return; }
             if (ratio < 1 && previewKey !== key ()) { status.textContent = 'Preview optimized array before creating it.'; return; }
             if (this.selected !== source) { status.textContent = 'Selection changed. Close this dialog and reopen it.'; return; }
+            let spacing; try { spacing = gap (); } catch (error) { status.textContent = error.message; return; }
             create.disabled = true; status.textContent = 'Creating an array…';
-            try { if (ratio < 1) { await this.polygonOptimizer.Apply (); } await this.CreateArray (...counts, { autoGroup : group.checked, spacing : originalSize, layerRotation : Number (layerRotation.value) }); dialog.close (); } catch (error) { status.textContent = error.message; create.disabled = false; }
+            try { if (ratio < 1) { await this.polygonOptimizer.Apply (); } await this.CreateArray (...counts, { autoGroup : group.checked, spacing : originalSize, gap : spacing, layerRotation : Number (layerRotation.value) }); dialog.close (); } catch (error) { status.textContent = error.message; create.disabled = false; }
         });
     }
 
@@ -1049,6 +1070,7 @@ export class SessionEditor
         const counts = [widthCount, lengthCount, heightCount];
         if (counts.some ((value) => !Number.isInteger (value) || value < 1 || value > 20)) { throw new Error ('Array counts must be integers from 1 to 20.'); }
         const layerRotation = options.layerRotation ?? 0; if (![0, 45, 90, 180].includes (layerRotation)) { throw new Error ('Use 0, 45, 90 or 180 degree layer rotation.'); }
+        const gap = options.gap || new THREE.Vector3 (); ArrayCellSize (new THREE.Vector3 (), layerRotation, gap);
         const total = widthCount * lengthCount * heightCount;
         if (this.document.objects.length + total - 1 > 1000) { throw new Error ('Array exceeds the 1,000-object session limit.'); }
         if (total === 1) { this.Status ('Array is 1 × 1 × 1; no copies created.'); return []; }
@@ -1069,7 +1091,7 @@ export class SessionEditor
                         const copy = this.document.Instance (source);
                         added.push (copy);
                         copy.name = source.name + ' [' + (w + 1) + ',' + (l + 1) + ',' + (h + 1) + ']';
-                        Object.assign (copy, ArrayPlacement (source, box, size, w, l, h, layerRotation));
+                        Object.assign (copy, ArrayPlacement (source, box, size, w, l, h, layerRotation, gap));
                         this.document.ApplyTransform (copy);
                         this.Status ('Creating an array… ' + added.length + ' / ' + (total - 1) + ' copies');
                         await new Promise ((resolve) => setTimeout (resolve, 0));

@@ -6,7 +6,7 @@ import { WorkspaceDialog } from './modellibrary.js';
 import { Unit } from '../engine/model/unit.js';
 import { OpenCommandPanel } from './commandpanel.js';
 
-export const AppVersion = '0.34.0';
+export const AppVersion = '0.35.0';
 
 export function AppBuildInfo ()
 {
@@ -28,7 +28,7 @@ export function AccountPreferenceState (preferences = {})
     if (Number.isFinite (view.edgeThreshold) && view.edgeThreshold >= 0 && view.edgeThreshold <= 180) { settings.edgeSettings.edgeThreshold = view.edgeThreshold; }
     for (const key of ['navigationMode', 'projectionMode']) { if ([1, 2].includes (view[key])) { camera[key] = view[key]; } }
     settings.AlignBackgroundWithTheme ();
-    return { settings, camera, units : preferences?.units === 'standard' ? 'standard' : 'metric' };
+    return { settings, camera, units : preferences?.units === 'standard' ? 'standard' : 'metric', viewportQuality : ['auto', 'fast', 'quality'].includes (preferences?.viewportQuality) ? preferences.viewportQuality : 'auto' };
 }
 
 export function UnitFactor (sourceUnit, system)
@@ -75,6 +75,7 @@ export class Preferences
     {
         this.website = website;
         this.units = 'metric';
+        this.viewportQuality = 'auto';
         this.accountId = null; this.applying = false; this.pendingSave = Promise.resolve (); this.loadGeneration = 0; this.loading = null;
         website.sidebar.detailsPanel.unitSystem = this.units;
         const badge = document.createElement ('span'); badge.className = 'version_badge'; badge.textContent = 'v' + AppVersion; badge.title = 'Build ' + AppBuildInfo ().build;
@@ -96,6 +97,11 @@ export class Preferences
         const theme = document.createElement ('select'); theme.setAttribute ('aria-label', 'Appearance'); theme.add (new Option ('Light', String (Theme.Light))); theme.add (new Option ('Dark', String (Theme.Dark))); theme.value = String (this.website.settings.themeId);
         theme.addEventListener ('change', () => { this.website.SwitchTheme (Number (theme.value), true); }); appearance.appendChild (theme);
         const unitLabel = document.createElement ('label'); unitLabel.textContent = 'Units';
+        const qualityLabel = document.createElement ('label'); qualityLabel.textContent = 'Viewport quality';
+        const quality = document.createElement ('select'); quality.setAttribute ('aria-label', 'Viewport quality');
+        quality.add (new Option ('Auto — faster while moving', 'auto')); quality.add (new Option ('Fast — reduced display resolution', 'fast')); quality.add (new Option ('Quality — native display resolution', 'quality')); quality.value = this.viewportQuality;
+        quality.addEventListener ('change', () => { this.SetViewportQuality (quality.value).catch (error => { syncStatus.textContent = error.message; }); }); qualityLabel.appendChild (quality);
+        const qualityNote = document.createElement ('p'); qualityNote.className = 'section_hint'; qualityNote.textContent = 'Display quality never changes model geometry, saved files or final render resolution. Auto restores detail after camera movement stops.';
         const units = document.createElement ('select'); units.setAttribute ('aria-label', 'Units'); units.add (new Option ('Metric (mm)', 'metric')); units.add (new Option ('Standard (in)', 'standard')); units.value = this.units;
         units.addEventListener ('change', () => {
             this.SetUnits (units.value).catch ((error) => { syncStatus.textContent = error.message; });
@@ -134,7 +140,14 @@ export class Preferences
         const commands = document.createElement ('button'); commands.textContent = 'Commands and macros'; commands.className = 'workspace_primary'; commands.addEventListener ('click', () => { dialog.close (); OpenCommandPanel (this.website); });
         const errorLogs = document.createElement ('button'); errorLogs.textContent = 'Error logs'; errorLogs.addEventListener ('click', () => { dialog.close (); OpenErrorLog (this.website); });
         const recovery = document.createElement ('button'); recovery.textContent = 'Recover unsaved session'; recovery.addEventListener ('click', () => { dialog.close (); this.website.sessionEditor.OfferRecovery (true).catch (error => this.website.sessionEditor.Status (error.message)); });
-        const heading = document.createElement ('strong'); heading.textContent = 'About'; form.append (appearance, unitLabel, syncStatus, commands, errorLogs, recovery, aiHeading, aiProviderLabel, aiBaseLabel, aiKeyLabel, rememberLabel, aiNote, aiActions, aiStatus, heading, about); dialog.appendChild (form);
+        const heading = document.createElement ('strong'); heading.textContent = 'About'; form.append (appearance, unitLabel, qualityLabel, qualityNote, syncStatus, commands, errorLogs, recovery, aiHeading, aiProviderLabel, aiBaseLabel, aiKeyLabel, rememberLabel, aiNote, aiActions, aiStatus, heading, about); dialog.appendChild (form);
+    }
+
+    async SetViewportQuality (mode)
+    {
+        if (!['auto', 'fast', 'quality'].includes (mode)) { throw new Error ('Invalid viewport quality.'); }
+        this.viewportQuality = mode; this.website.viewer.SetViewportQuality (mode);
+        await this.SaveAccount (); return this.website.viewer.viewportQuality.Inspect ();
     }
 
     SetUnits (units)
@@ -167,6 +180,7 @@ export class Preferences
                 const state = AccountPreferenceState (data?.preferences); this.applying = true; this.website.viewer.BeginRenderBatch?.();
                 try {
                     this.units = state.units; this.website.sidebar.detailsPanel.unitSystem = this.units;
+                    this.viewportQuality = state.viewportQuality; this.website.viewer.SetViewportQuality?.(state.viewportQuality);
                     const settings = this.website.settings; const camera = this.website.cameraSettings;
                     Object.assign (settings, state.settings); Object.assign (camera, state.camera);
                     this.website.SwitchTheme (settings.themeId, false);
@@ -191,7 +205,7 @@ export class Preferences
     SaveAccount ()
     {
         if (this.applying || !this.accountId || this.website.auth.user?.id !== this.accountId) { return Promise.resolve (); }
-        const owner = this.accountId; const generation = this.loadGeneration; const preferences = { units : this.units, theme : this.website.settings.themeId, view : this.ViewPreferences () };
+        const owner = this.accountId; const generation = this.loadGeneration; const preferences = { units : this.units, theme : this.website.settings.themeId, view : this.ViewPreferences (), viewportQuality : this.viewportQuality || 'auto' };
         this.pendingSave = this.pendingSave.catch (() => {}).then (async () => {
             if (this.website.auth.user?.id !== owner || generation !== this.loadGeneration) { return; }
             if (this.syncStatus?.isConnected) { this.syncStatus.textContent = 'Saving account preferences…'; }

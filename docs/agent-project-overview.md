@@ -117,3 +117,9 @@ MaterialPanel shares a combined thumbnail/slider drawer and large preview dialog
 ## CAD-derived solid folds (v0.34.0 / Packaging v1.5.0)
 
 The independent module now owns convex finite-caliper panel detection in solid.js. folding.js keeps the original CAD partition, outside-face wall hinges and sequential flap-stack clearances. CreateFefcoBox bakes the same route endpoint instead of constructing a different box geometry. Both hosts preflight the full sampled route before replacement and FefcoFoldPose refuses intersecting displayed poses. The nonmutating packaging.fefco.folding.check command exposes the same audit. Existing history, material/UV, archive, cancellation and lazy-loading boundaries remain in place; collision checks cover only the generated box’s panels.
+
+## Display quality and share service hardening (v0.35.0 candidate)
+
+ViewportQuality in the engine controls display DPR only. Viewer coalesces navigation updates into a requested frame; Auto lowers display resolution while moving and restores it at idle. Preferences persists the mode per account with strict server validation and matching shared-service commands. RenderPNG continues using original scene geometry and independently sized targets. Do not call polygon Apply automatically to implement LOD.
+
+The share-service migration removes browser-role function/table/column grants and obsolete policies while retaining the Pages service role. It was staged and applied on 2026-10-11; do not replay historical prototype SQL afterward. Account-gated API middleware remains authoritative. PIN verification enablement is still separate. Deployment gates validate the candidate before publication, and release identity includes the mini-viewer bundle.

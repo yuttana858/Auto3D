@@ -63,6 +63,16 @@ describe ('Render job queue', () => {
     });
 });
 describe ('Alternating array layers', () => {
+    it ('adds independent edge gaps after rotation and preserves layer heights', () => {
+        const size = new THREE.Vector3 (4, 2, 8); const gap = new THREE.Vector3 (1, 3, 5);
+        assert.deepEqual (ArrayCellSize (size, 90, gap).toArray ().map (n => Math.round (n)), [9, 5, 13]);
+        const bounds = new THREE.Box3 (new THREE.Vector3 (), size); const source = { position : [0, 0, 0], rotation : [0, 0, 0] };
+        const placed = ArrayPlacement (source, bounds, size, 1, 1, 2, 90, gap);
+        assert.deepEqual (placed.position.map (n => Math.round (n)), [9, 10, 13]);
+        assert.throws (() => ArrayCellSize (size, 0, new THREE.Vector3 (-1, 0, 0)));
+        assert.throws (() => ArrayCellSize (size, 0, new THREE.Vector3 (0, NaN, 0)));
+    });
+
     it ('rotates odd layers around their bounds center and expands spacing for rectangular footprints', () => {
         const size = new THREE.Vector3 (4, 2, 8); const bounds = new THREE.Box3 (new THREE.Vector3 (10, 0, 20), new THREE.Vector3 (14, 2, 28)); const source = { position : [10, 0, 20], rotation : [0, 0, 0] };
         const cell = ArrayCellSize (size, 90); assert.ok (Math.abs (cell.x - 8) < 1e-9); assert.ok (Math.abs (cell.z - 8) < 1e-9);
