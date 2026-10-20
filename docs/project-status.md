@@ -1,10 +1,10 @@
 # Auto3D development log and handoff
 
-Updated 2026-10-18. This is the starting point for project status, completed work, open issues and the next release. Architecture: [agent-project-overview.md](agent-project-overview.md).
+Updated 2026-10-20. This is the starting point for project status, completed work, open issues and the next release. Architecture: [agent-project-overview.md](agent-project-overview.md).
 
-## Local candidate: Auto3D v0.36.0 / Packaging v1.6.0
+## Release candidate: Auto3D v0.36.0 / Packaging v1.6.0
 
-Baseline is merged PR #35, commit `c4629c9`. This work is local on `work`; no new PR or production deployment has been created. App/package/version labels are aligned at 0.36.0 and Packaging 1.6.0, with API v1 retained.
+Baseline is merged PR #35, commit `c4629c9`. The release is prepared in [PR #36](https://github.com/yuttana858/Auto3D/pull/36), branch `feat/packaging-measurements-036`. Production deployment was requested on 2026-10-20; merge and live asset verification follow the existing GitHub Actions workflow. App/package/version labels are aligned at 0.36.0 and Packaging 1.6.0, with API v1 retained.
 
 Packaging Designer adds a dedicated **Measurement layer** tab and a selected-box shortcut. Per-dimension Auto, Manual and Parametric modes operate on canonical CAD point distances, independently selecting score/inside/outside basis, target and score-tolerance override. Formula labels, purple CAD leaders and worst-case tolerance bands remain independent of renderer meshes, camera and display smoothing. Generated box edits rebuild CAD and matching scene geometry atomically; custom segments move endpoints and coincident vertices. Parametric conflicts, scaling, malformed references and invalid material records are rejected. Undo/Redo and portable archives retain records and targets.
 
@@ -14,7 +14,7 @@ The rendering module adds separate rounded crease surfaces between known shared 
 
 Documentation: [corrugated-dimensions-and-creases.md](corrugated-dimensions-and-creases.md). The searchable knowledge API adds `dimensionalEngineering`, source links and scoped tolerance guidance. Shared strict commands cover opening/toggling the layer, dimension inspection/edits, and material updates/activation/duplication; the generated command catalog is synchronized.
 
-Validation: 563 unit/module tests, 11 backend tests, lint, production licenses and moderate-threshold dependency audit pass (zero reported production vulnerabilities). Website, independent module and Pages builds pass. Chromium verifies CAD-derived dimensions, independent Manual/Parametric material changes, continuous rendered folds, and material/target preservation through fold/unfold playback. Chromium also verifies a 390 px mobile Measurement layout without horizontal overflow and repeated standalone material/target edits with an independent CAD view. Local Pages asset hashes and app/module versions are verified. Production is unchanged.
+Validation: 563 unit/module tests, 11 backend tests, lint, production licenses and moderate-threshold dependency audit pass (zero reported production vulnerabilities). Website, independent module and Pages builds pass. Chromium verifies CAD-derived dimensions, independent Manual/Parametric material changes, continuous rendered folds, and material/target preservation through fold/unfold playback. Chromium also verifies a 390 px mobile Measurement layout without horizontal overflow and repeated standalone material/target edits with an independent CAD view. Local Pages asset hashes and app/module versions are verified. Local release gates were repeated successfully on 2026-10-20. Production rollout and verification are tracked in PR #36.
 
 ## Previous release: Auto3D v0.35.0 / Packaging v1.5.0
 
