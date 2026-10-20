@@ -1,4 +1,12 @@
 const Sources = [
+    { id : 'fefco-101', authority : 'FEFCO', title : 'Recommendation 101: internal dimensions (July 2006)', url : 'https://www.fefco.org/sites/default/files/documents/RECOMMENDATIONS__101.pdf', access : 'public recommendation; principally 0201 cases' },
+    { id : 'pmmi-fba-rsc-2018', authority : 'PMMI / FBA', title : 'B155-TR2.1-2018: RSC tolerances', url : 'https://admin.fibrebox.org/wp-content/uploads/2025/07/B155_TR2-1_RSC_Containers_2018_Edition.pdf', access : 'public, non-normative technical report with limited scope' },
+    { id : 'iso-3034', authority : 'ISO', title : 'ISO 3034:2011: single sheet thickness', url : 'https://www.iso.org/standard/51266.html', access : 'public abstract; full procedure requires complete standard' },
+    { id : 'tappi-827', authority : 'TAPPI', title : 'T 827: box blank dimensioning', url : 'https://imisrise.tappi.org/TAPPI/Products/01/T/0104T827.aspx', access : 'public abstract; full method required for procedure' },
+    { id : 'tappi-829', authority : 'TAPPI', title : 'T 829: score quality', url : 'https://imisrise.tappi.org/TAPPI/Products/01/T/0104T829.aspx', access : 'public abstract' },
+    { id : 'tappi-402', authority : 'TAPPI', title : 'T 402: conditioning and test atmospheres', url : 'https://imisrise.tappi.org/TAPPI/Products/01/T/0104T402.aspx', access : 'public abstract' },
+    { id : 'esko-board-allowance', authority : 'Esko', title : 'Adding a Board: inside loss / outside gain', url : 'https://docs.esko.com/docs/en-us/ArtiosCAD/21.11/userguide/en-us/common/ac/task/ta_ac_10_AddingABoard.html', access : 'public documentation; half-caliper convention is a starting value' },
+    { id : 'corrugated-creasing-research', authority : 'Thakkar et al. / Eindhoven University of Technology', title : 'Experimental and numerical investigation of creasing in corrugated paperboard', url : 'https://research.tue.nl/en/publications/experimental-and-numerical-investigation-of-creasing-in-corrugate/', access : 'public research abstract; DOI 10.1080/14786430802342576' },
     { id : 'fefco-code', authority : 'FEFCO', title : 'FEFCO Code – Design style library for corrugated board products, 12th edition', url : 'https://www.fefco.org/technical-information/fefco-code', access : 'public summary/index' },
     { id : 'fefco-code-pdf', authority : 'FEFCO', title : 'FEFCO Code, 12th edition (2022)', url : 'https://www.fefco.org/sites/default/files/files/FEFCO%20Code_WEB%287%29.pdf', access : 'copyrighted reference; do not reproduce drawings wholesale' },
     { id : 'fefco-production', authority : 'FEFCO', title : 'Corrugated board production', url : 'https://www.fefco.org/node/1588', access : 'public' },
@@ -19,7 +27,7 @@ const Sources = [
 const Knowledge = {
     id : 'paper-packaging.corrugated.v1',
     name : 'Auto3D Corrugated Paper Packaging Knowledge Base',
-    updated : '2026-10-06',
+    updated : '2026-10-18',
     scope : 'Corrugated fibreboard packaging, FEFCO style families, board construction, flute profiles, material specifications, strength/performance metrics, and design-selection guidance.',
     limitations : [
         'Use this knowledge as design guidance, not as a substitute for converter drawings, certified board data, transport regulations, lab testing, or customer-specific packaging specifications.',
@@ -158,6 +166,21 @@ const Knowledge = {
         ],
         sources : ['fba-walmart']
     },
+    dimensionalEngineering : {
+        continuity : 'A score/crease is continuous board with local crushing and bending, not an empty gap. Perforations retain bridges between actual cuts. Slots, full cuts and manufacturer joints retain their intended geometry.',
+        authority : 'Canonical CAD points and measured board specifications determine dimensions. Visual crease meshes, display smoothing, perspective, textures and animation never determine engineering measurements.',
+        terms : { allowance : 'Intentional nominal CAD correction for folding/assembly.', tolerance : 'Permitted production variation about a nominal dimension.', clearance : 'Intentional space for product fit or assembly.' },
+        formulas : [
+            { id : 'inside-loss', expression : 'I = S - A_I; S = I_target + A_I', scope : 'Allowance bookkeeping; A_I must match the board, fold, orientation and style.', sources : ['fefco-101', 'esko-board-allowance'] },
+            { id : 'outside-gain', expression : 'O = S + A_O; S = O_target - A_O', scope : 'Allowance bookkeeping; outside gain is independent and must include the relevant layer arrangement.', sources : ['esko-board-allowance'] },
+            { id : 'fefco-101', expression : 'L_i = S_L - t; W_i = S_W - t; H_i = S_H - 2t', scope : 'Recommendation 101 measurement procedure, primarily 0201 flap-type cases. Not a universal style or closure rule.', sources : ['fefco-101'] },
+            { id : 'worst-case-tolerance', expression : 'T_D = T_S + abs(c) * T_t + T_process for D = S + c*t', scope : 'Engineering worst-case bound, not a standard-prescribed universal tolerance. Avoid double-counting process variation.', sources : [] }
+        ],
+        rscToleranceReference : { panelScoreToScoreMm : 1.5, overallFlatSheetMm : 3, inchValues : ['1/16', '1/8'], note : 'Report lists soft metric equivalents; these apply to flat measurements, not automatically to finished inside dimensions.', scope : 'B/C singlewall RSCs, 150–275 psi burst or 26–44 lb/in ECT, panel dimensions 4–25 inches, automatic packaging machinery. Non-normative technical report; not universal manufacturing limits.', source : 'pmmi-fba-rsc-2018' },
+        materialInputs : ['measured combined-board caliper and variation', 'liner and medium paper calipers/composition', 'flute profile, pitch, direction', 'score tooling, width/depth and process', 'conditioning/moisture', 'fold angle, closure and layer stack', 'converter-calibrated inside loss and outside gain'],
+        rules : ['Flute height excludes facings and is not finished board caliper.', 'Take-up factor accounts for medium paper consumption; never multiply CAD dimensions by it.', 'Default 0201 inside factors [1,1,2] are a FEFCO reference, not converter certification.', 'Default outside factors are zero until entered; zero is absence of a calibrated correction, not proof that inside and outside sizes are equal.', 'Measure caliper using the applicable complete ISO/TAPPI method; do not infer strength or caliper from flute letter alone.', 'Auto measures CAD; Manual drives a dimension once; Parametric holds a target through material changes. Each dimension has its own basis and tolerance.'],
+        sources : ['fefco-101', 'pmmi-fba-rsc-2018', 'iso-3034', 'tappi-827', 'tappi-829', 'tappi-402', 'esko-board-allowance', 'corrugated-creasing-research']
+    },
     cadReferences : [
         { style : 'FEFCO 0201 / RSC', formats : ['DXF', 'SVG', 'PDF', 'JSON'], source : 'Box Blanks', parametric : true, verifiedAgainstPublishedPlate : true, licenseUse : 'commercial generated output allowed; preserve API attribution when API terms require it', url : 'https://boxblanks.com/fefco/0201/' },
         { style : 'FEFCO 0200 / HSC', formats : ['DXF', 'SVG', 'PDF'], source : 'Free Box Template', parametric : true, licenseUse : 'site states free for personal/commercial projects', url : 'https://www.freeboxtemplate.com/corrugated/half-slotted-container-fefco-0200/' },
@@ -215,6 +238,8 @@ function searchKnowledge (query)
     Knowledge.flutes.forEach ((item) => add ('flute', item.code, item));
     Knowledge.performance.metrics.forEach ((item) => add ('performance-metric', item.id, item));
     Knowledge.selectionGuidance.forEach ((item, index) => add ('selection-guidance', String (index), item));
+    Knowledge.dimensionalEngineering.formulas.forEach ((item) => add ('dimensional-formula', item.id, item));
+    add ('dimensional-engineering', 'corrugated-measurements', Knowledge.dimensionalEngineering);
     Knowledge.terminology.forEach ((item) => add ('term', item.term, item));
     candidates.sort ((a, b) => b.relevance - a.relevance);
     return candidates.slice (0, 12);
@@ -249,7 +274,7 @@ export function onRequestGet (context)
     }
 
     if (section) {
-        const allowed = new Set (['terminology', 'fefco', 'papers', 'flutes', 'multiwall', 'performance', 'referenceGrades', 'cadReferences', 'selectionGuidance', 'agentRules', 'sources']);
+        const allowed = new Set (['terminology', 'fefco', 'papers', 'flutes', 'multiwall', 'performance', 'referenceGrades', 'cadReferences', 'dimensionalEngineering', 'selectionGuidance', 'agentRules', 'sources']);
         if (!allowed.has (section)) { return response ({ error : 'Unknown knowledge section.' }, 404); }
         return response ({
             knowledgeBase : { id : Knowledge.id, name : Knowledge.name, updated : Knowledge.updated, scope : Knowledge.scope },

@@ -41,7 +41,7 @@ export function PackagingModel (data, unit = Unit.Millimeter, surfaces = {})
         for (const [key, map] of Object.entries (definition)) { if (key.endsWith ('Map') && map) { material[key] = Object.assign (new TextureMap (), map); } }
         model.AddMaterial (material);
     }
-    for (const definition of data.meshes) {
+    for (const definition of [...data.meshes, ...(data.visualMeshes || [])]) {
         if (!definition.triangles.length && !definition.lines.length) { continue; }
         const mesh = new Mesh (); mesh.SetName (definition.name);
         definition.vertices.forEach (point => mesh.AddVertex (new Coord3D (...point.map (value => value / factor)))); definition.normals.forEach (normal => mesh.AddNormal (new Coord3D (...normal))); definition.uvs.forEach (uv => mesh.AddTextureUV (new Coord2D (...uv)));
@@ -57,7 +57,8 @@ export async function CreatePackagingModel (profile, unit = Unit.Millimeter) { c
 export function ApplyFefcoFoldPose (root, rig, pose, unit)
 {
     const factor = PackagingUnitMM[unit]; const matrices = new Map (rig.panels.map ((panel, index) => { const values = [...pose.matrices[index]]; for (const axis of [12, 13, 14]) { values[axis] /= factor; } return [panel.name, values]; }));
-    root.traverse (item => { if (item.isMesh && matrices.has (item.name)) { item.matrixAutoUpdate = false; item.matrix.copy (new Matrix4 ().fromArray (matrices.get (item.name))); } }); root.updateMatrixWorld (true);
+    const visuals = new Map ((pose.visualMeshes || []).map (mesh => [mesh.name, mesh]));
+    root.traverse (item => { if (item.isMesh && visuals.has (item.name)) { const data = visuals.get (item.name); const positions = item.geometry.getAttribute ('position'); const normals = item.geometry.getAttribute ('normal'); let i = 0; for (const triangle of data.triangles) { for (let corner = 0; corner < 3; corner++) { positions.setXYZ (i, ...data.vertices[triangle.vertices[corner]].map (value => value / factor)); normals.setXYZ (i, ...data.normals[triangle.normals[corner]]); i++; } } positions.needsUpdate = true; normals.needsUpdate = true; item.geometry.computeBoundingSphere (); } else if (item.isMesh && matrices.has (item.name)) { item.matrixAutoUpdate = false; item.matrix.copy (new Matrix4 ().fromArray (matrices.get (item.name))); } }); root.updateMatrixWorld (true);
 }
 
 export function FefcoSurfaces (model)

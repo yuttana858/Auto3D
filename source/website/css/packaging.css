@@ -1,5 +1,5 @@
-.packaging_dialog { width: min(1240px, 94vw); max-width: 94vw; height: min(850px, 90vh); }
-.packaging_body { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 16px; padding: 16px; min-height: 0; height: calc(100% - 92px); }
+.packaging_dialog { box-sizing: border-box; width: min(1240px, 94vw); max-width: 94vw; height: min(850px, 90vh); }
+.packaging_body { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 16px; padding: 16px; min-height: 0; height: calc(100% - 92px); }
 .packaging_controls { display: flex; flex-direction: column; gap: 8px; overflow: auto; padding-right: 8px; }
 .packaging_controls label { display: grid; gap: 4px; font-size: 12px; }
 .packaging_controls input, .packaging_controls select, .packaging_controls button, .packaging_drawing button { background: var(--ov_background_color); color: var(--ov_foreground_color); border: 1px solid var(--ov_border_color); padding: 7px; border-radius: 4px; min-width: 0; font: inherit; }
@@ -14,3 +14,9 @@
 .packaging_vertices { max-height: 220px; overflow: auto; margin-top: 8px; }
 .packaging_vertex { display: grid; grid-template-columns: 18px 1fr 1fr; align-items: center; gap: 4px; margin-bottom: 4px; font-size: 12px; }
 @media (max-width: 700px) { .packaging_body { grid-template-columns: 185px minmax(0, 1fr); gap: 8px; padding: 8px; } .packaging_drawing_header { flex-direction: column; align-items: start; } }
+.packaging_controls > [hidden] { display: none !important; }
+.packaging_controls button[aria-pressed=true] { border-color: #bd76ed; color: #bd76ed; }
+
+@media (max-width: 700px) { .packaging_body { display: flex; flex-direction: column; overflow:auto; } .packaging_controls { flex: 0 0 auto; max-height: 45vh; } .packaging_drawing { min-height: 40vh; } .packaging_canvas { min-height: 250px; } }
+
+@media (max-width: 700px) { .packaging_dialog { padding: 12px; width: 96vw; max-width: 96vw; height: 92vh; max-height: 92vh; } }

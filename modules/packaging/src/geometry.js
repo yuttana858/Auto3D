@@ -6,11 +6,11 @@ import { ReferenceSingleWallStack } from './boardlayers.js';
 import { PackagingContours, ValidatePackaging } from './profile.js';
 import { MeshData } from './mesh.js';
 
-export function CreateFefcoBox (input)
+export function CreateFefcoBox (input, savedProfile = null)
 {
     // Generation and animation use exactly the same finite board solids.
     // No shape/caliper jump when playback completes.
-    const rig = CreateFefcoFoldRig (input); const p = rig.parameters;
+    const rig = CreateFefcoFoldRig (input, savedProfile); const p = rig.parameters;
     const frame = FefcoFoldFrame (rig, p.code === '0200' || p.closure === 'closed' ? 1 : 0.72);
     return { ...frame, parameters : p };
 }

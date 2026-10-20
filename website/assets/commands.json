@@ -796,6 +796,335 @@
       }
     },
     {
+      "id": "packaging.measurements.open",
+      "title": "Open CAD Measurement layer",
+      "category": "Packaging",
+      "description": "Open Packaging Designer directly to its interactive Measurement layer. Does not apply edits or change geometry.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.layer",
+      "title": "Choose Packaging Designer layer",
+      "category": "Packaging",
+      "description": "Switch an open Packaging Designer between Drawing tools and Measurement layer. Does not change geometry.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "layer": {
+            "type": "string",
+            "enum": [
+              "drawing",
+              "measurement"
+            ]
+          }
+        },
+        "required": [
+          "layer"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "layer": "measurement"
+      }
+    },
+    {
+      "id": "packaging.measurements.inspect",
+      "title": "Inspect CAD Measurement layer",
+      "category": "Packaging",
+      "description": "Read authoritative CAD point distances, inside/outside allowance formulas, independent dimension modes, worst-case intervals and portable material records. Never measures rendered geometry.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.measurements.visible",
+      "title": "Show CAD measurements",
+      "category": "Packaging",
+      "description": "Set visibility of the saved Measurement layer on the CAD drawing. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "visible": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "visible"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "visible": true
+      }
+    },
+    {
+      "id": "packaging.measurements.update",
+      "title": "Drive a CAD dimension",
+      "category": "Packaging",
+      "description": "Edit one independent CAD measurement in canonical mm. Auto reads geometry; Manual drives once; Parametric holds its target on material updates. Inside/outside use material allowance factors. Rebuilds matching generated boxes atomically; custom segments move their endpoint. Undo supported; conflicting constraints rejected.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "manual",
+              "parametric"
+            ]
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "score",
+              "inside",
+              "outside"
+            ]
+          },
+          "targetMm": {
+            "type": "number",
+            "minimum": 0.001,
+            "maximum": 100000
+          },
+          "toleranceMm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "length",
+        "mode": "parametric",
+        "basis": "inside",
+        "targetMm": 400,
+        "toleranceMm": 1
+      }
+    },
+    {
+      "id": "packaging.materials.update",
+      "title": "Update board engineering specification",
+      "category": "Packaging",
+      "description": "Update the active portable board record, including measured caliper, component paper calipers, process tolerances and L/W/H allowance factors. Parametric dimensions retain their targets; manual dimensions follow the resulting CAD. Preserves original engineering precision and records Undo. User-calibrated does not imply certification.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "flute": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "provenance": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "calibrated": {
+            "type": "boolean"
+          },
+          "insideFactors": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 20
+            }
+          },
+          "outsideFactors": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 20
+            }
+          },
+          "outsideLinerGrade": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "insideLinerGrade": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "mediumGrade": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "scoreProcess": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "conditioning": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "outsideLinerGsm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2000
+          },
+          "insideLinerGsm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2000
+          },
+          "mediumGsm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2000
+          },
+          "fluteDirectionDegrees": {
+            "type": "number",
+            "minimum": -360,
+            "maximum": 360
+          },
+          "caliperMm": {
+            "type": "number",
+            "minimum": 0.000001,
+            "maximum": 100
+          },
+          "caliperToleranceMm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "outsideLinerMm": {
+            "type": "number",
+            "minimum": 1e-8,
+            "maximum": 100
+          },
+          "insideLinerMm": {
+            "type": "number",
+            "minimum": 1e-8,
+            "maximum": 100
+          },
+          "mediumPaperMm": {
+            "type": "number",
+            "minimum": 1e-8,
+            "maximum": 100
+          },
+          "flutePitchMm": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 50
+          },
+          "scoreWidthMm": {
+            "type": "number",
+            "minimum": 0.000001,
+            "maximum": 200
+          },
+          "scoreToleranceMm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "processToleranceMm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 50
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "caliperMm": 4,
+        "caliperToleranceMm": 0.15,
+        "insideFactors": [
+          1,
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "id": "packaging.materials.activate",
+      "title": "Activate board record",
+      "category": "Packaging",
+      "description": "Select an existing per-design material record and recalculate parametric dimensions. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "board-custom"
+      }
+    },
+    {
+      "id": "packaging.materials.duplicate",
+      "title": "Duplicate board record",
+      "category": "Packaging",
+      "description": "Copy the active board specification into a new unique per-design record and activate it. Records travel in saved profiles/sessions. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "supplier-bc-01"
+      }
+    },
+    {
       "id": "packaging.open_selected",
       "title": "Open selected packaging dieline",
       "category": "Packaging",
@@ -2686,6 +3015,7 @@
               "performance",
               "referenceGrades",
               "cadReferences",
+              "dimensionalEngineering",
               "selectionGuidance",
               "agentRules",
               "sources"

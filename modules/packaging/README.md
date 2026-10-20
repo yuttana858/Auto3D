@@ -1,4 +1,4 @@
-# Packaging module v1.5.0
+# Packaging module v1.6.0
 
 A separate package for FEFCO 0200–0203 boxes, canonical-mm dielines, physical board extrusion, kraft textures, catalog controls and flat-sheet unfolding. It can be developed or copied to a separate repository without Auto3D source. Its only runtime dependencies are Three.js and fflate, under MIT licenses.
 
@@ -77,3 +77,12 @@ Outside score-face hinges wrap the sleeve, with one caliper reserved for its glu
 `FefcoFoldContacts(rig, pose)` reports positive-volume intersections in mm, permitting touching surfaces within 0.00001 mm. `FefcoFoldPose` checks its resulting pose and throws with the offending pair before a host displays intersecting panels. `await InspectFefcoFold(rig, optionalYieldCallback)` audits 3,601 poses covering the complete route (maximum one degree per hinge between samples), returning `{clear, code, samples, angularStep, units, tolerance, intersections}` plus the first blocked progress/stage if necessary. Auto3D and the standalone preview audit before replacing the original, yield processing feedback, and restore the original on playback failures. Auto3D exposes the same audit through `packaging.fefco.folding.check`.
 
 Detection covers this generated box’s panels, including its trapezoidal joint. It does not test unrelated scene objects, renderer displacement or arbitrary edited/imported meshes. The route audit is sampled, with exact checks at displayed poses; it is not a continuous collision solver or certified tooling calculation. Original CAD paths and unscaled parameters remain required for folding.
+
+
+## Engineering measurements and visual continuity in v1.6.0
+
+`engineering.js` evaluates dimensions from actual saved CAD points with independent Auto / Manual / Parametric modes, score / inside / outside basis, tolerance overrides, allowance factors and worst-case intervals. `EngineeringPanel` uses a neutral inspect/update/run host. Optional validated `profile.engineering` persists a per-design material database and dimension references. `EditEngineering`, `ScoreForTarget`, and `DrivePathDimension` provide pure editing primitives; hosts atomically regenerate matching generated objects and reject incompatible constraints.
+
+`CreaseVisualMeshes(rig, pose)` returns separate presentation meshes for known shared scores. `FefcoFoldPose` and `FefcoFoldFrame` include these as `visualMeshes`; `CreateFefcoBox(input, optionalSavedProfile)` retains board specifications. Hosts display them alongside `meshes` and update their buffers during playback. They are excluded from rigid collision solids and authoritative CAD measurements. Editable visual crease width controls bounded rounding; constituent paper calipers and flute pitch remain material/visual metadata, not an inferred mechanical law. Existing API-v1 consumers may ignore optional visual meshes.
+
+Auto3D exposes the controls under Packaging Designer → Measurement layer. The independent preview shows CAD, dimensions/formulas and the rendered box together. See [the engineering contract](../../docs/corrugated-dimensions-and-creases.md) for formula scope, calibration, limits and references. Existing generator inputs and legacy fit-reserve dimensions remain backward compatible; once the Measurement layer is saved, edit engineering targets there rather than through the legacy fit editor.

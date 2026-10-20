@@ -3,6 +3,7 @@ import { ValidateFefco, FlapDepth, FefcoProfile } from './fefco.js';
 import { ValidatePackaging } from './profile.js';
 import { BoardMaterials } from './material.js';
 import { ReferenceSingleWallStack } from './boardlayers.js';
+import { CreaseVisualMeshes } from './creasevisuals.js';
 import { MeshData } from './mesh.js';
 import { PanelSolid, SolidIntersections } from './solid.js';
 
@@ -37,7 +38,10 @@ export function CreateFefcoFoldRig (input, savedProfile = null)
         if (parameters.code !== '0200') { add ('Top ' + sides[i], rectangle (a, b, h, h + depth), 'top', i); }
     }
     add ('Inside glued joint', [[-joint, 2 * t], [0, 0], [0, h], [-joint, h - 2 * t]], 'joint', 0);
-    return { apiVersion : 1, units : 'mm', parameters, profile, materials : BoardMaterials (), meshes, panels, edges, boardStack : ReferenceSingleWallStack (t), artworkMapping : { coordinates : 'global-dieline-mm', repeat : false } };
+    const rig = { apiVersion : 1, units : 'mm', parameters, profile, materials : BoardMaterials (), meshes, panels, edges, boardStack : ReferenceSingleWallStack (t), artworkMapping : { coordinates : 'global-dieline-mm', repeat : false } };
+    const material = profile.engineering?.materials.find (m => m.id === profile.engineering.activeMaterialId);
+    if (material) { rig.boardStack = { model : 'visual-reference', units : 'mm', totalCaliperMm : t, outsideLinerMm : material.outsideLinerMm, insideLinerMm : material.insideLinerMm, mediumPaperMm : material.mediumPaperMm, flute : { pitchMm : material.flutePitchMm, axisRadians : material.fluteDirectionDegrees * Math.PI / 180, heightMm : t - material.outsideLinerMm - material.insideLinerMm }, scoreWidthMm : material.scoreWidthMm }; }
+    rig.visualMeshes = CreaseVisualMeshes (rig, { matrices : panels.map (() => new THREE.Matrix4 ().toArray ()) }); return rig;
 }
 
 function FoldPose (rig, progress)
@@ -86,7 +90,7 @@ export function FefcoFoldPose (rig, progress)
 {
     const pose = FoldPose (rig, progress); const contacts = FefcoFoldContacts (rig, pose);
     if (!contacts.clear) { const pair = contacts.intersections[0]; throw new Error ('Fold blocked: ' + pair.panels.join (' / ') + ' intersect at ' + (progress * 100).toFixed (2) + '%.'); }
-    return { ...pose, contacts };
+    return { ...pose, contacts, visualMeshes : CreaseVisualMeshes (rig, pose) };
 }
 
 // Audit independently of display frame rate, before replacing the original.
@@ -110,5 +114,5 @@ export function FefcoFoldFrame (rig, progress)
         const matrix = new THREE.Matrix4 ().fromArray (pose.matrices[index]); const normals = new THREE.Matrix3 ().getNormalMatrix (matrix);
         return { ...mesh, vertices : mesh.vertices.map (point => new THREE.Vector3 (...point).applyMatrix4 (matrix).toArray ()), normals : mesh.normals.map (normal => new THREE.Vector3 (...normal).applyMatrix3 (normals).normalize ().toArray ()) };
     });
-    return { ...rig, meshes, state : progress === 0 ? 'flat' : 'folded', parameters : { ...rig.parameters, closure : progress === 1 && rig.parameters.code !== '0200' ? 'closed' : 'open' }, foldProgress : progress, stage : pose.stage };
+    return { ...rig, meshes, visualMeshes : CreaseVisualMeshes (rig, pose), state : progress === 0 ? 'flat' : 'folded', parameters : { ...rig.parameters, closure : progress === 1 && rig.parameters.code !== '0200' ? 'closed' : 'open' }, foldProgress : progress, stage : pose.stage };
 }
