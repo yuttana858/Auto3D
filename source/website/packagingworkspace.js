@@ -3,6 +3,7 @@ import { BoardCalipers, NewPackagingDesign, ValidatePackaging, PackagingBounds, 
 import { Unit } from '../engine/model/unit.js';
 import { DisplayUnitLabel } from './preferences.js';
 import { DefaultFefco, ValidateFefco, FefcoProfile, FefcoPreset, FefcoAnimationPlan } from '../../modules/packaging/src/fefco.js';
+import { EngineeringAxes, DefaultEngineering, EngineeringMeasurements, EditEngineering, ScoreForTarget, DrivePathDimension } from '../../modules/packaging/src/engineering.js';
 import { FefcoDimensions, ResolveFefcoDimensions } from '../../modules/packaging/src/dimensions.js';
 import { Box3, Vector3, Sphere } from 'three';
 import { LoadPackagingModule, PackagingModel, FefcoSurfaces, ApplyFefcoFoldPose } from './packagingadapter.js';
@@ -16,16 +17,17 @@ export class PackagingWorkspace
 {
     constructor (editor) { this.editor = editor; this.dialog = null; this.refreshing = false; this.draft = []; this.active = null; this.draftType = 'cut'; this.gridSnapMM = 5; this.displayFactor = 1; this.view = { x : -20, y : -220, width : 340, height : 240 }; }
     Design () { return this.editor.document.packaging || NewPackagingDesign (); }
-    PanelHost () { return { dimensions : () => this.DimensionsInspect (), dimensionMode : basis => this.DimensionMode (basis), updateDimensions : changes => this.UpdateDimensions (changes), dimensionsBlocked : () => this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false || this.editor.busy && !this.dimensionUpdating, inspect : () => this.FefcoInspect (), configure : changes => this.ConfigureFefco (changes), generate : changes => this.GenerateFefco (changes), preset : (code, changes) => this.GeneratePreset (code, changes), designer : () => this.OpenSelected (), unfold : () => this.UnfoldSelected (), animate : () => this.AnimateFold (), animation : () => this.AnimationInspect (), playback : () => this.FoldInspect (), control : action => this.FoldControl (action), canAnimate : () => Boolean (this.editor.selected?.userData?._auto3dFefco), factor : () => this.Factor (), run : action => this.editor.Run (action), blocked : () => this.editor.busy || this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false, canUnfold : () => this.CanUnfold () }; }
+    PanelHost () { return { dimensions : () => this.DimensionsInspect (), dimensionMode : basis => this.DimensionMode (basis), updateDimensions : changes => this.UpdateDimensions (changes), dimensionsBlocked : () => this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false || this.editor.busy && !this.dimensionUpdating, inspect : () => this.FefcoInspect (), configure : changes => this.ConfigureFefco (changes), generate : changes => this.GenerateFefco (changes), preset : (code, changes) => this.GeneratePreset (code, changes), designer : () => this.OpenSelected (), measurements : () => { this.OpenSelected (); return this.OpenMeasurements (); }, unfold : () => this.UnfoldSelected (), animate : () => this.AnimateFold (), animation : () => this.AnimationInspect (), playback : () => this.FoldInspect (), control : action => this.FoldControl (action), canAnimate : () => Boolean (this.editor.selected?.userData?._auto3dFefco), factor : () => this.Factor (), run : action => this.editor.Run (action), blocked : () => this.editor.busy || this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false, canUnfold : () => this.CanUnfold () }; }
     DimensionsInspect ()
     {
         const object = this.editor.selected; if (!object?.userData?._auto3dFefco) { return null; }
-        try { const p = ValidateFefco (JSON.parse (object.userData._auto3dFefco)); const tolerance = Number (object.userData._auto3dFitTolerance || 0); return { ...FefcoDimensions (p, tolerance), objectId : object.id, name : object.name, code : p.code, basis : this.dimensionBasis || 'inside', editable : object.scale.every (v => Math.abs (v - 1) < 1e-6) }; } catch { return null; }
+        try { if (object.packagingProfile?.engineering) { const e = EngineeringMeasurements (object.packagingProfile); const dimensions = key => Object.fromEntries (e.dimensions.map (d => [d.id, d[key]])); return { ...FefcoDimensions (JSON.parse (object.userData._auto3dFefco)), inside : dimensions ('insideMm'), outside : dimensions ('outsideMm'), objectId : object.id, name : object.name, code : JSON.parse (object.userData._auto3dFefco).code, basis : this.dimensionBasis || 'inside', editable : false, editReason : 'Edit in Packaging Designer → Measurement layer' }; } const p = ValidateFefco (JSON.parse (object.userData._auto3dFefco)); const tolerance = Number (object.userData._auto3dFitTolerance || 0); return { ...FefcoDimensions (p, tolerance), objectId : object.id, name : object.name, code : p.code, basis : this.dimensionBasis || 'inside', editable : object.scale.every (v => Math.abs (v - 1) < 1e-6) }; } catch { return null; }
     }
     DimensionMode (basis) { if (!['inside', 'outside'].includes (basis)) { throw new Error ('Choose inside or outside dimensions.'); } this.dimensionBasis = basis; this.editor.website.aiWorkspace?.fefcoPanel?.RefreshDimensions (); return this.DimensionsInspect (); }
     async UpdateDimensions (changes, objectId = null)
     {
         this.Editable (); const editor = this.editor; const target = editor.document; const source = objectId ? target.objects.find (item => item.id === objectId) : editor.selected;
+        if (source?.packagingProfile?.engineering) { throw new Error ('Edit this engineering-linked design under Packaging Designer → Measurement layer.'); }
         if (!source?.userData?._auto3dFefco || source.scale.some (v => Math.abs (v - 1) > 1e-6)) { throw new Error ('Select an unscaled generated box or its dieline to edit dimensions.'); }
         if (!changes || Object.keys (changes).some (key => !['basis', 'length', 'width', 'height', 'thickness', 'tolerance'].includes (key))) { throw new Error ('Invalid box dimension fields.'); }
         const p = ValidateFefco (JSON.parse (source.userData._auto3dFefco)); const oldTolerance = Number (source.userData._auto3dFitTolerance || 0); const basis = changes.basis || this.dimensionBasis || 'inside'; const beforeDimensions = FefcoDimensions (p, oldTolerance);
@@ -111,7 +113,7 @@ export class PackagingWorkspace
             // Playback controls remain accessible while ordinary editing/saving is blocked.
             operation.completion = operation.player.Start ().then (async result => {
                 if (!result.completed) { await restore (); this.lastFold = { state : 'cancelled', progress : 0, objectId : source.id }; editor.Status ('Folding cancelled · original object restored'); return; }
-                const next = { ...parameters, closure : plan.targetClosure }; const data = plan.targetState === 'flat' ? module.UnfoldFefco (next, profile) : module.CreateFefcoBox (next); final = target.AddImported (PackagingModel (data, unit, surfaces), source.name.replace (/ · (Dieline|Folded|Open|Closed)$/, '') + (plan.targetState === 'flat' ? ' · Dieline' : plan.targetClosure === 'open' ? ' · Open' : ' · Closed')); assign (final, plan.targetState, data.parameters); final.source = 'FEFCO ' + parameters.code + ' ' + plan.targetState;
+                const next = { ...parameters, closure : plan.targetClosure }; const data = plan.targetState === 'flat' ? module.UnfoldFefco (next, profile) : module.CreateFefcoBox (next, profile); final = target.AddImported (PackagingModel (data, unit, surfaces), source.name.replace (/ · (Dieline|Folded|Open|Closed)$/, '') + (plan.targetState === 'flat' ? ' · Dieline' : plan.targetClosure === 'open' ? ' · Open' : ' · Closed')); assign (final, plan.targetState, data.parameters); final.source = 'FEFCO ' + parameters.code + ' ' + plan.targetState;
                 target.Remove (final); target.Remove (preview); target.Restore (final, index); target.packaging = profile; editor.selected = final; await editor.Render (true);
                 const apply = async forward => { target.Remove (forward ? source : final); target.Restore (forward ? final : source, index); target.packaging = forward ? profile : before; editor.selected = forward ? final : previous; await editor.Render (true); this.Refresh (); editor.website.aiWorkspace?.RefreshPackaging (); };
                 editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); this.lastFold = { state : 'completed', progress : 1, stage : plan.stages.at (-1), action : plan.action, objectId : final.id }; editor.Status ('Folding complete · ' + plan.stages.at (-1) + ' · Undo available');
@@ -180,26 +182,67 @@ export class PackagingWorkspace
             if (object) { target.Remove (object); target.packaging = before; editor.selected = previous; await editor.Render (); } throw error;
         } finally { editor.busy = false; editor.RefreshButtons?.(); editor.website.aiWorkspace?.RefreshPackaging (); }
     }
+    EngineeringInspect ()
+    {
+        const profile = ValidatePackaging (this.Design ()); const code = this.EngineeringParameters (profile)?.code || null;
+        return EngineeringMeasurements ({ ...profile, engineering : profile.engineering || DefaultEngineering (profile, code) });
+    }
+    EngineeringParameters (profile)
+    {
+        try { const p = this.editor.selected?.userData?._auto3dFefco ? ValidateFefco (JSON.parse (this.editor.selected.userData._auto3dFefco)) : ValidateFefco (this.fefco || DefaultFefco);
+            const expected = FefcoProfile (p); return JSON.stringify (expected.paths) === JSON.stringify (profile.paths) && expected.thickness === profile.thickness ? p : null;
+        } catch { return null; }
+    }
+    async UpdateEngineering (changes)
+    {
+        this.Editable (); const editor = this.editor; const target = editor.document; const account = editor.website.auth.user.id; const before = ValidatePackaging (this.Design ()); const originalParameters = this.EngineeringParameters (before);
+        const { engineering, material, driving } = EditEngineering (before, changes, originalParameters?.code);
+        let next = { ...before, thickness : material.caliperMm, grade : material.name, engineering }; let parameters = originalParameters;
+        if (originalParameters) {
+            parameters = { ...originalParameters, thickness : material.caliperMm };
+            for (const dimension of driving) { if (EngineeringAxes.includes (dimension.id)) { parameters[dimension.id] = ScoreForTarget (dimension, material); } }
+            parameters = ValidateFefco (parameters); next = { ...FefcoProfile (parameters), name : before.name, grade : material.name, engineering };
+        } else { for (const dimension of driving) { next = DrivePathDimension (next, dimension, material); } }
+        next = ValidatePackaging (next);
+        const result = EngineeringMeasurements (next);
+        if (result.dimensions.some (d => d.mode === 'parametric' && !d.targetMet)) { throw new Error ('Conflicting parametric dimensions. Adjust their targets or switch one to Auto.'); }
+        const source = editor.selected; const matching = source?.packagingProfile && JSON.stringify (ValidatePackaging (source.packagingProfile)) === JSON.stringify (before);
+        if (source && matching && source.scale.some (v => Math.abs (v - 1) > 1e-6)) { throw new Error ('Reset object scaling before editing engineering dimensions.'); }
+        if (!matching) { this.Change (next); return this.EngineeringInspect (); }
+        // Build before mutation; then atomically replace profile and selected object.
+        const module = await LoadPackagingModule (); this.Editable ();
+        if (editor.document !== target || editor.website.auth.user.id !== account || !target.objects.includes (source) || JSON.stringify (this.Design ()) !== JSON.stringify (before)) { throw new Error ('The workspace or account changed during the engineering edit.'); }
+        const flat = source.userData._auto3dPackagingState === 'flat'; const data = !parameters ? module.CreateBoard (next, { textured : true, guides : true }) : flat ? module.UnfoldFefco (parameters, next) : module.CreateFefcoBox (parameters, next); data.profile = next;
+        const model = PackagingModel (data, target.model.GetUnit (), FefcoSurfaces (target.CompactModel ([source], true))); const index = target.objects.indexOf (source); let replacement;
+        editor.busy = true; editor.RefreshButtons?.();
+        try {
+            replacement = target.AddImported (model, source.name); Object.assign (replacement, { id : source.id, source : source.source, position : [...source.position], rotation : [...source.rotation], scale : [...source.scale], visible : source.visible, castShadow : source.castShadow !== false, receiveShadow : source.receiveShadow !== false, packagingProfile : next, userData : { ...source.userData, ...(parameters ? { _auto3dFefco : JSON.stringify (parameters) } : {}) } }); target.ApplyTransform (replacement);
+            target.Remove (replacement); target.Remove (source); target.Restore (replacement, index); target.packaging = next; editor.selected = replacement; await editor.Render ();
+            const apply = async forward => { target.Remove (forward ? source : replacement); target.Restore (forward ? replacement : source, index); target.packaging = forward ? next : before; editor.selected = forward ? replacement : source; this.fefco = forward ? parameters : originalParameters; await editor.Render (); this.Refresh (); };
+            editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); this.fefco = parameters; this.Refresh (); return result;
+        } catch (error) { if (replacement) { target.Remove (replacement); } if (!target.objects.includes (source)) { target.Restore (source, index); } target.packaging = before; editor.selected = source; await editor.Render (); throw error; }
+        finally { editor.busy = false; editor.RefreshButtons?.(); this.Refresh (); }
+    }
     Factor () { return this.editor.website.preferences.units === 'standard' ? 25.4 : 1; }
     Editable () { if (this.editor.readOnly || this.editor.busy || !this.editor.website.auth?.user || this.editor.website.accountReady === false) { throw new Error ('Sign in to an editable, idle workspace.'); } }
     Inspect () { return { ...ValidatePackaging (this.Design ()), units : 'mm', displayUnits : DisplayUnitLabel (this.editor.website.preferences.units), selectedPathId : this.active, draftType : this.draftType, gridSnapMM : this.gridSnapMM, draftPoints : this.draft.map ((point) => [...point]) }; }
     Change (next)
     {
-        this.Editable (); const before = this.editor.document.packaging ? ValidatePackaging (this.editor.document.packaging) : null; const after = ValidatePackaging (next); const target = this.editor.document;
+        this.Editable (); const before = this.editor.document.packaging ? ValidatePackaging (this.editor.document.packaging) : null; const after = ValidatePackaging (next); if (after.engineering && EngineeringMeasurements (after).dimensions.some (d => d.mode === 'parametric' && !d.targetMet)) { throw new Error ('This edit conflicts with a parametric measurement. Update its target or switch it to Auto.'); } const target = this.editor.document;
         const apply = (value) => { target.packaging = value ? ValidatePackaging (value) : null; this.Refresh (); };
         apply (after); this.editor.history.Push ({ undo : () => apply (before), redo : () => apply (after) }); return this.Inspect ();
     }
     AddPath (points, type = 'cut', closed = false, units = 'display')
     {
-        const factor = units === 'mm' ? 1 : this.Factor (); const design = ValidatePackaging (this.Design ()); const path = { id : crypto.randomUUID (), type, closed, points : points.map ((point) => point.map ((value) => value * factor)) }; design.paths.push (path); const result = this.Change (design); this.active = path.id; this.Refresh (); return { pathId : path.id, design : result };
+        const factor = units === 'mm' ? 1 : this.Factor (); const design = ValidatePackaging (this.Design ()); const path = { id : crypto.randomUUID (), type, closed, points : points.map ((point) => point.map ((value) => value * factor)) }; design.paths.push (path); if (design.engineering) { design.engineering.dimensions.push (...DefaultEngineering ({ ...design, paths : [path] }).dimensions); } const result = this.Change (design); this.active = path.id; this.Refresh (); return { pathId : path.id, design : result };
     }
     EditPath (id, changes, units = 'display')
     {
         const design = ValidatePackaging (this.Design ()); const path = design.paths.find ((item) => item.id === id); if (!path) { throw new Error ('Choose an existing path.'); }
         const factor = units === 'mm' ? 1 : this.Factor (); if (changes.points) { path.points = changes.points.map ((point) => point.map ((value) => value * factor)); } if (changes.type !== undefined) { path.type = changes.type; } if (changes.closed !== undefined) { path.closed = changes.closed; } return this.Change (design);
     }
-    DeletePath (id) { const design = ValidatePackaging (this.Design ()); if (!design.paths.some ((path) => path.id === id)) { throw new Error ('Choose an existing path.'); } design.paths = design.paths.filter ((path) => path.id !== id); return this.Change (design); }
-    SetBoard (thickness, grade = 'Custom', units = 'display') { const design = ValidatePackaging (this.Design ()); design.thickness = thickness * (units === 'mm' ? 1 : this.Factor ()); design.grade = grade; return this.Change (design); }
+    DeletePath (id) { const design = ValidatePackaging (this.Design ()); if (!design.paths.some ((path) => path.id === id)) { throw new Error ('Choose an existing path.'); } design.paths = design.paths.filter ((path) => path.id !== id); if (design.engineering) { design.engineering.dimensions = design.engineering.dimensions.filter (d => d.pathId !== id); } return this.Change (design); }
+    SetBoard (thickness, grade = 'Custom', units = 'display') { const design = ValidatePackaging (this.Design ()); if (design.engineering) { return this.UpdateEngineering ({ material : { caliperMm : thickness * (units === 'mm' ? 1 : this.Factor ()), name : grade } }); } design.thickness = thickness * (units === 'mm' ? 1 : this.Factor ()); design.grade = grade; return this.Change (design); }
     SetName (name) { const design = ValidatePackaging (this.Design ()); design.name = name; return this.Change (design); }
     Export (format)
     {
@@ -263,13 +306,24 @@ export class PackagingWorkspace
     {
         this.Editable (); const result = this.AddPath (this.draft, this.draftType, closed, 'mm'); this.draft = []; this.Refresh (); this.Message ((closed ? 'Closed outline' : 'Open path') + ' added · ' + result.pathId.slice (0, 8)); return result;
     }
+    SetControlLayer (layer)
+    {
+        if (!['drawing', 'measurement'].includes (layer)) { throw new Error ('Choose Drawing or Measurement layer.'); }
+        this.controlLayer = layer;
+        if (this.authoringContainer) { this.authoringContainer.hidden = layer !== 'drawing'; }
+        if (this.engineeringContainer) { this.engineeringContainer.hidden = layer !== 'measurement'; }
+        this.layerButtons?.forEach ((button, key) => button.setAttribute ('aria-pressed', String (key === layer)));
+        return { opened : Boolean (this.dialog?.isConnected), layer };
+    }
+    OpenMeasurements () { const result = this.Open (); this.SetControlLayer ('measurement'); return { ...result, layer : 'measurement' }; }
     Open ()
     {
         if (this.dialog?.isConnected) { return { opened : true }; } this.Editable (); this.draft = []; this.active = null; this.displayFactor = this.Factor ();
         const dialog = WorkspaceDialog ('Packaging'); this.dialog = dialog; dialog.classList.add ('packaging_dialog');
-        const body = Element ('div', dialog, undefined, 'packaging_body'); const tools = Element ('div', body, undefined, 'packaging_controls');
+        const body = Element ('div', dialog, undefined, 'packaging_body'); const controls = Element ('div', body, undefined, 'packaging_controls'); const layers = Element ('div', controls, undefined, 'packaging_actions'); const tools = Element ('div', controls); this.authoringContainer = tools;
         const field = (title, tag = 'input') => { const label = Element ('label', tools, title); const input = Element (tag, label); input.setAttribute ('aria-label', title); return input; };
         const action = (title, fn, parent = tools) => { const button = Element ('button', parent, title); button.type = 'button'; button.addEventListener ('click', () => this.Run (fn)); return button; };
+        this.layerButtons = new Map (); for (const [id, title] of [['drawing', 'Drawing tools'], ['measurement', 'Measurement layer']]) { const button = action (title, () => this.SetControlLayer (id), layers); this.layerButtons.set (id, button); }
         this.name = field ('Profile name'); this.name.maxLength = 100; this.name.addEventListener ('change', () => this.Run (() => this.SetName (this.name.value)));
         this.type = field ('New path type', 'select'); this.type.add (new Option ('Cut · red', 'cut')); this.type.add (new Option ('Score · blue dashed', 'score')); this.type.value = this.draftType; this.type.addEventListener ('change', () => { this.Run (() => this.SetDraftType (this.type.value)); });
         const hint = Element ('p', tools, 'Click points on the drawing or enter exact X/Y coordinates. Finish an open line or close an outline. Red = cut; blue dashed = score.', 'section_hint');
@@ -290,6 +344,7 @@ export class PackagingWorkspace
         action ('Save profile and session…', () => { if (this.draft.length) { throw new Error ('Finish or cancel the current path before saving.'); } dialog.close (); return this.editor.library.SaveDialog (); });
         const exports = Element ('div', tools, undefined, 'packaging_actions'); for (const format of ['svg', 'dxf']) { action ('Download ' + format.toUpperCase (), () => { if (this.draft.length) { throw new Error ('Finish or cancel the current path before exporting.'); } return this.Download (format); }, exports); }
         action ('Undo edit', () => this.editor.Undo ()); action ('Redo edit', () => this.editor.Redo ());
+        this.engineeringContainer = Element ('div', controls); this.SetControlLayer (this.controlLayer || 'drawing'); LoadPackagingModule ().then (module => { if (!dialog.isConnected) { return; } this.engineeringPanel = new module.EngineeringPanel ({ inspect : () => this.EngineeringInspect (), update : changes => this.UpdateEngineering (changes), factor : () => this.Factor (), blocked : () => this.editor.readOnly || this.editor.busy, run : action => this.Run (action) }, this.engineeringContainer); }).catch (error => this.Message (error.message));
         const drawing = Element ('div', body, undefined, 'packaging_drawing'); const top = Element ('div', drawing, undefined, 'packaging_drawing_header'); this.units = Element ('span', top); action ('Fit drawing', () => this.Fit (), top);
         this.svg = document.createElementNS ('http://www.w3.org/2000/svg', 'svg'); this.svg.classList.add ('packaging_canvas'); this.svg.setAttribute ('role', 'img'); this.svg.setAttribute ('aria-label', 'Packaging point-to-point drawing'); this.svg.setAttribute ('tabindex', '0'); drawing.appendChild (this.svg);
         const coordinate = (event) => { const point = this.svg.createSVGPoint (); point.x = event.clientX; point.y = event.clientY; const converted = point.matrixTransform (this.svg.getScreenCTM ().inverse ()); return [converted.x, -converted.y]; };
@@ -303,7 +358,7 @@ export class PackagingWorkspace
         this.svg.addEventListener ('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault (); this.Run (() => this.Finish (event.shiftKey)); } if (event.key === 'Escape' && this.draft.length) { event.preventDefault (); event.stopPropagation (); this.CancelDraft (); } });
         this.status = Element ('p', drawing, 'Ready to draw', 'packaging_status'); this.status.setAttribute ('role', 'status');
         dialog.addEventListener ('cancel', (event) => { if (this.draft.length) { event.preventDefault (); this.CancelDraft (); } });
-        dialog.addEventListener ('close', () => { this.draft = []; this.dialog = null; this.status = null; }); this.snap.addEventListener ('change', () => this.Run (() => this.SetGridSnap (this.snap.valueAsNumber)));
+        dialog.addEventListener ('close', () => { this.draft = []; this.dialog = null; this.status = null; this.engineeringPanel = null; }); this.snap.addEventListener ('change', () => this.Run (() => this.SetGridSnap (this.snap.valueAsNumber)));
         hint.title = 'Enter finishes an open path; Shift+Enter closes it. Escape cancels the current draft. Scroll to zoom.'; this.Refresh (); this.Fit (); return { opened : true };
     }
     Refresh ()
@@ -322,7 +377,7 @@ export class PackagingWorkspace
         selected?.points.forEach ((point, index) => {
             const row = Element ('div', this.pointFields, undefined, 'packaging_vertex'); Element ('span', row, String (index + 1));
             point.forEach ((value, axis) => { const input = Element ('input', row); input.type = 'number'; input.step = 'any'; input.value = String (Number ((value / this.Factor ()).toFixed (6))); input.setAttribute ('aria-label', 'Path point ' + (index + 1) + ' ' + (axis ? 'Y' : 'X')); input.addEventListener ('change', () => { if (this.refreshing) { return; } this.Run (() => { const points = selected.points.map ((item) => [...item]); points[index][axis] = input.valueAsNumber * this.Factor (); this.EditPath (selected.id, { points }, 'mm'); }); }); });
-        }); this.Draw ();
+        }); this.engineeringPanel?.Refresh (); this.Draw ();
     }
     Draw ()
     {
@@ -335,6 +390,21 @@ export class PackagingWorkspace
         for (const path of [...design.paths, ...(this.draft.length ? [{ id : 'draft', type : this.draftType, closed : false, points : this.draft }] : [])]) {
             const selected = path.id === this.active; make ('path', { d : path.points.map ((point, index) => (index ? 'L' : 'M') + point[0] + ' ' + -point[1]).join (' ') + (path.closed ? 'Z' : ''), fill : path.closed && path.type === 'cut' ? '#b8926112' : 'none', stroke : path.type === 'cut' ? '#e34b4b' : '#318cdd', 'stroke-width' : selected ? 3 : 2, 'vector-effect' : 'non-scaling-stroke', 'stroke-dasharray' : path.type === 'score' ? '7 5' : 'none', 'data-path' : path.id, 'pointer-events' : 'stroke' });
             if (selected || path.id === 'draft') { path.points.forEach ((point) => make ('circle', { cx : point[0], cy : -point[1], r : this.view.width / 240, fill : path.type === 'cut' ? '#e34b4b' : '#318cdd', 'pointer-events' : 'none' })); }
+        }
+        const measurements = this.EngineeringInspect ();
+        if (measurements.state.visible) {
+            const layer = make ('g', { id : 'MEASUREMENT', 'pointer-events' : 'none', 'data-source' : 'canonical-cad' });
+            const size = this.view.width / 85;
+            for (const [index, dimension] of measurements.dimensions.entries ()) {
+                const { a, b } = dimension; const dx = b[0] - a[0], dy = b[1] - a[1]; const length = Math.hypot (dx, dy) || 1; const offset = size * (2 + index * 0.3); const normal = [-dy / length, dx / length];
+                const p = [a[0] + normal[0] * offset, -a[1] - normal[1] * offset], q = [b[0] + normal[0] * offset, -b[1] - normal[1] * offset];
+                const line = (x, y) => make ('line', { x1 : x[0], y1 : x[1], x2 : y[0], y2 : y[1], stroke : '#bd76ed', 'stroke-width' : 1, 'vector-effect' : 'non-scaling-stroke' }, layer);
+                line ([a[0], -a[1]], p); line ([b[0], -b[1]], q); line (p, q);
+                for (const point of [p, q]) { line ([point[0] - size / 3, point[1] + size / 3], [point[0] + size / 3, point[1] - size / 3]); }
+                const text = make ('text', { x : (p[0] + q[0]) / 2, y : (p[1] + q[1]) / 2 - size / 2, fill : '#d39afa', 'font-size' : size, 'text-anchor' : 'middle', 'paint-order' : 'stroke', stroke : 'var(--ov_background_color, #202326)', 'stroke-width' : size / 5 }, layer);
+                if (Math.abs (dy) > Math.abs (dx)) { const x = (p[0] + q[0]) / 2 - size / 2, y = (p[1] + q[1]) / 2; text.setAttribute ('x', x); text.setAttribute ('y', y); text.setAttribute ('transform', 'rotate(-90 ' + x + ' ' + y + ')'); }
+                text.textContent = dimension.id + ' ' + Number ((dimension.valueMm / this.Factor ()).toFixed (4)) + ' ±' + Number ((dimension.toleranceMm / this.Factor ()).toFixed (4)) + ' ' + DisplayUnitLabel (this.editor.website.preferences.units) + ' · ' + dimension.basis;
+            }
         }
         if (this.status) { const selected = design.paths.find ((path) => path.id === this.active); const length = selected ? selected.points.reduce ((sum, point, index) => index ? sum + Math.hypot (point[0] - selected.points[index - 1][0], point[1] - selected.points[index - 1][1]) : sum, 0) + (selected.closed ? Math.hypot (selected.points[0][0] - selected.points.at (-1)[0], selected.points[0][1] - selected.points.at (-1)[1]) : 0) : 0; this.status.textContent = this.draft.length + ' draft points · ' + design.paths.length + ' paths · selected length ' + (length / this.Factor ()).toFixed (3) + ' ' + DisplayUnitLabel (this.editor.website.preferences.units); }
     }

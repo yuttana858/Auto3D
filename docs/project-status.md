@@ -1,8 +1,22 @@
 # Auto3D development log and handoff
 
-Updated 2026-10-13. This is the starting point for project status, completed work, open issues and the next release. Architecture: [agent-project-overview.md](agent-project-overview.md).
+Updated 2026-10-18. This is the starting point for project status, completed work, open issues and the next release. Architecture: [agent-project-overview.md](agent-project-overview.md).
 
-## Release candidate: Auto3D v0.35.0 / Packaging v1.5.0
+## Local candidate: Auto3D v0.36.0 / Packaging v1.6.0
+
+Baseline is merged PR #35, commit `c4629c9`. This work is local on `work`; no new PR or production deployment has been created. App/package/version labels are aligned at 0.36.0 and Packaging 1.6.0, with API v1 retained.
+
+Packaging Designer adds a dedicated **Measurement layer** tab and a selected-box shortcut. Per-dimension Auto, Manual and Parametric modes operate on canonical CAD point distances, independently selecting score/inside/outside basis, target and score-tolerance override. Formula labels, purple CAD leaders and worst-case tolerance bands remain independent of renderer meshes, camera and display smoothing. Generated box edits rebuild CAD and matching scene geometry atomically; custom segments move endpoints and coincident vertices. Parametric conflicts, scaling, malformed references and invalid material records are rejected. Undo/Redo and portable archives retain records and targets.
+
+The per-design material database supports duplication/activation, measured caliper/variation, liner and medium paper calipers, grade/fibre/grammage, flute pitch/direction, tooling/conditioning, inside/outside allowance factors, score/process tolerances, provenance and calibration status. It is portable profile data, not a remotely synchronized organization-wide material catalog. 0201 inside factors start from scoped FEFCO Recommendation 101 guidance; outside gains and other styles require explicit converter values. Zero default tolerances are unspecified reference inputs, not promises of zero manufacturing variation. Existing legacy fit-reserve controls remain for older profiles; engineering-linked objects direct editing to the Measurement layer.
+
+The rendering module adds separate rounded crease surfaces between known shared score rails, following both panels during animation. They bridge display clearances while leaving canonical paths and rigid collision prisms unchanged. Cut slots remain open. Optional `visualMeshes` preserve API-v1 compatibility; Auto3D and standalone hosts display/update them. Standalone preview adds a CAD/formula view beside the 3D model. Individual paper mechanics, arbitrary imported folding, a general constraint solver and manufacturing certification remain outside scope.
+
+Documentation: [corrugated-dimensions-and-creases.md](corrugated-dimensions-and-creases.md). The searchable knowledge API adds `dimensionalEngineering`, source links and scoped tolerance guidance. Shared strict commands cover opening/toggling the layer, dimension inspection/edits, and material updates/activation/duplication; the generated command catalog is synchronized.
+
+Validation: 563 unit/module tests, 11 backend tests, lint, production licenses and moderate-threshold dependency audit pass (zero reported production vulnerabilities). Website, independent module and Pages builds pass. Chromium verifies CAD-derived dimensions, independent Manual/Parametric material changes, continuous rendered folds, and material/target preservation through fold/unfold playback. Chromium also verifies a 390 px mobile Measurement layout without horizontal overflow and repeated standalone material/target edits with an independent CAD view. Local Pages asset hashes and app/module versions are verified. Production is unchanged.
+
+## Previous release: Auto3D v0.35.0 / Packaging v1.5.0
 
 Main baseline is PR #34, commit `5ecde44`, Auto3D v0.34.0. This candidate is prepared in an isolated checkout as [PR #35](https://github.com/yuttana858/Auto3D/pull/35); application deployment remains pending PR review/merge.
 

@@ -186,3 +186,7 @@ Then the system should:
 FEFCO style drawings and some industry handbooks/standards are copyrighted or commercial references. Auto3D should store normalized facts, metadata, classifications, derived engineering fields and source links, but should not bulk-copy proprietary catalogs or standards into the repository.
 
 This knowledge base is an engineering aid. Final production packaging should be released only after the applicable converter, customer and transport requirements have been confirmed and appropriate physical testing has been completed.
+
+## Dimensional engineering update — 2026-10-18
+
+The API now exposes/searches `dimensionalEngineering`: continuous scores versus cuts, allowance/tolerance/clearance, FEFCO 101 scoped equations, independent inside/outside corrections, worst-case tolerance propagation, measured-caliper/component inputs, PMMI/FBA RSC tolerance scope and measurement-method references. See [corrugated-dimensions-and-creases.md](corrugated-dimensions-and-creases.md) for the implementation contract and editable material-record workflow. Rendering never supplies authoritative CAD dimensions.

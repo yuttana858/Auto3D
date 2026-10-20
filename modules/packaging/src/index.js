@@ -11,3 +11,6 @@ export { FoldPlayback } from './foldplayback.js';
 export { FefcoPanel } from './panel.js';
 export * from './surfacetextures.js';
 export * from './boardlayers.js';
+export * from './engineering.js';
+export * from './creasevisuals.js';
+export { EngineeringPanel } from './engineeringpanel.js';
