@@ -473,15 +473,7 @@ export class Website
 
     FitModelToWindow (onLoad)
     {
-        let animation = !onLoad;
-        let boundingSphere = this.viewer.GetBoundingSphere ((meshUserData) => {
-            return this.navigator.IsMeshVisible (meshUserData.originalMeshInstance.id) && this.sessionEditor.IsVisible (meshUserData.originalMeshInstance);
-        });
-        if (boundingSphere === null || !Number.isFinite (boundingSphere.radius) || boundingSphere.radius <= 0) { return; }
-        if (onLoad) {
-            this.viewer.AdjustClippingPlanesToSphere (boundingSphere);
-        }
-        this.viewer.FitSphereToWindow (boundingSphere, animation);
+        return this.viewer.FitAllToWindow (!onLoad);
     }
 
     FitMeshToWindow (meshInstanceId)

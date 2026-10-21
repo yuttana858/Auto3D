@@ -143,8 +143,7 @@ fullscreen.addEventListener ('click', () => stage.requestFullscreen?.());
 document.getElementById ('resetView').addEventListener ('click', () => { if (loaded && initialCamera) { ApplyCameraState (viewer, initialCamera); } });
 document.getElementById ('fit').addEventListener ('click', () => {
     if (!loaded || !viewer) { return; }
-    const sphere = viewer.GetBoundingSphere (() => true);
-    viewer.FitSphereToWindow (sphere, true);
+    viewer.FitAllToWindow (true);
 });
 window.addEventListener ('resize', Fit);
 new ResizeObserver (Fit).observe (stage);
