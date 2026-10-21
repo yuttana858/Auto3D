@@ -23,3 +23,5 @@ Generated 0200–0203 panels and custom extruded contours (including holes) have
 Agent commands: `packaging.appearance.inspect` and `packaging.appearance.update`, using the same services as the panel. No publication or deployment occurs through these commands.
 
 Crease triangles use a consistent material-sorted order in static and animated buffers, bounding each crease to three draw groups. Disabling and re-enabling restores/replaces GPU buffers and releases superseded geometry without changing canonical meshes.
+
+Identical static array boxes share immutable GPU surface buffers within a scene conversion, rather than allocating a separate copy per box. An individual appearance edit receives private buffers so the other instances stay unchanged. `lighting.shadow.inspect` and the Error logs shadow review report geometry/texture/program/draw-call counts alongside context-loss and shader diagnostics.

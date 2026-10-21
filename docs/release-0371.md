@@ -6,4 +6,8 @@ Toggling Enable board surface previously rebuilt the entire scene and repeated f
 
 Crease buffers are consistently sorted by material, reducing replacement-buffer draw groups to at most three per crease. Preview material lookup uses original document indices so materials remain consistent after import or array creation.
 
-Validation: 625 unit/module tests, 11 backend tests and lint pass; both engine builds, website, independent module and Pages builds pass. Focused tests cover repeat toggles, disposal, pose retention, locking, history and rollback. Chromium exercises six toggles on a four-box array with an intermediate fold pose and checks exact placements/CAD, camera, history and WebGL context. No general FPS guarantee or confirmed diagnosis of an unprovided crash log is claimed.
+Validation: 626 unit/module tests, 11 backend tests and lint pass; both engine builds, website, independent module and Pages builds pass. Focused tests cover repeat toggles, disposal, pose retention, locking, history and rollback. Chromium exercises six toggles on a four-box array with an intermediate fold pose and checks exact placements/CAD, camera, history and WebGL context. No general FPS guarantee or confirmed diagnosis of an unprovided crash log is claimed.
+
+White-viewer follow-up: identical static boxes share GPU surface buffers, while individual edits detach safely. The lighting/shadow inspector adds resource counts. Pixel checks of the actual surface panel pass with ordinary and reflected/shadowed lighting, including grain refresh and an intermediate fold pose. The reported production white screen remains unreproduced; the exact scene/version/error log is still needed.
+
+A 20-box Chromium resource check holds at 63 geometries and 32 textures during repeated selected-box edits, with no context loss. These fixture counts are evidence of bounded allocation, not device-independent budgets.

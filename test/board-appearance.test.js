@@ -58,6 +58,13 @@ describe ('Board appearance shared UI/Agent services', () => {
         const first = editor.packaging.UpdateAppearance ({ enabled : false }); assert.equal (editor.busy, true);
         await assert.rejects (() => editor.packaging.UpdateAppearance ({ enabled : true }), /idle/); await first; assert.equal (editor.busy, false);
     });
+    it ('Shares immutable surface buffers across identical array boxes and detaches an individual edit', async () => {
+        const data = CreateFefcoFoldRig ({ length : 100, width : 80, height : 60 }), materials = data.materials.map (m => ({ boardSurfaceRole : m.role }));
+        const make = () => { const root = new THREE.Group (), mesh = new THREE.Mesh (new THREE.BoxGeometry (), [new THREE.MeshStandardMaterial (), new THREE.MeshStandardMaterial (), new THREE.MeshStandardMaterial ()]); mesh.name = 'Left wall'; mesh.userData.originalMaterials = [0, 1, 2]; root.add (mesh); return { threeObject : root, packagingProfile : data.profile, userData : { _auto3dFefco : JSON.stringify (data.parameters) } }; };
+        const a = make (), b = make (); await PreparePackagingPresentations ([a, b], materials, 1); const shared = b.threeObject.children[0].geometry; assert.equal (a.threeObject.children[0].geometry, shared); const positions = shared.attributes.position.array.slice ();
+        a.packagingProfile = { ...data.profile, appearance : { panelBow : .8 } }; await PreparePackagingPresentations ([a], materials, 1);
+        assert.notEqual (a.threeObject.children[0].geometry, shared); assert.equal (b.threeObject.children[0].geometry, shared); assert.deepEqual (shared.attributes.position.array, positions);
+    });
     it ('Restores display detail on a saved flat dieline without requiring separate panel meshes', async () => {
         const data = CreateFefcoFoldRig ({ length : 100, width : 80, height : 60 }), root = new THREE.Group ();
         const mesh = new THREE.Mesh (new THREE.BoxGeometry (), data.materials.slice (0, 3).map (() => new THREE.MeshStandardMaterial ())); mesh.name = data.profile.name + ' · Dieline board'; mesh.userData.originalMaterials = [0, 1, 2]; root.add (mesh);
