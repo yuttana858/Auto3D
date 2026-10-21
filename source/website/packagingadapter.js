@@ -90,12 +90,12 @@ export function FefcoSurfaces (model)
 
 // Replace GPU buffers only. Engine meshes remain the canonical source for CAD,
 // archives, manufacturing exports, quantities and array spacing.
-export function ApplyPackagingPresentation (root, data, unit, materials = [])
+export function ApplyPackagingPresentation (root, data, unit, materials = [], foldPreview = false)
 {
     const factor = PackagingUnitMM[unit]; if (!factor) { return; }
-    const definitions = new Map ((data.presentationMeshes || []).map (mesh => [mesh.name, mesh]));
+    const definitions = new Map ([...(data.presentationMeshes || []), ...(data.visualMeshes || [])].map (mesh => [mesh.name, mesh]));
     root.traverse (item => {
-        const mesh = definitions.get (item.name); if (!item.isMesh || !mesh?.presentationOnly) { return; }
+        const mesh = definitions.get (item.name); if (!item.isMesh || (item.userData.auto3dFoldPresentation && !foldPreview) || !mesh || (!mesh.presentationOnly && !mesh.visualOnly && !item.userData.auto3dBoardAppearance)) { return; }
         const positions = [], normals = [], uvs = []; const geometry = new BufferGeometry (); const roles = (item.userData.originalMaterials || []).map (index => materials[index]?.boardSurfaceRole);
         for (const triangle of mesh.triangles) {
             const role = data.materials[triangle.material]?.role; let material = roles.indexOf (role); if (material < 0) { material = roles.indexOf (role === 'inner' || role === 'closed' ? 'liner' : role); } if (material < 0) { material = Math.max (0, Math.min (triangle.material, (Array.isArray (item.material) ? item.material.length : 1) - 1)); }
@@ -103,7 +103,7 @@ export function ApplyPackagingPresentation (root, data, unit, materials = [])
             const last = geometry.groups.at (-1); if (last && last.materialIndex === material) { last.count += 3; } else { geometry.addGroup (start, 3, material); }
         }
         geometry.setAttribute ('position', new Float32BufferAttribute (positions, 3)); geometry.setAttribute ('normal', new Float32BufferAttribute (normals, 3)); geometry.setAttribute ('uv', new Float32BufferAttribute (uvs, 2));
-        geometry.computeBoundingSphere (); geometry.computeBoundingBox (); item.geometry.dispose (); item.geometry = geometry; item.userData.auto3dBoardAppearance = true;
+        geometry.computeBoundingSphere (); geometry.computeBoundingBox (); item.geometry.dispose (); item.geometry = geometry; item.userData.auto3dBoardAppearance = mesh.presentationOnly === true || mesh.visualOnly === true;
     });
 }
 export async function PreparePackagingPresentations (objects, materials, unit)

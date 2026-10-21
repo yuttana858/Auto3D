@@ -30,6 +30,10 @@ describe ('Masked varnish and curved board presentation', () => {
         const other = CreateFefcoFoldRig ({ thickness : 4 }, changed); const otherMesh = CreaseVisualMeshes (other, FefcoFoldPose (other, .72))[0];
         assert.notEqual (otherMesh.insideRadiusMm, mesh.insideRadiusMm); assert.equal (JSON.stringify ([rig.profile, rig.panels]), cad);
     });
+    it ('Keeps crease buffers material-sorted at every pose to avoid per-segment draw calls', () => {
+        const rig = CreateFefcoFoldRig ({ length : 100, width : 80, height : 60 });
+        for (const progress of [0, .23, .72, 1]) { for (const mesh of CreaseVisualMeshes (rig, FefcoFoldPose (rig, progress))) { const groups = mesh.triangles.reduce ((count, triangle, index, list) => count + (index === 0 || list[index - 1].material !== triangle.material ? 1 : 0), 0); assert.ok (groups <= 3); assert.ok (mesh.triangles.every ((triangle, index, list) => index === 0 || list[index - 1].material <= triangle.material)); } }
+    });
     it ('Keeps flute phase in sheet coordinates and makes parallel cuts show longitudinal channels', () => {
         const board = { pitchMm : 6, caliperMm : 3, directionDegrees : 90 };
         assert.ok (Math.abs (ExposedEdgeUV (10, 0, 1.5, board)[0] - ExposedEdgeUV (10, 100, 1.5, board)[0]) < 1e-10);

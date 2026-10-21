@@ -90,6 +90,9 @@ export function CreaseVisualMeshes (rig, pose)
         for (let step = 0; step < segments; step++) { const a = step * 4, b = a + 4;
             for (const [i, j, k, l, cap] of [[a, a + 2, b + 2, b, false], [a + 1, b + 1, b + 3, a + 3, false], [a, b, b + 1, a + 1, true], [a + 2, a + 3, b + 3, b + 2, true]]) { face (i, j, k, cap); face (i, k, l, cap); }
         }
+        // Keep the same material-sorted buffer order as the host converter.
+        // This also bounds each crease to three draw groups during playback.
+        mesh.triangles.sort ((a, b) => a.material - b.material);
         return mesh;
     });
 }
