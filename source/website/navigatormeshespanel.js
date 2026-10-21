@@ -142,7 +142,7 @@ export class NavigatorMeshesPanel extends NavigatorPanel
 
     Fill (importResult)
     {
-        super.Fill (importResult);
+        this.sceneGroups = []; this.groupSignature = null; super.Fill (importResult);
 
         const rootNode = importResult.model.GetRootNode ();
         let isHierarchical = false;
@@ -318,8 +318,17 @@ export class NavigatorMeshesPanel extends NavigatorPanel
         }
     }
 
+    SetSceneGroups (groups, expanded, changed)
+    {
+        this.sceneGroups = groups; this.groupExpanded = expanded; this.onGroupExpanded = changed;
+        const signature = JSON.stringify (groups.map (group => [group.id, group.name, group.objects.map (object => object.node.GetId ())]));
+        if (signature === this.groupSignature || !this.groupModel) { return; } this.groupSignature = signature;
+        const hidden = []; this.EnumerateMeshItems (item => { if (!item.IsVisible ()) { hidden.push (item.GetMeshInstanceId ()); } return true; });
+        this.ClearMeshTree (); this.FillMeshTree (this.groupModel); hidden.forEach (id => this.GetMeshItem (id)?.SetVisible (false, NavigatorItemRecurse.Parents));
+    }
     FillMeshTree (model)
     {
+        this.groupModel = model; this.groupItems = new Map ();
         function AddMeshToNodeTree (panel, node, mesh, meshIndex, parentItem, mode)
         {
             let meshName = GetMeshName (node.GetName (), mesh.GetName ());
@@ -379,20 +388,31 @@ export class NavigatorMeshesPanel extends NavigatorPanel
         {
             let meshNodes = [];
             for (let childNode of node.GetChildNodes ()) {
+                let itemParent = parentItem;
+                if (node === model.GetRootNode ()) {
+                    const group = panel.sceneGroups?.find (group => group.objects.some (object => object.node === childNode));
+                    if (group) {
+                        if (!panel.groupItems.has (group.id)) {
+                            const item = new NodeItem (group.name + ' (' + group.objects.length + ')', 'group:' + group.id, {}); item.buttonsDiv.remove (); item.preserveCollapsedOnSelection = true; item.mainElement.dataset.sceneGroup = group.id;
+                            parentItem.AddChild (item); const show = item.ShowChildren.bind (item); item.ShowChildren = expanded => { show (expanded); if (item.children.length && panel.groupExpanded?.get (group.id) !== expanded) { panel.onGroupExpanded?.(group.id, expanded); } }; panel.groupItems.set (group.id, item);
+                        }
+                        itemParent = panel.groupItems.get (group.id);
+                    }
+                }
                 if (mode === MeshesPanelMode.TreeView) {
                     if (childNode.IsMeshNode ()) {
-                        meshNodes.push (childNode);
+                        meshNodes.push ({ node : childNode, parent : itemParent });
                     } else {
                         let nodeItem = CreateNodeItem (panel, childNode);
-                        parentItem.AddChild (nodeItem);
+                        itemParent.AddChild (nodeItem);
                         AddModelNodeToTree (panel, model, childNode, nodeItem, mode);
                     }
                 } else {
-                    AddModelNodeToTree (panel, model, childNode, parentItem, mode);
+                    AddModelNodeToTree (panel, model, childNode, itemParent, mode);
                 }
             }
             for (let meshNode of meshNodes) {
-                AddModelNodeToTree (panel, model, meshNode, parentItem, mode);
+                AddModelNodeToTree (panel, model, meshNode.node, meshNode.parent, mode);
             }
             for (let meshIndex of node.GetMeshIndices ()) {
                 let mesh = model.GetMesh (meshIndex);
@@ -403,6 +423,7 @@ export class NavigatorMeshesPanel extends NavigatorPanel
         let rootNode = model.GetRootNode ();
         this.rootItem = CreateDummyRootItem (this, rootNode);
         AddModelNodeToTree (this, model, rootNode, this.rootItem, this.mode);
+        this.groupItems.forEach ((item, id) => item.ShowChildren (this.groupExpanded?.get (id) === true));
     }
 
     UpdateMaterialList (materialInfoArray)

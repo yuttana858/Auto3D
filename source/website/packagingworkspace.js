@@ -1,3 +1,5 @@
+import { ValidateBoardAppearance } from '../../modules/packaging/src/appearancesettings.js';
+import { FoldPresentation, BaseFoldPose } from './foldpresentation.js';
 import { WorkspaceDialog } from './modellibrary.js';
 import { BoardCalipers, NewPackagingDesign, ValidatePackaging, PackagingBounds, ExportPackagingSVG, ExportPackagingDXF } from './packagingcore.js';
 import { Unit } from '../engine/model/unit.js';
@@ -5,8 +7,10 @@ import { DisplayUnitLabel } from './preferences.js';
 import { DefaultFefco, ValidateFefco, FefcoProfile, FefcoPreset, FefcoAnimationPlan } from '../../modules/packaging/src/fefco.js';
 import { EngineeringAxes, DefaultEngineering, EngineeringMeasurements, EditEngineering, ScoreForTarget, DrivePathDimension } from '../../modules/packaging/src/engineering.js';
 import { FefcoDimensions, ResolveFefcoDimensions } from '../../modules/packaging/src/dimensions.js';
-import { Box3, Vector3, Sphere } from 'three';
-import { LoadPackagingModule, PackagingModel, FefcoSurfaces, ApplyFefcoFoldPose } from './packagingadapter.js';
+import { Box3, Sphere } from 'three';
+import { LoadPackagingModule, PackagingModel, FefcoSurfaces, ApplyFefcoFoldPose, BoardAppearanceMaterialChanges } from './packagingadapter.js';
+import { FoldMotionProgress, FoldCameraFrame, CameraBottomInset } from './foldcamera.js';
+import { ApplyCameraState } from './sessiontimeline.js';
 
 
 function Element (tag, parent, text, className)
@@ -15,9 +19,28 @@ function Element (tag, parent, text, className)
 }
 export class PackagingWorkspace
 {
-    constructor (editor) { this.editor = editor; this.dialog = null; this.refreshing = false; this.draft = []; this.active = null; this.draftType = 'cut'; this.gridSnapMM = 5; this.displayFactor = 1; this.view = { x : -20, y : -220, width : 340, height : 240 }; }
+    constructor (editor) { this.editor = editor; this.presentation = new FoldPresentation (editor); this.dialog = null; this.refreshing = false; this.draft = []; this.active = null; this.draftType = 'cut'; this.gridSnapMM = 5; this.displayFactor = 1; this.view = { x : -20, y : -220, width : 340, height : 240 }; }
     Design () { return this.editor.document.packaging || NewPackagingDesign (); }
-    PanelHost () { return { dimensions : () => this.DimensionsInspect (), dimensionMode : basis => this.DimensionMode (basis), updateDimensions : changes => this.UpdateDimensions (changes), dimensionsBlocked : () => this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false || this.editor.busy && !this.dimensionUpdating, inspect : () => this.FefcoInspect (), configure : changes => this.ConfigureFefco (changes), generate : changes => this.GenerateFefco (changes), preset : (code, changes) => this.GeneratePreset (code, changes), designer : () => this.OpenSelected (), measurements : () => { this.OpenSelected (); return this.OpenMeasurements (); }, unfold : () => this.UnfoldSelected (), animate : () => this.AnimateFold (), animation : () => this.AnimationInspect (), playback : () => this.FoldInspect (), control : action => this.FoldControl (action), canAnimate : () => Boolean (this.editor.selected?.userData?._auto3dFefco), factor : () => this.Factor (), run : action => this.editor.Run (action), blocked : () => this.editor.busy || this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false, canUnfold : () => this.CanUnfold () }; }
+    PanelHost () { return { appearance : () => this.AppearanceInspect (), updateAppearance : changes => this.UpdateAppearance (changes), dimensions : () => this.DimensionsInspect (), dimensionMode : basis => this.DimensionMode (basis), updateDimensions : changes => this.UpdateDimensions (changes), dimensionsBlocked : () => this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false || this.editor.busy && !this.dimensionUpdating, inspect : () => this.FefcoInspect (), configure : changes => this.ConfigureFefco (changes), generate : changes => this.GenerateFefco (changes), preset : (code, changes) => this.GeneratePreset (code, changes), designer : () => this.OpenSelected (), measurements : () => { this.OpenSelected (); return this.OpenMeasurements (); }, unfold : () => this.UnfoldSelected (), scrub : (progress, commit) => this.SetFoldScrub (progress, commit), scrubInspect : () => this.FoldScrubInspect (), animate : () => this.AnimateFold (), animation : () => this.AnimationInspect (), playback : () => this.FoldInspect (), control : action => this.FoldControl (action), canAnimate : () => Boolean (this.editor.selected?.userData?._auto3dFefco), factor : () => this.Factor (), run : action => this.editor.Run (action), blocked : () => this.editor.busy || this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false, canUnfold : () => this.CanUnfold () }; }
+    AppearanceInspect ()
+    {
+        const object = this.editor.selected; const profile = object?.packagingProfile;
+        return { available : Boolean (profile), objectId : profile ? object.id : null, settings : ValidateBoardAppearance (profile?.appearance), visualOnly : true };
+    }
+    async UpdateAppearance (changes)
+    {
+        this.Editable (); const editor = this.editor, target = editor.document, object = editor.selected, owner = editor.website.auth.user.id;
+        if (!object?.packagingProfile) { throw new Error ('Select a packaging model to adjust its board surface.'); }
+        ValidateBoardAppearance (changes); if (!Object.keys (changes).length) { return this.AppearanceInspect (); } const before = object.packagingProfile; const next = ValidatePackaging ({ ...before, appearance : ValidateBoardAppearance ({ ...ValidateBoardAppearance (before.appearance), ...changes }) }); const beforeDesign = target.packaging;
+        const module = await LoadPackagingModule (); this.Editable ();
+        if (editor.document !== target || !target.objects.includes (object) || editor.website.auth.user?.id !== owner || object.packagingProfile !== before) { throw new Error ('The selected packaging or account changed.'); }
+        const data = object.userData?._auto3dFefco ? module.CreateFefcoFoldRig (JSON.parse (object.userData._auto3dFefco), next) : module.CreateBoard (next, { textured : true });
+        const materials = BoardAppearanceMaterialChanges (target, object, data.materials);
+        const apply = async forward => { object.packagingProfile = forward ? next : before; target.packaging = forward ? next : beforeDesign; materials.forEach (entry => Object.assign (entry.material, forward ? entry.after : entry.before)); await editor.Render (); this.Refresh (); };
+        try { await apply (true); if (editor.document !== target || editor.website.auth.user?.id !== owner || editor.readOnly || editor.website.accountReady === false || !target.objects.includes (object)) { throw new Error ('The workspace changed while updating board appearance.'); } }
+        catch (error) { object.packagingProfile = before; target.packaging = beforeDesign; materials.forEach (entry => Object.assign (entry.material, entry.before)); if (editor.document === target) { await editor.Render (); } throw error; }
+        editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); editor.MarkDirty?.(); return { available : true, objectId : object.id, settings : ValidateBoardAppearance (next.appearance), visualOnly : true };
+    }
     DimensionsInspect ()
     {
         const object = this.editor.selected; if (!object?.userData?._auto3dFefco) { return null; }
@@ -46,12 +69,44 @@ export class PackagingWorkspace
         } catch (error) { if (replacement) { target.Remove (replacement); if (!target.objects.includes (source)) { target.Restore (source, index); } target.packaging = before; editor.selected = previous; await editor.Render (); } throw error; }
         finally { this.dimensionUpdating = false; editor.busy = false; editor.RefreshButtons?.(); }
     }
+    FoldScrubInspect ()
+    {
+        const object = this.editor.selected; if (!object?.userData?._auto3dFefco) { return { available : false, progress : 0 }; }
+        const record = this.presentation.records.get (object.id); return { available : true, objectId : object.id, progress : record?.preview.visible ? record.pose : BaseFoldPose (object) };
+    }
+    async SetFoldScrub (progress, commit = true, objectId = null)
+    {
+        this.Editable (); if (!Number.isFinite (progress) || progress < 0 || progress > 1 || typeof commit !== 'boolean') { throw new Error ('Use fold progress from 0 to 1.'); }
+        const editor = this.editor; const object = objectId ? editor.document.objects.find (item => item.id === objectId) : editor.selected;
+        if (!object?.userData?._auto3dFefco) { throw new Error ('Select a generated box.'); }
+        const owner = editor.website.auth.user.id; editor.timeline.Stop ();
+        const first = !this.scrubEdit || this.scrubEdit.object !== object; if (first) { this.scrubEdit = { object, before : object.userData._auto3dFoldPreview }; }
+        this.presentation.manual.set (object.id, progress); await this.presentation.Prepare (object);
+        if (editor.website.auth.user?.id !== owner || editor.website.accountReady === false || editor.readOnly || !editor.document.objects.includes (object)) { throw new Error ('The account or model changed while scrubbing.'); }
+        if (first && editor.timeline.foldAutoFit !== false && !editor.timeline.cameraKeyframes.length) { const record = this.presentation.records.get (object.id); record.root.updateMatrixWorld (true); const sphere = record.sweep.clone ().applyMatrix4 (record.root.matrixWorld).getBoundingSphere (new Sphere ()); editor.website.viewer.FitSphereToWindow (sphere, true); }
+        this.presentation.Apply (editor.timeline.time, false); editor.UpdateSelectionBox (); editor.website.viewer.RequestRender (); editor.website.aiWorkspace?.fefcoPanel?.RefreshPlayback ();
+        if (commit) {
+            const before = this.scrubEdit.before; const after = String (progress); const apply = value => { if (value === undefined) { delete object.userData._auto3dFoldPreview; } else { object.userData._auto3dFoldPreview = value; } this.presentation.manual.delete (object.id); this.presentation.Apply (editor.timeline.time, false); editor.UpdateSelectionBox (); editor.website.viewer.Render (); editor.website.aiWorkspace?.fefcoPanel?.RefreshPlayback (); };
+            object.userData._auto3dFoldPreview = after; this.presentation.manual.delete (object.id); this.scrubEdit = null;
+            if (before !== after) { editor.history.Push ({ undo : () => apply (before), redo : () => apply (after) }); } editor.MarkDirty ();
+        }
+        return { available : true, objectId : object.id, progress : this.presentation.records.get (object.id)?.pose ?? progress };
+    }
+    OpenTimelineAction ()
+    {
+        this.Editable (); if (!this.editor.selected?.userData?._auto3dFefco) { throw new Error ('Select a box before adding a fold action.'); }
+        const dialog = WorkspaceDialog ('Add timeline action'); const label = Element ('label', null, 'Action', dialog); const action = Element ('select', null, undefined, label); action.setAttribute ('aria-label', 'Timeline action');
+        for (const [value, text] of [['toggle', 'Fold / unfold selected box'], ['fold', 'Fold selected box'], ['unfold', 'Unfold selected box']]) { action.add (new Option (text, value)); }
+        const durationLabel = Element ('label', null, 'Duration (seconds)', dialog); const duration = Element ('input', null, undefined, durationLabel); duration.type = 'number'; duration.min = '1'; duration.max = '30'; duration.value = '6'; duration.setAttribute ('aria-label', 'Action duration');
+        const status = Element ('p', 'section_hint', 'Add at playhead ' + this.editor.timeline.time.toFixed (2) + ' s.', dialog); const add = Element ('button', null, 'Add action keyframe', dialog); add.type = 'button';
+        const target = this.editor.selected; add.onclick = async () => { add.disabled = true; try { await this.editor.timeline.AddAction ({ objectId : target.id, direction : action.value, duration : Number (duration.value) }); dialog.close (); } catch (error) { status.textContent = error.message; add.disabled = false; } }; return { opened : true };
+    }
     FoldInspect ()
     {
         if (!this.foldOperation) { return this.lastFold || { state : 'idle', progress : 0 }; }
         const operation = this.foldOperation; const playback = operation.player?.Inspect () || { state : 'preparing', progress : 0 };
         const state = { completed : 'finishing', cancelled : 'cancelling', failed : 'restoring' }[playback.state] || playback.state;
-        return { ...playback, state, stage : operation.stage, action : operation.action, objectId : operation.source.id, clearance : operation.clearance || null };
+        return { ...playback, state, stage : operation.stage, action : operation.action, objectId : operation.source.id, clearance : operation.clearance || null, cameraAutoFit : operation.cameraAutoFit ?? false, boundingBoxVisible : !!this.editor.selectionBox?.visible };
     }
     FoldControl (action)
     {
@@ -82,44 +137,62 @@ export class PackagingWorkspace
         const parameters = ValidateFefco (JSON.parse (source.userData._auto3dFefco)); const profile = ValidatePackaging (source.packagingProfile || FefcoProfile (parameters));
         const module = await LoadPackagingModule (); this.Editable (); const accountId = editor.website.auth.user.id;
         if (editor.document !== target || !target.objects.includes (source)) { throw new Error ('The workspace changed before folding.'); }
-        const plan = FefcoAnimationPlan (parameters, source.userData._auto3dPackagingState || 'folded'); const rig = module.CreateFefcoFoldRig (parameters, profile);
+        const manualPose = source.userData._auto3dFoldPreview === undefined ? null : BaseFoldPose (source); const plan = FefcoAnimationPlan (parameters, manualPose === 0 ? 'flat' : source.userData._auto3dPackagingState || 'folded'); if (manualPose !== null) { plan.from = manualPose; } const rig = module.CreateFefcoFoldRig (parameters, profile);
         // Audit while the original is still in the scene. Keep saving/editing
         // blocked during this preparation, and recheck account/scene on yields.
-        let clearance; this.foldOperation = { source, action : plan.action, stage : 'checking surfaces' }; editor.busy = true; editor.RefreshButtons?.();
+        let clearance; this.foldOperation = { source, action : plan.action, stage : 'checking surfaces' }; editor.UpdateSelectionBox?.(); editor.website.viewer?.Render (); editor.busy = true; editor.RefreshButtons?.();
         try { clearance = await module.InspectFefcoFold (rig, async progress => { if (editor.document !== target || !target.objects.includes (source) || editor.website.auth?.user?.id !== accountId || editor.website.accountReady === false || editor.readOnly) { throw new Error ('The workspace or account changed while checking folding.'); } editor.Status ('Processing · checking fold surfaces · ' + Math.round (progress * 100) + '%'); editor.website.aiWorkspace?.fefcoPanel?.RefreshPlayback (); await new Promise (resolve => setTimeout (resolve, 0)); }); }
         finally { this.foldOperation = null; editor.busy = false; editor.RefreshButtons?.(); }
         this.Editable (); if (!clearance.clear) { throw new Error ('Fold blocked: ' + clearance.intersections[0].panels.join (' / ') + ' intersect.'); }
         const surfaces = FefcoSurfaces (target.CompactModel ([source], true)); const unit = target.model.GetUnit ();
         const before = target.packaging; const previous = editor.selected; const index = target.objects.indexOf (source); const account = editor.website.auth.user.id; const cameraBefore = editor.website.viewer?.GetCamera?.().Clone (); let preview; let final;
+        editor.website.viewer?.navigation?.StopCameraMovement ();
         const restore = async () => { if (preview) { target.Remove (preview); } if (final) { target.Remove (final); } if (!target.objects.includes (source)) { target.Restore (source, index); } target.packaging = before; if (editor.document === target) { editor.selected = previous; await editor.Render (); if (cameraBefore) { editor.website.viewer.SetCamera (cameraBefore.Clone ()); } } };
-        const assign = (object, state, data = parameters) => { object.packagingProfile = profile; object.userData = { ...source.userData, _auto3dFefco : JSON.stringify (data), _auto3dPackagingState : state }; object.position = [...source.position]; object.rotation = [...source.rotation]; object.visible = source.visible; object.castShadow = source.castShadow !== false; object.receiveShadow = source.receiveShadow !== false; target.ApplyTransform (object); };
-        const operation = { source, action : plan.action, stage : plan.stages[0], clearance }; this.foldOperation = operation;
+        const assign = (object, state, data = parameters) => { object.id = source.id; object.keyframes = (source.keyframes || []).map (frame => ({ ...frame, position : [...frame.position], rotation : [...frame.rotation], scale : [...frame.scale] })); object.packagingProfile = profile; object.userData = { ...source.userData, _auto3dFefco : JSON.stringify (data), _auto3dPackagingState : state }; delete object.userData._auto3dFoldPreview; object.position = [...source.position]; object.rotation = [...source.rotation]; object.visible = source.visible; object.castShadow = source.castShadow !== false; object.receiveShadow = source.receiveShadow !== false; target.ApplyTransform (object); };
+        const autoFit = editor.timeline?.foldAutoFit !== false && !editor.timeline?.cameraKeyframes?.length;
+        const operation = { source, action : plan.action, stage : plan.stages[0], clearance, cameraAutoFit : autoFit }; this.foldOperation = operation;
+        const canvas = editor.website.viewer?.renderer?.domElement;
+        const manualCamera = () => { operation.cameraAutoFit = false; operation.cameraManual = true; };
+        const removeCameraListeners = () => { for (const event of ['pointerdown', 'wheel', 'touchstart']) { canvas?.removeEventListener (event, manualCamera); } };
         try {
             preview = target.AddImported (PackagingModel (rig, unit, surfaces), source.name + ' · Folding'); assign (preview, 'flat'); target.packaging = profile; this.Refresh (); target.Remove (preview); target.Remove (source); target.Restore (preview, index); editor.selected = preview;
-            editor.busy = true; editor.RefreshButtons?.(); await editor.Render (); editor.busy = true; editor.RefreshButtons?.();
+            editor.busy = true; editor.RefreshButtons?.(); await editor.Render (false, () => { if (preview.threeObject) { ApplyFefcoFoldPose (preview.threeObject, rig, module.FefcoFoldPose (rig, plan.from), unit); } }); editor.busy = true; editor.RefreshButtons?.();
+            let sweepRadius = 0;
             if (preview.threeObject) {
                 // Fit the whole sequence so the long CAD blank remains visible while unfolding.
-                let radius = 0;
-                for (const progress of [0, 0.22, 0.48, 0.72, 1]) { ApplyFefcoFoldPose (preview.threeObject, rig, module.FefcoFoldPose (rig, progress), unit); radius = Math.max (radius, new Box3 ().setFromObject (preview.threeObject).getBoundingSphere (new Sphere ()).radius); }
-                ApplyFefcoFoldPose (preview.threeObject, rig, module.FefcoFoldPose (rig, plan.from), unit); const sphere = new Box3 ().setFromObject (preview.threeObject).getBoundingSphere (new Sphere ()); sphere.radius = radius; editor.website.viewer.FitSphereToWindow (sphere, false);
+                for (let sample = 0; sample <= 20; sample++) { ApplyFefcoFoldPose (preview.threeObject, rig, module.FefcoFoldPose (rig, sample / 20), unit); sweepRadius = Math.max (sweepRadius, new Box3 ().setFromObject (preview.threeObject).getBoundingSphere (new Sphere ()).radius); }
+                ApplyFefcoFoldPose (preview.threeObject, rig, module.FefcoFoldPose (rig, plan.from), unit);
             }
+            for (const event of ['pointerdown', 'wheel', 'touchstart']) { canvas?.addEventListener (event, manualCamera, { passive : true }); }
             editor.selectionBox && (editor.selectionBox.visible = false);
-            let center = preview.threeObject ? new Box3 ().setFromObject (preview.threeObject).getCenter (new Vector3 ()) : null;
             operation.player = new module.FoldPlayback (progress => {
                 if (editor.document !== target || editor.website.auth.user?.id !== account || editor.website.accountReady === false || editor.readOnly) { throw new Error ('The workspace or account changed during folding.'); }
-                const pose = module.FefcoFoldPose (rig, plan.from + (plan.to - plan.from) * progress); operation.stage = plan.action === 'unfold' ? ({ 'closing top' : 'opening top', 'closing base' : 'opening base', 'erecting walls' : 'unwrapping walls' }[pose.stage] || pose.stage) : pose.stage;
-                if (preview.threeObject) { ApplyFefcoFoldPose (preview.threeObject, rig, pose, unit); const next = new Box3 ().setFromObject (preview.threeObject).getCenter (new Vector3 ()); const delta = next.clone ().sub (center); const camera = editor.website.viewer.GetCamera ().Clone (); for (const axis of ['x', 'y', 'z']) { camera.eye[axis] += delta[axis]; camera.center[axis] += delta[axis]; } center = next; editor.website.viewer.SetCamera (camera); } else { editor.website.viewer?.Render (); } editor.Status ('Folding · ' + operation.stage + ' · ' + Math.round (progress * 100) + '%'); editor.website.aiWorkspace?.fefcoPanel?.RefreshPlayback ();
+                const motion = FoldMotionProgress (progress, autoFit); const pose = module.FefcoFoldPose (rig, plan.from + (plan.to - plan.from) * motion); operation.stage = plan.action === 'unfold' ? ({ 'closing top' : 'opening top', 'closing base' : 'opening base', 'erecting walls' : 'unwrapping walls' }[pose.stage] || pose.stage) : pose.stage;
+                if (preview.threeObject) {
+                    ApplyFefcoFoldPose (preview.threeObject, rig, pose, unit);
+                    if (operation.cameraAutoFit && cameraBefore) { const viewer = editor.website.viewer; const sphere = new Box3 ().setFromObject (preview.threeObject).getBoundingSphere (new Sphere ()); const size = viewer.GetImageSize (); viewer.SetCamera (FoldCameraFrame (cameraBefore, sphere, sweepRadius, progress, size.width / size.height, CameraBottomInset (viewer, editor.status))); }
+                    else if (!operation.cameraManual && editor.timeline?.cameraKeyframes?.length) { const timeline = editor.timeline; ApplyCameraState (editor.website.viewer, timeline.CameraStateAt (timeline.rangeStart + progress * (timeline.rangeEnd - timeline.rangeStart))); }
+                    else { editor.website.viewer.Render (); }
+                } else { editor.website.viewer?.Render (); } editor.Status ('Folding · ' + operation.stage + ' · ' + Math.round (progress * 100) + '%'); editor.website.aiWorkspace?.fefcoPanel?.RefreshPlayback ();
             }, duration);
             // Playback controls remain accessible while ordinary editing/saving is blocked.
             operation.completion = operation.player.Start ().then (async result => {
                 if (!result.completed) { await restore (); this.lastFold = { state : 'cancelled', progress : 0, objectId : source.id }; editor.Status ('Folding cancelled · original object restored'); return; }
                 const next = { ...parameters, closure : plan.targetClosure }; const data = plan.targetState === 'flat' ? module.UnfoldFefco (next, profile) : module.CreateFefcoBox (next, profile); final = target.AddImported (PackagingModel (data, unit, surfaces), source.name.replace (/ · (Dieline|Folded|Open|Closed)$/, '') + (plan.targetState === 'flat' ? ' · Dieline' : plan.targetClosure === 'open' ? ' · Open' : ' · Closed')); assign (final, plan.targetState, data.parameters); final.source = 'FEFCO ' + parameters.code + ' ' + plan.targetState;
-                target.Remove (final); target.Remove (preview); target.Restore (final, index); target.packaging = profile; editor.selected = final; await editor.Render (true);
+                target.Remove (final); target.Remove (preview); target.Restore (final, index); target.packaging = profile; editor.selected = final; await editor.Render ();
                 const apply = async forward => { target.Remove (forward ? source : final); target.Restore (forward ? final : source, index); target.packaging = forward ? profile : before; editor.selected = forward ? final : previous; await editor.Render (true); this.Refresh (); editor.website.aiWorkspace?.RefreshPackaging (); };
                 editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); this.lastFold = { state : 'completed', progress : 1, stage : plan.stages.at (-1), action : plan.action, objectId : final.id }; editor.Status ('Folding complete · ' + plan.stages.at (-1) + ' · Undo available');
-            }).catch (async error => { try { await restore (); } catch { /* Retain the playback error. */ } this.lastFold = { state : 'failed', progress : 0, error : error.message }; editor.website.errorLogs?.Record ('error', 'packaging-fold', error.message); editor.Status (error.message); }).finally (() => { this.foldOperation = null; editor.busy = false; editor.RefreshButtons?.(); this.Refresh (); editor.website.aiWorkspace?.RefreshPackaging (); });
+            }).catch (async error => { try { await restore (); } catch { /* Retain the playback error. */ } this.lastFold = { state : 'failed', progress : 0, error : error.message }; editor.website.errorLogs?.Record ('error', 'packaging-fold', error.message); editor.Status (error.message); }).finally (() => { removeCameraListeners (); this.foldOperation = null; editor.UpdateSelectionBox?.(); editor.busy = false; editor.RefreshButtons?.(); this.Refresh (); editor.website.aiWorkspace?.RefreshPackaging (); });
             editor.website.aiWorkspace?.fefcoPanel?.RefreshPlayback (); return { started : true, objectId : source.id, duration, action : plan.action, stages : plan.stages, clearance };
-        } catch (error) { try { await restore (); } finally { this.foldOperation = null; editor.busy = false; editor.RefreshButtons?.(); } throw error; }
+        } catch (error) { removeCameraListeners (); try { await restore (); } finally { this.foldOperation = null; editor.busy = false; editor.RefreshButtons?.(); } throw error; }
+    }
+    SetFoldCameraAutoFit (autoFit)
+    {
+        this.Editable (); if (typeof autoFit !== 'boolean') { throw new Error ('Auto-fit must be a boolean.'); }
+        const editor = this.editor; const before = editor.timeline.foldAutoFit !== false;
+        const apply = value => { editor.timeline.foldAutoFit = value; editor.MarkDirty?.(); editor.AnimationUI?.(); };
+        if (before !== autoFit) { apply (autoFit); editor.history.Push ({ undo : () => apply (before), redo : () => apply (autoFit) }); }
+        return { autoFit, cameraKeyframesOverride : !!editor.timeline.cameraKeyframes?.length };
     }
     CanUnfold () { return Boolean (this.editor.selected?.userData?._auto3dFefco) && this.editor.selected.userData._auto3dPackagingState !== 'flat'; }
     async UnfoldSelected (objectId = null)
@@ -201,7 +274,7 @@ export class PackagingWorkspace
         if (originalParameters) {
             parameters = { ...originalParameters, thickness : material.caliperMm };
             for (const dimension of driving) { if (EngineeringAxes.includes (dimension.id)) { parameters[dimension.id] = ScoreForTarget (dimension, material); } }
-            parameters = ValidateFefco (parameters); next = { ...FefcoProfile (parameters), name : before.name, grade : material.name, engineering };
+            parameters = ValidateFefco (parameters); next = { ...FefcoProfile (parameters), name : before.name, grade : material.name, engineering, ...(before.appearance ? { appearance : before.appearance } : {}) };
         } else { for (const dimension of driving) { next = DrivePathDimension (next, dimension, material); } }
         next = ValidatePackaging (next);
         const result = EngineeringMeasurements (next);

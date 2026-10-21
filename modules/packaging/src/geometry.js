@@ -1,7 +1,9 @@
+import { BoardAppearanceMesh } from './boardappearance.js';
 import * as THREE from 'three';
 import { ValidateFefco, FefcoProfile } from './fefco.js';
 import { CreateFefcoFoldRig, FefcoFoldFrame } from './folding.js';
 import { BoardMaterials } from './material.js';
+import { VisualBoardSpecification, ExposedEdgeUV } from './flutemapping.js';
 import { ReferenceSingleWallStack } from './boardlayers.js';
 import { PackagingContours, ValidatePackaging } from './profile.js';
 import { MeshData } from './mesh.js';
@@ -19,18 +21,21 @@ export function CreateBoard (input, { textured = false, guides = false } = {})
 {
     const profile = ValidatePackaging (input); const shapes = PackagingContours (profile).map (contour => { const shape = new THREE.Shape (contour.outer.map (point => new THREE.Vector2 (...point))); shape.holes = contour.holes.map (points => new THREE.Path (points.map (point => new THREE.Vector2 (...point)))); return shape; });
     const thickness = profile.thickness;
+    const boardVisual = VisualBoardSpecification (profile);
     const uvGenerator = {
         generateTopUV : (geometry, vertices, a, b, c) => [a, b, c].map (index => new THREE.Vector2 (vertices[index * 3] / 50, vertices[index * 3 + 1] / 50)),
         generateSideWallUV : (geometry, vertices, a, b, c, d) => {
-            const length = Math.hypot (vertices[a * 3] - vertices[b * 3], vertices[a * 3 + 1] - vertices[b * 3 + 1]);
-            return [a, b, c, d].map ((index, i) => new THREE.Vector2 ((i === 1 || i === 2 ? length : 0) / (thickness * 2), vertices[index * 3 + 2] / thickness));
+            return [a, b, c, d].map (index => new THREE.Vector2 (...ExposedEdgeUV (vertices[index * 3], vertices[index * 3 + 1], vertices[index * 3 + 2], boardVisual)));
         }
     };
     const geometry = new THREE.ExtrudeGeometry (shapes, { depth : thickness, bevelEnabled : false, steps : 1, curveSegments : 1, UVGenerator : uvGenerator });
     // Preserve canonical profile X/Y as world X/-Z; the board rests on Y=0.
     geometry.rotateX (-Math.PI / 2);
-    const materials = textured ? BoardMaterials () : [{ role : 'liner', name : 'Board', color : [184, 146, 97], roughness : 0.9, metalness : 0 }];
+    const materials = textured ? BoardMaterials (boardVisual, profile.appearance) : [{ role : 'liner', name : 'Board', color : [184, 146, 97], roughness : 0.9, metalness : 0 }];
     const meshes = [MeshData (geometry, profile.name + ' · Dieline board', group => textured && group === 1 ? 1 : 0)]; geometry.dispose ();
+    if (textured) { meshes[0].triangles.forEach (triangle => { if (triangle.material === 0 && meshes[0].normals[triangle.normals[0]][1] < -.5) { triangle.material = 2; } }); }
+    const boundaries = PackagingContours (profile).flatMap (contour => [{ points : contour.outer.map (p => [p[0], 0, -p[1]]) }, ...contour.holes.map (hole => ({ points : hole.map (p => [p[0], 0, -p[1]]), hole : true }))]);
+    const presentationMeshes = [BoardAppearanceMesh (meshes[0], profile, boundaries)];
     if (guides) {
         const cut = { name : 'CUT · dieline edges', vertices : [], normals : [], uvs : [], triangles : [], lines : [] };
         const score = { name : 'SCORE · fold hinges', vertices : [], normals : [], uvs : [], triangles : [], lines : [] };
@@ -48,7 +53,7 @@ export function CreateBoard (input, { textured = false, guides = false } = {})
         }
         meshes.push (cut, score);
     }
-    return { apiVersion : 1, units : 'mm', materials, meshes, profile, state : 'flat', boardStack : ReferenceSingleWallStack (thickness), artworkMapping : { coordinates : 'global-dieline-mm', repeat : false } };
+    return { apiVersion : 1, units : 'mm', materials, meshes, presentationMeshes, profile, state : 'flat', boardStack : ReferenceSingleWallStack (thickness), artworkMapping : { coordinates : 'global-dieline-mm', repeat : false } };
 }
 export function UnfoldFefco (input, savedProfile = null)
 {

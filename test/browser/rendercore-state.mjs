@@ -23,9 +23,15 @@ window.checkRenderState = async () => {
  const tiled=await decode(await RenderPNG(app,job,{tileSize:64}));check(); const single=await decode(await RenderPNG(app,job,{tileSize:512}));check();
  let changed=0,blue=0,red=0;for(let i=0;i<tiled.length;i+=4){if(Math.max(...[0,1,2,3].map(c=>Math.abs(tiled[i+c]-single[i+c])))>4)changed++;if(tiled[i+2]>tiled[i]*1.3&&tiled[i+2]>tiled[i+1]*1.1&&tiled[i+3]>0)blue++;if(tiled[i]>tiled[i+2]*1.3&&tiled[i+3]>0)red++;}
  if(tiled[3]!==0||blue<1000||red!==0)throw Error('alpha or helper filtering failed');
+ let previews=0,liveFrames=0;const originalLiveRender=viewer.Render;viewer.Render=()=>{if(scene.background!==background||!helper.visible||!dome.visible)throw Error('background live frame lost helpers');liveFrames++;originalLiveRender();};
+ const interactive=await decode(await RenderPNG(app,job,{tileSize:64,background:true,preview:()=>previews++,progress:value=>{if(value<100)camera.position.set(9,8,7);}}));check();
+ if(camera.position.x!==9||previews<2||liveFrames<2)throw Error('background navigation or previews failed');
+ let backgroundChanged=0;for(let i=0;i<tiled.length;i+=4){if(Math.max(...[0,1,2,3].map(c=>Math.abs(tiled[i+c]-interactive[i+c])))>4)backgroundChanged++;}
+ if(backgroundChanged>317*211*.005)throw Error('navigation changed queued image');viewer.Render=originalLiveRender;
  let cancelled=false;try{await RenderPNG(app,job,{cancelled:()=>true});}catch(error){cancelled=/cancelled/.test(error.message);}check();
  const render=renderer.render.bind(renderer);renderer.render=(...args)=>{if(renderer.getRenderTarget())throw Error('GPU test fault');return render(...args);};let failed=false;try{await RenderPNG(app,job);}catch(error){failed=/GPU test fault/.test(error.message);}check();
- renderer.render=render;scene.traverse(item=>{item.geometry?.dispose();item.material?.dispose();});renderer.dispose();return{changed,blue,red,cancelled,failed};
+ renderer.render=render;let shouldCancel=false;try{await RenderPNG(app,job,{tileSize:64,background:true,cancelled:()=>shouldCancel,progress:()=>{shouldCancel=true;}});}catch(error){if(!/cancelled/.test(error.message))throw error;}check();
+ renderer.render=render;scene.traverse(item=>{item.geometry?.dispose();item.material?.dispose();});renderer.dispose();return{changed,blue,red,cancelled,failed,previews,liveFrames,backgroundChanged};
 };`, resolveDir : process.cwd () }, bundle : true, outfile : 'work/render-state.js' });
 await writeFile ('work/render-state.html', '<script src="/work/render-state.js"></script>');
 const browser = await chromium.launch ({ executablePath : '/usr/bin/chromium', args : ['--no-sandbox', '--enable-unsafe-swiftshader'] });

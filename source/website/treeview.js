@@ -90,7 +90,7 @@ export class TreeViewSingleItem extends TreeViewItem
                 ScrollToView (this.mainElement);
             } else {
                 while (parent !== null) {
-                    parent.ShowChildren (true);
+                    if (!parent.preserveCollapsedOnSelection) { parent.ShowChildren (true); }
                     ScrollToView (this.mainElement);
                     parent = parent.parent;
                 }

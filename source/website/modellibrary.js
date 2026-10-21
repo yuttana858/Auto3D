@@ -1,7 +1,9 @@
+import { AudienceSharing, NewShareCode } from './audiencesharing.js';
 import { AccountLibrary } from './accountlibrary.js';
 import { LibraryCategories } from './sessionarchive.js';
 import { CloudLibrary } from './cloudlibrary.js';
 import { EnablePopupFade } from './popuptransition.js';
+import { RedactLogText } from './errorlogs.js';
 
 export async function RecoveryArchiveBuffer (archive)
 {
@@ -230,7 +232,7 @@ export class ModelLibrary
         this.sharedStorage = new CloudLibrary ();
         this.accountStorage = new AccountLibrary (editor.website.auth);
         this.storage = this.deviceStorage;
-        this.category = 'All sessions';
+        this.category = 'All sessions'; this.sharing = new AudienceSharing (this);
     }
 
     InitializeAccount (id)
@@ -240,6 +242,31 @@ export class ModelLibrary
         this.storage = this.accountStorage; this.category = 'All sessions';
     }
 
+    async ArchiveForItem (item)
+    {
+        return item.personal ? this.accountStorage.Archive (item) : item.shared ? this.sharedStorage.Archive (item) : RecoveryArchiveBuffer (item.archive);
+    }
+    async FindItem (source, id)
+    {
+        const item = await (source === 'account' ? this.accountStorage : source === 'published' ? this.sharedStorage : this.deviceStorage).Get (id);
+        if (!item || id === '__auto3d_recovery__' || id === '__auto3d_folders__') { throw new Error ('Saved Library item not found.'); } return item;
+    }
+    async LoadItem (item, append = false)
+    {
+        const editor = this.editor; const owner = editor.website.auth.user?.id; const document = editor.document;
+        if (!owner || editor.website.accountReady === false || editor.readOnly || editor.busy || this.loadingItem) { throw new Error ('Wait for an editable signed-in workspace.'); }
+        this.loadingItem = true; editor.busy = true; editor.Status ((append ? 'Adding ' : 'Opening ') + item.name + ' · downloading saved model…'); editor.RefreshButtons ();
+        let stage = 'download';
+        try {
+            const archive = await this.ArchiveForItem (item);
+            if (editor.website.auth.user?.id !== owner || editor.website.accountReady === false || editor.document !== document || editor.readOnly) { throw new Error ('Account or workspace changed. Reopen the Library.'); }
+            stage = 'read/render'; editor.Status ((append ? 'Adding ' : 'Opening ') + item.name + ' · reading geometry and textures…');
+            const result = await editor.OpenArchive (archive, append); return { opened : item.id, append, ...result };
+        } catch (error) {
+            const message = (append ? 'Could not add ' : 'Could not open ') + item.name + ' (' + stage + '): ' + error.message;
+            editor.website.errorLogs?.Record ('error', 'library-open', message, error.stack || ''); console.error ('[Library open] ' + RedactLogText (message), RedactLogText (error.stack || '')); editor.Status (message); throw new Error (message);
+        } finally { this.loadingItem = false; editor.busy = false; editor.RefreshButtons (); }
+    }
     async SaveAccount (name, category = 'Uncategorized', kind = 'session')
     {
         if (this.editor.readOnly || (!this.editor.document.objects.length && !this.editor.document.packaging?.paths?.length)) { throw new Error ('Open an editable session to save.'); }
@@ -365,6 +392,7 @@ export class ModelLibrary
             event.preventDefault ();
             if (!name.value.trim () || destination.value === 'shared' || category.value === '__new_folder__') { return; }
             submit.disabled = true; progress.hidden = false; progress.removeAttribute ('value'); status.textContent = 'Preparing session…';
+            let stage = 'preparing session';
             await new Promise ((resolve) => requestAnimationFrame (() => requestAnimationFrame (resolve)));
             try {
                 let fileHandle = null;
@@ -375,6 +403,7 @@ export class ModelLibrary
                 const objects = kind.value === 'model' ? [this.editor.selected] : this.editor.document.objects;
                 const saved = await this.editor.ArchiveAsync (objects, kind.value, name.value.trim ());
                 if (destination.value === 'file') {
+                    stage = 'saving session file';
                     if (fileHandle) {
                         const writable = await fileHandle.createWritable ();
                         try {
@@ -398,9 +427,12 @@ export class ModelLibrary
                     }
                 } else {
                     if (!owner || this.editor.website.auth.user?.id !== owner) { throw new Error ('Account changed. Sign in before saving.'); }
+                    stage = 'preparing Library folder';
                     const folder = await saveStorage.AddFolder (category.value || 'Uncategorized');
-                    status.textContent = destination.value === 'account' ? 'Uploading to your account Library…' : 'Saving to device Library…';
+                    stage = 'creating preview'; status.textContent = 'Creating Library preview…';
                     const thumbnail = this.editor.Thumbnail (objects);
+                    stage = destination.value === 'account' ? 'uploading to account Library' : 'saving to device Library';
+                    status.textContent = destination.value === 'account' ? 'Uploading to your account Library…' : 'Saving to device Library…';
                     await saveStorage.Save ({
                         id : crypto.randomUUID (), name : name.value.trim (), category : folder, kind : kind.value,
                         updatedAt : new Date ().toISOString (), thumbnail, objects : objects.length,
@@ -410,6 +442,7 @@ export class ModelLibrary
                     status.textContent = 'Saved successfully to ' + folder + '.'; progress.max = 1; progress.value = 1; this.editor.Status ('Saved to ' + folder + ': ' + name.value.trim ());
                 }
                 if (kind.value === 'session') {
+                    stage = 'updating saved session state';
                     this.editor.document.name = name.value.trim ();
                     this.editor.website.parameters.fileNameDiv.textContent = this.editor.document.name;
                     await this.editor.MarkClean ();
@@ -419,7 +452,8 @@ export class ModelLibrary
                 dialog.close ();
             } catch (error) {
                 progress.hidden = true;
-                status.textContent = error.name === 'AbortError' ? 'Save canceled.' : 'Save failed: ' + error.message;
+                status.textContent = error.name === 'AbortError' ? 'Save canceled.' : 'Save failed while ' + stage + ': ' + RedactLogText (error.message);
+                if (error.name !== 'AbortError') { console.error ('[Library save] ' + status.textContent, RedactLogText (error.stack || '')); }
                 this.editor.Status (status.textContent);
                 submit.disabled = false;
             }
@@ -432,14 +466,14 @@ export class ModelLibrary
         const shared = WorkspaceDialog ('Share model');
         const form = document.createElement ('div'); form.className = 'workspace_save_form';
         const hint = document.createElement ('p'); hint.className = 'section_hint';
-        hint.textContent = 'Create a read-only Auto3D viewer link for internal or external users. The viewer adapts to desktop, tablet and mobile screens.';
+        hint.textContent = 'Create a code-protected, read-only audience link and QR code. This uploads a separate saved-model snapshot, valid for 30 days. Your Library item stays private; revoke the link to end audience access.';
         const downloadLabel = document.createElement ('label'); downloadLabel.className = 'share_option';
         const allowDownload = document.createElement ('input'); allowDownload.type = 'checkbox';
         downloadLabel.append (allowDownload, document.createTextNode (' Allow .auto3d download'));
         const codeLabel = document.createElement ('label'); codeLabel.className = 'share_option';
-        const requireCode = document.createElement ('input'); requireCode.type = 'checkbox';
+        const requireCode = document.createElement ('input'); requireCode.type = 'checkbox'; requireCode.checked = true; requireCode.disabled = true;
         codeLabel.append (requireCode, document.createTextNode (' Require 4-digit access code'));
-        const codeInput = document.createElement ('input'); codeInput.type = 'password'; codeInput.inputMode = 'numeric'; codeInput.pattern = '[0-9]{4}'; codeInput.maxLength = 4; codeInput.placeholder = '4-digit code'; codeInput.setAttribute ('aria-label', 'Four digit access code'); codeInput.hidden = true;
+        const codeInput = document.createElement ('input'); codeInput.type = 'text'; codeInput.inputMode = 'numeric'; codeInput.pattern = '[0-9]{4}'; codeInput.maxLength = 4; codeInput.placeholder = '4-digit code'; codeInput.setAttribute ('aria-label', 'Four digit access code'); codeInput.hidden = false; codeInput.value = NewShareCode ();
         requireCode.addEventListener ('change', () => { codeInput.hidden = !requireCode.checked; if (!requireCode.checked) { codeInput.value = ''; } else { codeInput.focus (); } });
         codeInput.addEventListener ('input', () => { codeInput.value = codeInput.value.replace (/\D/g, '').slice (0, 4); });
         const generate = document.createElement ('button'); generate.className = 'workspace_primary'; generate.textContent = 'Generate viewer link';
@@ -483,15 +517,28 @@ export class ModelLibrary
             if (requireCode.checked && !/^\d{4}$/.test (codeInput.value)) { shareStatus.textContent = 'Enter exactly four digits for the access code.'; codeInput.focus (); return; }
             generate.disabled = true; shareStatus.textContent = 'Creating secure viewer link…';
             try {
-                const result = await this.sharedStorage.CreateShare (item, allowDownload.checked, requireCode.checked ? codeInput.value : '');
+                const result = await this.sharing.Create (item, { allowDownload : allowDownload.checked, code : codeInput.value });
                 input.value = result.url; input.hidden = false; copy.hidden = false; link.hidden = false; link.href = result.url; qrButton.hidden = false; qrContainer.hidden = true; qrSave.hidden = true;
                 shareStatus.textContent = (result.codeRequired ? 'Access code required · ' : 'No access code · ') + (result.allowDownload ? 'Download enabled.' : 'Download hidden.');
-                input.select ();
+                input.select (); qrButton.click ();
+                const revoke = document.createElement ('button'); revoke.textContent = 'Revoke this link'; revoke.type = 'button'; revoke.onclick = async () => { revoke.disabled = true; try { await this.sharing.Revoke (result.token); shareStatus.textContent = 'Link revoked.'; link.hidden = true; copy.hidden = true; qrContainer.hidden = true; qrButton.hidden = true; qrSave.hidden = true; generate.disabled = false; } catch (error) { shareStatus.textContent = error.message; revoke.disabled = false; } }; form.appendChild (revoke);
             } catch (error) { shareStatus.textContent = error.message; generate.disabled = false; }
         });
         copy.addEventListener ('click', async () => { try { await navigator.clipboard.writeText (input.value); copy.textContent = 'Copied'; } catch { input.select (); copy.textContent = 'Select and copy link'; } });
         form.append (hint, downloadLabel, codeLabel, codeInput, generate, shareStatus, input, copy, link, qrButton, qrContainer, qrStatus, qrSave);
         shared.appendChild (form);
+        const links = document.createElement ('details'); const title = document.createElement ('summary'); title.textContent = 'Existing audience links'; links.appendChild (title); shared.appendChild (links);
+        const owner = this.editor.website.auth.user?.id; const source = item.personal ? 'account' : item.shared ? 'published' : 'device';
+        this.sharing.List ().then (({ shares }) => {
+            if (!shared.isConnected || owner !== this.editor.website.auth.user?.id) { return; }
+            const existing = shares.filter (row => row.itemId === item.id && row.source === source && row.status === 'ready');
+            if (!existing.length) { const empty = document.createElement ('p'); empty.textContent = 'No existing audience links for this save.'; links.appendChild (empty); }
+            for (const row of existing) {
+                const entry = document.createElement ('p'); const anchor = document.createElement ('a'); anchor.textContent = 'Open viewer · expires ' + new Date (row.expiresAt).toLocaleDateString (); anchor.href = row.url; anchor.target = '_blank'; anchor.rel = 'noopener';
+                const revoke = document.createElement ('button'); revoke.type = 'button'; revoke.textContent = 'Revoke link'; revoke.onclick = async () => { revoke.disabled = true; try { await this.sharing.Revoke (row.token); entry.textContent = 'Link revoked.'; } catch (error) { shareStatus.textContent = error.message; revoke.disabled = false; } };
+                entry.append (anchor, document.createTextNode (' '), revoke); links.appendChild (entry);
+            }
+        }).catch (error => { if (shared.isConnected) { const message = document.createElement ('p'); message.textContent = error.message; links.appendChild (message); } });
     }
 
     async Open ()
@@ -610,9 +657,7 @@ export class ModelLibrary
                     button.addEventListener ('click', async () => {
                         button.disabled = true;
                         try {
-                            const archive = item.personal ? await this.accountStorage.Archive (item) : item.shared ? await this.sharedStorage.Archive (item) : await RecoveryArchiveBuffer (item.archive);
-                            if (!this.editor.website.auth.user) { throw new Error ('Sign in again to open the Library.'); }
-                            await this.editor.OpenArchive (archive, append); dialog.close ();
+                            await this.LoadItem (item, append); dialog.close ();
                         } catch (error) { status.textContent = error.message; button.disabled = false; }
                     });
                     actions.appendChild (button);
@@ -630,7 +675,8 @@ export class ModelLibrary
                         await this.storage.Remove (item.id); selectedIds.delete (item.id); await load ();
                     });
                     actions.append (move, remove);
-                } else if (item.shared) {
+                }
+                {
                     const share = document.createElement ('button'); share.textContent = 'Share'; share.addEventListener ('click', () => this.OpenShareDialog (item)); actions.appendChild (share);
                 }
                 card.append (image, name, info, actions); grid.appendChild (card);

@@ -8,9 +8,16 @@ import { PhysicalMaterial, TextureMap } from '../engine/model/material.js';
 import { RGBColor } from '../engine/model/color.js';
 import { Unit } from '../engine/model/unit.js';
 import { CloneSurface } from './scenedocument.js';
-import { Matrix4 } from 'three';
+import { Matrix4, BufferGeometry, Float32BufferAttribute } from 'three';
 
 export const PackagingUnitMM = { [Unit.Millimeter] : 1, [Unit.Centimeter] : 10, [Unit.Meter] : 1000, [Unit.Inch] : 25.4, [Unit.Foot] : 304.8 };
+function PackagingTexture (definition)
+{
+    const map = Object.assign (new TextureMap (), definition);
+    map.offset = new Coord2D (definition.offset?.x ?? 0, definition.offset?.y ?? 0);
+    map.scale = new Coord2D (definition.scale?.x ?? 1, definition.scale?.y ?? 1);
+    return map;
+}
 const inBrowser = typeof document !== 'undefined';
 const entry = new URL (inBrowser ? './packaging/packaging.module.js' : '../../modules/packaging/src/index.js', import.meta.url);
 if (inBrowser) { entry.search = new URL (import.meta.url).search; }
@@ -35,10 +42,15 @@ export function PackagingModel (data, unit = Unit.Millimeter, surfaces = {})
     const factor = PackagingUnitMM[unit]; if (!factor) { throw new Error ('Set known scene units before adding packaging geometry.'); }
     const model = new Model (); model.SetUnit (unit);
     for (const definition of data.materials) {
-        if (surfaces[definition.role]) { model.AddMaterial (CloneSurface (surfaces[definition.role])); continue; }
+        if (surfaces[definition.role]) {
+            const material = CloneSurface (surfaces[definition.role]); material.boardSurfaceRole = definition.role;
+            if (material.boardFluteLinked) { for (const key of ['normalMap', 'bumpMap']) { if (definition[key]) { material[key] = PackagingTexture (definition[key]); } } }
+            model.AddMaterial (material); continue;
+        }
         const material = new PhysicalMaterial (); material.name = definition.name; material.color = new RGBColor (...definition.color);
+        material.boardFluteLinked = definition.boardFluteLinked === true; material.boardSurfaceRole = definition.role;
         for (const key of ['roughness', 'metalness', 'specularIntensity', 'bumpScale', 'normalScale', 'aoIntensity', 'displacementScale']) { if (definition[key] !== undefined) { material[key] = definition[key]; } }
-        for (const [key, map] of Object.entries (definition)) { if (key.endsWith ('Map') && map) { material[key] = Object.assign (new TextureMap (), map); } }
+        for (const [key, map] of Object.entries (definition)) { if (key.endsWith ('Map') && map) { material[key] = PackagingTexture (map); } }
         model.AddMaterial (material);
     }
     for (const definition of [...data.meshes, ...(data.visualMeshes || [])]) {
@@ -72,5 +84,54 @@ export function FefcoSurfaces (model)
     } }
     const indices = area.map ((value, index) => ({ value, index })).sort ((a, b) => b.value - a.value).filter (item => item.value > 0);
     if (!indices.length) { throw new Error ('The selected box has no board material.'); }
-    return { liner : model.materials[indices[0].index], edge : model.materials[(indices[1] || indices[0]).index] };
+    const tagged = Object.fromEntries (model.materials.filter (material => material.boardSurfaceRole).map (material => [material.boardSurfaceRole, material]));
+    return { liner : tagged.liner || model.materials[indices[0].index], edge : tagged.edge || model.materials[(indices[1] || indices[0]).index], ...(tagged.inner ? { inner : tagged.inner } : {}), ...(tagged.closed ? { closed : tagged.closed } : {}) };
+}
+
+// Replace GPU buffers only. Engine meshes remain the canonical source for CAD,
+// archives, manufacturing exports, quantities and array spacing.
+export function ApplyPackagingPresentation (root, data, unit, materials = [])
+{
+    const factor = PackagingUnitMM[unit]; if (!factor) { return; }
+    const definitions = new Map ((data.presentationMeshes || []).map (mesh => [mesh.name, mesh]));
+    root.traverse (item => {
+        const mesh = definitions.get (item.name); if (!item.isMesh || !mesh?.presentationOnly) { return; }
+        const positions = [], normals = [], uvs = []; const geometry = new BufferGeometry (); const roles = (item.userData.originalMaterials || []).map (index => materials[index]?.boardSurfaceRole);
+        for (const triangle of mesh.triangles) {
+            const role = data.materials[triangle.material]?.role; let material = roles.indexOf (role); if (material < 0) { material = roles.indexOf (role === 'inner' || role === 'closed' ? 'liner' : role); } if (material < 0) { material = Math.max (0, Math.min (triangle.material, (Array.isArray (item.material) ? item.material.length : 1) - 1)); }
+            const start = positions.length / 3; for (let i = 0; i < 3; i++) { positions.push (...mesh.vertices[triangle.vertices[i]].map (value => value / factor)); normals.push (...mesh.normals[triangle.normals[i]]); uvs.push (...mesh.uvs[triangle.uvs[i]]); }
+            const last = geometry.groups.at (-1); if (last && last.materialIndex === material) { last.count += 3; } else { geometry.addGroup (start, 3, material); }
+        }
+        geometry.setAttribute ('position', new Float32BufferAttribute (positions, 3)); geometry.setAttribute ('normal', new Float32BufferAttribute (normals, 3)); geometry.setAttribute ('uv', new Float32BufferAttribute (uvs, 2));
+        geometry.computeBoundingSphere (); geometry.computeBoundingBox (); item.geometry.dispose (); item.geometry = geometry; item.userData.auto3dBoardAppearance = true;
+    });
+}
+export async function PreparePackagingPresentations (objects, materials, unit)
+{
+    if (!objects.some (object => object.packagingProfile)) { return; }
+    const module = await LoadPackagingModule (); const cache = new Map ();
+    for (const object of objects) {
+        if (!object.packagingProfile || !object.threeObject) { continue; }
+        const profile = object.packagingProfile, parameters = object.userData?._auto3dFefco ? JSON.parse (object.userData._auto3dFefco) : null;
+        const flat = object.userData?._auto3dPackagingState === 'flat'; let localRig = false; object.threeObject.traverse (mesh => { if (mesh.name === 'Left wall') { localRig = true; } });
+        if (parameters) { const expected = module.FefcoProfile (parameters); if (JSON.stringify (expected.paths) !== JSON.stringify (profile.paths) || expected.thickness !== profile.thickness) { continue; } }
+        const key = JSON.stringify ([profile, parameters, flat, localRig]);
+        let data = cache.get (key); if (!data) { data = parameters ? flat ? localRig ? module.CreateFefcoFoldRig (parameters, profile) : module.UnfoldFefco (parameters, profile) : module.CreateFefcoBox (parameters, profile) : module.CreateBoard (profile, { textured : true }); cache.set (key, data); }
+        ApplyPackagingPresentation (object.threeObject, data, unit, materials);
+    }
+}
+export function BoardAppearanceMaterialChanges (document, object, definitions)
+{
+    const ids = new Set (); document.model.EnumerateMeshInstances (instance => { if (document.Owner (instance) === object) { instance.GetMesh ().triangles.forEach (triangle => ids.add (triangle.mat)); } });
+    const changes = [];
+    for (const id of ids) {
+        const material = document.model.materials[id]; const legacy = material.diffuseMap?.name === 'kraft-fiber.png' ? 'liner' : material.diffuseMap?.name === 'corrugated-edge.png' ? 'edge' : ''; const definition = definitions.find (item => item.role === (material.boardSurfaceRole || legacy)); if (!definition) { continue; }
+        const before = CloneSurface (material), after = CloneSurface (material); let changed = false;
+        for (const [key, map] of Object.entries (definition)) {
+            if (!key.endsWith ('Map') || !map || !material[key]?.name || !/^(?:(kraft-fiber|inner-kraft-fiber|closed-kraft-fiber|corrugated-edge)(-(color|normal|bump|roughness|metalness|specular|ao|height))?|board-((liner|inner|closed)-)?flute-(normal|bump))\.png$/.test (material[key].name)) { continue; }
+            after.boardSurfaceRole = definition.role; after[key] = PackagingTexture ({ ...map, offset : material[key].offset, scale : material[key].scale, rotation : material[key].rotation }); changed = true;
+        }
+        if (changed) { changes.push ({ material, before, after }); }
+    }
+    return changes;
 }

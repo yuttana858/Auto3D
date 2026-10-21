@@ -13,7 +13,8 @@ export function CloneSurface (material)
         const value = material[key];
         if (value instanceof TextureMap) {
             copy[key] = Object.assign (new TextureMap (), value, { offset : value.offset.Clone (), scale : value.scale.Clone () });
-        } else { copy[key] = value && value.Clone ? value.Clone () : value; }
+        } else if (['surfaceRelief', 'varnishSettings'].includes (key) && value) { copy[key] = { ...value }; }
+        else { copy[key] = value && value.Clone ? value.Clone () : value; }
     }
     return copy;
 }

@@ -1,6 +1,9 @@
+import { PreparePackagingPresentations } from './packagingadapter.js';
+import { SceneGroups } from './scenegroups.js';
 import { CommandBar } from './commandbar.js';
 import { ProcessingFeedback } from './processingfeedback.js';
-import { ArrayPlacement, ArrayCellSize } from './arraylayout.js';
+import { ArrayPlacement, ArrayCellSize, ArrayObjectBounds } from './arraylayout.js';
+import { RevealArray } from './arrayreveal.js';
 import { SessionCameras } from './sessioncameras.js';
 import { CalculateVolume, CalculateSurfaceArea } from '../engine/model/quantities.js';
 import { IsTwoManifold } from '../engine/model/modelutils.js';
@@ -501,14 +504,14 @@ export class SessionEditor
         this.selected = object; await this.Render (true); this.Status ((target ? 'Updated ' : 'Added ') + object.name + ' · ' + this.document.objects.length + ' object(s)');
     }
 
-    async Render (fit = false)
+    async Render (fit = false, beforeDisplay = null)
     {
-        this.timeline.Stop (); this.DisposeModelPreview ();
+        this.timeline.Stop (); this.packaging.presentation?.Clear (); this.DisposeModelPreview ();
         this.busy = true; this.controls.detach (); this.players.forEach ((player) => player.Dispose ()); this.players = [];
         try {
             if (!this.document.objects.length) { this.selectionBox.visible = false; this.DisposeModelPreview (); this.website.ClearModel (); this.website.SetUIState (1); this.RefreshUI (); return; }
             const output = new ModelToThreeConversionOutput ();
-            const root = await new Promise ((resolve) => ConvertModelToThreeObject (this.document.model, new ModelToThreeConversionParams (), output, { onTextureLoaded : () => this.website.viewer.RequestRender (), onModelLoaded : resolve }));
+            const root = await new Promise ((resolve, reject) => ConvertModelToThreeObject (this.document.model, new ModelToThreeConversionParams (), output, { onTextureLoaded : () => this.website.viewer.RequestRender (), onModelLoaded : resolve, onError : reject })).catch (error => { output.objectUrls.forEach (URL.revokeObjectURL); throw error; });
             for (let index = 0; index < this.document.objects.length; index++) {
                 const object = this.document.objects[index]; object.threeObject = root.children[index]; object.threeObject.name = object.name;
                 if (object.animationAsset) {
@@ -516,6 +519,9 @@ export class SessionEditor
                     catch (error) { object.animationError = 'Animation unavailable: ' + error.message; }
                 }
             }
+            this.document.objects.forEach ((object) => { object.threeObject.visible = object.visible; });
+            await PreparePackagingPresentations (this.document.objects, this.document.model.materials, this.document.model.GetUnit ());
+            if (beforeDisplay) { beforeDisplay (); }
             this.website.navigator.Clear ();
             this.website.SetUIState (2);
             this.website.OnModelLoaded ({ model : this.document.model, mainFile : this.document.name, usedFiles : this.document.objects.map ((object) => object.source), missingFiles : [] }, root, fit);
@@ -524,8 +530,9 @@ export class SessionEditor
             });
             if (this.objectUrls) { this.objectUrls.forEach (URL.revokeObjectURL); } this.objectUrls = output.objectUrls;
             this.website.sidebar.detailsPanel.modelFormat = 'SESSION';
-            this.document.objects.forEach ((object) => { object.threeObject.visible = object.visible; }); this.website.UpdateMeshesVisibility ();
+            this.website.UpdateMeshesVisibility ();
             this.website.sceneEffects?.ApplyObjectSettings (this.document.objects);
+            await this.packaging.presentation?.PrepareAll (); this.packaging.presentation?.Apply (this.timeline.time, false);
             this.RefreshUI (); this.Select (this.selected); this.website.sceneEffects?.Refresh (); this.website.viewer.Render ();
         } finally { this.busy = false; this.RefreshButtons (); this.website.materialPanel?.Update (); }
     }
@@ -592,8 +599,11 @@ export class SessionEditor
         const root = object.threeObject; root.updateWorldMatrix (true, true);
         const inverse = root.matrixWorld.clone ().invert (); const box = new THREE.Box3 (); const point = new THREE.Vector3 ();
         root.traverse ((mesh) => {
+            if (mesh.userData?.auto3dFoldPresentation) { return; }
             const positions = mesh.geometry?.attributes?.position; if (!positions) { return; }
             const relative = new THREE.Matrix4 ().multiplyMatrices (inverse, mesh.matrixWorld);
+            const canonical = mesh.userData?.auto3dBoardAppearance ? mesh.userData.originalMeshInstance?.GetMesh?.().vertices : null;
+            if (canonical) { canonical.forEach (vertex => box.expandByPoint (point.set (vertex.x, vertex.y, vertex.z).applyMatrix4 (relative))); return; }
             for (let index = 0; index < positions.count; index++) {
                 if (mesh.isMesh) { mesh.getVertexPosition (index, point); } else { point.fromBufferAttribute (positions, index); }
                 box.expandByPoint (point.applyMatrix4 (relative));
@@ -605,11 +615,11 @@ export class SessionEditor
 
     UpdateSelectionBox ()
     {
-        if (!this.selected?.threeObject || !this.selected.visible) {
+        if (this.packaging?.foldOperation || this.packaging?.presentation?.HasVisiblePreview () || this.arrayOperation || !this.selected?.threeObject || !this.selected.visible) {
             this.selectionBox.visible = false;
             return;
         }
-        this.selectionBounds.makeEmpty (); (this.SelectedObjects ().length ? this.SelectedObjects () : [this.selected]).forEach ((object) => { if (object.threeObject && object.visible) { this.selectionBounds.union (new THREE.Box3 ().setFromObject (object.threeObject)); } });
+        this.selectionBounds.makeEmpty (); (this.SelectedObjects ().length ? this.SelectedObjects () : [this.selected]).forEach ((object) => { if (object.threeObject && object.visible) { const include = () => this.selectionBounds.union (new THREE.Box3 ().setFromObject (object.threeObject)); if (this.packaging?.presentation) { this.packaging.presentation.WithOriginal (object, include); } else { include (); } } });
         this.selectionBox.visible = !this.selectionBounds.isEmpty ();
         this.selectionBox.updateMatrixWorld (true);
     }
@@ -639,7 +649,7 @@ export class SessionEditor
     }
     RefreshButtons ()
     {
-        this.processing?.Sync (this.busy && !this.packaging?.foldOperation && !this.packaging?.dimensionUpdating); this.commandBar?.SetBusy (this.busy);
+        this.processing?.Sync (this.busy && !this.packaging?.foldOperation && !this.packaging?.dimensionUpdating && this.arrayOperation?.stage !== 'revealing' && !this.website?.rendering?.running); this.commandBar?.SetBusy (this.busy);
         this.website?.aiWorkspace?.fefcoPanel?.SetDisabled ();
         for (const [key, button] of this.buttons) {
             button.disabled = this.ToolDisabled (key);
@@ -653,8 +663,14 @@ export class SessionEditor
     {
         this.RefreshButtons (); this.objectList.replaceChildren ();
         if (!this.document.objects.length) { Element ('p', 'section_hint', 'Add multiple models and select an object to edit its placement.', this.objectList); }
+        this.groupExpanded ||= new Map (); const groups = SceneGroups (this.document.objects); const hosts = new Map ();
         for (const object of this.document.objects) {
-            const row = Element ('div', 'session_object_row', undefined, this.objectList); row.classList.toggle ('selected', this.selectedIds.has (object.id));
+            let host = this.objectList; const group = groups.find (group => group.id === object.userData?._auto3dGroup);
+            if (group) {
+                if (!hosts.has (group.id)) { const details = Element ('details', 'scene_object_group', undefined, this.objectList); details.dataset.sceneGroup = group.id; details.open = this.groupExpanded.get (group.id) === true; Element ('summary', null, group.name + ' (' + group.objects.length + ')', details); details.addEventListener ('toggle', () => { if (details.isConnected) { this.SetGroupExpanded (group.id, details.open); } }); hosts.set (group.id, details); }
+                host = hosts.get (group.id);
+            }
+            const row = Element ('div', 'session_object_row', undefined, host); row.classList.toggle ('selected', this.selectedIds.has (object.id));
             const select = Element ('button', 'object_name editable_name', object.name, row);
             select.title = object === this.selected ? 'Click again to rename · ' + object.source : 'Select ' + object.name + ' · ' + object.source;
             select.setAttribute ('aria-label', (object === this.selected ? 'Rename ' : 'Select ') + object.name);
@@ -664,6 +680,7 @@ export class SessionEditor
             const visible = Element ('button', null, object.visible ? '◉' : '○', row); visible.title = object.visible ? 'Hide object' : 'Show object'; visible.setAttribute ('aria-label', visible.title + ' ' + object.name); visible.addEventListener ('click', () => { this.Select (object); this.ToggleVisibility (); });
             const update = Element ('button', null, '↻', row); update.title = 'Replace model, keep placement'; update.setAttribute ('aria-label', 'Update ' + object.name); update.addEventListener ('click', () => this.UpdateModel (object));
         }
+        this.website.navigator?.meshesPanel?.SetSceneGroups?.(groups, this.groupExpanded, (id, expanded) => this.SetGroupExpanded (id, expanded));
         const selectionTools = Element ('div', 'selection_group_tools', undefined, this.objectList);
         Element ('p', 'section_hint', this.SelectedObjects ().length + ' selected · Ctrl + click adds to selection.', selectionTools);
         const group = Element ('button', null, 'Group selection', selectionTools); group.disabled = this.readOnly || this.busy || this.SelectedObjects ().length < 2; group.onclick = () => this.Run (() => this.GroupObjects ());
@@ -918,6 +935,7 @@ export class SessionEditor
         const capture = Element ('div', 'mode_buttons timeline_capture_buttons', undefined, native);
         const addObject = Element ('button', null, 'Keyframe scene state', capture); addObject.disabled = this.readOnly || !this.document.objects.length; addObject.title = 'Save every scene object position, rotation and scale at the current time.';
         addObject.addEventListener ('click', () => { timeline.CaptureScene (); this.MarkDirty (); this.AnimationUI (); });
+        const addAction = Element ('button', null, 'Action', capture); addAction.disabled = this.readOnly || this.busy || !this.selected?.userData?._auto3dFefco; addAction.addEventListener ('click', () => this.Run (() => this.packaging.OpenTimelineAction ()));
         const addCamera = Element ('button', null, 'Keyframe camera', capture); addCamera.disabled = this.readOnly; addCamera.title = 'Save viewer eye, target, up vector, FOV, azimuth and elevation at the current time.';
         addCamera.addEventListener ('click', () => { timeline.CaptureCamera (); this.MarkDirty (); this.AnimationUI (); });
 
@@ -937,6 +955,7 @@ export class SessionEditor
         for (const object of this.document.objects) {
             timeline.NormalizeObjectKeyframes (object).forEach ((keyframe) => entries.push ({ type : 'object', keyframe, object, label : object.name }));
         }
+        for (const action of timeline.actions) { const object = this.document.objects.find (object => object.id === action.objectId); if (object) { entries.push ({ type : 'action', keyframe : action, object, label : object.name + ' · ' + action.direction + ' fold action (' + action.duration + ' s)' }); } }
         entries.sort ((left, right) => left.keyframe.time - right.keyframe.time || left.type.localeCompare (right.type));
         if (!entries.length) {
             Element ('p', 'section_hint', 'Set the timeline time, position an object or the viewer camera, then save a keyframe. Smooth tweening is applied between keyframes by default.', keys);
@@ -946,12 +965,12 @@ export class SessionEditor
                 const seek = Element ('button', 'timeline_keyframe_seek', entry.keyframe.time.toFixed (2) + 's · ' + entry.label, row);
                 seek.title = entry.type === 'camera'
                     ? 'Camera · ' + entry.keyframe.azimuth.toFixed (1) + '° az · ' + entry.keyframe.elevation.toFixed (1) + '° el · ' + DisplayLength (entry.keyframe.distance, this.document.model.GetUnit (), this.website.preferences.units) + ' distance'
-                    : entry.label + ' · ' + entry.keyframe.interpolation + ' tween';
+                    : entry.label + (entry.type === 'action' ? ' · procedural fold' : ' · ' + entry.keyframe.interpolation + ' tween');
                 seek.addEventListener ('click', () => { timeline.Seek (entry.keyframe.time); this.AnimationUI (); });
-                Element ('span', 'timeline_keyframe_mode', entry.keyframe.interpolation, row);
+                Element ('span', 'timeline_keyframe_mode', entry.type === 'action' ? 'Action' : entry.keyframe.interpolation, row);
                 if (!this.readOnly) {
                     const remove = Element ('button', 'timeline_keyframe_delete', '×', row); remove.title = 'Delete keyframe';
-                    remove.addEventListener ('click', () => { timeline.DeleteKeyframe (entry.type, entry.keyframe.id, entry.object); this.MarkDirty (); this.AnimationUI (); });
+                    remove.addEventListener ('click', () => { if (entry.type === 'action') { timeline.DeleteAction (entry.keyframe.id); } else { timeline.DeleteKeyframe (entry.type, entry.keyframe.id, entry.object); } this.MarkDirty (); this.AnimationUI (); });
                 }
             }
         }
@@ -1027,9 +1046,12 @@ export class SessionEditor
         };
         const layerLabel = Element ('label', null, 'Rotate every other layer', form); const layerRotation = Element ('select', null, undefined, layerLabel); layerRotation.setAttribute ('aria-label', 'Alternate layer rotation'); [0, 45, 90, 180].forEach (angle => layerRotation.add (new Option (angle ? angle + '°' : 'None', String (angle))));
         const groupLabel = Element ('label', null, 'Automatically group array', form); const group = Element ('input', null, undefined, groupLabel); group.type = 'checkbox'; group.checked = true; group.setAttribute ('aria-label', 'Automatically group array');
+        const animateLabel = Element ('label', null, 'Animate array reveal', form); const animate = Element ('input', null, undefined, animateLabel); animate.type = 'checkbox'; animate.checked = true; animate.setAttribute ('aria-label', 'Animate array reveal');
+        const durationLabel = Element ('label', null, 'Reveal duration (seconds)', form); const duration = Element ('input', null, undefined, durationLabel); duration.type = 'number'; duration.min = 1; duration.max = 15; duration.step = .5; duration.value = 4; duration.setAttribute ('aria-label', 'Array reveal duration');
+        const cameraLabel = Element ('label', null, 'Auto-fit array camera (camera keyframes take priority)', form); const autoFit = Element ('input', null, undefined, cameraLabel); autoFit.type = 'checkbox'; autoFit.checked = true; autoFit.setAttribute ('aria-label', 'Auto-fit array camera');
         const optimizeLabel = Element ('label', null, 'Retain triangles (%)', form); const retain = Element ('input', null, undefined, optimizeLabel); retain.type = 'number'; retain.min = '5'; retain.max = '100'; retain.value = '100'; retain.setAttribute ('aria-label', 'Array retained triangles percentage');
         Element ('p', 'section_hint', 'Optional polygon reduction: preview quality before creating.', form);
-        const host = Element ('div', 'array_polygon_preview', undefined, form); let dispose = null; let previewKey = null; const source = this.selected; const originalSize = new THREE.Box3 ().setFromObject (source.threeObject, true).getSize (new THREE.Vector3 ());
+        const host = Element ('div', 'array_polygon_preview', undefined, form); let dispose = null; let previewKey = null; const source = this.selected; const originalSize = ArrayObjectBounds (source.threeObject).getSize (new THREE.Vector3 ());
         const preview = Element ('button', null, 'Preview optimized array', form); preview.type = 'button';
         const key = () => [fields.w.value, fields.l.value, fields.h.value, gaps.w.value, gaps.l.value, gaps.h.value, retain.value, layerRotation.value].join (':');
         const invalidate = () => { previewKey = null; this.polygonOptimizer.Cancel (); dispose?.(); dispose = null; };
@@ -1058,7 +1080,7 @@ export class SessionEditor
             if (this.selected !== source) { status.textContent = 'Selection changed. Close this dialog and reopen it.'; return; }
             let spacing; try { spacing = gap (); } catch (error) { status.textContent = error.message; return; }
             create.disabled = true; status.textContent = 'Creating an array…';
-            try { if (ratio < 1) { await this.polygonOptimizer.Apply (); } await this.CreateArray (...counts, { autoGroup : group.checked, spacing : originalSize, gap : spacing, layerRotation : Number (layerRotation.value) }); dialog.close (); } catch (error) { status.textContent = error.message; create.disabled = false; }
+            try { if (ratio < 1) { await this.polygonOptimizer.Apply (); } const seconds = duration.valueAsNumber; if (!Number.isFinite (seconds) || seconds < 1 || seconds > 15) { throw new Error ('Use a 1–15 second array reveal.'); } dialog.close (); await this.CreateArray (...counts, { autoGroup : group.checked, spacing : originalSize, gap : spacing, layerRotation : Number (layerRotation.value), animate : animate.checked, duration : seconds, autoFit : autoFit.checked }); } catch (error) { status.textContent = error.message; this.Status (error.message); create.disabled = false; }
         });
     }
 
@@ -1070,6 +1092,8 @@ export class SessionEditor
         const counts = [widthCount, lengthCount, heightCount];
         if (counts.some ((value) => !Number.isInteger (value) || value < 1 || value > 20)) { throw new Error ('Array counts must be integers from 1 to 20.'); }
         const layerRotation = options.layerRotation ?? 0; if (![0, 45, 90, 180].includes (layerRotation)) { throw new Error ('Use 0, 45, 90 or 180 degree layer rotation.'); }
+        for (const key of ['animate', 'autoFit']) { if (options[key] !== undefined && typeof options[key] !== 'boolean') { throw new Error ('Array animation options must be boolean.'); } }
+        const duration = options.duration ?? 4; if (!Number.isFinite (duration) || duration < 1 || duration > 15) { throw new Error ('Use a 1–15 second array reveal.'); }
         const gap = options.gap || new THREE.Vector3 (); ArrayCellSize (new THREE.Vector3 (), layerRotation, gap);
         const total = widthCount * lengthCount * heightCount;
         if (this.document.objects.length + total - 1 > 1000) { throw new Error ('Array exceeds the 1,000-object session limit.'); }
@@ -1078,16 +1102,23 @@ export class SessionEditor
         const added = [];
         const firstIndex = this.document.objects.length;
         const sourceData = { ...(source.userData || {}) }; const groupId = options.autoGroup === false ? null : crypto.randomUUID ();
+        if (!this.website.auth?.user || this.website.accountReady === false) { throw new Error ('Sign in to an editable workspace.'); }
+        const target = this.document; const owner = this.website.auth.user.id; const cameraBefore = this.website.viewer?.GetCamera?.().Clone ();
+        this.website.viewer?.navigation?.StopCameraMovement ();
+        const operation = { stage : 'creating', duration, total, cameraAutoFit : options.autoFit !== false && !this.timeline?.cameraKeyframes?.length, placed : 1, cancelled : false };
+        operation.check = () => { if (operation.cancelled) { throw new Error ('Array creation canceled.'); } if (this.document !== target || this.website.auth.user?.id !== owner || this.website.accountReady === false || this.readOnly) { throw new Error ('The workspace or account changed during array creation.'); } };
+        this.arrayOperation = operation; if (this.selectionBox) { this.UpdateSelectionBox (); }
         this.busy = true; this.RefreshButtons ();
         this.Status ('Creating an array… 0 / ' + (total - 1) + ' copies');
         try {
             await new Promise ((resolve) => setTimeout (resolve, 20));
-            const box = new THREE.Box3 ().setFromObject (source.threeObject, true);
+            const box = ArrayObjectBounds (source.threeObject);
             const size = options.spacing || box.getSize (new THREE.Vector3 ());
             for (let h = 0; h < heightCount; h++) {
                 for (let l = 0; l < lengthCount; l++) {
                     for (let w = 0; w < widthCount; w++) {
                         if (w === 0 && l === 0 && h === 0) { continue; }
+                        operation.check ();
                         const copy = this.document.Instance (source);
                         added.push (copy);
                         copy.name = source.name + ' [' + (w + 1) + ',' + (l + 1) + ',' + (h + 1) + ']';
@@ -1098,29 +1129,44 @@ export class SessionEditor
                     }
                 }
             }
-            const groupData = () => { if (groupId) { [source, ...added].forEach ((object) => { object.userData = { ...(object.userData || {}), _auto3dGroup : groupId, _auto3dGroupName : source.name + ' array' }; }); } }; groupData ();
+            const groupData = () => { if (groupId) { [source, ...added].forEach ((object) => { object.userData = { ...(object.userData || {}), _auto3dGroup : groupId, _auto3dGroupName : 'Array group of ' + source.name, _auto3dGroupKind : 'array' }; }); } }; groupData ();
             this.selected = source;
-            await this.Render ();
+            const animate = options.animate !== false;
+            operation.stage = animate ? 'revealing' : 'creating';
+            await this.Render (false, () => { if (animate) { added.forEach (object => { object.threeObject.visible = false; }); } });
+            this.busy = true; this.RefreshButtons (); operation.check ();
+            if (animate) { if (this.selectionBox) { this.selectionBox.visible = false; } await RevealArray (this, source, added, Math.max (size.y * 1.25, 0.001), operation); operation.check (); }
             this.history.Push ({
                 undo : async () => { source.userData = { ...sourceData }; added.forEach ((object) => this.document.Remove (object)); this.selected = source; await this.Render (); },
                 redo : async () => { groupData (); added.forEach ((object, index) => this.document.Restore (object, firstIndex + index)); this.selected = source; await this.Render (); }
             });
             this.Status ('Created ' + widthCount + ' × ' + lengthCount + ' × ' + heightCount + ' array · ' + total + ' objects');
-            return added;
+            this.lastArray = { state : 'completed', progress : 1, placed : added.length + 1, total : added.length + 1 }; return added;
         } catch (error) {
-            source.userData = { ...sourceData }; added.forEach ((object) => this.document.Remove (object));
-            this.selected = source;
-            try { await this.Render (); } catch { /* Preserve the original failure. */ }
+            source.userData = { ...sourceData }; added.forEach ((object) => target.Remove (object));
+            if (this.document === target) { this.selected = source; try { await this.Render (); if (cameraBefore) { this.website.viewer.SetCamera (cameraBefore); } } catch { /* Preserve the original failure. */ } }
+            this.lastArray = { state : operation.cancelled ? 'cancelled' : 'failed', progress : 0, error : error.message };
             this.Status ('Could not create the array. ' + error.message);
             throw error;
-        } finally { this.busy = false; this.RefreshButtons (); }
+        } finally { this.arrayOperation = null; this.busy = false; this.RefreshButtons (); if (this.selectionBox) { this.selectionBox.visible = false; } }
+    }
+
+    ArrayInspect () { const operation = this.arrayOperation; return operation ? { ...(operation.player?.Inspect () || { state : operation.stage, progress : 0 }), stage : operation.stage, placed : operation.placed, total : operation.total, duration : operation.duration, cameraAutoFit : operation.cameraAutoFit, framing : operation.framing || null } : this.lastArray || { state : 'idle', progress : 0 }; }
+    ArrayControl (action)
+    {
+        if (!['pause', 'resume', 'cancel'].includes (action)) { throw new Error ('Choose pause, resume or cancel.'); }
+        const operation = this.arrayOperation; if (!operation) { return this.ArrayInspect (); }
+        operation.check ();
+        if (action === 'cancel') { operation.cancelled = true; operation.player?.Stop (); }
+        else if (action === 'pause') { operation.player?.Pause (); } else { operation.player?.Resume (); }
+        return this.ArrayInspect ();
     }
 
     GroupObjects (objects = this.SelectedObjects (), name = 'Group')
     {
         if (this.readOnly || this.busy || objects.length < 2 || objects.some ((object) => !this.document.objects.includes (object))) { throw new Error ('Select at least two editable objects.'); }
         const id = crypto.randomUUID (); const records = objects.map ((object) => ({ object, before : { ...(object.userData || {}) } }));
-        const apply = (grouped) => { records.forEach ((item) => { item.object.userData = grouped ? { ...item.before, _auto3dGroup : id, _auto3dGroupName : name.slice (0, 100) } : { ...item.before }; }); this.Select (objects[0]); this.MarkDirty (); };
+        const apply = (grouped) => { records.forEach ((item) => { item.object.userData = grouped ? { ...item.before, _auto3dGroup : id, _auto3dGroupName : name.slice (0, 100), _auto3dGroupKind : 'group' } : { ...item.before }; }); this.Select (objects[0]); this.MarkDirty (); };
         apply (true); this.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); return { groupId : id, objectIds : objects.map ((object) => object.id) };
     }
     UngroupObjects ()
@@ -1161,6 +1207,7 @@ export class SessionEditor
     }
     async ArchiveAsync (objects, kind, name)
     {
+        if (this.arrayOperation) { throw new Error ('Finish or cancel the array animation before saving the session.'); }
         if (this.packaging?.foldOperation) { throw new Error ('Finish or cancel folding before saving the session.'); }
         const writer = new RecoveryWriter ();
         try { return await writer.Create ({ ...this.document, objects }, this.CaptureView (), kind, name); }
@@ -1168,21 +1215,18 @@ export class SessionEditor
     }
     Archive (objects, kind, name)
     {
+        if (this.arrayOperation) { throw new Error ('Finish or cancel the array animation before saving the session.'); }
         if (this.packaging?.foldOperation) { throw new Error ('Finish or cancel folding before saving the session.'); }
         const data = PackSession (this.document, this.CaptureView (), objects, kind); data.name = name; return CreateSessionArchive (data);
     }
     async OpenArchive (buffer, append, recovered = false)
     {
+        if (this.website?.rendering?.running) { throw new Error ('Stop rendering before opening another session.'); }
+        if (this.arrayOperation) { throw new Error ('Finish or cancel the array animation before opening a session.'); }
         if (this.packaging?.foldOperation) { throw new Error ('Finish or cancel folding before opening a session.'); }
         const saved = OpenSessionArchive (buffer); // Validate everything before replacing the current document.
-        if (append) {
-            const added = [];
-            for (const source of saved.document.objects) {
-                const model = saved.document.CompactModel ([source], true); model.root = model.root.GetChildNode (0);
-                const object = this.document.AddImported (model, source.name, Direction.Y, false); Object.assign (object, TransformState (source), { source : source.source, packagingProfile : source.packagingProfile, visible : source.visible, hiddenParts : [...source.hiddenParts], unit : source.unit, userData : { ...(source.userData || {}) }, castShadow : source.castShadow !== false, receiveShadow : source.receiveShadow !== false, keyframes : (source.keyframes || []).map ((keyframe) => ({ ...keyframe, position : [...keyframe.position], rotation : [...keyframe.rotation], scale : [...keyframe.scale] })), animationAsset : source.animationAsset, playback : source.playback }); this.document.ApplyTransform (object); added.push (object);
-            }
-            const firstIndex = this.document.objects.length - added.length; this.history.Push ({ undo : async () => { added.forEach ((object) => this.document.Remove (object)); this.selected = null; await this.Render (); }, redo : async () => { added.forEach ((object, index) => this.document.Restore (object, firstIndex + index)); this.selected = added[0]; await this.Render (); } }); this.selected = added[0];
-        } else { this.document = saved.document; this.history = new SceneHistory (() => this.MarkDirty ()); this.timeline.Load (saved.view.timeline); this.cameras.Load (saved.view.cameraViews); this.selected = this.document.objects[0] || null; if (this.website.hashHandler.HasHash ()) { this.website.hashHandler.SkipNextEventHandler (); this.website.hashHandler.ClearHash (); } }
+        if (append) { return this.AppendArchive (saved); }
+        this.website.rendering?.Lock (); this.document = saved.document; this.history = new SceneHistory (() => this.MarkDirty ()); this.timeline.Load (saved.view.timeline); this.cameras.Load (saved.view.cameraViews); this.selected = this.document.objects[0] || null; if (this.website.hashHandler.HasHash ()) { this.website.hashHandler.SkipNextEventHandler (); this.website.hashHandler.ClearHash (); }
         await this.Render (true);
         if (!append) {
             if (['standard', 'dark', 'light', 'sunset', 'outdoor', 'custom'].includes (saved.view.backgroundPreset)) { this.website.settings.backgroundPreset = saved.view.backgroundPreset; }
@@ -1202,6 +1246,41 @@ export class SessionEditor
             if (recovered) { this.dirty = true; }
             else { await this.MarkClean (); }
         }
+    }
+    async AppendArchive (saved)
+    {
+        if (this.readOnly) { throw new Error ('This session is read-only.'); }
+        const target = this.document; const owner = this.website.auth?.user?.id; const previous = this.selected; const selection = new Set (this.selectedIds || []);
+        if (!saved.document.objects.length) { throw new Error ('The saved Library item has no models to add.'); }
+        if (target.objects.length + saved.document.objects.length > 1000) { throw new Error ('Adding this save would exceed 1,000 scene objects.'); }
+        const added = []; const firstIndex = target.objects.length; const meshes = target.model.meshes.length; const materials = target.model.materials.length; const unit = target.model.GetUnit (); const groups = new Map (); const objectIds = new Map (); const previousActions = this.timeline?.actions || []; let importedActions = [];
+        try {
+            for (const source of saved.document.objects) {
+                const model = saved.document.CompactModel ([source], true); model.root = model.root.GetChildNode (0);
+                const object = target.AddImported (model, source.name, Direction.Y, false); added.push (object); objectIds.set (source.id, object.id);
+                Object.assign (object, TransformState (source), { source : source.source, packagingProfile : source.packagingProfile, visible : source.visible, hiddenParts : [...source.hiddenParts], unit : source.unit, userData : { ...source.userData }, castShadow : source.castShadow !== false, receiveShadow : source.receiveShadow !== false, keyframes : source.keyframes.map (frame => ({ ...frame, id : crypto.randomUUID (), position : [...frame.position], rotation : [...frame.rotation], scale : [...frame.scale] })), animationAsset : source.animationAsset, playback : source.playback ? { ...source.playback, playing : false } : undefined });
+                const group = object.userData._auto3dGroup; if (group) { if (!groups.has (group)) { groups.set (group, crypto.randomUUID ()); } object.userData._auto3dGroup = groups.get (group); }
+                target.ApplyTransform (object);
+            }
+            importedActions = (saved.view?.timeline?.actions || []).filter (action => objectIds.has (action.objectId)).map (action => ({ ...action, id : crypto.randomUUID (), objectId : objectIds.get (action.objectId) }));
+            if (this.timeline) { this.timeline.actions = [...previousActions, ...importedActions]; this.timeline.ExtendDurationForKeys (); }
+            this.selected = added[0]; this.selectedIds = new Set ([added[0].id]); await this.Render (true);
+            if (this.document !== target || this.website.auth?.user?.id !== owner || this.website.accountReady === false || this.readOnly) { throw new Error ('Account or workspace changed while adding the saved model.'); }
+            this.history.Push ({ undo : async () => { added.forEach (object => target.Remove (object)); if (this.timeline) { this.timeline.actions = previousActions; } this.selected = previous; this.selectedIds = new Set (selection); await this.Render (); }, redo : async () => { added.forEach ((object, index) => target.Restore (object, firstIndex + index)); if (this.timeline) { this.timeline.actions = [...previousActions, ...importedActions]; } this.selected = added[0]; this.selectedIds = new Set ([added[0].id]); await this.Render (); } });
+            this.Status ('Added ' + added.length + ' model(s) from ' + saved.document.name + ' · selected ' + added[0].name);
+            return { objectIds : added.map (object => object.id), objectCount : added.length };
+        } catch (error) {
+            added.forEach (object => target.Remove (object)); if (this.timeline) { this.timeline.actions = previousActions; } target.model.meshes.length = meshes; target.model.materials.length = materials; target.model.SetUnit (unit);
+            if (this.document === target) { this.selected = previous; this.selectedIds = selection; try { await this.Render (); } catch { /* Keep the original import error. */ } } throw error;
+        }
+    }
+    GroupsInspect () { return SceneGroups (this.document.objects).map (group => ({ id : group.id, name : group.name, array : group.array, count : group.objects.length, expanded : this.groupExpanded?.get (group.id) === true })); }
+    SetGroupExpanded (id, expanded)
+    {
+        if (typeof expanded !== 'boolean' || !SceneGroups (this.document.objects).some (group => group.id === id)) { throw new Error ('Choose a scene group and expanded state.'); }
+        this.groupExpanded ||= new Map (); this.groupExpanded.set (id, expanded);
+        this.objectList?.querySelectorAll ('details[data-scene-group]').forEach (element => { if (element.dataset.sceneGroup === id) { element.open = expanded; } });
+        this.website.navigator?.meshesPanel?.groupItems?.get (id)?.ShowChildren (expanded); return { id, expanded };
     }
     Thumbnail (objects)
     {
@@ -1228,6 +1307,7 @@ export class SessionEditor
     }
     Export ()
     {
+        if (this.arrayOperation) { this.Status ('Finish or cancel the array animation before exporting.'); return; }
         if (this.packaging?.foldOperation) { this.Status ('Finish or cancel folding before exporting.'); return; }
         const dialog = WorkspaceDialog ('Export session'); const form = Element ('div', 'workspace_save_form', undefined, dialog);
         Element ('p', 'section_hint', 'GLB/glTF includes embedded animation. Hidden objects are excluded.', form);
@@ -1236,6 +1316,7 @@ export class SessionEditor
             button.addEventListener ('click', async () => {
                 button.disabled = true;
                 try {
+                    if (this.arrayOperation) { throw new Error ('Finish or cancel the array animation before exporting.'); }
                     if (this.packaging?.foldOperation) { throw new Error ('Finish or cancel folding before exporting.'); }
                     this.website.viewer.SetMeshesHighlight (this.website.highlightColor, () => false);
                     const root = this.website.viewer.mainModel.mainModel.GetRootObject (); const animations = this.players.filter ((player) => player.object.visible).flatMap ((player) => player.ExportClips ());
@@ -1244,7 +1325,7 @@ export class SessionEditor
                     let result;
                     const exporter = new GLTFExporter (); exporter.register ((writer) => ({ name : 'SW_Auto3D_surface', writeMaterialAsync : async (material, definition) => {
                         const surface = { bumpScale : material.bumpScale, displacementScale : material.displacementScale, displacementBias : material.displacementBias };
-                        for (const [key, map] of [['bumpTexture', material.bumpMap], ['displacementTexture', material.displacementMap]]) {
+                        for (const [key, map] of [['bumpTexture', material.bumpMap || material.auto3dBumpMap], ['displacementTexture', material.displacementMap]]) {
                             if (map) { const texture = { index : await writer.processTextureAsync (map) }; writer.applyTextureTransform (texture, map); surface[key] = texture; }
                         }
                         definition.extras = { ...definition.extras, swAuto3D : surface };

@@ -1,0 +1,23 @@
+# Realistic corrugated board surfaces
+
+Local implementation, not deployed. Auto3D and the independent Packaging preview apply a restrained visual treatment automatically to supported generated boxes and extruded packaging profiles. Open Packaging → **Realistic board surface** for Enable, Panel bow, Fold softness, Cut compression and Paper grain. Individual materials remain editable in the Materials panel: Natural kraft liner (outer), Natural kraft inner liner, Exposed corrugated edge, and Wrapped closed score liner.
+
+## Engineering separation
+
+Canonical engine meshes, collision prisms, cut/score paths, dimensions and material calipers remain unchanged. Optional neutral `presentationMeshes` replace GPU position/normal/UV buffers only. Array spacing and size fields use original engine coordinates, not the bowed display bounds. Manufacturing exports and portable archive meshes retain canonical geometry; profile appearance settings restore visual buffers after loading. The audience mini viewer and independent preview use the same kernel. Mesh exports remain canonical rather than baking this display deformation.
+
+`profile.appearance` stores validated dimensionless controls. Defaults are enabled, panelBow 0.18, foldSoftness 1, cutCompression 0.18, paperGrain 0.35. Strengths are 0–1 except foldSoftness (0–2). Settings and automatically generated texture changes share one Undo/Redo operation. Failed rendering restores the profile and materials. Invalid settings and read-only/changed-account edits are rejected. Custom print, normal, impression and varnish maps are retained; automatic grain updates replace recognized default paper maps and preserve their UV transforms. Shared materials follow the existing shared-material behavior across instances.
+
+## Appearance approximations
+
+Broad panel bow uses a smooth squared-sine envelope with zero displacement and slope at panel boundaries. A distance-to-boundary pinning envelope protects score connections. Sheet/flute direction introduces restrained deterministic variation. With t caliper and D the smaller panel span, its reference amplitude is min(0.22t, 0.006D) × panelBow. Both liners move together, retaining thickness away from compressed cuts. This is an appearance heuristic, not a constitutive paper model or a prediction of production bow.
+
+Free cut boundaries receive a narrow quarter-circle shoulder with reference radius r = min(0.24t, 0.015D) × cutCompression. Within distance d < r, the face compression is r − sqrt(r² − (r−d)²). Inner and outer faces move toward the board centre. Recognized score rails are excluded from cut compression; existing circular score bridges keep separate compressed inner and expanded outer arcs. Fold softness scales their visual inner fillet. Edge-clustered tessellation and smooth face normals make these changes affect highlights and silhouettes. Visual compression does not change the manufacturing caliper.
+
+Outer, inner and wrapped liner textures use deterministic periodic fibre noise and low-contrast mottling, with seamless borders. Their colour/roughness/normal/bump maps remain independent. Exposed edge texture repeats four flute waves per tile; global dieline UVs retain flute phase, pitch and direction while folding. The paper-grain control modifies generated paper detail; custom artwork and masks stay in the same UV coordinates as the deformed surface. Wrapped/closed means the liner around a known score, not a sealed manufacturer joint or a closed raw cut.
+
+## Scope and limits
+
+Generated 0200–0203 panels and custom extruded contours (including holes) have procedural surfaces. Custom flat extrusions receive a sheet-level bow; they are not automatically segmented into mechanically independent panels. Imported arbitrary meshes and generated boxes whose saved paths no longer match the supported rig retain canonical display geometry because reliable panel boundaries cannot be inferred. There is no flexible-body stress solver, individual flute crushing, fibre failure or converter-calibrated deformation model. Broad deformation is kept small to avoid padded/plastic appearance. Review representative materials and lighting before changing defaults.
+
+Agent commands: `packaging.appearance.inspect` and `packaging.appearance.update`, using the same services as the panel. No publication or deployment occurs through these commands.

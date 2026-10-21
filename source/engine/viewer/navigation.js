@@ -301,13 +301,20 @@ export class Navigation
 
 	SetCamera (camera)
 	{
+		this.StopCameraMovement ();
 		this.camera = camera;
+	}
+
+	StopCameraMovement ()
+	{
+		this.cameraMoveGeneration = (this.cameraMoveGeneration || 0) + 1;
 	}
 
 	MoveCamera (newCamera, stepCount)
 	{
-		function Step (obj, steps, count, index)
+		function Step (obj, steps, count, index, generation)
 		{
+			if (obj.cameraMoveGeneration !== generation) { return; }
 			obj.camera.eye = steps.eye[index];
 			obj.camera.center = steps.center[index];
 			obj.camera.up = steps.up[index];
@@ -315,7 +322,7 @@ export class Navigation
 
 			if (index < count - 1) {
 				requestAnimationFrame (() => {
-					Step (obj, steps, count, index + 1);
+					Step (obj, steps, count, index + 1, generation);
 				});
 			}
 		}
@@ -323,6 +330,8 @@ export class Navigation
 		if (newCamera === null) {
 			return;
 		}
+		this.StopCameraMovement ();
+		const generation = this.cameraMoveGeneration;
 
 		if (stepCount === 0 || CameraIsEqual3D (this.camera, newCamera)) {
 			this.camera = newCamera;
@@ -334,7 +343,7 @@ export class Navigation
 				up : TweenCoord3D (this.camera.up, newCamera.up, stepCount, tweenFunc)
 			};
 			requestAnimationFrame (() => {
-				Step (this, steps, stepCount, 0);
+				Step (this, steps, stepCount, 0, generation);
 			});
 		}
 

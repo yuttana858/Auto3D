@@ -1,3 +1,4 @@
+import { BoardAppearanceMesh, TransformAppearanceMesh } from './boardappearance.js';
 import * as THREE from 'three';
 import { ValidateFefco, FlapDepth, FefcoProfile } from './fefco.js';
 import { ValidatePackaging } from './profile.js';
@@ -6,6 +7,7 @@ import { ReferenceSingleWallStack } from './boardlayers.js';
 import { CreaseVisualMeshes } from './creasevisuals.js';
 import { MeshData } from './mesh.js';
 import { PanelSolid, SolidIntersections } from './solid.js';
+import { VisualBoardSpecification, ExposedEdgeUV } from './flutemapping.js';
 
 const ease = value => { const t = Math.max (0, Math.min (1, value)); return t * t * (3 - 2 * t); };
 const phase = (value, start, end) => ease ((value - start) / (end - start));
@@ -17,16 +19,18 @@ export function CreateFefcoFoldRig (input, savedProfile = null)
     const parameters = ValidateFefco (input); const expected = FefcoProfile (parameters); const profile = savedProfile ? ValidatePackaging (savedProfile) : expected;
     if (profile.thickness !== expected.thickness || JSON.stringify (profile.paths) !== JSON.stringify (expected.paths)) { throw new Error ('Folding requires the original generated dieline. Regenerate a box after editing its cut or score paths.'); }
     const { length : l, width : w, height : h, thickness : t } = parameters; const depth = FlapDepth (parameters); const joint = Math.min (35, w / 5); const slot = Math.max (2, t);
+    const boardVisual = VisualBoardSpecification (profile);
     const spans = [l, w, l, w]; const edges = [0]; spans.forEach (span => edges.push (edges.at (-1) + span)); const panels = []; const meshes = [];
     const add = (name, points, kind, index) => {
         const geometry = new THREE.ExtrudeGeometry (new THREE.Shape (points.map (p => new THREE.Vector2 (...p))), { depth : t, bevelEnabled : false, steps : 1, curveSegments : 1, UVGenerator : {
             generateTopUV : (g, vertices, a, b, c) => [a, b, c].map (i => new THREE.Vector2 (vertices[i * 3] / 50, vertices[i * 3 + 1] / 50)),
-            generateSideWallUV : (g, vertices, a, b, c, d) => { const length = Math.hypot (vertices[a * 3] - vertices[b * 3], vertices[a * 3 + 1] - vertices[b * 3 + 1]); return [a, b, c, d].map ((i, at) => new THREE.Vector2 ((at === 1 || at === 2 ? length : 0) / (t * 2), vertices[i * 3 + 2] / t)); }
+            generateSideWallUV : (g, vertices, a, b, c, d) => [a, b, c, d].map (i => new THREE.Vector2 (...ExposedEdgeUV (vertices[i * 3], vertices[i * 3 + 1], vertices[i * 3 + 2], boardVisual)))
         } });
         geometry.rotateX (-Math.PI / 2); const mesh = MeshData (geometry, name, group => group === 1 ? 1 : 0);
         // ExtrudeGeometry uses float32 storage. Restore canonical coordinates so
         // meshes and collision prisms agree on long, fractional-mm blanks.
         mesh.vertices = mesh.vertices.map (v => { const p = points.reduce ((best, p) => Math.hypot (p[0] - v[0], -p[1] - v[2]) < Math.hypot (best[0] - v[0], -best[1] - v[2]) ? p : best); return [p[0], v[1] > t / 2 ? t : 0, -p[1] || 0]; });
+        mesh.triangles.forEach (triangle => { if (triangle.material === 0 && mesh.normals[triangle.normals[0]][1] < -.5) { triangle.material = 2; } });
         meshes.push (mesh); geometry.dispose (); panels.push ({ name, kind, index, solid : PanelSolid (points, t) });
     };
     const rectangle = (a, b, y0, y1) => [[a, y0], [b, y0], [b, y1], [a, y1]];
@@ -38,9 +42,10 @@ export function CreateFefcoFoldRig (input, savedProfile = null)
         if (parameters.code !== '0200') { add ('Top ' + sides[i], rectangle (a, b, h, h + depth), 'top', i); }
     }
     add ('Inside glued joint', [[-joint, 2 * t], [0, 0], [0, h], [-joint, h - 2 * t]], 'joint', 0);
-    const rig = { apiVersion : 1, units : 'mm', parameters, profile, materials : BoardMaterials (), meshes, panels, edges, boardStack : ReferenceSingleWallStack (t), artworkMapping : { coordinates : 'global-dieline-mm', repeat : false } };
+    const rig = { apiVersion : 1, units : 'mm', parameters, profile, materials : BoardMaterials (boardVisual, profile.appearance), meshes, panels, edges, boardStack : ReferenceSingleWallStack (t, { pitchMm : boardVisual.pitchMm, fluteAxisRadians : boardVisual.directionDegrees * Math.PI / 180 }), artworkMapping : { coordinates : 'global-dieline-mm', repeat : false } };
     const material = profile.engineering?.materials.find (m => m.id === profile.engineering.activeMaterialId);
     if (material) { rig.boardStack = { model : 'visual-reference', units : 'mm', totalCaliperMm : t, outsideLinerMm : material.outsideLinerMm, insideLinerMm : material.insideLinerMm, mediumPaperMm : material.mediumPaperMm, flute : { pitchMm : material.flutePitchMm, axisRadians : material.fluteDirectionDegrees * Math.PI / 180, heightMm : t - material.outsideLinerMm - material.insideLinerMm }, scoreWidthMm : material.scoreWidthMm }; }
+    rig.presentationMeshes = meshes.map ((mesh, i) => BoardAppearanceMesh (mesh, profile, panels[i].solid.vertices.slice (0, panels[i].solid.vertices.length / 2)));
     rig.visualMeshes = CreaseVisualMeshes (rig, { matrices : panels.map (() => new THREE.Matrix4 ().toArray ()) }); return rig;
 }
 
@@ -114,5 +119,5 @@ export function FefcoFoldFrame (rig, progress)
         const matrix = new THREE.Matrix4 ().fromArray (pose.matrices[index]); const normals = new THREE.Matrix3 ().getNormalMatrix (matrix);
         return { ...mesh, vertices : mesh.vertices.map (point => new THREE.Vector3 (...point).applyMatrix4 (matrix).toArray ()), normals : mesh.normals.map (normal => new THREE.Vector3 (...normal).applyMatrix3 (normals).normalize ().toArray ()) };
     });
-    return { ...rig, meshes, visualMeshes : CreaseVisualMeshes (rig, pose), state : progress === 0 ? 'flat' : 'folded', parameters : { ...rig.parameters, closure : progress === 1 && rig.parameters.code !== '0200' ? 'closed' : 'open' }, foldProgress : progress, stage : pose.stage };
+    return { ...rig, meshes, presentationMeshes : rig.presentationMeshes.map ((mesh, index) => TransformAppearanceMesh (mesh, pose.matrices[index])), visualMeshes : CreaseVisualMeshes (rig, pose), state : progress === 0 ? 'flat' : 'folded', parameters : { ...rig.parameters, closure : progress === 1 && rig.parameters.code !== '0200' ? 'closed' : 'open' }, foldProgress : progress, stage : pose.stage };
 }

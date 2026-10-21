@@ -51,8 +51,16 @@ export class FefcoPanel
         }
         this.generationStatus = Element ('p', root, '', 'section_hint'); this.generationStatus.setAttribute ('role', 'status'); this.generationStatus.setAttribute ('aria-live', 'polite');
         this.description = Element ('p', root, undefined, 'section_hint');
-        this.generate = Element ('button', root, 'Generate 3D box', 'workspace_primary fefco_generate'); this.generate.type = 'button'; this.controls.push (this.generate);
-        this.generate.addEventListener ('click', () => this.RunGeneration (async () => { const changes = this.DraftParameters (); let result; if (workspace.preset) { result = await workspace.generate (changes); } else { await workspace.configure (changes); result = await workspace.generate (); } this.draftDirty.clear (); this.Refresh (); return result; }));
+        this.appearanceControls = new Map ();
+        const appearance = Element ('details', root, undefined, 'board_appearance'); Element ('summary', appearance, 'Realistic board surface');
+        Element ('p', appearance, 'Visual bowing, soft scores and compressed cut edges. CAD dimensions stay exact.', 'section_hint');
+        for (const [key, title, max] of [['enabled', 'Enable board surface', 1], ['panelBow', 'Panel bow', 1], ['foldSoftness', 'Fold softness', 2], ['cutCompression', 'Cut compression', 1], ['paperGrain', 'Paper grain', 1]]) {
+            const label = Element ('label', appearance, title, 'fefco_field'), input = Element ('input', label); input.type = key === 'enabled' ? 'checkbox' : 'range'; input.min = '0'; input.max = String (max); input.step = '.01'; input.setAttribute ('aria-label', title); this.appearanceControls.set (key, input);
+            input.addEventListener ('change', async () => { input.disabled = true; try { await workspace.run (() => workspace.updateAppearance ({ [key] : key === 'enabled' ? input.checked : Number (input.value) })); } catch (error) { this.generationStatus.textContent = error.message; } finally { this.RefreshAppearance (); } });
+        }
+        const scrubLabel = Element ('label', root, 'Fold / unfold', 'fold_scrub'); this.foldScrub = Element ('input', scrubLabel); this.foldScrub.type = 'range'; this.foldScrub.min = '0'; this.foldScrub.max = '1'; this.foldScrub.step = '0.005'; this.foldScrub.value = '1'; this.foldScrub.setAttribute ('aria-label', 'Fold / unfold position'); this.controls.push (this.foldScrub);
+        const scrub = commit => { if (!workspace.scrub) { return; } Promise.resolve (workspace.scrub (Number (this.foldScrub.value), commit)).catch (error => { this.foldStatus.textContent = error.message; }); };
+        this.foldScrub.addEventListener ('input', () => scrub (false)); this.foldScrub.addEventListener ('change', () => scrub (true));
         this.animate = Element ('button', root, 'Animate', 'fefco_animate'); this.animate.type = 'button'; this.controls.push (this.animate); this.animate.addEventListener ('click', () => workspace.run (() => workspace.animate ()));
         if (workspace.designer) { this.designer = Element ('button', root, 'View dieline in CAD', 'fefco_animate'); this.designer.type = 'button'; this.controls.push (this.designer); this.designer.addEventListener ('click', () => workspace.run (() => workspace.designer ())); }
         Element ('p', root, 'Animate unfolds the selected box to its saved CAD dieline. Click again to assemble it. Board surfaces are checked before playback; overlapping flaps fold in separate layers.', 'section_hint');
@@ -83,7 +91,7 @@ export class FefcoPanel
         for (const [key, field] of this.fields) { if (!this.draftDirty.has (key)) { field.input.value = String (Number ((data[key] / factor).toFixed (6))); } else if (this.draftFactor && this.draftFactor !== factor && Number.isFinite (field.input.valueAsNumber)) { field.input.value = String (Number ((field.input.valueAsNumber * this.draftFactor / factor).toFixed (6))); } field.input.min = String ((key === 'thickness' ? 0.5 : key === 'overlap' ? 0 : 20) / factor); field.input.max = String ((key === 'thickness' ? 15 : 10000) / factor); }
         this.fields.get ('overlap').label.hidden = data.code !== '0202'; this.closureLabel.hidden = data.code === '0200'; if (!this.draftDirty.has ('closure')) { this.closure.value = data.closure; } this.draftFactor = factor;
         for (const [code, button] of this.cards) { button.setAttribute ('aria-pressed', String (code === data.code)); }
-        this.generate.textContent = 'Generate ' + style.acronym + ' · 3D box'; this.RefreshDimensions (); this.SetDisabled ();
+        this.RefreshDimensions (); this.SetDisabled ();
     }
     RefreshDimensions ()
     {
@@ -97,6 +105,7 @@ export class FefcoPanel
         for (const [key, input] of this.dimensionFields) { input.disabled = !data || data.editable === false || this.host.dimensionsBlocked (); if (changed || document.activeElement !== input) { input.value = data ? String (Number (((data[data.basis][key] ?? data[key]) / factor).toFixed (6))) : ''; } }
         this.dimensionMode.disabled = !data || this.host.dimensionsBlocked ();
     }
-    RefreshPlayback () { const state = this.host.playback?.() || { state : 'idle', progress : 0 }; const active = ['playing', 'paused'].includes (state.state); this.pause.disabled = this.cancel.disabled = !active; this.pause.textContent = state.state === 'paused' ? 'Resume folding' : 'Pause folding'; this.foldProgress.value = state.progress || 0; this.foldStatus.textContent = state.state === 'idle' ? 'Select a box or dieline to animate.' : state.state + ' · ' + (state.stage || 'folding') + ' · ' + Math.round ((state.progress || 0) * 100) + '%'; }
+    RefreshAppearance () { const state = this.host.appearance?.(); for (const [key, input] of this.appearanceControls || []) { input.disabled = this.generating || this.host.blocked () || !state?.available || !this.host.updateAppearance; if (key === 'enabled') { input.checked = state?.settings.enabled ?? true; } else { input.value = String (state?.settings[key] ?? 0); } } }
+    RefreshPlayback () { this.RefreshAppearance (); const scrub = this.host.scrubInspect?.(); if (this.foldScrub) { this.foldScrub.disabled = this.generating || this.host.blocked () || !this.host.scrub || !scrub?.available; if (document.activeElement !== this.foldScrub) { this.foldScrub.value = String (scrub?.progress ?? 1); } } const state = this.host.playback?.() || { state : 'idle', progress : 0 }; const active = ['playing', 'paused'].includes (state.state); this.pause.disabled = this.cancel.disabled = !active; this.pause.textContent = state.state === 'paused' ? 'Resume folding' : 'Pause folding'; this.foldProgress.value = state.progress || 0; this.foldStatus.textContent = state.state === 'idle' ? 'Select a box or dieline to animate.' : state.state + ' · ' + (state.stage || 'folding') + ' · ' + Math.round ((state.progress || 0) * 100) + '%'; }
     SetDisabled () { const blocked = this.generating || this.host.blocked (); for (const control of this.controls) { control.disabled = blocked; } this.animate.disabled = blocked || !this.host.canAnimate?.(); if (this.designer) { this.designer.disabled = blocked || !this.host.canAnimate?.(); } this.animate.title = this.host.animation?.()?.stages.join (' → ') || 'Animate selected box or dieline'; this.RefreshDimensions (); this.RefreshPlayback (); }
 }

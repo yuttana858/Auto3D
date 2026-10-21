@@ -6,6 +6,8 @@ import { TextureMap } from '../engine/model/material.js';
 import { HexStringToRGBColor } from '../engine/model/color.js';
 import { GenerateMissingBoxUVs } from './materialuv.js';
 import { SetMaterialReflectionStrength } from '../engine/viewer/materialreflection.js';
+import { ApplySurfaceRelief, SampleImpressionMask, ApplySpotVarnish, SampleMappedSurface } from './materialtextures.js';
+import { SurfaceReliefDefaults, SpotVarnishDefaults } from '../../modules/packaging/src/reliefsettings.js';
 
 const TextureSlots = SurfaceTextureSlots;
 
@@ -411,16 +413,6 @@ export class MaterialPanel
                 entry.original[originalKey] = Number (value);
             });
         }
-        let extent = 1;
-        for (const { mesh } of entry.meshes) {
-            mesh.geometry.computeBoundingBox ();
-            const size = mesh.geometry.boundingBox.getSize (new THREE.Vector3 ());
-            extent = Math.max (size.x, size.y, size.z, 1e-6);
-        }
-        const maxDisplacement = Math.max (extent * 0.05, Math.abs (material.displacementScale));
-        this.Control (properties, 'Displacement', 'range', material.displacementScale, { min : -maxDisplacement, max : maxDisplacement, step : maxDisplacement / 100, disabled : !material.displacementMap }, (value) => {
-            material.displacementScale = Number (value); entry.original.displacementScale = Number (value);
-        });
         if (material.emissiveMap) { this.Control (properties, 'Emission', 'range', material.emissiveIntensity, { min : 0, max : 5, step : 0.01 }, value => SetEmissionStrength (entry, Number (value))); }
         this.Control (properties, 'Double sided', 'checkbox', material.side === THREE.DoubleSide, {}, (value) => {
             material.side = value ? THREE.DoubleSide : THREE.FrontSide; entry.original.doubleSided = value;
@@ -500,6 +492,10 @@ export class MaterialPanel
     Entry (index) { return MaterialEntry (this, index); }
     SampleSurfaceImage (entry) { return SampleSurfaceImage (this, entry); }
     GenerateTextures (args) { return AutoGenerateTextures (this, args); }
+    ApplySurfaceRelief (args) { return ApplySurfaceRelief (this, args); }
+    SampleImpressionMask (map) { return SampleImpressionMask (map); }
+    SampleMappedSurface (map, reference) { return SampleMappedSurface (map, reference); }
+    ApplySpotVarnish (args) { return ApplySpotVarnish (this, args); }
 
     ShowSurfaceTools (parent, entry)
     {
@@ -519,11 +515,98 @@ export class MaterialPanel
         const editor = this.website.sessionEditor; regenerate.disabled = generate.disabled = relief.disabled = editor.readOnly || editor.busy || !this.website.auth?.user;
     }
 
+    ShowVarnishDesigner (parent, entry)
+    {
+        const details = document.createElement ('details'); details.className = 'surface_relief_designer surface_varnish_designer';
+        const summary = document.createElement ('summary'); summary.textContent = 'Gloss / reflective · Spot varnish mask'; details.appendChild (summary);
+        const hint = document.createElement ('p'); hint.className = 'section_hint'; hint.textContent = 'Mask gloss and reflectivity without changing ink, relief or CAD. Transparent areas keep the underlying finish. Settings follow the roughness texture UV tile.'; details.appendChild (hint);
+        const fields = document.createElement ('div'); fields.className = 'surface_relief_fields'; details.appendChild (fields);
+        const settings = { ...SpotVarnishDefaults, ...(entry.original.varnishSettings || {}) }; const inputs = {};
+        for (const [key, title, minimum] of [['gloss', 'Varnish gloss', 0], ['reflectivity', 'Varnish reflectivity', 0], ['maskScale', 'Varnish mask size', 0.1], ['maskU', 'Varnish horizontal position', 0], ['maskV', 'Varnish vertical position', 0]]) {
+            const label = document.createElement ('label'); label.textContent = title;
+            const input = document.createElement ('input'); input.type = 'number'; input.min = minimum; input.max = 1; input.step = 0.05; input.value = settings[key]; input.setAttribute ('aria-label', title); label.appendChild (input); fields.appendChild (label); inputs[key] = input;
+        }
+        const polarity = document.createElement ('select'); polarity.setAttribute ('aria-label', 'Varnish mask areas'); polarity.add (new Option ('Light areas', 'light')); polarity.add (new Option ('Dark areas', 'dark')); polarity.value = settings.polarity; fields.appendChild (polarity);
+        const fileLabel = document.createElement ('label'); fileLabel.textContent = entry.original.varnishMaskMap ? 'Replace saved varnish mask' : 'Varnish mask (PNG / JPEG / WebP)';
+        const file = document.createElement ('input'); file.type = 'file'; file.accept = 'image/png,image/jpeg,image/webp'; file.setAttribute ('aria-label', 'Varnish mask'); fileLabel.appendChild (file); fields.appendChild (fileLabel);
+        const label = document.createElement ('label'); const enabled = document.createElement ('input'); enabled.type = 'checkbox'; enabled.checked = settings.enabled; enabled.setAttribute ('aria-label', 'Enable spot varnish'); label.append (enabled, document.createTextNode ('Enable spot varnish')); details.appendChild (label);
+        const apply = document.createElement ('button'); apply.type = 'button'; apply.className = 'section_button'; apply.textContent = 'Apply spot varnish'; details.appendChild (apply);
+        const editor = this.website.sessionEditor;
+        for (const input of [...Object.values (inputs), polarity, file, enabled, apply]) { input.disabled = editor.readOnly || editor.busy || !this.website.auth?.user || this.website.accountReady === false; }
+        apply.addEventListener ('click', () => editor.Run (async () => {
+            RequireMaterialEdit (this, entry); const owner = this.website.auth.user.id; const doc = editor.document;
+            const previewSlot = this.textureDialog?.dataset.slot;
+            const args = { index : entry.index, enabled : enabled.checked, polarity : polarity.value };
+            for (const [key, input] of Object.entries (inputs)) { args[key] = input.value.trim () ? Number (input.value) : NaN; }
+            if (file.files[0]) {
+                const selected = file.files[0]; if (!['image/png', 'image/jpeg', 'image/webp'].includes (selected.type) || !selected.size || selected.size > 8 * 1024 * 1024) { throw new Error ('Choose a PNG, JPEG or WebP mask up to 8 MB.'); }
+                args.maskDataUri = await new Promise ((resolve, reject) => { const reader = new FileReader (); reader.onload = () => resolve (reader.result); reader.onerror = () => reject (new Error ('Could not read varnish mask.')); reader.readAsDataURL (selected); });
+            }
+            RequireMaterialEdit (this, entry); if (this.website.auth.user.id !== owner || editor.document !== doc) { throw new Error ('The workspace or account changed while reading the mask.'); }
+            const result = await this.ApplySpotVarnish (args); if (previewSlot) { this.OpenTexturePreview (entry.index, previewSlot); } return result;
+        }));
+        parent.appendChild (details);
+    }
+
+    ShowReliefDesigner (parent, entry)
+    {
+        const details = document.createElement ('details'); details.className = 'surface_relief_designer';
+        const summary = document.createElement ('summary'); summary.textContent = 'Corrugated surface · Emboss / deboss'; details.appendChild (summary);
+        const hint = document.createElement ('p'); hint.className = 'section_hint';
+        hint.textContent = 'Appearance only. Grain and flute lines combine with a die-impression mask. Spacing and artwork follow this material’s UV tile; use Bump texture placement to adjust tiling. CAD dimensions and silhouette stay exact.';
+        details.appendChild (hint);
+        const fields = document.createElement ('div'); fields.className = 'surface_relief_fields'; details.appendChild (fields);
+        const settings = { ...SurfaceReliefDefaults, ...(entry.original.surfaceRelief || {}), ...(entry.original.surfaceRelief ? { strength : entry.original.bumpScale } : {}) };
+        const inputs = {};
+        const numeric = (key, title, min, max, step) => {
+            const label = document.createElement ('label'); label.textContent = title;
+            const input = document.createElement ('input'); input.type = 'number'; input.min = min; input.max = max; input.step = step; input.value = settings[key]; input.setAttribute ('aria-label', title);
+            label.appendChild (input); fields.appendChild (label); inputs[key] = input;
+        };
+        numeric ('grain', 'Paper grain', 0, 1, 0.05); numeric ('flute', 'Flute visibility', 0, 1, 0.05);
+        numeric ('cycles', 'Flute lines per UV tile', 1, 64, 1); numeric ('strength', 'Surface relief strength', 0, 2, 0.05);
+        const select = (key, title, choices) => {
+            const label = document.createElement ('label'); label.textContent = title;
+            const input = document.createElement ('select'); input.setAttribute ('aria-label', title);
+            for (const [value, text] of choices) { input.add (new Option (text, value)); } input.value = settings[key];
+            label.appendChild (input); fields.appendChild (label); inputs[key] = input;
+        };
+        select ('direction', 'Flute direction', [['vertical', 'Vertical'], ['horizontal', 'Horizontal']]);
+        select ('impression', 'Die impression', [['off', 'Off'], ['emboss', 'Emboss · raised'], ['deboss', 'Deboss · recessed']]);
+        select ('polarity', 'Impression mask areas', [['light', 'Light areas'], ['dark', 'Dark areas']]);
+        numeric ('impressionStrength', 'Impression strength', 0, 1, 0.05);
+        numeric ('maskScale', 'Mask size in tile', 0.1, 1, 0.05); numeric ('maskU', 'Mask horizontal position', 0, 1, 0.05); numeric ('maskV', 'Mask vertical position', 0, 1, 0.05);
+        const label = document.createElement ('label'); label.textContent = entry.original.impressionMap ? 'Replace saved impression mask' : 'Impression mask (PNG / JPEG / WebP)';
+        const file = document.createElement ('input'); file.type = 'file'; file.accept = 'image/png,image/jpeg,image/webp'; file.setAttribute ('aria-label', 'Impression mask'); label.appendChild (file); fields.appendChild (label);
+        const note = document.createElement ('p'); note.className = 'section_hint'; note.textContent = 'Use high-contrast artwork. Transparent areas remain flat; rectangular images fit inside the tile without stretching. All panels sharing this material receive the effect. Applying activates Bump relief and retains your color artwork and normal map.'; details.appendChild (note);
+        const clearLabel = document.createElement ('label'); const clear = document.createElement ('input'); clear.type = 'checkbox'; clear.setAttribute ('aria-label', 'Remove saved impression mask'); clearLabel.append (clear, document.createTextNode ('Remove saved impression mask (select Off)')); details.appendChild (clearLabel);
+        const apply = document.createElement ('button'); apply.type = 'button'; apply.className = 'section_button'; apply.textContent = 'Apply surface relief'; details.appendChild (apply);
+        const editor = this.website.sessionEditor;
+        for (const input of [...Object.values (inputs), file, clear, apply]) { input.disabled = editor.readOnly || editor.busy || !this.website.auth?.user || this.website.accountReady === false; }
+        apply.addEventListener ('click', () => editor.Run (async () => {
+            RequireMaterialEdit (this, entry);
+            const owner = this.website.auth.user.id; const doc = editor.document;
+            const previewSlot = this.textureDialog?.dataset.slot;
+            const args = { index : entry.index, clearMask : clear.checked };
+            for (const [key, input] of Object.entries (inputs)) { args[key] = input.type === 'number' ? (input.value.trim () ? Number (input.value) : NaN) : input.value; }
+            if (file.files[0]) {
+                const selected = file.files[0];
+                if (!['image/png', 'image/jpeg', 'image/webp'].includes (selected.type) || !selected.size || selected.size > 8 * 1024 * 1024) { throw new Error ('Choose a PNG, JPEG or WebP mask up to 8 MB.'); }
+                args.maskDataUri = await new Promise ((resolve, reject) => { const reader = new FileReader (); reader.onload = () => resolve (reader.result); reader.onerror = () => reject (new Error ('Could not read impression mask.')); reader.readAsDataURL (selected); });
+            }
+            RequireMaterialEdit (this, entry);
+            if (this.website.auth.user.id !== owner || editor.document !== doc) { throw new Error ('The workspace or account changed while reading the mask.'); }
+            const result = await this.ApplySurfaceRelief (args); if (previewSlot) { this.OpenTexturePreview (entry.index, previewSlot); } return result;
+        }));
+        parent.appendChild (details);
+    }
+
     ShowSurfaceMapCards (parent, entry, properties)
     {
         const cards = document.createElement ('div'); cards.className = 'surface_map_cards'; parent.appendChild (cards);
         const assignments = { map : ['Base color', 'Opacity'], roughnessMap : ['Glossy', 'Roughness'], specularMap : ['Reflective'], metalnessMap : ['Metalness'], bumpMap : ['Bump'], normalMap : ['Normal strength'], aoMap : ['AO intensity'], displacementMap : ['Displacement'], emissiveMap : ['Emission'] };
         for (const [key, title] of TextureSlots) {
+            if (key === 'displacementMap') { continue; }
             if (key === 'emissiveMap' && !TextureForSlot (entry, key)) { continue; }
             const card = document.createElement ('div'); card.className = 'surface_map_card'; card.dataset.map = key;
             const preview = document.createElement ('button'); preview.type = 'button'; preview.className = 'surface_map_preview'; preview.setAttribute ('aria-label', 'Preview ' + title + ' texture');
@@ -532,6 +615,19 @@ export class MaterialPanel
             const heading = document.createElement ('span'); heading.textContent = title; preview.append (canvas, heading);
             preview.title = OriginalTexture (entry, key)?.name || 'No image assigned'; preview.addEventListener ('click', () => this.OpenTexturePreview (entry.index, key)); card.appendChild (preview);
             for (const label of properties.querySelectorAll ('.editor_control')) { if ((assignments[key] || []).includes (label.querySelector ('input').getAttribute ('aria-label'))) { card.appendChild (label); } }
+            if (key === 'bumpMap' || key === 'normalMap') {
+                const mode = key === 'bumpMap' ? 'bump' : 'normal';
+                const active = EffectiveReliefMode (entry.original.reliefMode, !!TextureForSlot (entry, 'normalMap'), !!TextureForSlot (entry, 'bumpMap'));
+                if (image && active !== mode) {
+                    const activate = document.createElement ('button'); activate.type = 'button'; activate.className = 'section_button';
+                    activate.textContent = 'Use ' + (mode === 'bump' ? 'Bump' : 'Normal') + ' relief';
+                    activate.title = 'Activate this relief map to adjust its strength.';
+                    const editor = this.website.sessionEditor;
+                    activate.disabled = editor.readOnly || editor.busy || !this.website.auth?.user;
+                    activate.addEventListener ('click', () => editor.Run (() => this.SetRelief (entry.index, mode)));
+                    card.appendChild (activate);
+                }
+            }
             cards.appendChild (card);
         }
         const sided = properties.querySelector ('.editor_control'); if (sided) { parent.querySelector ('.surface_tools').appendChild (sided); } properties.remove ();
@@ -565,6 +661,7 @@ export class MaterialPanel
         const slot = TextureSlots.find (slot => slot[0] === key); if (!slot) { throw new Error ('Unknown texture slot.'); }
         const entry = this.Entry (index); this.previewEntry = entry.material; this.textureDialog?.close ();
         const dialog = WorkspaceDialog (slot[1] + ' texture'); this.textureDialog = dialog; dialog.classList.add ('surface_texture_dialog');
+        dialog.dataset.slot = key;
         const texture = TextureForSlot (entry, key); const original = OriginalTexture (entry, key);
         const canvas = document.createElement ('canvas'); canvas.width = canvas.height = 512; canvas.className = 'surface_texture_large'; canvas.setAttribute ('aria-label', slot[1] + ' texture preview');
         if (texture?.image) { DrawTextureThumbnail (canvas, texture.image); } dialog.appendChild (canvas);
@@ -578,13 +675,44 @@ export class MaterialPanel
         remove.addEventListener ('click', () => editor.Run (async () => { await this.RemoveTexture (index, key); this.OpenTexturePreview (index, key); }));
         input.addEventListener ('change', () => editor.Run (async () => { if (!input.files[0]) { return; } await this.LoadTexture (this.Entry (index), slot, input.files[0]); this.OpenTexturePreview (index, key); })); actions.append (save, replace, remove, input);
         if (texture && original) {
-            const mapping = document.createElement ('details'); const title = document.createElement ('summary'); title.textContent = 'UV' + texture.channel + ' · tile ' + texture.repeat.x.toFixed (2) + ' × ' + texture.repeat.y.toFixed (2) + ' · mapping'; mapping.appendChild (title); dialog.appendChild (mapping);
-            for (const [field, axis, title] of [['repeat', 'x', 'Tile U'], ['repeat', 'y', 'Tile V'], ['offset', 'x', 'Offset U'], ['offset', 'y', 'Offset V']]) {
-                this.Control (mapping, title, 'number', texture[field][axis], { step : 0.05 }, value => { texture[field][axis] = Number (value); original[field === 'repeat' ? 'scale' : field][axis] = Number (value); texture.updateMatrix (); }, entry);
+            const mapping = document.createElement ('details'); mapping.className = 'surface_uv_mapping'; mapping.open = true;
+            const title = document.createElement ('summary'); title.textContent = 'UV' + texture.channel + ' · coordinates, rotation and tiling'; mapping.appendChild (title); dialog.appendChild (mapping);
+            const settings = this.InspectTexture (index, key);
+            for (const [field, title, step] of [['tileU', 'Tile U', .05], ['tileV', 'Tile V', .05], ['offsetU', 'Offset U', .05], ['offsetV', 'Offset V', .05], ['rotationDegrees', 'Texture rotation (°)', 1]]) {
+                const label = document.createElement ('label'); label.className = 'surface_uv_control'; const caption = document.createElement ('span'); caption.textContent = title; label.appendChild (caption);
+                const input = document.createElement ('input'); input.type = 'number'; input.step = step; input.value = settings[field]; input.setAttribute ('aria-label', title); input.disabled = editor.readOnly || editor.busy || !this.website.auth?.user; label.appendChild (input); mapping.appendChild (label);
+                input.addEventListener ('change', () => editor.Run (() => this.SetTextureMapping (index, key, { [field] : input.value.trim () ? Number (input.value) : NaN })));
             }
-            this.Control (mapping, 'Texture rotation (°)', 'number', texture.rotation * 180 / Math.PI, { step : 1 }, value => { texture.rotation = Number (value) * Math.PI / 180; original.rotation = texture.rotation; texture.updateMatrix (); }, entry);
         }
-        return { opened : true, index, slot : key };
+        if (['map', 'bumpMap', 'normalMap'].includes (key)) { this.ShowReliefDesigner (dialog, entry); }
+        if (['roughnessMap', 'specularMap'].includes (key)) { this.ShowVarnishDesigner (dialog, entry); }
+        return { opened : true, index, slot : key, tools : { mapping : !!original, embossDeboss : ['map', 'bumpMap', 'normalMap'].includes (key), spotVarnish : ['roughnessMap', 'specularMap'].includes (key) } };
+    }
+
+    InspectTexture (index, key)
+    {
+        if (!TextureSlots.some (slot => slot[0] === key)) { throw new Error ('Unknown texture slot.'); }
+        const entry = this.Entry (index); const map = OriginalTexture (entry, key);
+        return { index, slot : key, assigned : !!map, name : map?.name || null, tileU : map?.scale.x ?? 1, tileV : map?.scale.y ?? 1, offsetU : map?.offset.x ?? 0, offsetV : map?.offset.y ?? 0, rotationDegrees : (map?.rotation || 0) * 180 / Math.PI,
+            surfaceRelief : entry.original.surfaceRelief ? { ...entry.original.surfaceRelief } : null, varnishSettings : entry.original.varnishSettings ? { ...entry.original.varnishSettings } : null, boardFluteLinked : entry.original.boardFluteLinked };
+    }
+
+    SetTextureMapping (index, key, changes)
+    {
+        const entry = this.Entry (index); const editor = RequireMaterialEdit (this, entry); const before = this.InspectTexture (index, key);
+        if (!before.assigned) { throw new Error ('Assign a texture before editing its UV mapping.'); }
+        const keys = ['tileU', 'tileV', 'offsetU', 'offsetV', 'rotationDegrees'];
+        if (!changes || !Object.keys (changes).length || Object.keys (changes).some (key => !keys.includes (key)) || Object.values (changes).some (value => !Number.isFinite (value) || Math.abs (value) > 1000000) || ['tileU', 'tileV'].some (field => changes[field] === 0)) { throw new Error ('Use finite UV values within ±1,000,000 and nonzero tiling.'); }
+        const after = { ...before, ...changes }; if (['bumpMap', 'normalMap'].includes (key)) { after.boardFluteLinked = false; }
+        const apply = value => {
+            const current = this.Entry (index); const map = OriginalTexture (current, key); const texture = TextureForSlot (current, key);
+            map.scale.x = value.tileU; map.scale.y = value.tileV; map.offset.x = value.offsetU; map.offset.y = value.offsetV; map.rotation = value.rotationDegrees * Math.PI / 180;
+            current.original.boardFluteLinked = value.boardFluteLinked;
+            if (texture) { texture.repeat.set (value.tileU, value.tileV); texture.offset.set (value.offsetU, value.offsetV); texture.rotation = map.rotation; texture.updateMatrix (); }
+            this.website.viewer.Render (); editor.MarkDirty?.();
+        };
+        if (JSON.stringify (before) !== JSON.stringify (after)) { apply (after); editor.PushHistory (() => apply (before), () => apply (after)); }
+        return this.InspectTexture (index, key);
     }
 
     SaveTexture (index, key)
@@ -598,6 +726,7 @@ export class MaterialPanel
         const slot = TextureSlots.find (slot => slot[0] === key); if (!slot) { throw new Error ('Unknown texture slot.'); }
         const editor = RequireMaterialEdit (this, entry); const before = CloneSurface (entry.original);
         entry.original[slot[2]] = next; if (key === 'map' && next) { entry.original.multiplyDiffuseMap = true; }
+        if (key === 'bumpMap' || key === 'normalMap') { entry.original.boardFluteLinked = false; }
         const after = CloneSurface (entry.original);
         const apply = async (surface) => { Object.assign (entry.original, CloneSurface (surface)); await editor.Render (); editor.MarkDirty (); };
         try { await apply (after); } catch (error) { await apply (before); throw error; }

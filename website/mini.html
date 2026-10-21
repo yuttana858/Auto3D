@@ -48,9 +48,9 @@ dialog::backdrop{background:#000b}.qr{margin:15px auto;display:grid;place-items:
 <script src="/assets/vendor/qrcode.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
 (() => {
- const token = new URLSearchParams(location.search).get('view') || '';
+ const query = new URLSearchParams(location.search);const audience=query.has('share');const token=query.get('share') || query.get('view') || '';
  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(token))return;
- const link = new URL('/mini.html',location.origin);link.searchParams.set('view',token);
+ const link = new URL('/mini.html',location.origin);if(audience){link.searchParams.set('share',token);}else{link.searchParams.set('view',token);}
  const copy=document.getElementById('copy'),qr=document.getElementById('qrButton'),dialog=document.getElementById('qrDialog');
  copy.disabled=false;qr.disabled=false;
  copy.onclick=async()=>{try{await navigator.clipboard.writeText(link.href);copy.textContent='Copied';}catch{copy.textContent='Copy unavailable';}};

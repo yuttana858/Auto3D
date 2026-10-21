@@ -1,0 +1,31 @@
+# Fold and array presentation
+
+These features affect camera/render presentation. Manufacturing measurements remain based on canonical CAD; arrays use original mesh coordinates and omit decorative crease skins from placement bounds.
+
+## Automatic fold camera
+
+Fold/unfold now initializes the replacement renderer at the current fold pose before displaying it. The original box stays displayed during preparation. This avoids a flat-blank flash when starting with an assembled box. Completion replaces the preview at the same pose and preserves the camera rather than fitting the scene abruptly.
+
+With automatic framing enabled, the first 15% of playback holds the start pose while the camera eases from the user's current eye/target into a view that fits the sampled fold sweep. Folding occupies the middle 70%. The last 15% holds the endpoint while the camera eases to a closer fit. Camera targeting follows the selected box's transformed bounds and includes portrait-view fitting and space above the command bar. Pending ordinary camera-fit tweens are canceled before presentation begins, so they cannot overwrite animation framing. The current azimuth is retained; an unhelpful grazing angle is raised into a 25–65° viewing elevation. The full duration includes these camera transitions. The sweep uses 21 samples plus a 12% framing margin; this is a presentation heuristic, not a continuous visibility proof for arbitrary geometry.
+
+**Advance animation → Auto-fit fold / unfold** disables automatic framing when unchecked. `packaging.fefco.camera` uses the same setting and saves it in the session timeline with Undo support. Authored camera keyframes take priority: their camera track is evaluated across the configured Advance Animation range while folding. Object keyframes do not drive the CAD fold. Pointer/touch/wheel input in the viewport relinquishes camera control for the remaining operation. Pause freezes both fold and camera; cancellation restores the pre-fold scene and camera. Camera auto-fit state is available in `packaging.fefco.playback.inspect`; `camera.current.inspect` reports live camera values during playback.
+
+## Array reveal
+
+The array dialog adds Animate array reveal, a 1–15 second duration (default 4), and Auto-fit array camera. `object.array` accepts matching `animate`, `duration` and `autoFit` options. `animate: false` retains immediate placement. Array generation and any optional approved decimation finish before the reveal; duration describes the reveal itself, not model preparation.
+
+The original object stays at cell 1,1,1. Copies become visible above their destination and ease down without bounce or interpenetration. Order is width/X left to right, then length/Z rows, then height/Y layers, preserving existing layer rotation and edge gaps. For copy fraction `f`, start time is `0.08 + 0.8 × f^0.45` of the reveal; dropping duration decreases from 0.16 to 0.06 of the reveal. Thus the first placements are separated and the ending placements overlap rapidly. Every final transform equals the ordinary array placement result.
+
+The camera eases from the current framing toward the full array bounds, including temporary drop headroom, which settles to the final arrangement in the last 20% of the reveal. Advance camera keyframes override auto-fit; viewport interaction relinquishes camera control. Pause, Resume and Cancel controls remain accessible without a processing modal. Agent controls `object.array.playback` and `object.array.playback.inspect` bypass the pending creation command queue so they work while `object.array` is awaiting completion. Other edits remain blocked. The creation command completes after the reveal so macros can safely act on the finished array.
+
+During the reveal only Three.js matrices/visibility are temporary; canonical object transforms are already final and cannot be saved/exported until the operation completes. Cancellation or account/workspace change rolls back all new copies and grouping without adding history. Successful creation records one Undo/Redo step; Redo restores the completed arrangement. The reveal is a creation-time presentation, not a saved/exportable animation clip. Final scene geometry, array membership and placement persist normally.
+
+## Manual fold pose and timeline Actions
+
+The Packaging panel replaces the large **Generate RSC · 3D box** button with a **Fold / unfold position** slider. Preset cards still generate boxes. The slider prepares a procedural display rig, stores a normalized pose from flat (0) to assembled (1), and records one Undo step per committed drag. It does not regenerate or change canonical CAD geometry, manufacturing dimensions or measurement targets. Saved `_auto3dFoldPreview` metadata restores this display pose; malformed values are rejected on archive import.
+
+The bottom Advance animation panel now has an **Action** button and an **Actions** track. Select a generated box, choose Fold/unfold, Fold or Unfold, and choose a 1–30 second duration. The action begins at the playhead. Actions are evaluated from timeline time, so seeking backward, seeking forward and playback produce the same pose. Toggle unfolds any nonflat initial pose and folds a flat pose. Same-box action spans cannot overlap; separate boxes may act concurrently. Automatic camera settling uses the same 15/70/15 timing convention unless automatic framing is disabled. Authored camera keys take priority; viewport interaction relinquishes automatic control. Selection bounds are hidden while a procedural fold preview is visible.
+
+Action records and manual preview settings persist in session archives. Library Add remaps action and object IDs so imported actions target the added models. Exported manufacturing geometry remains canonical; these visual Actions are not baked into exported GLB animation clips. Live procedural previews reuse current materials. Free cut slots and the manufacturer’s closing joint remain distinct from shared score connections.
+
+Shared commands: `packaging.fefco.scrub`, `packaging.fefco.scrub.inspect`, `animation.action.open` (interactive dialog), `animation.action.add`, `animation.action.delete` and existing `animation.timeline.seek`/playback. All persistent edits use the same UI services with strict validation, account/read-only guards and history.

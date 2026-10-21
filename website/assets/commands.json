@@ -403,7 +403,7 @@
       "id": "packaging.fefco.animate",
       "title": "Animate box folding",
       "category": "Packaging",
-      "description": "Animate the selected assembled box completely flat along its saved CAD cut/score paths; animate a flat dieline to assemble it. Supports RSC, HSC, OSC and FOL. HSC keeps its open top. Returns when playback starts; inspect completion with packaging.fefco.playback.inspect. Preserves board materials; completion adds one Undo step. Cancel restores the original without a history step. Original generated paths and unscaled geometry required.",
+      "description": "Animate the selected box along its original CAD folds. Auto-fit eases from the current camera, follows the selected box and settles at the endpoint; Advance Animation camera keyframes or auto-fit Off preserve manual framing. Viewport interaction takes camera control. Returns when playback starts; inspect completion with packaging.fefco.playback.inspect. Preserves materials; completion adds one Undo step. Cancel restores the original. Unscaled generated geometry required.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -422,6 +422,28 @@
       },
       "example": {
         "duration": 6
+      }
+    },
+    {
+      "id": "packaging.fefco.camera",
+      "title": "Set automatic folding camera",
+      "category": "Packaging",
+      "description": "Enable smooth auto-fit and object following for fold/unfold, or preserve manual framing. Saved Advance Animation camera keyframes take priority. Undo supported; setting persists in the session timeline.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "autoFit": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "autoFit"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "autoFit": true
       }
     },
     {
@@ -1788,7 +1810,7 @@
       "id": "object.array",
       "title": "Array object",
       "category": "Objects",
-      "description": "Create a W/L/H array. Optional gap is edge spacing by width/length/height, in display units by default; unknown source units use model units. Zero gap makes copies touch. W=X, L=Z, H=Y. Undo supported.",
+      "description": "Create a W/L/H array. Optional gap is edge spacing by width/length/height, in display units by default; unknown source units use model units. Zero gap makes copies touch. W=X, L=Z, H=Y. Animated reveal is on by default: sequential drops accelerate while the camera eases to the full array. Camera keyframes override auto-fit. Await completion; pause/resume/cancel via object.array.playback. One Undo step.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -1842,6 +1864,17 @@
           "autoGroup": {
             "type": "boolean"
           },
+          "animate": {
+            "type": "boolean"
+          },
+          "duration": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 15
+          },
+          "autoFit": {
+            "type": "boolean"
+          },
           "layerRotation": {
             "type": "number",
             "enum": [
@@ -1864,6 +1897,47 @@
         "length": 2,
         "height": 1
       }
+    },
+    {
+      "id": "object.array.playback",
+      "title": "Control array reveal",
+      "category": "Objects",
+      "description": "Pause, resume or cancel an active array reveal while normal editing is blocked. Cancel restores the pre-array scene and camera.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "pause",
+              "resume",
+              "cancel"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "action": "pause"
+      }
+    },
+    {
+      "id": "object.array.playback.inspect",
+      "title": "Inspect array reveal",
+      "category": "Objects",
+      "description": "Read array creation/reveal state, progress, placed count and automatic camera state.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
     },
     {
       "id": "object.drop_to_floor",
@@ -2751,6 +2825,270 @@
       "example": {}
     },
     {
+      "id": "material.texture.inspect",
+      "title": "Inspect texture UV and effects",
+      "category": "Materials",
+      "description": "Read assigned image name, UV tiling, offsets, rotation, emboss/deboss settings, spot varnish settings and automatic board-flute linkage. Does not return image bytes.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "slot": {
+            "type": "string",
+            "enum": [
+              "map",
+              "roughnessMap",
+              "normalMap",
+              "bumpMap",
+              "emissiveMap",
+              "specularMap",
+              "aoMap",
+              "displacementMap",
+              "metalnessMap"
+            ]
+          }
+        },
+        "required": [
+          "index",
+          "slot"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "index": 0,
+        "slot": "bumpMap"
+      }
+    },
+    {
+      "id": "material.texture.mapping",
+      "title": "Set texture UV mapping",
+      "category": "Materials",
+      "description": "Set UV tiling, offsets or rotation in degrees using the texture preview service. Preserves image bytes. Nonzero tiling supports mirrored textures; one Undo step. Manual bump/normal placement disables automatic board-flute mapping.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "slot": {
+            "type": "string",
+            "enum": [
+              "map",
+              "roughnessMap",
+              "normalMap",
+              "bumpMap",
+              "emissiveMap",
+              "specularMap",
+              "aoMap",
+              "displacementMap",
+              "metalnessMap"
+            ]
+          },
+          "tileU": {
+            "type": "number",
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "tileV": {
+            "type": "number",
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "offsetU": {
+            "type": "number",
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "offsetV": {
+            "type": "number",
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "rotationDegrees": {
+            "type": "number",
+            "minimum": -1000000,
+            "maximum": 1000000
+          }
+        },
+        "required": [
+          "index",
+          "slot"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "index": 0,
+        "slot": "bumpMap",
+        "tileU": 2,
+        "tileV": 2,
+        "rotationDegrees": 90
+      }
+    },
+    {
+      "id": "material.surface.varnish",
+      "title": "Apply spot varnish mask",
+      "category": "Materials",
+      "description": "Mask gloss and reflectivity with local artwork. Preserves ink and relief; keeps original finish maps for disabling or reapplying. UV-relative mask placement, one Undo step, no CAD changes. Optional PNG/JPEG/WebP base64 mask up to 8 MB.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "gloss": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "reflectivity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "polarity": {
+            "type": "string",
+            "enum": [
+              "light",
+              "dark"
+            ]
+          },
+          "maskScale": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 1
+          },
+          "maskU": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "maskV": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "maskDataUri": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "index"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "index": 0,
+        "enabled": false
+      }
+    },
+    {
+      "id": "material.surface.relief",
+      "title": "Apply corrugated surface or die impression",
+      "category": "Materials",
+      "description": "Build a visual-only bump map combining paper grain, flute impressions and optional emboss/deboss artwork. UV-relative spacing; preserves CAD geometry, color and normal maps. Optional PNG/JPEG/WebP base64 mask up to 8 MB is saved for further adjustments. One Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "grain": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "flute": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "cycles": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "vertical",
+              "horizontal"
+            ]
+          },
+          "strength": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "impression": {
+            "type": "string",
+            "enum": [
+              "off",
+              "emboss",
+              "deboss"
+            ]
+          },
+          "impressionStrength": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "polarity": {
+            "type": "string",
+            "enum": [
+              "light",
+              "dark"
+            ]
+          },
+          "maskScale": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 1
+          },
+          "maskU": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "maskV": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "maskDataUri": {
+            "type": "string"
+          },
+          "clearMask": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "index"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "index": 0,
+        "grain": 0.35,
+        "flute": 0.25,
+        "cycles": 10,
+        "impression": "off",
+        "strength": 0.3
+      }
+    },
+    {
       "id": "material.textures.generate",
       "title": "Auto texture generator",
       "category": "Materials",
@@ -2779,9 +3117,9 @@
     },
     {
       "id": "material.texture.preview",
-      "title": "Preview texture",
+      "title": "Preview texture and edit UV/effects",
       "category": "Materials",
-      "description": "Open an interactive large texture preview with Save and Replace controls.",
+      "description": "Open an interactive large texture preview with coordinates, rotation, tiling, Save and Replace. Base/Bump/Normal previews include emboss/deboss masks; Gloss/Reflective previews include spot varnish masks. Opening does not apply edits.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -3016,6 +3354,7 @@
               "referenceGrades",
               "cadReferences",
               "dimensionalEngineering",
+              "surfacePresentation",
               "selectionGuidance",
               "agentRules",
               "sources"
@@ -3044,6 +3383,45 @@
         "additionalProperties": false
       },
       "example": {}
+    },
+    {
+      "id": "render.now",
+      "title": "Render scene now",
+      "category": "Rendering",
+      "description": "Render the main viewer scene and open the right render workspace. Returns immediately. Background mode permits camera navigation while scene edits pause.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "screen",
+              "hd",
+              "4k",
+              "16k"
+            ]
+          },
+          "alpha": {
+            "type": "boolean"
+          },
+          "cameraId": {
+            "type": "string"
+          },
+          "allCameras": {
+            "type": "boolean"
+          },
+          "background": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "resolution": "screen",
+        "background": false
+      }
     },
     {
       "id": "render.queue.enqueue",
@@ -3100,15 +3478,21 @@
       "id": "render.queue.start",
       "title": "Start render queue",
       "category": "Rendering",
-      "description": "Start sequential local PNG rendering. Returns immediately; inspect progress or cancel through queue commands.",
+      "description": "Start sequential local PNG rendering. Background mode leaves camera navigation enabled. Returns immediately; inspect progress or cancel through queue commands.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
-        "properties": {},
+        "properties": {
+          "background": {
+            "type": "boolean"
+          }
+        },
         "required": [],
         "additionalProperties": false
       },
-      "example": {}
+      "example": {
+        "background": true
+      }
     },
     {
       "id": "render.queue.stop",
@@ -3148,17 +3532,124 @@
     },
     {
       "id": "render.queue.clear",
-      "title": "Clear finished renders",
+      "title": "Clear render queue",
       "category": "Rendering",
-      "description": "Release completed/failed/cancelled image jobs from browser memory.",
+      "description": "Empty the session render queue and close its image windows. Set all false to remove only finished jobs. Active jobs cancel between tiles.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
-        "properties": {},
+        "properties": {
+          "all": {
+            "type": "boolean"
+          }
+        },
         "required": [],
         "additionalProperties": false
       },
-      "example": {}
+      "example": {
+        "all": true
+      }
+    },
+    {
+      "id": "render.queue.delete",
+      "title": "Delete selected renders",
+      "category": "Rendering",
+      "description": "Delete selected session jobs, release image memory and close their image windows. Active jobs cancel between tiles.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "ids": [
+          "render-job-id"
+        ]
+      }
+    },
+    {
+      "id": "render.queue.open",
+      "title": "Open rendered image",
+      "category": "Rendering",
+      "description": "Open a completed PNG in an interactive separate image window with pan and zoom. Browser pop-up permission may be needed.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "render-job-id"
+      }
+    },
+    {
+      "id": "render.image.view",
+      "title": "Control rendered image view",
+      "category": "Rendering",
+      "description": "Inspect or control an already opened image popout. Fit, actual (100%), relative zoom factor, or pan in screen pixels. Does not alter the render or scene.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "inspect",
+              "fit",
+              "actual",
+              "zoom",
+              "pan"
+            ]
+          },
+          "factor": {
+            "type": "number",
+            "minimum": 0.000001,
+            "maximum": 100
+          },
+          "deltaX": {
+            "type": "number",
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "deltaY": {
+            "type": "number",
+            "minimum": -1000000,
+            "maximum": 1000000
+          }
+        },
+        "required": [
+          "id",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "render-job-id",
+        "action": "zoom",
+        "factor": 1.25
+      }
     },
     {
       "id": "render.queue.download",
@@ -3223,6 +3714,20 @@
       "title": "Inspect saved cameras",
       "category": "Camera",
       "description": "List named camera views saved in the current session.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "camera.current.inspect",
+      "title": "Inspect current camera",
+      "category": "Camera",
+      "description": "Read current camera position, target, orientation, projection and FOV, including during fold or array animation. Does not create a saved camera.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -3380,6 +3885,181 @@
       "title": "Inspect keyframe timeline",
       "category": "Animation",
       "description": "Return native Auto3D timeline duration, playhead, interpolation mode, camera keyframes and per-object keyframe counts.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "animation.action.open",
+      "title": "Open Action keyframe options",
+      "category": "Animation",
+      "description": "Open the interactive Action dialog for the selected box at the current playhead. Does not add a keyframe until submitted.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "animation.action.add",
+      "title": "Add fold/unfold Action keyframe",
+      "category": "Animation",
+      "description": "Add a procedural fold/unfold action for a generated box, evaluated by timeline time during playback and scrubbing. Rejects overlapping actions on the same box. Undo supported; CAD geometry is unchanged.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          },
+          "time": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3599
+          },
+          "duration": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 30
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "toggle",
+              "fold",
+              "unfold"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "time": 1,
+        "duration": 6,
+        "direction": "toggle"
+      }
+    },
+    {
+      "id": "animation.action.delete",
+      "title": "Delete Action keyframe",
+      "category": "Animation",
+      "description": "Delete a timeline action and reevaluate its pose, with Undo support.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "action-id"
+      }
+    },
+    {
+      "id": "packaging.appearance.inspect",
+      "title": "Inspect realistic board surface",
+      "category": "Packaging",
+      "description": "Read visual-only board bow, fold softness, cut compression and paper grain for the selected packaging model. CAD and manufacturing dimensions remain exact.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.appearance.update",
+      "title": "Adjust realistic board surface",
+      "category": "Packaging",
+      "description": "Update the selected packaging visual surface. Preserves CAD geometry, authoritative measurements, array spacing and authored print/varnish maps. Automatic generated paper maps update with grain. Settings persist with the profile; Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "panelBow": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "foldSoftness": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "cutCompression": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "paperGrain": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "panelBow": 0.18,
+        "cutCompression": 0.18
+      }
+    },
+    {
+      "id": "packaging.fefco.scrub",
+      "title": "Scrub box fold/unfold pose",
+      "category": "Packaging",
+      "description": "Set a visual fold pose from flat (0) to assembled (1). Commit saves the preview setting with one Undo step. Canonical CAD and measurements remain unchanged.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          },
+          "progress": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "commit": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "progress"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "progress": 0.5
+      }
+    },
+    {
+      "id": "packaging.fefco.scrub.inspect",
+      "title": "Inspect selected box fold pose",
+      "category": "Packaging",
+      "description": "Read selected box visual fold progress without modifying CAD or geometry.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -3982,6 +4662,197 @@
       "example": {
         "id": "00000000-0000-4000-8000-000000000001",
         "append": false
+      }
+    },
+    {
+      "id": "library.saved.open",
+      "title": "Open or add saved Library model",
+      "category": "Library",
+      "description": "Load a saved account, device or published model through the same guarded service as the Library Open/Add buttons. Append preserves the current scene and records one Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "account",
+              "device",
+              "published"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "append": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "source",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "source": "account",
+        "id": "saved-item-id",
+        "append": true
+      }
+    },
+    {
+      "id": "library.share.open",
+      "title": "Open saved-model sharing",
+      "category": "Library",
+      "description": "Open an interactive Share dialog for a saved model. It defaults to a four-digit code and offers link/QR generation; opening does not upload.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "account",
+              "device",
+              "published"
+            ]
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "source": "account",
+        "id": "saved-item-id"
+      }
+    },
+    {
+      "id": "library.share.create",
+      "title": "Create protected audience link",
+      "category": "Library",
+      "description": "Explicitly create a separate remote read-only snapshot of a saved model with a four-digit code, mini-viewer link and 1–90 day expiry. Device saves upload. The QR encodes only the URL. Server rollout must be enabled.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "account",
+              "device",
+              "published"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{4}$"
+          },
+          "allowDownload": {
+            "type": "boolean"
+          },
+          "expiresDays": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 90
+          }
+        },
+        "required": [
+          "source",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "source": "account",
+        "id": "saved-item-id",
+        "expiresDays": 30,
+        "allowDownload": false
+      }
+    },
+    {
+      "id": "library.share.list",
+      "title": "List owned audience links",
+      "category": "Library",
+      "description": "List this account’s audience links and expiry/revocation status without access codes or model bytes.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "library.share.revoke",
+      "title": "Revoke audience link",
+      "category": "Library",
+      "description": "Immediately revoke an owned audience link and release its remote snapshot file. Does not delete the original Library item.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "token": "share-token"
+      }
+    },
+    {
+      "id": "scene.groups.inspect",
+      "title": "Inspect scene model groups",
+      "category": "Scene",
+      "description": "Read group names, array membership, model counts and navigation expansion state.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "scene.group.expand",
+      "title": "Expand or collapse model group",
+      "category": "Scene",
+      "description": "Expand/collapse a group in the model list and mesh navigator without changing geometry or transforms.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "expanded": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "expanded"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "group-id",
+        "expanded": true
       }
     },
     {

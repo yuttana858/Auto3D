@@ -1,3 +1,4 @@
+import { ValidateTimelineActions } from './timelineactions.js';
 import { ValidateCameraViews } from './sessioncameras.js';
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { Model } from '../engine/model/model.js';
@@ -5,6 +6,7 @@ import { Mesh } from '../engine/model/mesh.js';
 import { Triangle } from '../engine/model/triangle.js';
 import { Line } from '../engine/model/line.js';
 import { PhongMaterial, PhysicalMaterial, TextureMap, MaterialType } from '../engine/model/material.js';
+import { ValidateSurfaceRelief, ValidateSpotVarnish } from '../../modules/packaging/src/reliefsettings.js';
 import { Property, PropertyGroup, PropertyType } from '../engine/model/property.js';
 import { RGBColor } from '../engine/model/color.js';
 import { Coord2D } from '../engine/geometry/coord2d.js';
@@ -60,7 +62,9 @@ function ReadMaterial (data)
             map.rotation = value.rotation;
             if (![map.offset.x, map.offset.y, map.scale.x, map.scale.y, map.rotation].every (Number.isFinite)) { throw new Error ('Invalid texture transform.'); }
             material[key] = map;
-        } else if (material[key] instanceof RGBColor) {
+        } else if (key === 'surfaceRelief' && value !== null) { material[key] = ValidateSurfaceRelief (value); }
+        else if (key === 'varnishSettings' && value !== null) { material[key] = ValidateSpotVarnish (value); }
+        else if (material[key] instanceof RGBColor) {
             if (!value || ![value.r, value.g, value.b].every ((component) => Number.isFinite (component) && component >= 0 && component <= 255)) { throw new Error ('Invalid material color.'); }
             material[key] = new RGBColor (value.r, value.g, value.b);
         }
@@ -68,6 +72,8 @@ function ReadMaterial (data)
         else if (typeof material[key] !== 'object' || value === null) { material[key] = value; }
     }
     if (!['normal', 'bump', 'off'].includes (material.reliefMode)) { throw new Error ('Invalid material relief mode.'); }
+    if (!['', 'liner', 'edge', 'inner', 'closed', 'cut', 'score'].includes (material.boardSurfaceRole)) { throw new Error ('Invalid board surface role.'); }
+    if (typeof material.boardFluteLinked !== 'boolean') { throw new Error ('Invalid board flute link.'); }
     return material;
 }
 
@@ -164,6 +170,7 @@ export function MigrateSessionData (data)
 export function PackSession (document, view = {}, objects = document.objects, kind = 'session')
 {
     const model = document.CompactModel (objects);
+    if (view.timeline?.actions) { view = { ...view, timeline : { ...view.timeline, actions : ValidateTimelineActions (view.timeline.actions).filter (action => objects.some (object => object.id === action.objectId)) } }; }
     return {
         format : 'SW Auto3D', version : SessionVersion, metadata : { savedAt : new Date ().toISOString () }, kind, name : document.name, view, packaging : kind === 'session' && document.packaging ? ValidatePackaging (document.packaging) : null,
         objects : objects.map ((object) => ({ id : object.id, packagingProfile : object.packagingProfile ? ValidatePackaging (object.packagingProfile) : null, name : object.name, source : object.source, unit : object.unit, visible : object.visible, hiddenParts : object.hiddenParts || [], position : object.position, rotation : object.rotation, scale : object.scale, userData : object.userData || {}, castShadow : object.castShadow !== false, receiveShadow : object.receiveShadow !== false, keyframes : Array.isArray (object.keyframes) ? object.keyframes : [], playback : object.playback, animationAsset : object.animationAsset ? { main : object.animationAsset.main, files : object.animationAsset.files.map ((file) => ({ name : file.name, buffer : EncodeBuffer (file.buffer) })) } : null })),
@@ -229,6 +236,7 @@ export function ReadSession (data)
                 if (name && !['__proto__', 'prototype', 'constructor'].includes (name)) { object.userData[name] = text; }
             }
         }
+        if (object.userData._auto3dFoldPreview !== undefined && (!object.userData._auto3dFefco || !object.userData._auto3dFoldPreview.trim () || !Number.isFinite (Number (object.userData._auto3dFoldPreview)) || Number (object.userData._auto3dFoldPreview) < 0 || Number (object.userData._auto3dFoldPreview) > 1)) { throw new Error ('Invalid visual fold position.'); }
         if (data.animationAsset) {
             object.animationAsset = { main : String (data.animationAsset.main), files : data.animationAsset.files.map ((file) => ({ name : String (file.name), buffer : DecodeBuffer (file.buffer) })) };
             object.playback = { clip : Number.isInteger (data.playback?.clip) ? data.playback.clip : 0, time : Number.isFinite (data.playback?.time) ? Math.max (0, data.playback.time) : 0, speed : Number.isFinite (data.playback?.speed) ? Math.max (0.1, Math.min (4, data.playback.speed)) : 1, playing : false, loop : data.playback?.loop !== false };
@@ -237,6 +245,7 @@ export function ReadSession (data)
         document.ApplyTransform (object);
         return object;
     });
+    if (data.view?.timeline?.actions) { const actions = ValidateTimelineActions (data.view.timeline.actions); if (actions.some (action => !document.objects.some (object => object.id === action.objectId && object.userData._auto3dFefco))) { throw new Error ('Invalid action keyframe target.'); } }
     return { document, view : data.view || {}, kind : data.kind === 'model' ? 'model' : 'session' };
 }
 

@@ -7,6 +7,7 @@ describe ('Branded mini viewer access boundary', () => {
         assert.match (html, /assets\/vendor\/qrcode\.min\.js/);
         assert.doesNotMatch (html, /cdn\.jsdelivr|api\.qrserver|chart\.googleapis/);
         assert.match (html, /link\.searchParams\.set\('view',token\)/);
+        assert.match (html, /link\.searchParams\.set\('share',token\)/);
         assert.doesNotMatch (html, /searchParams\.set\('code'/);
     });
     it ('offers share QR preview and PNG export in the authenticated share dialog', () => {
@@ -17,7 +18,7 @@ describe ('Branded mini viewer access boundary', () => {
         assert.match (editor, /text : input\.value/);
         assert.doesNotMatch (editor, /qrcode\.api|api\.qrserver\.com/);
     });
-    it ('does not embed the protected workspace or bypass sign-in', () => {
+    it ('keeps legacy sign-in handling and separates the guest audience challenge from the workspace', () => {
         assert.doesNotMatch (html, /createElement\('iframe'\)/);
         const mini = readFileSync (new URL ('../source/website/miniviewer.js', import.meta.url), 'utf8');
         assert.match (mini, /Sign in to Auto3D/);

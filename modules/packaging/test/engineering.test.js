@@ -22,10 +22,17 @@ describe ('Authoritative CAD measurements and visual creases', () => {
         const p = { version : 1, name : 'Custom', grade : 'Custom', thickness : 3, paths : [{ id : 'cut', type : 'cut', closed : true, points : [[0, 0], [100, 0], [100, 50], [0, 50]] }, { id : 'score', type : 'score', closed : false, points : [[100, 0], [100, 50]] }] }; p.engineering = DefaultEngineering (p);
         const edit = EditEngineering (p, { dimension : { id : 'cut:0', mode : 'manual', targetMm : 120.125 } }); const result = DrivePathDimension (p, edit.driving[0], edit.material); assert.deepEqual (result.paths[0].points[1], [120.125, 0]); assert.deepEqual (result.paths[1].points[0], [120.125, 0]); assert.deepEqual (p.paths[0].points[1], [100, 0]);
     });
-    it ('Anchors crease surfaces exactly on both panel rails throughout folding, without changing CAD or collision solids', () => {
+    it ('Anchors curved crease skins on both panel faces with bounded insets, without changing CAD or collision solids', () => {
         for (const code of ['0200', '0201', '0202', '0203']) { const rig = CreateFefcoFoldRig ({ code }); const saved = JSON.stringify ([rig.profile, rig.panels]);
             for (const progress of [0, 0.3, 0.55, 0.72, 0.9, 1]) { const pose = FefcoFoldPose (rig, progress); const meshes = CreaseVisualMeshes (rig, pose); assert.equal (meshes.length, code === '0200' ? 8 : 12); assert.ok (meshes.every (m => m.visualOnly && m.vertices.flat ().every (Number.isFinite)));
-                const crease = meshes[0]; for (const [offset, index] of [[0, 0], [32, 1]]) { for (let end = 0; end < 2; end++) { for (let side = 0; side < 2; side++) { const expected = new Vector3 (rig.edges[1], side * rig.parameters.thickness, end ? -rig.parameters.height : 0).applyMatrix4 (new Matrix4 ().fromArray (pose.matrices[rig.panels.findIndex (p => p.kind === 'wall' && p.index === index)])); assert.ok (expected.distanceTo (new Vector3 (...crease.vertices[offset + end * 2 + side])) < 1e-8); } } }
+                const crease = meshes[0]; for (const [offset, index] of [[0, 0], [crease.segments * 4, 1]]) { for (let end = 0; end < 2; end++) { for (let side = 0; side < 2; side++) {
+                    const matrix = new Matrix4 ().fromArray (pose.matrices[rig.panels.findIndex (p => p.kind === 'wall' && p.index === index)]);
+                    const expected = new Vector3 (rig.edges[1], side * rig.parameters.thickness, end ? -rig.parameters.height : 0).applyMatrix4 (matrix);
+                    const difference = new Vector3 (...crease.vertices[offset + end * 2 + side]).sub (expected); const normal = new Vector3 (0, 1, 0).transformDirection (matrix);
+                    assert.ok (Math.abs (difference.dot (normal)) < 1e-8); assert.ok (difference.length () <= rig.parameters.thickness + 1e-8);
+                } } }
+                assert.ok (meshes.every (m => m.normals.flat ().every (Number.isFinite) && m.triangles.some (t => t.material === 1)));
+
             } assert.equal (JSON.stringify ([rig.profile, rig.panels]), saved);
         }
     });

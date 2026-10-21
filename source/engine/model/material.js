@@ -133,6 +133,13 @@ export class FaceMaterial extends MaterialBase
         this.bumpScale = 1.0;
         this.normalScale = 1.0;
         this.reliefMode = 'normal';
+        this.surfaceRelief = null;
+        this.impressionMap = null;
+        this.boardFluteLinked = false; this.boardSurfaceRole = '';
+        this.varnishSettings = null;
+        this.varnishMaskMap = null;
+        this.varnishBaseRoughnessMap = null;
+        this.varnishBaseSpecularMap = null;
         this.aoIntensity = 1.0;
         this.displacementScale = 0.0;
         this.displacementBias = 0.0;
@@ -167,10 +174,12 @@ export class FaceMaterial extends MaterialBase
         if (!TextureMapIsEqual (this.emissiveMap, rhs.emissiveMap)) {
             return false;
         }
-        for (const key of ['doubleSided', 'emissiveIntensity', 'bumpScale', 'normalScale', 'aoIntensity', 'displacementScale', 'displacementBias', 'reliefMode']) {
+        for (const key of ['doubleSided', 'emissiveIntensity', 'bumpScale', 'normalScale', 'aoIntensity', 'displacementScale', 'displacementBias', 'reliefMode', 'boardFluteLinked', 'boardSurfaceRole']) {
             if (this[key] !== rhs[key]) { return false; }
         }
-        for (const key of ['aoMap', 'displacementMap']) {
+        if (JSON.stringify (this.surfaceRelief) !== JSON.stringify (rhs.surfaceRelief)) { return false; }
+        if (JSON.stringify (this.varnishSettings) !== JSON.stringify (rhs.varnishSettings)) { return false; }
+        for (const key of ['aoMap', 'displacementMap', 'impressionMap', 'varnishMaskMap', 'varnishBaseRoughnessMap', 'varnishBaseSpecularMap']) {
             if (!TextureMapIsEqual (this[key], rhs[key])) { return false; }
         }
         if (!IsEqual (this.alphaTest, rhs.alphaTest)) {

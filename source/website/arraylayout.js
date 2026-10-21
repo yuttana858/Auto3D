@@ -1,5 +1,18 @@
 import * as THREE from 'three';
 
+export function ArrayObjectBounds (root)
+{
+    root.updateWorldMatrix (true, true); const bounds = new THREE.Box3 ();
+    root.traverse (mesh => {
+        if (!mesh.geometry || mesh.userData?.auto3dFoldPresentation) { return; }
+        const original = mesh.userData?.originalMeshInstance?.GetMesh?.();
+        if ((original?.GetName?.() || mesh.name).startsWith ('Visual crease · ')) { return; }
+        if (original?.vertices?.length && !mesh.isSkinnedMesh && !mesh.morphTargetInfluences?.length) { for (const vertex of original.vertices) { bounds.expandByPoint (new THREE.Vector3 (vertex.x, vertex.y, vertex.z).applyMatrix4 (mesh.matrixWorld)); } }
+        else { bounds.union (new THREE.Box3 ().setFromObject (mesh, true)); }
+    });
+    return bounds.isEmpty () ? new THREE.Box3 ().setFromObject (root, true) : bounds;
+}
+
 export function ArrayCellSize (size, angle = 0, gap = new THREE.Vector3 ())
 {
     if (![0, 45, 90, 180].includes (angle)) { throw new Error ('Layer rotation must be 0, 45, 90 or 180 degrees.'); }

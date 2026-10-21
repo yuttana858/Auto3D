@@ -47,6 +47,53 @@ describe ('Render job queue', () => {
         assert.equal ((await registry.Execute ('render.queue.cancel', { id : result.result.jobs[0].id })).ok, true); release (); await app.rendering.completion;
         assert.equal (app.rendering.jobs[0].status, 'cancelled'); app.rendering.Lock (); assert.equal (app.rendering.jobs.length, 0);
     });
+    it ('renders in background with immutable camera snapshots and live navigation, restoring controls', async () => {
+        const app = website (); let release; let hooks; let reveals = 0;
+        const main = { inert : false }; const toolbar = { inert : false };
+        global.document.getElementById = id => id === 'main_viewer' ? main : id === 'toolbar' ? toolbar : null;
+        app.renderingPanel = { RevealQueue : () => reveals++, RenderQueue : () => {} };
+        const queue = new RenderQueue (app, async (_, job, options) => {
+            hooks = options; assert.equal (app.sessionEditor.busy, true); assert.equal (app.viewer.navigation.enabled, true);
+            assert.equal (main.inert, false); assert.equal (toolbar.inert, true);
+            await new Promise (resolve => { release = resolve; });
+            job.previewDataUri = 'data:image/png;base64,test'; return new Blob (['png']);
+        });
+        const result = queue.RenderNow ({ background : true }); assert.equal (result.running, true); assert.ok (reveals > 0);
+        assert.deepEqual (queue.jobs[0].size, { width : 800, height : 600 }); assert.equal (hooks.background, true); assert.equal (hooks.tileSize, 512);
+        app.viewer.GetCamera = () => new Camera (new Coord3D (20, 20, 20), new Coord3D (), new Coord3D (0, 1, 0), 45);
+        assert.deepEqual (queue.jobs[0].camera.eye, [4, 5, 6]);
+        assert.throws (() => queue.RenderNow ({})); assert.equal (queue.jobs.length, 1);
+        release (); await queue.completion;
+        const info = queue.Inspect ()[0]; assert.equal (info.mode, 'background'); assert.equal (info.thumbnailAvailable, true);
+        assert.equal ('previewDataUri' in info, false); assert.equal ('thumbnail' in info, false);
+        assert.equal (queue.Preview (info.id), 'data:image/png;base64,test');
+        assert.equal (toolbar.inert, false); assert.equal (app.sessionEditor.busy, false); assert.equal (app.viewer.navigation.enabled, true);
+    });
+    it ('validates selection before deletion, releases windows and cancels active jobs on clear', async () => {
+        const app = website (); let release;
+        app.rendering = new RenderQueue (app, async (_, job, { cancelled }) => { await new Promise (resolve => { release = resolve; }); assert.equal (cancelled (), true); return new Blob (['png']); });
+        const queue = app.rendering; const registry = CreateAgentCommands (app);
+        const ids = queue.Enqueue ({ allCameras : true }).map (job => job.id);
+        assert.throws (() => queue.Delete ([ids[0], 'missing'])); assert.equal (queue.jobs.length, 2);
+        assert.equal ((await registry.Execute ('render.queue.delete', { ids : [] })).ok, false);
+        let disposed = 0; queue.views.set (ids[1], { dispose : () => disposed++ });
+        assert.equal ((await registry.Execute ('render.queue.delete', { ids : [ids[1]] })).ok, true); assert.equal (disposed, 1);
+        queue.Start (); assert.equal (app.viewer.navigation.enabled, false);
+        queue.Clear ({ all : false }); assert.equal (queue.jobs.length, 1);
+        assert.equal ((await registry.Execute ('render.queue.clear', { all : true })).ok, true); assert.equal (queue.jobs.length, 0);
+        release (); await queue.completion; assert.equal (queue.jobs.length, 0); assert.equal (queue.running, false);
+        assert.equal (app.viewer.navigation.enabled, true); assert.equal (app.sessionEditor.busy, false);
+    });
+    it ('indexes render actions with strict schemas and rejects busy requests before enqueue', async () => {
+        const app = website (); app.rendering = new RenderQueue (app); const registry = CreateAgentCommands (app);
+        for (const id of ['render.now', 'render.queue.open', 'render.queue.delete']) { assert.equal (registry.Catalog ().some (command => command.id === id), true); }
+        assert.equal ((await registry.Execute ('render.now', { background : 'yes' })).ok, false);
+        assert.equal ((await registry.Execute ('render.queue.start', { background : 1 })).ok, false);
+        app.sessionEditor.busy = true;
+        assert.equal ((await registry.Execute ('render.now')).ok, false); assert.equal (app.rendering.jobs.length, 0);
+        app.sessionEditor.busy = false; app.accountReady = false;
+        assert.throws (() => app.rendering.RenderNow ()); assert.equal (app.rendering.jobs.length, 0);
+    });
     it ('rejects invalid inputs, camera IDs, queue overflow and unapproved account readiness', () => {
         const app = website (); const queue = new RenderQueue (app);
         assert.throws (() => queue.Enqueue ({ cameraId : 'unknown' })); assert.throws (() => queue.Enqueue ({ cameraId : 'one', allCameras : true }));

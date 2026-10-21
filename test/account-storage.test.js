@@ -81,6 +81,13 @@ describe ('Private account storage', () => {
         const client = new AccountLibrary (auth, async () => ({ ok : true, arrayBuffer : async () => new Promise ((resolve) => { release = resolve; }) }));
         const downloading = client.Archive ({ id : A }); await new Promise ((resolve) => setImmediate (resolve)); auth.user = { id : B }; release (new ArrayBuffer (1)); await assert.rejects (() => downloading, /Account changed/);
     });
+    it ('includes HTTP status for both JSON and non-JSON Library failures', async () => {
+        const auth = { user : { id : A } };
+        const json = new AccountLibrary (auth, async () => Response.json ({ error : 'Storage unavailable.' }, { status : 503 }));
+        await assert.rejects (() => json.List (), /Storage unavailable\. \(HTTP 503\)/);
+        const html = new AccountLibrary (auth, async () => new Response ('upstream failure', { status : 502 }));
+        await assert.rejects (() => html.List (), /Account Library request failed\. \(HTTP 502\)/);
+    });
     it ('uses shared Library methods for strict commands/macros and respects read-only', async () => {
         const events = []; const storage = { List : async () => [], Update : async (id, changes) => { events.push (id); return changes; }, Remove : async () => ({ removed : true }) };
         const editor = { readOnly : false, library : { accountStorage : storage, SaveAccount : async (name) => ({ name }) } };

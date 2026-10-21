@@ -14,3 +14,7 @@ and RPC denials for anon/authenticated, and service-role creation and correct/wr
 code verification. No credentials or user data are needed. Production was also
 verified with effective privilege checks and read-only role-denial/verification
 queries; production rows were not created by the regression.
+
+## New audience snapshots
+
+Use a separate disposable PostgreSQL 17 database. Apply `audience-bootstrap.sql`, `supabase/migrations/20261020223655_audience_library_sharing.sql`, then `audience-access.sql` with `psql -v ON_ERROR_STOP=1`. The deployment workflow runs the same test. This suite tests the new service-only invoker functions and audience limits independently of legacy share permissions.
