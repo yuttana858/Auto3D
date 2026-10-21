@@ -2,7 +2,7 @@
 
 ## Release candidate: Auto3D 0.37.0 / Packaging 1.7.0 (2026-10-21)
 
-Prepared on `feat/packaging-surfaces-sharing-037`, based on deployed PR #36 (`e356db1`). Includes the accumulated board surfaces/material tools, fold slider and timeline Actions, fold/array cameras, render workspace, Library Add/groups and protected audience-link implementation. See [release-037.md](release-037.md). API v1 is retained.
+Opened as [PR #37](https://github.com/yuttana858/Auto3D/pull/37) on `feat/packaging-surfaces-sharing-037`, based on deployed PR #36 (`e356db1`). Includes the accumulated board surfaces/material tools, fold slider and timeline Actions, fold/array cameras, render workspace, Library Add/groups and protected audience-link implementation. See [release-037.md](release-037.md). API v1 is retained.
 
 Fresh release gates pass: 620 unit/module tests, 11 backend tests, lint, license checks, zero reported production dependency vulnerabilities, engine and engine-module builds, website, independent Packaging and Pages builds. Earlier isolated PostgreSQL and Chromium evidence is detailed below; PR CI now repeats effective database permission/throttling tests. The PR is for review only: no merge, production deployment, database migration or sharing-secret/flag activation has occurred. Cloudflare connector access remains unavailable. Prior entries describe their development-time version labels.
 

@@ -1,6 +1,6 @@
 # Auto3D 0.37.0 / Packaging 1.7.0
 
-Release candidate; not merged or deployed. Packaging API v1 is retained.
+[PR #37](https://github.com/yuttana858/Auto3D/pull/37) release candidate; not merged or deployed. Packaging API v1 is retained.
 
 - Realistic board presentation: independent visual bow, cut compression and curved score surfaces; separate outer/inner/exposed/wrapped textures; canonical CAD, measurements and array spacing remain exact.
 - Texture-window UV, rotation, tiling, emboss/deboss and spot-varnish masks, with portable state and Undo. Height card hidden while legacy data stays readable.
