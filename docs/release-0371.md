@@ -1,6 +1,6 @@
 # Auto3D 0.37.1 / Packaging 1.7.1
 
-Stability patch based on merged PR #37; Packaging API v1 retained. This patch is not merged or deployed.
+[PR #38](https://github.com/yuttana858/Auto3D/pull/38), a stability patch based on merged PR #37; Packaging API v1 retained. This patch is not merged or deployed.
 
 Toggling Enable board surface previously rebuilt the entire scene and repeated fold-preview preparation/clearance audits, causing avoidable stalls in arrays and posed boxes. Enable/bow/fold-softness/cut-compression now refresh the selected object's GPU buffers in place, preserving its current fold pose, camera, textures, other scene objects and authoritative dimensions. Undo/Redo uses the same locked path; failed updates restore the previous profile/display. Disabling restores rigid geometry. Paper grain remains independent and uses the existing material refresh path.
 
