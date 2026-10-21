@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Mini viewer saved presentation (0.37.2 / Packaging 1.7.1)
+
+Implemented saved-camera restoration with legacy fallback, Reset view, explicit portable background capture, default dome/gradient/grid and packaged HDRI/scene-effects restoration. See [release-0372.md](release-0372.md). No production deployment of this change yet. Validation: 629 unit/module tests pass; the mobile Chromium saved-camera/reset check passes for default and HDRI scenes with shadows/reflections and resizing. Lint, website and Pages builds pass.
+
 ## External viewing production activation (2026-10-21)
 
 PR #38 is merged and Auto3D 0.37.1 / Packaging 1.7.1 is deployed at commit `c8b26ed3d91b101db95ac774efa95146d9f60395`. Cloudflare and Supabase connector access is restored. Applied the reviewed `audience_library_sharing` migration (production history version `20261021205006`, corresponding to source migration `20261020223655`), configured a securely generated server-only secret and enabled the production audience flag while preserving existing Supabase settings and the private R2 binding. Legacy PIN sharing remains disabled.

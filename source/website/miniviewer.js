@@ -1,3 +1,9 @@
+import { RestorePresentationCamera, SavedPresentationCamera } from './sharedpresentation.js';
+import { ApplyCameraState } from './sessiontimeline.js';
+import { HDRILighting } from '../engine/viewer/hdrilighting.js';
+import { SceneEffects } from '../engine/viewer/sceneeffects.js';
+import { GetBackgroundPreset } from '../engine/viewer/background.js';
+import { HexStringToRGBAColor, RGBAColor } from '../engine/model/color.js';
 import { PreparePackagingPresentations } from './packagingadapter.js';
 import { OpenSessionArchive } from './sessionarchive.js';
 import { ConvertModelToThreeObject, ModelToThreeConversionParams, ModelToThreeConversionOutput } from '../engine/threejs/threeconverter.js';
@@ -15,7 +21,7 @@ const accessForm = document.getElementById ('accessForm');
 const pin = document.getElementById ('code');
 const full = document.getElementById ('full');
 const fullscreen = document.getElementById ('fullscreen');
-let viewer = null; let loaded = false;
+let viewer = null; let loaded = false; let initialCamera = null; let appearanceWarning = '';
 const sharePath = (audience ? '/api/audience/' : '/api/share/') + encodeURIComponent (token);
 
 function Status (message) { notice.textContent = message; if (!notice.isConnected) { let status = document.getElementById ('viewerStatus'); if (!status) { status = document.createElement ('span'); status.id = 'viewerStatus'; status.setAttribute ('role', 'status'); document.getElementById ('viewerControls').appendChild (status); } status.textContent = message; } }
@@ -59,10 +65,33 @@ async function RenderArchive (buffer)
     viewer.SetUpVector (Direction.Y, false);
     const sphere = viewer.GetBoundingSphere (() => true);
     viewer.AdjustClippingPlanesToSphere (sphere);
-    viewer.FitSphereToWindow (sphere, false);
+    const view = session.view || {};
+    const savedBackground = view.presentationBackground;
+    const palette = GetBackgroundPreset (view.backgroundPreset, true);
+    const colors = Array.isArray (savedBackground?.colors) && savedBackground.colors.length === 5 && savedBackground.colors.every (c => /^#[0-9a-f]{6}$/i.test (c)) ? savedBackground.colors : palette.colors;
+    viewer.SetBackgroundColor (HexStringToRGBAColor (colors[0].slice (1) + 'ff'));
+    const color = savedBackground?.color;
+    if (color && ['r', 'g', 'b', 'a'].every (k => Number.isFinite (color[k]) && color[k] >= 0 && color[k] <= 255)) { viewer.SetBackgroundColor (new RGBAColor (color.r, color.g, color.b, color.a)); }
+    const dome = view.horizonGradient === true && view.lighting?.mode !== 'hdri';
+    viewer.SetBackgroundGradient (view.horizonGradient === true && !dome, savedBackground?.dark !== false, colors);
+    viewer.SetDefaultDome (dome, colors);
+    viewer.SetGroundGrid (view.showGroundGrid === true, palette.dark);
+    const lighting = new HDRILighting (viewer);
+    if (view.lighting?.mode === 'hdri' && /^[a-z0-9_]{1,80}$/.test (view.lighting.environment || '')) {
+        try {
+            const l = view.lighting;
+            await lighting.Load ('/assets/hdri/' + l.environment + '.hdr');
+            lighting.Adjust (...[['brightness', 0, 3, 1], ['rotation', -180, 180, 0], ['elevation', -90, 90, 0]].map (([key, min, max, fallback]) => Number.isFinite (l[key]) ? Math.max (min, Math.min (max, l[key])) : fallback));
+            lighting.SetBackgroundVisible (l.background === true);
+        } catch { appearanceWarning = 'Saved lighting could not load; default lighting is shown. '; }
+    }
+    const effects = new SceneEffects (viewer); effects.ApplyObjectSettings (session.document.objects); effects.Restore (view.lighting?.effects);
+    if (!RestorePresentationCamera (viewer, view)) { viewer.FitSphereToWindow (sphere, false); }
+    initialCamera = SavedPresentationCamera (viewer);
     Fit (); loaded = true;
     document.getElementById ('viewerControls').hidden = false;
     document.getElementById ('download').hidden = !downloadAllowed;
+    Fit ();
 }
 
 async function OpenModel (code = '')
@@ -80,7 +109,7 @@ async function OpenModel (code = '')
         throw new Error ('Unable to load shared model (' + response.status + ').');
     }
     ShowChallenge (false);
-    await RenderArchive (await response.arrayBuffer ()); accessCode = code; Status ('Drag to rotate · Scroll or pinch to zoom');
+    await RenderArchive (await response.arrayBuffer ()); accessCode = code; Status (appearanceWarning + 'Drag to rotate · Scroll or pinch to zoom');
     pin.value = '';
 }
 
@@ -111,10 +140,12 @@ document.getElementById ('download').addEventListener ('click', async () => {
     try { const response = await fetch (sharePath + '/download', { method : 'POST', credentials : 'same-origin', cache : 'no-store', headers : { 'Content-Type' : 'application/json' }, body : JSON.stringify ({ code : accessCode }) }); if (!response.ok) { throw new Error ('Download unavailable (' + response.status + ').'); } const url = URL.createObjectURL (await response.blob ()); const link = document.createElement ('a'); link.href = url; link.download = 'Auto3D-shared-model.auto3d'; link.click (); setTimeout (() => URL.revokeObjectURL (url), 1000); } catch (error) { Status (error.message); }
 });
 fullscreen.addEventListener ('click', () => stage.requestFullscreen?.());
+document.getElementById ('resetView').addEventListener ('click', () => { if (loaded && initialCamera) { ApplyCameraState (viewer, initialCamera); } });
 document.getElementById ('fit').addEventListener ('click', () => {
     if (!loaded || !viewer) { return; }
     const sphere = viewer.GetBoundingSphere (() => true);
     viewer.FitSphereToWindow (sphere, true);
 });
 window.addEventListener ('resize', Fit);
+new ResizeObserver (Fit).observe (stage);
 Initialize ();

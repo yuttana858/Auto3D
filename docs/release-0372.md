@@ -1,0 +1,9 @@
+# Auto3D 0.37.2 / Packaging 1.7.1
+
+The anonymous mini viewer now restores the saved camera position, target, up vector, field of view and perspective/orthographic projection. It uses auto-fit only when a saved camera is absent or invalid. Reset view returns to the saved opening camera; Fit remains an explicit alternative. Resizing changes the viewport aspect ratio without resetting the guest's camera. A narrower screen can crop horizontal content; Fit provides full-model framing without silently changing the saved view.
+
+Saved default dome/gradient, ground grid, packaged HDRI selection, intensity, rotation, elevation, background visibility, ambient fill, shadows and reflections use the same engine components as the editor. Each object's shadow settings are retained. Missing HDRI assets fall back to default lighting. New saves record explicit background palette and RGBA color, preserving theme-relative and custom backgrounds across visitors. Older archives retain their existing fields and use a dark-theme background fallback when explicit colors are absent.
+
+Sharing continues to copy the saved Library archive. Save the desired appearance before creating a link. Existing snapshots can use their recorded camera and lighting after this viewer update, but missing historical background colors cannot be reconstructed. No account permissions, audience endpoints or database schema change. HDRI assets come from the packaged same-origin collection; arbitrary URLs are never loaded from archive metadata. High-resolution remote HDRI upgrade parity is a future extension; the mini viewer uses the packaged preview tier.
+
+Reset view is a read-only mini-viewer navigation control, separate from the authenticated editor command registry. No editor mutation or new remote action is introduced.

@@ -1,3 +1,5 @@
+import { CapturePresentationBackground } from './sharedpresentation.js';
+import { Theme } from './settings.js';
 import { PreparePackagingPresentations } from './packagingadapter.js';
 import { SceneGroups } from './scenegroups.js';
 import { CommandBar } from './commandbar.js';
@@ -1203,7 +1205,7 @@ export class SessionEditor
 
     CaptureView ()
     {
-        return { camera : this.website.viewer.GetCamera (), cameraState : CaptureCameraState (this.website.viewer), timeline : this.timeline.Serialize (), cameraViews : this.cameras.Inspect (), backgroundPreset : this.website.settings.backgroundPreset, horizonGradient : this.website.settings.horizonGradient, showGroundGrid : this.website.settings.showGroundGrid, lighting : this.website.lightingPanel.Capture () };
+        return { presentationBackground : CapturePresentationBackground (this.website.settings, this.website.settings.themeId === Theme.Dark), camera : this.website.viewer.GetCamera (), cameraState : CaptureCameraState (this.website.viewer), timeline : this.timeline.Serialize (), cameraViews : this.cameras.Inspect (), backgroundPreset : this.website.settings.backgroundPreset, horizonGradient : this.website.settings.horizonGradient, showGroundGrid : this.website.settings.showGroundGrid, lighting : this.website.lightingPanel.Capture () };
     }
     async ArchiveAsync (objects, kind, name)
     {
