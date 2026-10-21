@@ -90,26 +90,31 @@ export function FefcoSurfaces (model)
 
 // Replace GPU buffers only. Engine meshes remain the canonical source for CAD,
 // archives, manufacturing exports, quantities and array spacing.
-export function ApplyPackagingPresentation (root, data, unit, materials = [])
+export function ApplyPackagingPresentation (root, data, unit, materials = [], foldPreview = false, geometryCache = null)
 {
     const factor = PackagingUnitMM[unit]; if (!factor) { return; }
-    const definitions = new Map ((data.presentationMeshes || []).map (mesh => [mesh.name, mesh]));
+    const definitions = new Map ([...(data.presentationMeshes || []), ...(data.visualMeshes || [])].map (mesh => [mesh.name, mesh]));
     root.traverse (item => {
-        const mesh = definitions.get (item.name); if (!item.isMesh || !mesh?.presentationOnly) { return; }
-        const positions = [], normals = [], uvs = []; const geometry = new BufferGeometry (); const roles = (item.userData.originalMaterials || []).map (index => materials[index]?.boardSurfaceRole);
+        const mesh = definitions.get (item.name); if (!item.isMesh || (item.userData.auto3dFoldPresentation && !foldPreview) || !mesh || (!mesh.presentationOnly && !mesh.visualOnly && !item.userData.auto3dBoardAppearance)) { return; }
+        const roles = (item.userData.originalMaterials || []).map (index => materials[index]?.boardSurfaceRole);
+        const cacheKey = JSON.stringify ([factor, roles, Array.isArray (item.material) ? item.material.length : 1]); let shared = geometryCache?.get (mesh);
+        if (geometryCache && !shared) { shared = new Map (); geometryCache.set (mesh, shared); }
+        const cached = shared?.get (cacheKey);
+        if (cached) { if (item.geometry !== cached) { item.geometry.dispose (); item.geometry = cached; } item.userData.auto3dBoardAppearance = mesh.presentationOnly === true || mesh.visualOnly === true; return; }
+        const positions = [], normals = [], uvs = []; const geometry = new BufferGeometry ();
         for (const triangle of mesh.triangles) {
             const role = data.materials[triangle.material]?.role; let material = roles.indexOf (role); if (material < 0) { material = roles.indexOf (role === 'inner' || role === 'closed' ? 'liner' : role); } if (material < 0) { material = Math.max (0, Math.min (triangle.material, (Array.isArray (item.material) ? item.material.length : 1) - 1)); }
             const start = positions.length / 3; for (let i = 0; i < 3; i++) { positions.push (...mesh.vertices[triangle.vertices[i]].map (value => value / factor)); normals.push (...mesh.normals[triangle.normals[i]]); uvs.push (...mesh.uvs[triangle.uvs[i]]); }
             const last = geometry.groups.at (-1); if (last && last.materialIndex === material) { last.count += 3; } else { geometry.addGroup (start, 3, material); }
         }
         geometry.setAttribute ('position', new Float32BufferAttribute (positions, 3)); geometry.setAttribute ('normal', new Float32BufferAttribute (normals, 3)); geometry.setAttribute ('uv', new Float32BufferAttribute (uvs, 2));
-        geometry.computeBoundingSphere (); geometry.computeBoundingBox (); item.geometry.dispose (); item.geometry = geometry; item.userData.auto3dBoardAppearance = true;
+        geometry.computeBoundingSphere (); geometry.computeBoundingBox (); shared?.set (cacheKey, geometry); item.geometry.dispose (); item.geometry = geometry; item.userData.auto3dBoardAppearance = mesh.presentationOnly === true || mesh.visualOnly === true;
     });
 }
 export async function PreparePackagingPresentations (objects, materials, unit)
 {
     if (!objects.some (object => object.packagingProfile)) { return; }
-    const module = await LoadPackagingModule (); const cache = new Map ();
+    const module = await LoadPackagingModule (); const cache = new Map (), geometryCache = new WeakMap ();
     for (const object of objects) {
         if (!object.packagingProfile || !object.threeObject) { continue; }
         const profile = object.packagingProfile, parameters = object.userData?._auto3dFefco ? JSON.parse (object.userData._auto3dFefco) : null;
@@ -117,7 +122,7 @@ export async function PreparePackagingPresentations (objects, materials, unit)
         if (parameters) { const expected = module.FefcoProfile (parameters); if (JSON.stringify (expected.paths) !== JSON.stringify (profile.paths) || expected.thickness !== profile.thickness) { continue; } }
         const key = JSON.stringify ([profile, parameters, flat, localRig]);
         let data = cache.get (key); if (!data) { data = parameters ? flat ? localRig ? module.CreateFefcoFoldRig (parameters, profile) : module.UnfoldFefco (parameters, profile) : module.CreateFefcoBox (parameters, profile) : module.CreateBoard (profile, { textured : true }); cache.set (key, data); }
-        ApplyPackagingPresentation (object.threeObject, data, unit, materials);
+        ApplyPackagingPresentation (object.threeObject, data, unit, materials, false, geometryCache);
     }
 }
 export function BoardAppearanceMaterialChanges (document, object, definitions)

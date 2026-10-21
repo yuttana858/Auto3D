@@ -1,4 +1,4 @@
-# Packaging module v1.7.0
+# Packaging module v1.7.1
 
 A separate package for FEFCO 0200–0203 boxes, canonical-mm dielines, physical board extrusion, kraft textures, catalog controls and flat-sheet unfolding. It can be developed or copied to a separate repository without Auto3D source. Its only runtime dependencies are Three.js and fflate, under MIT licenses.
 

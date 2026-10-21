@@ -1,5 +1,19 @@
 # Auto3D development log and handoff
 
+## White-viewer follow-up to PR #38 (2026-10-21)
+
+The user clarified that surface-panel interaction turns the main viewer white and hides the box. This exact failure has not reproduced locally on the patch: actual-checkbox and slider tests check rendered pixels after off/on, maximum bow/softness/compression, grain regeneration and intermediate-fold toggles. Both ordinary lighting and enabled shadows/ambient/model+floor reflections remain rendered with zero white-canvas frames, no console errors, no shader failures and no context loss. The user's affected scene/version and newest error log remain needed to establish the production cause.
+
+A separate resource issue was found and corrected: identical static array boxes now share immutable GPU display geometry, instead of duplicating it per instance. Editing one box detaches its buffers without modifying the others. Existing lighting/shadow diagnostics now include geometry, texture, program and draw-call counts to help investigate the white-screen report. These are additional hardening changes to the open PR #38, not a confirmed diagnosis of the user's white-screen event. Validation: 626 unit/module tests, lint, both engine builds, website/independent Packaging/Pages builds pass. The 20-box Chromium resource test holds at 63 geometries and 32 textures through repeated edits, with no context loss.
+
+
+## Board surface stability patch: Auto3D 0.37.1 / Packaging 1.7.1 (2026-10-21)
+
+Opened as [PR #38](https://github.com/yuttana858/Auto3D/pull/38), based on merged PR #37, commit `176b5f8`. The Enable board surface and geometry-control path previously rebuilt the full scene, reloaded textures and recreated/audited saved fold previews. It now replaces only the selected object's GPU buffers, preserving other objects, material instances, camera and current preview pose. Disabled surfaces restore rigid panel buffers. Full-operation edit/history locks prevent overlapping mutations; failures restore the prior display/profile. Paper grain stays an independent material setting and retains the material refresh path.
+
+Fold preview material lookup now uses original document material indices, and crease triangles use the same stable material-sorted order as the converter, limiting each crease to three draw groups. Canonical CAD, measurements and array placement remain unchanged. Tests cover repeated toggles, resource disposal, history, error rollback, saved previews and lock behavior. Local gates: 625 unit/module tests, 11 backend tests, lint, both engine builds and website/independent Packaging/Pages builds pass. A real viewer probe passes six toggles on a four-box array at fold pose 0.23, retaining camera, CAD, placements, Undo/Redo and WebGL context; the repeated Chromium check also passes after the draw-group refinement. No merge or deployment of this patch has occurred.
+
+
 ## Release candidate: Auto3D 0.37.0 / Packaging 1.7.0 (2026-10-21)
 
 Opened as [PR #37](https://github.com/yuttana858/Auto3D/pull/37) on `feat/packaging-surfaces-sharing-037`, based on deployed PR #36 (`e356db1`). Includes the accumulated board surfaces/material tools, fold slider and timeline Actions, fold/array cameras, render workspace, Library Add/groups and protected audience-link implementation. See [release-037.md](release-037.md). API v1 is retained.

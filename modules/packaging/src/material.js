@@ -28,13 +28,13 @@ export function BoardTexture (edge) { const data = BoardTexturePixels (edge); re
 const cache = new Map ();
 export function BoardMaterials (board = null, appearance = {})
 {
-    const settings = ValidateBoardAppearance (appearance), grain = settings.enabled ? settings.paperGrain : 0; const key = JSON.stringify ([grain, settings.enabled]);
+    const settings = ValidateBoardAppearance (appearance), grain = settings.paperGrain; const key = String (grain);
     if (!cache.has (key)) {
         if (cache.size >= 8) { cache.delete (cache.keys ().next ().value); }
         cache.set (key, ['liner', 'edge', 'inner', 'closed'].map (role => {
             const edge = role === 'edge', prefix = { liner : 'kraft-fiber', edge : 'corrugated-edge', inner : 'inner-kraft-fiber', closed : 'closed-kraft-fiber' }[role];
             const maps = GenerateSurfaceTextureSet (BoardTexturePixels (role, grain), prefix); maps.diffuseMap.name = prefix + '.png';
-            if (!edge) { const relief = BoardTexturePixels (role, grain, true, settings.enabled ? role === 'inner' ? .18 : .12 : 0); const reliefMaps = GenerateSurfaceTextureSet (relief); maps.bumpMap = { ...EncodeRGBTexture ('board-' + role + '-flute-bump.png', relief.width, relief.height, relief.pixels) }; maps.normalMap = { ...reliefMaps.normalMap, name : 'board-' + role + '-flute-normal.png' }; }
+            if (!edge) { const relief = BoardTexturePixels (role, grain, true, role === 'inner' ? .18 : .12); const reliefMaps = GenerateSurfaceTextureSet (relief); maps.bumpMap = { ...EncodeRGBTexture ('board-' + role + '-flute-bump.png', relief.width, relief.height, relief.pixels) }; maps.normalMap = { ...reliefMaps.normalMap, name : 'board-' + role + '-flute-normal.png' }; }
             return { role, boardFluteLinked : !edge, name : { liner : 'Natural kraft liner', edge : 'Exposed corrugated edge', inner : 'Natural kraft inner liner', closed : 'Wrapped closed score liner' }[role], color : [255, 255, 255], roughness : edge ? 1 : role === 'closed' ? .9 : .92, metalness : 0, specularIntensity : .15, bumpScale : edge ? .15 : .08, normalScale : edge ? .35 : .2, aoIntensity : .25, displacementScale : 0, ...maps };
         }));
     }

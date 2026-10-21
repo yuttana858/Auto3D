@@ -8,7 +8,7 @@ import { DefaultFefco, ValidateFefco, FefcoProfile, FefcoPreset, FefcoAnimationP
 import { EngineeringAxes, DefaultEngineering, EngineeringMeasurements, EditEngineering, ScoreForTarget, DrivePathDimension } from '../../modules/packaging/src/engineering.js';
 import { FefcoDimensions, ResolveFefcoDimensions } from '../../modules/packaging/src/dimensions.js';
 import { Box3, Sphere } from 'three';
-import { LoadPackagingModule, PackagingModel, FefcoSurfaces, ApplyFefcoFoldPose, BoardAppearanceMaterialChanges } from './packagingadapter.js';
+import { LoadPackagingModule, PackagingModel, FefcoSurfaces, ApplyFefcoFoldPose, BoardAppearanceMaterialChanges, PreparePackagingPresentations, ApplyPackagingPresentation } from './packagingadapter.js';
 import { FoldMotionProgress, FoldCameraFrame, CameraBottomInset } from './foldcamera.js';
 import { ApplyCameraState } from './sessiontimeline.js';
 
@@ -31,15 +31,39 @@ export class PackagingWorkspace
     {
         this.Editable (); const editor = this.editor, target = editor.document, object = editor.selected, owner = editor.website.auth.user.id;
         if (!object?.packagingProfile) { throw new Error ('Select a packaging model to adjust its board surface.'); }
-        ValidateBoardAppearance (changes); if (!Object.keys (changes).length) { return this.AppearanceInspect (); } const before = object.packagingProfile; const next = ValidatePackaging ({ ...before, appearance : ValidateBoardAppearance ({ ...ValidateBoardAppearance (before.appearance), ...changes }) }); const beforeDesign = target.packaging;
-        const module = await LoadPackagingModule (); this.Editable ();
-        if (editor.document !== target || !target.objects.includes (object) || editor.website.auth.user?.id !== owner || object.packagingProfile !== before) { throw new Error ('The selected packaging or account changed.'); }
-        const data = object.userData?._auto3dFefco ? module.CreateFefcoFoldRig (JSON.parse (object.userData._auto3dFefco), next) : module.CreateBoard (next, { textured : true });
-        const materials = BoardAppearanceMaterialChanges (target, object, data.materials);
-        const apply = async forward => { object.packagingProfile = forward ? next : before; target.packaging = forward ? next : beforeDesign; materials.forEach (entry => Object.assign (entry.material, forward ? entry.after : entry.before)); await editor.Render (); this.Refresh (); };
-        try { await apply (true); if (editor.document !== target || editor.website.auth.user?.id !== owner || editor.readOnly || editor.website.accountReady === false || !target.objects.includes (object)) { throw new Error ('The workspace changed while updating board appearance.'); } }
-        catch (error) { object.packagingProfile = before; target.packaging = beforeDesign; materials.forEach (entry => Object.assign (entry.material, entry.before)); if (editor.document === target) { await editor.Render (); } throw error; }
-        editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); editor.MarkDirty?.(); return { available : true, objectId : object.id, settings : ValidateBoardAppearance (next.appearance), visualOnly : true };
+        ValidateBoardAppearance (changes); if (!Object.keys (changes).length) { return this.AppearanceInspect (); }
+        const before = object.packagingProfile, next = ValidatePackaging ({ ...before, appearance : ValidateBoardAppearance ({ ...ValidateBoardAppearance (before.appearance), ...changes }) }), beforeDesign = target.packaging;
+        if (JSON.stringify (ValidateBoardAppearance (before.appearance)) === JSON.stringify (next.appearance)) { return this.AppearanceInspect (); }
+        const inPlace = Boolean (object.threeObject) && changes.paperGrain === undefined;
+        const check = () => { if (editor.document !== target || !target.objects.includes (object) || editor.website.auth.user?.id !== owner || editor.website.accountReady === false || editor.readOnly) { throw new Error ('The selected packaging or account changed.'); } };
+        let materials = [], module;
+        const refreshDisplay = async () => {
+            if (!inPlace) { await editor.Render (); return; }
+            await PreparePackagingPresentations ([object], target.model.materials, target.model.GetUnit ()); check ();
+            const record = this.presentation.records.get (object.id);
+            if (record?.root === object.threeObject) {
+                // Appearance never changes the rigid panels: reuse the audited
+                // pose and refresh only this preview's display buffers.
+                record.rig = module.CreateFefcoFoldRig (JSON.parse (object.userData._auto3dFefco), object.packagingProfile);
+                ApplyPackagingPresentation (record.preview, record.rig, record.unit, target.model.materials, true);
+                if (record.pose !== undefined) { this.presentation.SetPose (record, record.pose); }
+            }
+            editor.UpdateSelectionBox?.(); editor.website.sceneEffects?.Refresh (); editor.website.viewer.RequestRender (); editor.website.materialPanel?.Update ();
+        };
+        const apply = async forward => { object.packagingProfile = forward ? next : before; target.packaging = forward ? next : beforeDesign; materials.forEach (entry => Object.assign (entry.material, forward ? entry.after : entry.before)); await refreshDisplay (); this.Refresh (); };
+        editor.busy = true; editor.RefreshButtons?.();
+        try {
+            editor.Status?.('Updating board surface…'); await new Promise (resolve => setTimeout (resolve, 0));
+            module = await LoadPackagingModule (); check (); if (object.packagingProfile !== before) { throw new Error ('The board surface changed while preparing the update.'); }
+            // Geometry controls do not require image regeneration or a complete
+            // scene conversion. Paper grain retains the existing material path.
+            if (!inPlace) { const data = object.userData?._auto3dFefco ? module.CreateFefcoFoldRig (JSON.parse (object.userData._auto3dFefco), next) : module.CreateBoard (next, { textured : true }); materials = BoardAppearanceMaterialChanges (target, object, data.materials); }
+            try { await apply (true); check (); }
+            catch (error) { object.packagingProfile = before; target.packaging = beforeDesign; materials.forEach (entry => Object.assign (entry.material, entry.before)); if (editor.document === target) { try { await refreshDisplay (); } catch { /* Preserve the original update error. */ } } throw error; }
+            const historyApply = async forward => { check (); if (editor.busy) { throw new Error ('Wait for the current update before changing history.'); } editor.busy = true; editor.RefreshButtons?.(); try { await apply (forward); } finally { editor.busy = false; editor.RefreshButtons?.(); this.Refresh (); } };
+            editor.history.Push ({ undo : () => historyApply (false), redo : () => historyApply (true) }); editor.MarkDirty?.(); editor.Status?.('Board surface updated.');
+            return { available : true, objectId : object.id, settings : ValidateBoardAppearance (next.appearance), visualOnly : true };
+        } finally { editor.busy = false; editor.RefreshButtons?.(); this.Refresh (); }
     }
     DimensionsInspect ()
     {
