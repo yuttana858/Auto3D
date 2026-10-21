@@ -6,7 +6,7 @@ import { ModelExtensions, SupportedFormatsText } from '../source/website/importf
 function editor () {
     const instance = Object.create (SessionEditor.prototype);
     const source = { name : 'Model', position : [0, 0, 0], threeObject : new THREE.Mesh (new THREE.BoxGeometry (2, 3, 4)) };
-    instance.selected = source; instance.busy = false; instance.readOnly = false; const messages = [];
+    instance.website = { auth : { user : { id : 'test' } }, accountReady : true }; instance.selected = source; instance.busy = false; instance.readOnly = false; const messages = [];
     instance.document = { objects : [source], Instance () { const copy = { position : [...source.position] }; this.objects.push (copy); return copy; }, ApplyTransform () {}, Remove (object) { this.objects.splice (this.objects.indexOf (object), 1); }, Restore (object, index) { this.objects.splice (index, 0, object); } };
     instance.Status = (message) => messages.push (message); instance.RefreshButtons = () => {};
     instance.history = { entries : [], Push (entry) { this.entries.push (entry); } }; instance.Render = async () => {};
@@ -15,7 +15,7 @@ function editor () {
 describe ('Workspace operation feedback', () => {
     it ('announces array work before duplication, yields, reports copy counts and keeps undo', async () => {
         const { instance, messages } = editor ();
-        const operation = instance.CreateArray (3, 1, 1);
+        const operation = instance.CreateArray (3, 1, 1, { animate : false });
         assert.match (messages[0], /^Creating an array/); assert.equal (instance.busy, true); assert.equal (instance.document.objects.length, 1);
         const added = await operation;
         assert.equal (added.length, 2); assert.deepEqual (added.map ((copy) => copy.position), [[2, 0, 0], [4, 0, 0]]);
@@ -26,7 +26,7 @@ describe ('Workspace operation feedback', () => {
     it ('restores the original scene and clears busy after a failed copy', async () => {
         const { instance, messages } = editor (); let copies = 0; const duplicate = instance.document.Instance;
         instance.document.Instance = function () { if (++copies === 2) { throw new Error ('copy failed'); } return duplicate.call (this); };
-        await assert.rejects (() => instance.CreateArray (3, 1, 1), /copy failed/);
+        await assert.rejects (() => instance.CreateArray (3, 1, 1, { animate : false }), /copy failed/);
         assert.equal (instance.document.objects.length, 1); assert.equal (instance.busy, false); assert.equal (instance.history.entries.length, 0); assert.match (messages.at (-1), /Could not create the array/);
     });
     it ('closes processing feedback through the shared busy refresh after a failed array', async () => {
@@ -34,14 +34,14 @@ describe ('Workspace operation feedback', () => {
         instance.buttons = new Map (); instance.processing = { Sync : busy => states.push (Boolean (busy)) };
         instance.RefreshButtons = SessionEditor.prototype.RefreshButtons;
         instance.document.Instance = () => { throw new Error ('copy failed'); };
-        const operation = instance.CreateArray (2, 1, 1); assert.equal (states[0], true);
+        const operation = instance.CreateArray (2, 1, 1, { animate : false }); assert.equal (states[0], true);
         await assert.rejects (() => operation, /copy failed/); assert.equal (states.at (-1), false);
         assert.equal (instance.busy, false); assert.equal (instance.document.objects.length, 1);
     });
     it ('does not begin array work for read-only or busy sessions', async () => {
         const { instance, messages } = editor (); instance.readOnly = true;
-        await assert.rejects (() => instance.CreateArray (2, 1, 1), /cannot be edited/); instance.readOnly = false; instance.busy = true;
-        await assert.rejects (() => instance.CreateArray (2, 1, 1), /cannot be edited/); assert.equal (messages.length, 0);
+        await assert.rejects (() => instance.CreateArray (2, 1, 1, { animate : false }), /cannot be edited/); instance.readOnly = false; instance.busy = true;
+        await assert.rejects (() => instance.CreateArray (2, 1, 1, { animate : false }), /cannot be edited/); assert.equal (messages.length, 0);
     });
     it ('ignores keyboard events without a key and handles a non-element target', () => {
         const { instance } = editor ();

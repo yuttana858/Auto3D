@@ -1,3 +1,4 @@
+import { ValidateBoardAppearance } from './appearancesettings.js';
 import { ValidateEngineering } from './engineering.js';
 export const BoardCalipers = { Custom : null, 'E flute (nominal)' : 1.5, 'B flute (nominal)' : 3, 'C flute (nominal)' : 4, 'A flute (nominal)' : 4.8, 'EB flute (nominal)' : 4.5, 'BC flute (nominal)' : 7 };
 export function NewPackagingDesign () { return { version : 1, name : 'Packaging profile', grade : 'Custom', thickness : 3, paths : [] }; }
@@ -32,6 +33,7 @@ export function ValidatePackaging (data)
         if (count > 2000 || points.length < (path.closed ? 3 : 2) || points.some ((point, index) => index > 0 && same (point, points[index - 1]))) { throw new Error ('A path needs distinct points: 2 for a line, 3 for a closed outline; maximum 2000 points per design.'); }
         result.paths.push ({ id : path.id, type : path.type, closed : path.closed, points });
     }
+    if (data.appearance !== undefined) { result.appearance = ValidateBoardAppearance (data.appearance); }
     if (data.engineering !== undefined) { result.engineering = ValidateEngineering (data.engineering, result.paths); if (result.engineering.materials.find (m => m.id === result.engineering.activeMaterialId).caliperMm !== result.thickness) { throw new Error ('Active material caliper must match CAD board thickness.'); } }
     return result;
 }

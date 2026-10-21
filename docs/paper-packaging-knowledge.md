@@ -190,3 +190,9 @@ This knowledge base is an engineering aid. Final production packaging should be 
 ## Dimensional engineering update — 2026-10-18
 
 The API now exposes/searches `dimensionalEngineering`: continuous scores versus cuts, allowance/tolerance/clearance, FEFCO 101 scoped equations, independent inside/outside corrections, worst-case tolerance propagation, measured-caliper/component inputs, PMMI/FBA RSC tolerance scope and measurement-method references. See [corrugated-dimensions-and-creases.md](corrugated-dimensions-and-creases.md) for the implementation contract and editable material-record workflow. Rendering never supplies authoritative CAD dimensions.
+
+## Surface presentation knowledge
+
+The `surfacePresentation` knowledge section documents appearance-only relief/varnish masks, curved score skins, global flute registration fold/array camera behavior, and local foreground/background rendering with session image history. It lists matching Agent command IDs and explicitly separates rendered effects from engineering dimensions and certified tooling requirements. It is searchable through the existing knowledge API and `knowledge.paper_packaging_section`.
+
+The `surfacePresentation` section also describes the automatic realistic board preset: bounded panel bow, fold fillet softness and cut-edge compression, plus independent seamless liner and registered flute textures. These visual approximations do not prescribe manufacturing deformation or tolerance limits. See [board-surface-appearance.md](board-surface-appearance.md).

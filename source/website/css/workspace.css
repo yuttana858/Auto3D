@@ -135,6 +135,18 @@ div.main_viewer.hdri_background_visible .viewer_empty { background: transparent;
 .surface_uv_info { background: transparent; border: 0; color: inherit; cursor: pointer; font: inherit; opacity: .75; padding: 0; }
 .surface_map_cards { display: grid; grid-template-columns: repeat(8, minmax(130px, 1fr)); gap: 8px; }
 .surface_map_card { min-width: 0; border: 1px solid var(--ov_border_color); border-radius: 5px; padding: 6px; }
+.surface_relief_designer { margin: 10px 0; padding: 8px; border: 1px solid var(--ov_border_color); border-radius: 5px; }
+.surface_relief_designer summary { cursor: pointer; }
+.surface_relief_fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 8px 0; }
+.surface_relief_fields label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.surface_relief_fields input, .surface_relief_fields select { width: 100%; min-width: 0; box-sizing: border-box; }
+.surface_uv_control { display: grid; grid-template-columns: minmax(110px, 1fr) minmax(0, 2fr); gap: 8px; align-items: center; margin: 6px 0; }
+.surface_uv_control input { width: 100%; min-width: 0; box-sizing: border-box; }
+.render_live_preview { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--ov_border_color); border-radius: 5px; margin-bottom: 8px; }
+.render_live_preview img, .render_thumbnail img { display: block; width: 100%; max-height: 200px; object-fit: contain; background: repeating-conic-gradient(#35383c 0% 25%,#292c30 0% 50%) 0/16px 16px; }
+.render_live_preview progress, .render_queue_job progress { width: 100%; }
+.render_thumbnail { width: 100%; padding: 0; overflow: hidden; border-radius: 4px; }
+.array_reveal_controls { display: flex; gap: 6px; flex-wrap: wrap; }
 .surface_map_preview { display: flex; align-items: center; gap: 7px; width: 100%; min-width: 0; padding: 0; margin-bottom: 4px; background: transparent; color: inherit; border: 0; cursor: pointer; text-align: left; font-size: 10px; }
 .surface_map_preview span { overflow-wrap: anywhere; }
 .surface_map_card .texture_map_thumbnail { width: 40px; height: 40px; flex-basis: 40px; }
@@ -150,3 +162,13 @@ div.main_viewer.hdri_background_visible .viewer_empty { background: transparent;
 .module_version { margin-left: 5px; font-size: 9px; opacity: .65; white-space: nowrap; }
 @media (max-width: 1150px) { .surface_map_cards { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 650px) { .surface_map_cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } .surface_tools { gap: 6px; } .surface_texture_dialog { padding: 12px; } .surface_texture_dialog .editor_control > span { flex-basis: 110px; } }
+
+.render_queue .render_queue_content { max-height: none; overflow: visible; }
+.render_history { max-height: 32vh; overflow: auto; }
+.render_queue .mode_buttons { flex-wrap: wrap; margin: 8px 0; }
+.render_queue .mode_buttons button { flex: 1 1 64px; min-width: 0; overflow-wrap: anywhere; }
+.render_queue .mode_buttons label { display: flex; align-items: center; min-width: 0; }
+
+.scene_object_group { border: 1px solid var(--ov_border_color); border-radius: 4px; margin: 5px 0; padding: 6px; }
+.scene_object_group summary { cursor: pointer; overflow-wrap: anywhere; padding: 4px 0; }
+.scene_object_group .session_object_row { margin-left: 8px; }

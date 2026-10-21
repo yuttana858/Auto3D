@@ -15,6 +15,16 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,6 +36,13 @@ jobs:
       - run: npm run check_licenses
       - run: npm run audit_prod
       - run: npm test
+      - name: Verify audience-sharing database permissions and throttling
+        shell: bash
+        run: |
+          set -euo pipefail
+          for script in test/security/audience-bootstrap.sql supabase/migrations/20261020223655_audience_library_sharing.sql test/security/audience-access.sql; do
+            docker exec -i '${{ job.services.postgres.id }}' psql -U postgres -v ON_ERROR_STOP=1 < "$script"
+          done
       - run: npm --prefix backend test
       - run: npm run build_engine
       - run: npm run build_engine_module

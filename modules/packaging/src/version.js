@@ -1,1 +1,1 @@
-export const PackagingModuleVersion = '1.6.0';
+export const PackagingModuleVersion = '1.7.0';

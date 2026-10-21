@@ -1,3 +1,4 @@
+import { ValidateTimelineActions } from './timelineactions.js';
 import * as THREE from 'three';
 
 function Clamp (value, min, max)
@@ -138,8 +139,9 @@ export class SessionTimeline
         this.time = 0;
         this.rangeStart = 0; this.rangeEnd = 5;
         this.loop = false;
+        this.foldAutoFit = true;
         this.interpolation = 'smooth';
-        this.cameraKeyframes = []; this.objectKeyCache = new WeakMap ();
+        this.actions = []; this.cameraKeyframes = []; this.objectKeyCache = new WeakMap ();
         this.playing = false;
         this.frame = null;
         this.onTime = null;
@@ -153,6 +155,7 @@ export class SessionTimeline
         this.duration = Number.isFinite (source.duration) ? Clamp (source.duration, 0.1, 3600) : 5;
         this.time = Number.isFinite (source.time) ? Clamp (source.time, 0, this.duration) : 0;
         this.loop = source.loop === true;
+        this.foldAutoFit = source.foldAutoFit !== false; this.actions = ValidateTimelineActions (source.actions || []);
         this.interpolation = NormalizeInterpolation (source.interpolation);
         this.cameraKeyframes = Array.isArray (source.cameraKeyframes) ? source.cameraKeyframes.map (NormalizeCameraKeyframe).filter (Boolean).sort ((a, b) => a.time - b.time) : [];
         this.ExtendDurationForKeys ();
@@ -164,11 +167,13 @@ export class SessionTimeline
     Serialize ()
     {
         return {
-            version : 2,
+            version : 3,
+            actions : this.actions.filter (action => this.editor.document.objects.some (object => object.id === action.objectId)).map (action => ({ ...action })),
             rangeStart : this.rangeStart, rangeEnd : this.rangeEnd,
             duration : this.duration,
             time : this.time,
             loop : this.loop,
+            foldAutoFit : this.foldAutoFit,
             interpolation : this.interpolation,
             cameraKeyframes : this.cameraKeyframes.map ((item) => ({ ...item }))
         };
@@ -180,6 +185,7 @@ export class SessionTimeline
         for (const object of this.editor.document.objects) {
             for (const keyframe of object.keyframes || []) { maximum = Math.max (maximum, keyframe.time || 0); }
         }
+        maximum = Math.max (maximum, ...this.actions.filter (action => this.editor.document.objects.some (object => object.id === action.objectId)).map (action => action.time + action.duration));
         this.duration = Math.max (this.duration, maximum, 0.1);
         this.time = Clamp (this.time, 0, this.duration);
     }
@@ -192,6 +198,24 @@ export class SessionTimeline
         return object.keyframes;
     }
 
+    async AddAction ({ objectId = this.editor.selected?.id, time = this.time, duration = 6, direction = 'toggle' } = {})
+    {
+        const editor = this.editor; if (editor.readOnly || editor.busy || !editor.website.auth?.user || editor.website.accountReady === false) { throw new Error ('Choose an editable signed-in timeline.'); }
+        const object = editor.document.objects.find (item => item.id === objectId); if (!object?.userData?._auto3dFefco) { throw new Error ('Select a generated box for the action.'); }
+        const before = this.actions; const action = { id : crypto.randomUUID (), objectId, type : 'foldUnfold', time, duration, direction }; const next = ValidateTimelineActions ([...before, action]);
+        const owner = editor.website.auth.user.id; await editor.packaging.presentation.Prepare (object);
+        if (editor.website.auth.user?.id !== owner || !editor.document.objects.includes (object) || editor.readOnly || editor.busy || editor.website.accountReady === false || this.actions !== before) { throw new Error ('The workspace changed while preparing the action.'); }
+        const oldDuration = this.duration; const followedEnd = this.rangeEnd === oldDuration;
+        const apply = actions => { this.actions = actions; this.ExtendDurationForKeys (); if (followedEnd) { this.rangeEnd = this.duration; } this.Seek (this.time); editor.AnimationUI (); };
+        apply (next); editor.history.Push ({ undo : () => apply (before), redo : () => apply (next) }); editor.MarkDirty (); return { action : { ...action }, duration : this.duration };
+    }
+    DeleteAction (id)
+    {
+        const editor = this.editor; if (editor.readOnly || editor.busy || !editor.website.auth?.user || editor.website.accountReady === false) { throw new Error ('The timeline cannot be edited right now.'); }
+        const before = this.actions; const next = before.filter (action => action.id !== id); if (next.length === before.length) { throw new Error ('Action keyframe not found.'); }
+        const apply = actions => { this.actions = actions; editor.packaging?.presentation?.manual.clear (); this.Seek (this.time); editor.AnimationUI (); };
+        apply (next); editor.history.Push ({ undo : () => apply (before), redo : () => apply (next) }); editor.MarkDirty (); return { deleted : id };
+    }
     CaptureObject (object)
     {
         if (!object) { return null; }
@@ -291,6 +315,7 @@ export class SessionTimeline
         }
         const camera = this.CameraStateAt (this.time);
         if (camera) { ApplyCameraState (this.editor.website.viewer, camera); }
+        this.editor.packaging?.presentation?.Apply (this.time, render);
         if (render) {
             this.editor.UpdateSelectionBox ();
             this.editor.SyncInputs ();

@@ -39,7 +39,7 @@ export class ThreeConversionStateHandler
 		this.callbacks = callbacks;
 		this.texturesNeeded = 0;
 		this.texturesLoaded = 0;
-		this.threeObject = null;
+		this.threeObject = null; this.failed = false; this.finished = false;
 	}
 
 	OnTextureNeeded ()
@@ -60,9 +60,16 @@ export class ThreeConversionStateHandler
 		this.Finish ();
 	}
 
+    OnError (error)
+    {
+        if (this.failed || this.finished) { return; } this.failed = true;
+        if (this.callbacks.onError) { this.callbacks.onError (error); } else { throw error; }
+    }
+
 	Finish ()
 	{
-		if (this.threeObject !== null && this.texturesNeeded === this.texturesLoaded) {
+		if (!this.failed && !this.finished && this.threeObject !== null && this.texturesNeeded === this.texturesLoaded) {
+            this.finished = true;
 			this.callbacks.onModelLoaded (this.threeObject);
 		}
 	}
@@ -288,10 +295,9 @@ export class ThreeMaterialHandler
 		this.conversionOutput.objectUrls.push (textureObjectUrl);
 		loader.load (textureObjectUrl,
 			(threeTexture) => {
-				SetTextureParameters (texture, threeTexture);
-				threeMaterial.needsUpdate = true;
-				onTextureLoaded (threeTexture);
-				this.stateHandler.OnTextureLoaded ();
+                try {
+                    SetTextureParameters (texture, threeTexture); threeMaterial.needsUpdate = true; onTextureLoaded (threeTexture); this.stateHandler.OnTextureLoaded ();
+                } catch (error) { this.stateHandler.OnError (error); }
 			},
 			null,
 			(err) => {
@@ -535,11 +541,12 @@ export function ConvertModelToThreeObject (model, conversionParams, conversionOu
 
 		RunTasksBatch (threeNodeItems.length, 100, {
 			runTask : (firstMeshInstanceIndex, lastMeshInstanceIndex, onReady) => {
-				for (let meshInstanceIndex = firstMeshInstanceIndex; meshInstanceIndex <= lastMeshInstanceIndex; meshInstanceIndex++) {
-					let nodeItem = threeNodeItems[meshInstanceIndex];
-					ConvertMesh (nodeItem.threeNode, nodeItem.meshInstance, materialHandler);
-				}
-				onReady ();
+                try {
+                    for (let meshInstanceIndex = firstMeshInstanceIndex; meshInstanceIndex <= lastMeshInstanceIndex; meshInstanceIndex++) {
+                        let nodeItem = threeNodeItems[meshInstanceIndex]; ConvertMesh (nodeItem.threeNode, nodeItem.meshInstance, materialHandler);
+                    }
+                    onReady ();
+                } catch (error) { stateHandler.OnError (error); }
 			},
 			onReady : () => {
 				stateHandler.OnModelLoaded (threeRootNode);

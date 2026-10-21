@@ -15,6 +15,10 @@ export function ShowAdvanceAnimation (editor, visible)
 export function CreateTimelineTracks (editor, parent)
 {
     const timeline = editor.timeline;
+    const cameraLabel = Element ('label', 'fold_camera_option', undefined, parent);
+    const autoFit = Element ('input', null, undefined, cameraLabel); autoFit.type = 'checkbox'; autoFit.checked = timeline.foldAutoFit !== false; autoFit.disabled = editor.readOnly || editor.busy;
+    autoFit.setAttribute ('aria-label', 'Auto-fit folding camera'); cameraLabel.appendChild (document.createTextNode ('Auto-fit fold / unfold · Camera keyframes take priority'));
+    autoFit.addEventListener ('change', () => editor.Run (() => editor.packaging.SetFoldCameraAutoFit (autoFit.checked)));
     const ranges = Element ('div', 'timeline_ranges', undefined, parent);
     for (const [key, label] of [['rangeStart', 'Beginning'], ['rangeEnd', 'End']]) {
         const field = Element ('label', null, label + ' (s)', ranges); const input = Element ('input', null, undefined, field);
@@ -28,7 +32,7 @@ export function CreateTimelineTracks (editor, parent)
         input.dataset.range = key;
     }
     const tracks = Element ('div', 'advance_animation_tracks', undefined, parent);
-    for (const [type, label] of [['object', 'Scene state'], ['camera', 'Camera positioning']]) {
+    for (const [type, label] of [['object', 'Scene state'], ['camera', 'Camera positioning'], ['action', 'Actions']]) {
         const row = Element ('div', 'advance_animation_track', undefined, tracks); Element ('strong', null, label, row);
         const rail = Element ('div', 'advance_animation_rail', undefined, row);
         const interval = Element ('div', 'animation_interval', undefined, rail);
@@ -38,7 +42,7 @@ export function CreateTimelineTracks (editor, parent)
         playhead.setAttribute ('aria-label', label + ' playhead');
         playhead.addEventListener ('input', () => { timeline.Stop (); timeline.Seek (Number (playhead.value)); });
         playhead.addEventListener ('change', () => editor.MarkDirty ());
-        const entries = type === 'camera' ? timeline.cameraKeyframes.map ((keyframe) => ({ keyframe, label : 'Camera' })) : editor.document.objects.flatMap ((object) => (object.keyframes || []).map ((keyframe) => ({ keyframe, label : object.name })));
+        const entries = type === 'action' ? timeline.actions.filter (action => editor.document.objects.some (object => object.id === action.objectId)).map (keyframe => ({ keyframe, label : 'Fold / unfold · ' + editor.document.objects.find (object => object.id === keyframe.objectId).name })) : type === 'camera' ? timeline.cameraKeyframes.map ((keyframe) => ({ keyframe, label : 'Camera' })) : editor.document.objects.flatMap ((object) => (object.keyframes || []).map ((keyframe) => ({ keyframe, label : object.name })));
         for (const { keyframe, label : name } of entries) {
             const marker = Element ('button', 'animation_key_marker', '◆', rail); marker.style.left = 100 * keyframe.time / timeline.duration + '%';
             marker.title = name + ' at ' + keyframe.time.toFixed (2) + ' s'; marker.setAttribute ('aria-label', marker.title);

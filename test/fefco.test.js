@@ -23,7 +23,7 @@ describe ('FEFCO folded packaging', async () => {
             const model = await CreateFefcoModel ({ code }); let count = 0;
             model.EnumerateMeshInstances (mesh => { if (mesh.GetMesh ().GetName ().startsWith ('Visual crease · ')) { return; } count++; assert.ok (IsTwoManifold (mesh), mesh.GetName ()); assert.ok (Math.abs (CalculateVolume (mesh)) > 0); for (const triangle of mesh.GetMesh ().triangles) { assert.ok (triangle.HasNormals ()); assert.ok (triangle.HasTextureUVs ()); } });
             assert.equal (count, code === '0200' ? 9 : 13); assert.equal (PackagingContours (FefcoProfile ({ code })).length, 1);
-            assert.equal (model.MaterialCount (), 2); for (const material of model.materials) { assert.equal (material.metalness, 0); assert.ok (material.diffuseMap.IsValid ()); assert.deepEqual ([...new Uint8Array (material.diffuseMap.buffer).slice (0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]); }
+            assert.equal (model.MaterialCount (), 4); for (const material of model.materials) { assert.equal (material.metalness, 0); assert.ok (material.diffuseMap.IsValid ()); assert.deepEqual ([...new Uint8Array (material.diffuseMap.buffer).slice (0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]); }
         }
     }).timeout (15000);
     it ('Omits HSC top flaps and positions RSC closed outer flaps at the center seam', async () => {

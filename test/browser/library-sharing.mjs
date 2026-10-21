@@ -1,0 +1,61 @@
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright-core';
+import { readFile } from 'node:fs/promises';
+import { SceneDocument } from '../../source/website/scenedocument.js';
+import { Model } from '../../source/engine/model/model.js';
+import { Node } from '../../source/engine/model/node.js';
+import { PhysicalMaterial } from '../../source/engine/model/material.js';
+import { GenerateCuboid, GeneratorParams } from '../../source/engine/model/generator.js';
+import { FinalizeModel } from '../../source/engine/model/modelfinalization.js';
+import { PackSession, CreateSessionArchive } from '../../source/website/sessionarchive.js';
+const owner = '11111111-1111-4111-8111-111111111111', id = '22222222-2222-4222-8222-222222222222', token = '33333333-3333-4333-8333-333333333333';
+const model = new Model (); model.AddMaterial (new PhysicalMaterial ()); model.AddMesh (GenerateCuboid (new GeneratorParams ().SetMaterial (0), 1, 2, 1)); const node = new Node (); node.AddMeshIndex (0); model.root.AddChildNode (node); FinalizeModel (model, {});
+const saved = new SceneDocument (); saved.AddImported (model, 'REDCON fixture'); saved.name = 'REDCON fixture'; const archive = Buffer.from (CreateSessionArchive (PackSession (saved)));
+const browser = await chromium.launch ({ executablePath : '/usr/bin/chromium', args : ['--no-sandbox', '--enable-unsafe-swiftshader'] });
+try {
+ const page = await browser.newPage ({ viewport : { width : 1280, height : 900 } }); page.setDefaultTimeout (60000); const errors = []; page.on ('pageerror', e => errors.push (e.message)); let code;
+ await page.route ('**/api/auth/**', r => r.fulfill ({ json : { user : { id : owner, email : 'fixture@example.com' } } }));
+ await page.route ('**/api/preferences', r => r.fulfill ({ json : { preferences : { theme : 2, viewportQuality : 'fast' }, folders : ['Uncategorized'] } }));
+ for (const path of ['accounts/**','environments']) { await page.route ('**/api/' + path, r => r.fulfill ({ json : path.startsWith ('accounts') ? { isAdmin : false } : [] })); }
+ await page.route ('**/api/personal/items', r => r.fulfill ({ json : [{ id, name : 'REDCON fixture', category : 'Uncategorized', kind : 'model', objects : 1, personal : true, updatedAt : new Date ().toISOString () }] }));
+ await page.route ('**/api/personal/items/' + id + '/archive', async r => { await new Promise (resolve => setTimeout (resolve, 300)); await r.fulfill ({ body : archive, contentType : 'application/octet-stream' }); });
+ await page.route ('**/api/personal/items/' + id + '/thumbnail', r => r.fulfill ({ status : 404 }));
+ await page.route ('**/assets/vendor/qrcode.min.js', r => r.fulfill ({ path : 'website/assets/vendor/qrcode.min.js', contentType : 'text/javascript' }));
+ await page.route ('**/api/audience', r => {
+  if (r.request ().method () === 'GET') { return r.fulfill ({ json : { shares : [] } }); }
+  const body = r.request ().postDataJSON (); assert.equal (body.source, 'account'); assert.equal (body.itemId, id); assert.match (body.code, /^\d{4}$/); code = body.code;
+  return r.fulfill ({ status : 201, json : { token, name : 'REDCON fixture', url : 'http://127.0.0.1:8080/mini.html?share=' + token, code, codeRequired : true, allowDownload : false } });
+ });
+ await page.goto ('http://127.0.0.1:8080/website/index.html'); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
+ assert.equal (await page.locator ('#viewer_empty h2').count (), 0);
+ const call = async (command, args = {}) => { const r = await page.evaluate (({ command, args }) => Auto3D.execute (command, args), { command, args }); assert.equal (r.ok, true, JSON.stringify (r)); return r.result; };
+ await page.locator ('#open_file').setInputFiles ('test/testfiles/stl/cube_meshlab_binary.stl'); await page.waitForFunction (() => /^(Added|Imported)/.test (document.querySelector ('.scene_status')?.textContent || ''));
+ const original = (await call ('scene.inspect')).objects[0]; await call ('ui.library');
+ const library = page.getByRole ('dialog', { name : 'Model library', exact : true }); assert.equal (await library.getByRole ('button', { name : 'Share', exact : true }).count (), 1);
+ await library.getByRole ('button', { name : 'Add REDCON fixture', exact : true }).click ();
+ await page.waitForFunction (() => document.querySelector ('.scene_status')?.textContent.startsWith ('Added 1 model(s) from'));
+ const added = await call ('scene.inspect'); assert.equal (added.objects.length, 2); assert.equal (added.objects[0].id, original.id); assert.equal (added.objects[1].name, 'REDCON fixture');
+ await call ('history.undo'); assert.equal ((await call ('scene.inspect')).objects.length, 1); await call ('history.redo'); assert.equal ((await call ('scene.inspect')).objects.length, 2);
+ console.log ('Library Add preserved the existing model; Undo/Redo passed.');
+ await call ('object.array', { width : 3, length : 2, height : 1, animate : false });
+ const groups = (await call ('scene.groups.inspect')).groups; assert.equal (groups.length, 1); assert.equal (groups[0].count, 6); assert.match (groups[0].name, /^Array group of/);
+ const details = page.locator ('details[data-scene-group="' + groups[0].id + '"]'); assert.equal (await details.getAttribute ('open'), null);
+ assert.equal (await page.locator ('.ov_tree_item[data-scene-group="' + groups[0].id + '"]').count (), 1);
+ await call ('scene.group.expand', { id : groups[0].id, expanded : true }); assert.equal (await details.evaluate (e => e.open), true); await call ('scene.group.expand', { id : groups[0].id, expanded : false });
+ await page.screenshot ({ path : 'work/library-array-groups.png' }); console.log ('Array group dropdowns and Agent expansion passed.');
+ await call ('ui.library'); await page.getByRole ('dialog', { name : 'Model library', exact : true }).getByRole ('button', { name : 'Share', exact : true }).click ();
+ const share = page.getByRole ('dialog', { name : 'Share model', exact : true }); const generated = await share.getByLabel ('Four digit access code', { exact : true }).inputValue (); assert.match (generated, /^\d{4}$/);
+ await share.getByRole ('button', { name : 'Generate viewer link', exact : true }).click (); await share.getByLabel ('Shared viewer link', { exact : true }).waitFor ();
+ await share.locator ('.share_qr_container canvas').waitFor ({ state : 'attached' }); assert.equal (code, generated); await page.screenshot ({ path : 'work/audience-share-qr.png' });
+ const guest = await browser.newPage ({ viewport : { width : 390, height : 844 } }); guest.setDefaultTimeout (60000); guest.on ('pageerror', e => errors.push (e.message));
+ await guest.route ('**/mini.html?share=*', r => r.fulfill ({ path : 'website/mini.html', contentType : 'text/html' }));
+ await guest.route ('**/o3dv/o3dv.mini.js', r => r.fulfill ({ path : 'build/website/o3dv.mini.js', contentType : 'text/javascript' }));
+ await guest.route ('**/assets/vendor/qrcode.min.js', r => r.fulfill ({ path : 'website/assets/vendor/qrcode.min.js', contentType : 'text/javascript' }));
+ await guest.route ('**/api/audience/' + token, r => r.fulfill ({ json : { name : 'REDCON fixture', codeRequired : true, allowDownload : false } }));
+ await guest.route ('**/api/audience/' + token + '/archive', r => r.request ().postDataJSON ().code === code ? r.fulfill ({ body : archive, contentType : 'application/octet-stream' }) : r.fulfill ({ status : 401, json : { error : 'Incorrect code' } }));
+ await guest.goto ('http://127.0.0.1:8080/mini.html?share=' + token); await guest.getByLabel ('4-digit access code', { exact : true }).fill (code === '9999' ? '0000' : '9999'); await guest.getByRole ('button', { name : 'Unlock model', exact : true }).click (); await guest.getByRole ('status').filter ({ hasText : /Incorrect/ }).waitFor ();
+ await guest.getByLabel ('4-digit access code', { exact : true }).fill (code); await guest.getByRole ('button', { name : 'Unlock model', exact : true }).click (); await guest.locator ('#stage canvas').waitFor ();
+ assert.equal (await guest.locator ('#download').isVisible (), false); assert.equal (await guest.locator ('#full').isVisible (), false); assert.equal (await guest.locator ('#stage canvas').evaluate (c => c.width > 0 && c.height > 0), true);
+ await guest.screenshot ({ path : 'work/audience-mini-mobile.png' }); assert.deepEqual (errors, []);
+ console.log ('Default code, automatic QR, incorrect/correct code, anonymous mobile mini viewer and hidden download controls passed.');
+} finally { await browser.close (); }

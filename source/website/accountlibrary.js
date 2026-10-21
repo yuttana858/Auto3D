@@ -5,9 +5,9 @@ export class AccountLibrary
     async Request (path, options = {})
     {
         const owner = this.auth.user?.id; if (!owner) { throw new Error ('Sign in to use your account Library.'); }
-        const response = await this.fetch (path, { credentials : 'same-origin', ...options, headers : { ...options.headers, 'X-Auto3D-Account' : owner } });
+        const response = await this.fetch (path, { credentials : 'same-origin', signal : AbortSignal.timeout (120000), ...options, headers : { ...options.headers, 'X-Auto3D-Account' : owner } });
         if (this.auth.user?.id !== owner) { throw new Error ('Account changed. Reopen your Library.'); }
-        if (!response.ok) { let body; try { body = await response.json (); } catch { /* Non-JSON failure. */ } throw new Error (body?.error || 'Account Library request failed.'); }
+        if (!response.ok) { let body; try { body = await response.json (); } catch { /* Non-JSON failure. */ } throw new Error ((body?.error || 'Account Library request failed.') + ' (HTTP ' + response.status + ')'); }
         const result = {};
         for (const method of ['json', 'blob', 'arrayBuffer']) { result[method] = async () => { const value = await response[method] (); if (this.auth.user?.id !== owner) { throw new Error ('Account changed. Reopen your Library.'); } return value; }; }
         return result;

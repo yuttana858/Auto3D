@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { MaterialReflectionStrength } from './materialreflection.js';
-import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 
 // Integrate the radiance over the sphere. Rotating the sample directions moves
 // the diffuse lighting as well as the reflections on physical materials.
@@ -57,7 +57,7 @@ export class HDRILighting
         if (!response.ok) { throw new Error ('HDRI request failed (' + response.status + ').'); }
         const buffer = await response.arrayBuffer ();
         if (buffer.byteLength < 128) { throw new Error ('HDRI response is empty or invalid.'); }
-        return new RGBELoader ().setDataType (THREE.FloatType).createDataTexture (buffer);
+        return new HDRLoader ().setDataType (THREE.FloatType).createDataTexture (buffer);
     }
 
     async Prepare (url)

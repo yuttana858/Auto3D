@@ -1,4 +1,4 @@
-# Packaging module v1.6.0
+# Packaging module v1.7.0
 
 A separate package for FEFCO 0200–0203 boxes, canonical-mm dielines, physical board extrusion, kraft textures, catalog controls and flat-sheet unfolding. It can be developed or copied to a separate repository without Auto3D source. Its only runtime dependencies are Three.js and fflate, under MIT licenses.
 
@@ -86,3 +86,7 @@ Detection covers this generated box’s panels, including its trapezoidal joint.
 `CreaseVisualMeshes(rig, pose)` returns separate presentation meshes for known shared scores. `FefcoFoldPose` and `FefcoFoldFrame` include these as `visualMeshes`; `CreateFefcoBox(input, optionalSavedProfile)` retains board specifications. Hosts display them alongside `meshes` and update their buffers during playback. They are excluded from rigid collision solids and authoritative CAD measurements. Editable visual crease width controls bounded rounding; constituent paper calipers and flute pitch remain material/visual metadata, not an inferred mechanical law. Existing API-v1 consumers may ignore optional visual meshes.
 
 Auto3D exposes the controls under Packaging Designer → Measurement layer. The independent preview shows CAD, dimensions/formulas and the rendered box together. See [the engineering contract](../../docs/corrugated-dimensions-and-creases.md) for formula scope, calibration, limits and references. Existing generator inputs and legacy fit-reserve dimensions remain backward compatible; once the Measurement layer is saved, edit engineering targets there rather than through the legacy fit editor.
+
+## Realistic board surfaces in v1.7.0
+
+Optional presentation meshes add restrained panel bowing, score fillets and compressed cut shoulders without modifying CAD or collision meshes. Four independent outer/inner/exposed/wrapped material roles use seamless procedural textures and global flute registration. The neutral panel exposes saved visual controls; Auto3D adds timeline Actions, texture effect controls and strict shared commands. See [board-surface-appearance.md](../../docs/board-surface-appearance.md). API v1 remains compatible.

@@ -29,7 +29,7 @@ export function RenderCamera (state, width, height, near, far)
     camera.position.fromArray (state.eye); camera.up.fromArray (state.up); camera.lookAt (new THREE.Vector3 (...state.center)); camera.updateMatrixWorld (true); return camera;
 }
 
-export async function RenderPNG (website, job, { cancelled = () => false, progress = () => {}, tileSize = 1024 } = {})
+export async function RenderPNG (website, job, { cancelled = () => false, progress = () => {}, preview = () => {}, background : interactive = false, tileSize = 1024 } = {})
 {
     const viewer = website.viewer; const renderer = viewer.renderer; const scene = viewer.scene;
     const { width, height } = job.size; const canvas = document.createElement ('canvas'); canvas.width = width; canvas.height = height;
@@ -64,11 +64,22 @@ export async function RenderPNG (website, job, { cancelled = () => false, progre
             const pixels = new Uint8Array (tile.width * tile.height * 4); renderer.readRenderTargetPixels (target, 0, 0, tile.width, tile.height, pixels);
             if (renderer.getContext ().isContextLost ()) { throw new Error ('WebGL context lost. Reload the app before retrying.'); }
             context.putImageData (new ImageData (FlipRenderPixels (pixels, tile.width, tile.height, job.alpha), tile.width, tile.height), tile.x, tile.y);
+            preview (canvas);
             renderer.setRenderTarget (targetBefore); renderer.setViewport (viewport); renderer.setScissor (scissor); renderer.setScissorTest (scissorTest);
             renderer.shadowMap.autoUpdate = false; progress (Math.round ((index + 1) / tiles.length * 95));
+            if (interactive) {
+                scene.background = background; renderer.setClearColor (clearColor, clearAlpha);
+                const currentSize = renderer.getSize (new THREE.Vector2 ()); if (!targetBefore && !currentSize.equals (renderSizeBefore)) { renderer.setViewport (0, 0, currentSize.x, currentSize.y); }
+                hidden.forEach (([child, visible]) => { child.visible = visible; }); viewer.Render ();
+            }
             await new Promise (resolve => setTimeout (resolve, 0));
+            if (interactive) {
+                hidden.forEach (([child]) => { child.visible = false; });
+                if (job.alpha) { scene.background = null; renderer.setClearColor (0x000000, 0); }
+            }
         }
         if (cancelled ()) { throw new Error ('Render cancelled.'); }
+        if (interactive) { scene.background = background; renderer.setClearColor (clearColor, clearAlpha); hidden.forEach (([child, visible]) => { child.visible = visible; }); viewer.Render (); }
         const blob = await new Promise ((resolve, reject) => canvas.toBlob (value => value ? resolve (value) : reject (new Error ('PNG encoding failed. Choose a smaller resolution.')), 'image/png'));
         if (cancelled ()) { throw new Error ('Render cancelled.'); } progress (100); return blob;
     } finally {

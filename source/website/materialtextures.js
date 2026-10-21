@@ -2,6 +2,117 @@ import { TextureMap } from '../engine/model/material.js';
 import { CloneSurface } from './scenedocument.js';
 import { GenerateMissingBoxUVs } from './materialuv.js';
 import { LoadPackagingModule } from './packagingadapter.js';
+import { ValidateSurfaceRelief, ValidateSpotVarnish } from '../../modules/packaging/src/reliefsettings.js';
+import { Base64DataURIToArrayBuffer } from '../engine/io/bufferutils.js';
+
+export async function SampleImpressionMask (map, fitImage = true)
+{
+    if (!map?.buffer) { return null; }
+    const image = await createImageBitmap (new Blob ([map.buffer], { type : map.mimeType }));
+    try {
+        if (image.width > 8192 || image.height > 8192) { throw new Error ('Impression images must be at most 8192 pixels.'); }
+        const size = 512; const canvas = document.createElement ('canvas'); canvas.width = canvas.height = size;
+        const context = canvas.getContext ('2d', { willReadFrequently : true }); const fit = Math.min (size / image.width, size / image.height);
+        if (fitImage) { context.drawImage (image, (size - image.width * fit) / 2, (size - image.height * fit) / 2, image.width * fit, image.height * fit); }
+        else { context.drawImage (image, 0, 0, size, size); }
+        return { width : size, height : size, pixels : context.getImageData (0, 0, size, size).data };
+    } finally { image.close (); }
+}
+
+function DecodeMaskMap (dataUri, name)
+{
+    if (typeof dataUri !== 'string' || dataUri.length > 12 * 1024 * 1024 || !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test (dataUri)) { throw new Error ('Use a base64 PNG, JPEG or WebP mask up to 8 MB.'); }
+    const decoded = Base64DataURIToArrayBuffer (dataUri);
+    if (decoded.buffer.byteLength > 8 * 1024 * 1024) { throw new Error ('Mask exceeds 8 MB.'); }
+    return Object.assign (new TextureMap (), { name : name + '.' + decoded.mimeType.split ('/')[1], buffer : decoded.buffer, mimeType : decoded.mimeType });
+}
+
+export async function ApplySpotVarnish (panel, args)
+{
+    const { index, maskDataUri, ...options } = args; const entry = MaterialEntry (panel, index); const editor = RequireMaterialEdit (panel, entry);
+    const settings = ValidateSpotVarnish ({ ...(entry.original.varnishSettings || {}), ...options });
+    const maskMap = maskDataUri === undefined ? entry.original.varnishMaskMap : DecodeMaskMap (maskDataUri, 'spot-varnish-mask');
+    if (settings.enabled && !maskMap) { throw new Error ('Choose a spot varnish mask.'); }
+    const before = CloneSurface (entry.original); const doc = editor.document; const account = panel.website.auth.user.id;
+    const uvBefore = CaptureUVs ([entry]);
+    const roughness = entry.original.varnishSettings ? entry.original.varnishBaseRoughnessMap : entry.original.roughnessMap || entry.original.metalnessMap;
+    const specular = entry.original.varnishSettings ? entry.original.varnishBaseSpecularMap : entry.original.specularMap;
+    let applied = false; const apply = async (surface, uvs) => { Object.assign (entry.original, CloneSurface (surface)); RestoreUVs (uvs); await editor.Render (); editor.MarkDirty?.(); };
+    editor.busy = true; editor.RefreshButtons?.(); editor.Status ('Building spot varnish mask…');
+    try {
+        const module = await LoadPackagingModule ();
+        let maps = { roughnessMap : roughness, specularMap : specular };
+        if (settings.enabled) {
+            const mask = await panel.SampleImpressionMask (maskMap);
+            const [baseRoughness, baseSpecular] = await Promise.all ([panel.SampleMappedSurface (roughness, roughness), panel.SampleMappedSurface (specular, roughness)]);
+            const generated = module.GenerateSpotVarnish (settings, mask, baseRoughness, baseSpecular);
+            maps = {};
+            for (const key of ['roughnessMap', 'specularMap']) {
+                const map = Object.assign (new TextureMap (), generated[key]);
+                if (roughness) { map.offset = roughness.offset.Clone (); map.scale = roughness.scale.Clone (); map.rotation = roughness.rotation; }
+                maps[key] = map;
+            }
+        }
+        if (editor.document !== doc || panel.website.auth.user?.id !== account || panel.website.accountReady === false || editor.readOnly || !doc.model.materials.includes (entry.original)) { throw new Error ('The workspace or account changed during varnish generation.'); }
+        applied = true; Object.assign (entry.original, maps, { varnishSettings : settings, varnishMaskMap : maskMap, varnishBaseRoughnessMap : roughness, varnishBaseSpecularMap : specular });
+        if (settings.enabled) { GenerateMissingBoxUVs (panel.website.viewer, entry); }
+        const after = CloneSurface (entry.original); const uvAfter = CaptureUVs ([entry]); await editor.Render ();
+        if (editor.document !== doc || panel.website.auth.user?.id !== account || editor.readOnly) { throw new Error ('The workspace or account changed during varnish rendering.'); }
+        editor.PushHistory (() => apply (before, uvBefore), () => apply (after, uvAfter)); editor.MarkDirty?.(); editor.Status ('Spot varnish applied · Undo available');
+        return { index, settings : { ...settings }, mask : !!maskMap, geometryChanged : false };
+    } catch (error) { if (applied && editor.document === doc) { await apply (before, uvBefore); } throw error; }
+    finally { editor.busy = false; editor.RefreshButtons?.(); panel.Update (); }
+}
+
+export async function SampleMappedSurface (map, reference)
+{
+    const image = await SampleImpressionMask (map, false); if (!image || map === reference) { return image; }
+    const pixels = new Uint8ClampedArray (image.pixels.length); const size = image.width;
+    const ref = reference || new TextureMap (); if (!ref.scale.x || !ref.scale.y) { throw new Error ('Use nonzero roughness texture scale before applying varnish.'); }
+    const cr = Math.cos (ref.rotation); const sr = Math.sin (ref.rotation); const cm = Math.cos (map.rotation); const sm = Math.sin (map.rotation);
+    for (let y = 0; y < size; y++) { for (let x = 0; x < size; x++) {
+        const a = (x / size - ref.offset.x) / ref.scale.x; const b = (1 - y / size - ref.offset.y) / ref.scale.y;
+        const u = cr * a - sr * b; const v = sr * a + cr * b;
+        const mu = map.scale.x * (cm * u + sm * v) + map.offset.x; const mv = map.scale.y * (-sm * u + cm * v) + map.offset.y;
+        const sx = Math.floor (((mu % 1 + 1) % 1) * size); const sy = Math.floor ((((1 - mv) % 1 + 1) % 1) * size);
+        pixels.set (image.pixels.subarray ((sy * size + sx) * 4, (sy * size + sx + 1) * 4), (y * size + x) * 4);
+    } }
+    return { ...image, pixels };
+}
+
+export async function ApplySurfaceRelief (panel, args)
+{
+    const { index, maskDataUri, clearMask = false, ...options } = args;
+    const entry = MaterialEntry (panel, index); const editor = RequireMaterialEdit (panel, entry);
+    if (typeof clearMask !== 'boolean' || clearMask && maskDataUri !== undefined) { throw new Error ('Choose mask replacement or removal.'); }
+    const settings = ValidateSurfaceRelief ({ ...(entry.original.surfaceRelief || {}), ...options, ...(clearMask && options.impression === undefined ? { impression : 'off' } : {}) });
+    let maskMap = clearMask ? null : entry.original.impressionMap;
+    if (maskDataUri !== undefined) {
+        maskMap = DecodeMaskMap (maskDataUri, 'impression-mask');
+    }
+    if (settings.impression !== 'off' && !maskMap) { throw new Error ('Choose an impression mask before enabling emboss or deboss.'); }
+    const doc = editor.document; const account = panel.website.auth.user.id;
+    const before = CloneSurface (entry.original); const uvBefore = CaptureUVs ([entry]); let applied = false;
+    const apply = async (surface, uvs) => { Object.assign (entry.original, CloneSurface (surface)); RestoreUVs (uvs); await editor.Render (); editor.MarkDirty?.(); };
+    editor.busy = true; editor.RefreshButtons?.(); editor.Status ('Building corrugated surface and die impression…');
+    try {
+        const module = await LoadPackagingModule ();
+        const mask = maskMap ? await panel.SampleImpressionMask (maskMap) : null;
+        const generated = module.GenerateSurfaceRelief (settings, mask);
+        if (editor.document !== doc || panel.website.auth.user?.id !== account || panel.website.accountReady === false || editor.readOnly || !doc.model.materials.includes (entry.original)) { throw new Error ('The workspace or account changed during relief generation.'); }
+        const map = Object.assign (new TextureMap (), generated.map); const previous = entry.original.bumpMap;
+        if (previous) { map.offset = previous.offset.Clone (); map.scale = previous.scale.Clone (); map.rotation = previous.rotation; }
+        applied = true;
+        Object.assign (entry.original, { bumpMap : map, impressionMap : maskMap, surfaceRelief : settings, reliefMode : 'bump', bumpScale : settings.strength, boardFluteLinked : false });
+        GenerateMissingBoxUVs (panel.website.viewer, entry);
+        const after = CloneSurface (entry.original); const uvAfter = CaptureUVs ([entry]); await editor.Render ();
+        if (editor.document !== doc || panel.website.auth.user?.id !== account || panel.website.accountReady === false || editor.readOnly || !doc.model.materials.includes (entry.original)) { throw new Error ('The workspace or account changed during relief rendering.'); }
+        editor.PushHistory (() => apply (before, uvBefore), () => apply (after, uvAfter)); editor.MarkDirty?.();
+        editor.Status ('Surface relief applied · Undo available');
+        return { index, settings : { ...settings }, mask : !!maskMap, resolution : 512, geometryChanged : false };
+    } catch (error) { if (applied && editor.document === doc) { await apply (before, uvBefore); } throw error; }
+    finally { editor.busy = false; editor.RefreshButtons?.(); panel.Update (); }
+}
 
 export const SurfaceTextureSlots = [['map', 'Base color', 'diffuseMap'], ['roughnessMap', 'Gloss / roughness', 'roughnessMap'], ['specularMap', 'Reflective', 'specularMap'], ['metalnessMap', 'Metalness', 'metalnessMap'], ['bumpMap', 'Bump', 'bumpMap'], ['normalMap', 'Normal', 'normalMap'], ['aoMap', 'Ambient occlusion', 'aoMap'], ['displacementMap', 'Height', 'displacementMap'], ['emissiveMap', 'Emission', 'emissiveMap']];
 export function TextureForSlot (entry, key) { return (key === 'specularMap' && entry.material.isMeshPhysicalMaterial ? entry.material.specularColorMap : entry.material[key]) || (key === 'normalMap' ? entry.material.auto3dNormalMap : key === 'bumpMap' ? entry.material.auto3dBumpMap : null); }

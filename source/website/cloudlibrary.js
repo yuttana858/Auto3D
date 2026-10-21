@@ -12,7 +12,7 @@ export class CloudLibrary
 
     async Request (path, options = {})
     {
-        const response = await fetch (this.apiUrl.replace (/\/$/, '') + path, options);
+        const response = await fetch (this.apiUrl.replace (/\/$/, '') + path, { signal : AbortSignal.timeout (120000), ...options });
         if (!response.ok) {
             let detail = null; try { detail = await response.json (); } catch { /* Non-JSON backend error. */ }
             throw new Error (detail?.error || 'Shared library request failed (' + response.status + ').');

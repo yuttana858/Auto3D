@@ -189,6 +189,19 @@ const Knowledge = {
         { style : 'mixed ECMA/FEFCO packaging generators', formats : ['Rhino 7/8 IronPython geometry'], source : 'Rhino Packaging Toolkit', parametric : true, licenseUse : 'MIT', url : 'https://github.com/DDR68/Rhino_Packaging_Toolkit' },
         { style : 'FEFCO 0427', formats : ['DXF generator source'], source : 'bikinon/d0427', parametric : true, licenseUse : 'no license located; reference behavior only, do not redistribute/copy implementation', url : 'https://github.com/bikinon/d0427' }
     ],
+    surfacePresentation : {
+        authority : 'Auto3D rendering behavior; visual controls are not manufacturing tolerances or certified tooling specifications.',
+        relief : 'A bump map combines paper grain, flute impressions and a signed artwork mask for emboss/deboss. It affects lighting, not CAD vertices, measured caliper or silhouettes.',
+        masking : 'Alpha-weighted light/dark masks support independent raised/recessed relief and spot varnish. Varnish blends roughness/specular response while retaining ink and original finish maps.',
+        foldRadii : 'Known shared score rails use smooth circular arcs with endpoint corrections for stack offsets. Caliper, score width, flute pitch and score/flute orientation influence a visual compressed radius; exposed strip caps use corrugated-edge shading. Not a calibrated constitutive board model.',
+        boardAppearance : 'Optional visual-only panel bow, score fillet softness, cut-edge compression and paper grain are stored separately from CAD dimensions. Four independent outer/inner/exposed/wrapped liner material roles use seamless procedural paper textures and sheet-registered flute edges. These are bounded appearance heuristics, not predicted production stress or converter allowances.',
+        foldControls : 'A normalized visual fold slider and timeline fold/unfold Actions evaluate procedural poses independently of canonical CAD. Action spans persist in sessions and support backward/forward seeking; overlapping spans on the same box are rejected. Visual radii are presentation heuristics, not manufacturing allowances.',
+        fluteRegistration : 'Generated maps and exposed edges retain global dieline coordinates during folding. Edge texture phase is sampled perpendicular to the material flute axis. Custom relief/UV artwork opts out of automatic map relinking.',
+        interaction : 'Texture thumbnails open UV, rotation, tiling and relevant mask tools. Height/displacement cards are hidden; legacy archive data is retained.',
+        rendering : 'Foreground Render opens the right render workspace with tile preview, progress and session thumbnails. Background render keeps camera navigation available while scene edits pause; queued camera snapshots remain unchanged. Completed images open in a pan/zoom window. Selected deletion and Clear queue release images; nothing uploads automatically.',
+        animations : 'Fold auto-fit eases into and out of the motion. Array creation reveals copies by accelerating sequential drops and frames the final arrangement. Advance camera keyframes override auto-fit; viewport interaction relinquishes camera control.',
+        commands : ['material.texture.inspect', 'material.texture.mapping', 'material.texture.preview', 'material.surface.relief', 'material.surface.varnish', 'packaging.fefco.camera', 'object.array', 'object.array.playback', 'object.array.playback.inspect', 'camera.current.inspect', 'render.now', 'render.queue.inspect', 'render.queue.start', 'render.queue.open', 'render.image.view', 'render.queue.delete', 'render.queue.clear']
+    },
     selectionGuidance : [
         { need : 'lowest-cost general transit case', consider : ['FEFCO 0201', 'C or B single wall', 'ECT/BCT sized to stacking and distribution'], validate : ['gross weight', 'case dimensions', 'pallet pattern', 'humidity', 'compression test'] },
         { need : 'fragile product / cushioning', consider : ['A or C flute', 'double wall if compression and puncture loads are high', 'interior fitments from FEFCO 09 family'], validate : ['shock/drop test', 'flat crush', 'product resonance/cushioning study'] },
@@ -240,6 +253,7 @@ function searchKnowledge (query)
     Knowledge.selectionGuidance.forEach ((item, index) => add ('selection-guidance', String (index), item));
     Knowledge.dimensionalEngineering.formulas.forEach ((item) => add ('dimensional-formula', item.id, item));
     add ('dimensional-engineering', 'corrugated-measurements', Knowledge.dimensionalEngineering);
+    add ('surface-presentation', 'visual-corrugated-finishes', Knowledge.surfacePresentation);
     Knowledge.terminology.forEach ((item) => add ('term', item.term, item));
     candidates.sort ((a, b) => b.relevance - a.relevance);
     return candidates.slice (0, 12);
@@ -274,7 +288,7 @@ export function onRequestGet (context)
     }
 
     if (section) {
-        const allowed = new Set (['terminology', 'fefco', 'papers', 'flutes', 'multiwall', 'performance', 'referenceGrades', 'cadReferences', 'dimensionalEngineering', 'selectionGuidance', 'agentRules', 'sources']);
+        const allowed = new Set (['terminology', 'fefco', 'papers', 'flutes', 'multiwall', 'performance', 'referenceGrades', 'cadReferences', 'dimensionalEngineering', 'surfacePresentation', 'selectionGuidance', 'agentRules', 'sources']);
         if (!allowed.has (section)) { return response ({ error : 'Unknown knowledge section.' }, 404); }
         return response ({
             knowledgeBase : { id : Knowledge.id, name : Knowledge.name, updated : Knowledge.updated, scope : Knowledge.scope },
