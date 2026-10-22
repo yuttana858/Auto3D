@@ -2,7 +2,7 @@
 
 ## Mini viewer saved presentation (0.37.2 / Packaging 1.7.1)
 
-Implemented saved-camera restoration with legacy fallback, Reset view, explicit portable background capture, default dome/gradient/grid and packaged HDRI/scene-effects restoration. See [release-0372.md](release-0372.md). No production deployment of this change yet. Fit all additionally uses actual visible world-space geometry and 1.2× tighter framing with a no-crop bound, shared by main and mini viewers. Space + left-drag now pans without selecting or transforming models; text/control input is excluded and focus loss clears the gesture. Validation: 635 unit/module tests pass; the mobile Chromium saved-camera/reset check passes for default and HDRI scenes with shadows/reflections and resizing. Lint, website and Pages builds pass.
+Implemented saved-camera restoration with legacy fallback, Reset view, explicit portable background capture, default dome/gradient/grid and packaged HDRI/scene-effects restoration. See [release-0372.md](release-0372.md). No production deployment of this change yet. Fit all additionally uses actual visible world-space geometry and 1.2× tighter framing with a no-crop bound, shared by main and mini viewers. Space + left-drag now pans without selecting or transforming models; text/control input is excluded and focus loss clears the gesture. Trackpad pinch and two-finger touch zoom use half sensitivity; normal wheel/pan remain unchanged. Validation: 637 unit/module tests pass; the mobile Chromium saved-camera/reset check passes for default and HDRI scenes with shadows/reflections and resizing. Lint, website and Pages builds pass.
 
 ## External viewing production activation (2026-10-21)
 

@@ -510,7 +510,7 @@ export class Navigation
 			let orbitRatio = 0.5;
 			this.Orbit (moveDiff.x * orbitRatio, moveDiff.y * orbitRatio);
 		} else if (navigationType === NavigationType.Pan) {
-			let zoomRatio = 0.005;
+			let zoomRatio = 0.0025;
 			this.Zoom (distanceDiff * zoomRatio);
 			let panRatio = 0.001 * CoordDistance3D (this.camera.eye, this.camera.center);
 			this.Pan (moveDiff.x * panRatio, moveDiff.y * panRatio);
@@ -542,7 +542,10 @@ export class Navigation
 		params.preventDefault ();
 
 		let delta = -params.deltaY / 40;
-		let ratio = 0.1;
+        if (!Number.isFinite (delta) || delta === 0) { return; }
+        // Desktop browsers report trackpad pinch as Ctrl+wheel.
+        // Match the half-speed two-finger touch pinch without changing wheel steps.
+		let ratio = params.ctrlKey ? 0.05 : 0.1;
 		if (delta < 0) {
 			ratio = ratio * -1.0;
 		}
