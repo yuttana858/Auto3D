@@ -42,7 +42,7 @@ dialog::backdrop{background:#000b}.qr{margin:15px auto;display:grid;place-items:
  <form id="accessForm" hidden><label for="code">4-digit access code</label><input id="code" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required><button class="primary" type="submit">Unlock model</button></form>
  <a class="action primary" id="launch" href="/" hidden>Sign in to view</a>
  <p class="muted">Shared files are protected by the Auto3D service. A code does not replace account sign-in where required.</p>
- </section></div></main><div id="viewerControls" hidden style="padding:8px 24px;background:#101f2c"><button id="resetView">Reset view</button><button id="fit">Fit to view</button><button id="download" hidden>Download model</button><span style="margin-left:12px;color:#abc4d6">Drag to rotate · Scroll to zoom</span></div>
+ </section></div></main><div id="viewerControls" hidden style="padding:8px 24px;background:#101f2c"><button id="resetView">Reset view</button><button id="fit">Fit to view</button><button id="download" hidden>Download model</button><span style="margin-left:12px;color:#abc4d6">Right-drag to rotate · Space + left-drag to pan · Scroll to zoom</span></div>
 <footer><span>Powered by Auto3D · Interactive 3D viewer</span><span>Viewing is read-only · Sign-in may be required</span></footer>
 <dialog id="qrDialog"><h2>Scan to view in Auto3D</h2><div id="qr" class="qr" aria-label="QR code for shared model link"></div><p id="qrUrl" class="link"></p><button id="close">Close</button></dialog>
 <script src="/assets/vendor/qrcode.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>

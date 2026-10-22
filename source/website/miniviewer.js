@@ -109,7 +109,7 @@ async function OpenModel (code = '')
         throw new Error ('Unable to load shared model (' + response.status + ').');
     }
     ShowChallenge (false);
-    await RenderArchive (await response.arrayBuffer ()); accessCode = code; Status (appearanceWarning + 'Drag to rotate · Scroll or pinch to zoom');
+    await RenderArchive (await response.arrayBuffer ()); accessCode = code; Status (appearanceWarning + 'Right-drag or touch to rotate · Space + left-drag to pan · Scroll or pinch to zoom');
     pin.value = '';
 }
 

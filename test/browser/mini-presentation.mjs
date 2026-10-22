@@ -27,6 +27,13 @@ try {
   await page.locator ('#resetView').waitFor ({ state : 'visible' }); await page.locator ('#code').waitFor ({ state : 'detached' });
   const canvas = page.locator ('#stage canvas');
   const initial = await canvas.screenshot ();
+  const rect = await canvas.boundingBox ();
+  await page.mouse.move (rect.x + rect.width / 2, rect.y + rect.height / 2);
+  await page.keyboard.down ('Space'); await page.mouse.down (); await page.mouse.move (rect.x + rect.width / 2 + 40, rect.y + rect.height / 2 + 25, { steps : 5 }); await page.mouse.up (); await page.keyboard.up ('Space');
+  assert.equal (initial.equals (await canvas.screenshot ()), false, 'Space left drag must pan');
+  await page.locator ('#resetView').click ();
+  assert.equal (initial.equals (await canvas.screenshot ()), true);
+
   await page.locator ('#fit').click (); await page.waitForTimeout (1200);
   assert.equal (initial.equals (await canvas.screenshot ()), false, 'Fit must change the saved composition');
   await page.locator ('#resetView').click ();

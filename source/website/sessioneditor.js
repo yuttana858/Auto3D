@@ -84,6 +84,11 @@ export class SessionEditor
         }
         viewer.scene.add (this.selectionBox);
         this.controls = new TransformControls (viewer.camera, viewer.renderer.domElement); this.controls.setSize (0.8); this.helper = this.controls.getHelper (); viewer.scene.add (this.helper);
+        let panControlsEnabled = null;
+        viewer.navigation.onPanModifier = active => {
+            if (active && panControlsEnabled === null) { panControlsEnabled = this.controls.enabled; this.controls.enabled = false; }
+            if (!active && panControlsEnabled !== null) { this.controls.enabled = panControlsEnabled; panControlsEnabled = null; }
+        };
         const render = viewer.onRender;
         viewer.SetRenderHandler ((camera) => { if (render) { render (camera); } if (this.controls.camera !== camera) { this.controls.camera = camera; } });
         this.controls.addEventListener ('change', () => this.RequestInteractionRender ());

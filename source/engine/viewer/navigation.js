@@ -252,6 +252,8 @@ export class Navigation
 		this.onContext = null;
         this.enabled = true;
         this.suppressContextMenu = false;
+        this.spacePan = false;
+        this.panGesture = false;
 
 		if (this.canvas.addEventListener) {
 			this.canvas.addEventListener ('mousedown', this.OnMouseDown.bind (this));
@@ -263,6 +265,10 @@ export class Navigation
 			this.canvas.addEventListener ('contextmenu', this.OnContextMenu.bind (this));
 		}
 		if (document.addEventListener) {
+            document.addEventListener ('keydown', this.OnPanKeyDown.bind (this));
+            document.addEventListener ('keyup', ev => { if (ev.code === 'Space') { this.SetSpacePan (false); } });
+            document.addEventListener ('visibilitychange', () => { if (document.hidden) { this.CancelPan (); } });
+            globalThis.window?.addEventListener ('blur', () => this.CancelPan ());
 			document.addEventListener ('mousemove', this.OnMouseMove.bind (this));
 			document.addEventListener ('mouseup', this.OnMouseUp.bind (this));
 			document.addEventListener ('mouseleave', this.OnMouseLeave.bind (this));
@@ -374,12 +380,33 @@ export class Navigation
 		return fitCamera;
 	}
 
+    SetSpacePan (held)
+    {
+        this.spacePan = held;
+        this.onPanModifier?.(held || this.panGesture);
+    }
+
+    OnPanKeyDown (event)
+    {
+        if (event.code !== 'Space' || !this.enabled || event.ctrlKey || event.metaKey || event.altKey) { return; }
+        if (event.target?.closest?.('input,textarea,select,button,a,[contenteditable]:not([contenteditable="false"]),[role="textbox"],[role="slider"]')) { return; }
+        this.SetSpacePan (true);
+        if (event.target === this.canvas || this.canvas.matches?.(':hover')) { event.preventDefault (); }
+    }
+
+    CancelPan ()
+    {
+        this.panGesture = false; this.SetSpacePan (false);
+        this.mouse.buttons = []; this.clickDetector.Cancel ();
+    }
+
 	OnMouseDown (ev)
 	{
         if (!this.enabled) { return; }
 		ev.preventDefault ();
 
 		this.mouse.Down (this.canvas, ev);
+        this.panGesture = this.spacePan && ev.which === 1;
 		this.clickDetector.Start (this.mouse.GetPosition ());
         if (ev.which === 3) { this.suppressContextMenu = false; }
 	}
@@ -404,7 +431,7 @@ export class Navigation
 		let navigationType = NavigationType.None;
         // Auto3D desktop navigation:
         // left = selection click only, middle-drag = pan, right-drag = orbit.
-        if (mouseButton === 2) {
+        if (mouseButton === 2 || (mouseButton === 1 && this.panGesture)) {
             navigationType = NavigationType.Pan;
         } else if (mouseButton === 3) {
             navigationType = NavigationType.Orbit;
@@ -428,20 +455,22 @@ export class Navigation
 
 	OnMouseUp (ev)
 	{
-        if (!this.enabled) { this.mouse.Up (this.canvas, ev); this.clickDetector.Cancel (); return; }
+        if (!this.enabled) { this.mouse.Up (this.canvas, ev); this.CancelPan (); return; }
         const wasDown = this.mouse.IsButtonDown ();
 		this.mouse.Up (this.canvas, ev);
 		this.clickDetector.End ();
 
-        if (wasDown && this.clickDetector.IsClick ()) {
+        if (wasDown && !this.panGesture && this.clickDetector.IsClick ()) {
 			let mouseCoords = this.mouse.GetPosition ();
 			this.Click (ev.which, mouseCoords, { ctrlKey : ev.ctrlKey, metaKey : ev.metaKey });
 		}
         this.clickDetector.Cancel ();
+        this.panGesture = false; this.SetSpacePan (this.spacePan);
 	}
 
 	OnMouseLeave (ev)
 	{
+        this.CancelPan ();
 		this.mouse.Leave (this.canvas, ev);
 		this.clickDetector.Cancel ();
 	}
