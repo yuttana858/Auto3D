@@ -1,3 +1,4 @@
+import { VisibleSceneBounds, FitVisibleCamera } from './fitview.js';
 import { Coord3D, CoordDistance3D, SubCoord3D } from '../geometry/coord3d.js';
 import { DegRad, Direction, IsEqual } from '../geometry/geometry.js';
 import { ColorComponentToFloat } from '../model/color.js';
@@ -460,6 +461,17 @@ export class Viewer
         this.renderer.setSize (width, height);
         this.cameraValidator.ForceUpdate ();
         this.Render ();
+    }
+
+    FitAllToWindow (animation = true)
+    {
+        const bounds = VisibleSceneBounds (this.mainModel?.mainModel?.GetRootObject ());
+        if (!bounds) { return false; }
+        const camera = FitVisibleCamera (this.GetCamera (), bounds, this.canvas.width / this.canvas.height, this.GetProjectionMode () === ProjectionMode.Perspective);
+        if (!camera) { return false; }
+        this.AdjustClippingPlanesToSphere (bounds.getBoundingSphere (new THREE.Sphere ()));
+        this.navigation.MoveCamera (camera, animation ? this.settings.animationSteps : 0);
+        return true;
     }
 
     FitSphereToWindow (boundingSphere, animation)

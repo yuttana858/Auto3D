@@ -30,7 +30,7 @@ try {
  assert.equal (await page.locator ('#viewer_empty h2').count (), 0);
  const call = async (command, args = {}) => { const r = await page.evaluate (({ command, args }) => Auto3D.execute (command, args), { command, args }); assert.equal (r.ok, true, JSON.stringify (r)); return r.result; };
  await page.locator ('#open_file').setInputFiles ('test/testfiles/stl/cube_meshlab_binary.stl'); await page.waitForFunction (() => /^(Added|Imported)/.test (document.querySelector ('.scene_status')?.textContent || ''));
- const original = (await call ('scene.inspect')).objects[0]; await call ('ui.library');
+ const original = (await call ('scene.inspect')).objects[0]; assert.equal ((await call ('view.fit')).fitted, true); await call ('ui.library');
  const library = page.getByRole ('dialog', { name : 'Model library', exact : true }); assert.equal (await library.getByRole ('button', { name : 'Share', exact : true }).count (), 1);
  await library.getByRole ('button', { name : 'Add REDCON fixture', exact : true }).click ();
  await page.waitForFunction (() => document.querySelector ('.scene_status')?.textContent.startsWith ('Added 1 model(s) from'));
