@@ -1,5 +1,11 @@
 # Auto3D development log and handoff
 
+## Corrugate texture continuity: Auto3D 0.37.3 / Packaging 1.7.2 (2026-10-23)
+
+Added finite display score bands, adjoining liner material continuity, a shared edge/specimen flute phase, measured paper proportions in edge maps, finer tileable paper defaults and textured cut faces on the actual medium specimen. Erected FEFCO outer/inner facing assignments are corrected. Default edge maps refresh on material rebuilds while preserving UV edits and custom maps. CAD coordinates, collision solids, dimensions and exports remain canonical. See [board-surface-appearance.md](board-surface-appearance.md) and [release-0373.md](release-0373.md). PR #40 is merged; these texture changes are a separate release candidate and are not deployed.
+
+An actual four-view Chromium render is saved at `work/texture-review/rendered-review.png` and was displayed in chat. The main viewer control regression passes Enable off/on, maximum bow/softness/compression, grain regeneration and intermediate-fold toggles without page/console errors or context loss. Validation: 644 unit/module tests, lint, website, independent Packaging and Pages builds pass. The 20-box array regression retains 63 geometries and 25 textures through repeated edits, with no context loss. Recognized default edge refresh retains manual UV transforms; custom-named edge maps are covered by preservation tests.
+
 ## Mini viewer saved presentation (0.37.2 / Packaging 1.7.1)
 
 Implemented saved-camera restoration with legacy fallback, Reset view, explicit portable background capture, default dome/gradient/grid and packaged HDRI/scene-effects restoration. See [release-0372.md](release-0372.md). No production deployment of this change yet. Fit all additionally uses actual visible world-space geometry and 1.2× tighter framing with a no-crop bound, shared by main and mini viewers. Space + left-drag now pans without selecting or transforming models; text/control input is excluded and focus loss clears the gesture. Trackpad pinch and two-finger touch zoom use half sensitivity; normal wheel/pan remain unchanged. Validation: 637 unit/module tests pass; the mobile Chromium saved-camera/reset check passes for default and HDRI scenes with shadows/reflections and resizing. Lint, website and Pages builds pass.

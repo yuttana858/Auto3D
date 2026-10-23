@@ -1,3 +1,4 @@
+import { TrimScoreDisplay } from './scorebands.js';
 import { BoardAppearanceMesh, TransformAppearanceMesh } from './boardappearance.js';
 import * as THREE from 'three';
 import { ValidateFefco, FlapDepth, FefcoProfile } from './fefco.js';
@@ -30,7 +31,7 @@ export function CreateFefcoFoldRig (input, savedProfile = null)
         // ExtrudeGeometry uses float32 storage. Restore canonical coordinates so
         // meshes and collision prisms agree on long, fractional-mm blanks.
         mesh.vertices = mesh.vertices.map (v => { const p = points.reduce ((best, p) => Math.hypot (p[0] - v[0], -p[1] - v[2]) < Math.hypot (best[0] - v[0], -best[1] - v[2]) ? p : best); return [p[0], v[1] > t / 2 ? t : 0, -p[1] || 0]; });
-        mesh.triangles.forEach (triangle => { if (triangle.material === 0 && mesh.normals[triangle.normals[0]][1] < -.5) { triangle.material = 2; } });
+        mesh.triangles.forEach (triangle => { if (triangle.material === 0 && mesh.normals[triangle.normals[0]][1] > .5) { triangle.material = 2; } });
         meshes.push (mesh); geometry.dispose (); panels.push ({ name, kind, index, solid : PanelSolid (points, t) });
     };
     const rectangle = (a, b, y0, y1) => [[a, y0], [b, y0], [b, y1], [a, y1]];
@@ -46,6 +47,7 @@ export function CreateFefcoFoldRig (input, savedProfile = null)
     const material = profile.engineering?.materials.find (m => m.id === profile.engineering.activeMaterialId);
     if (material) { rig.boardStack = { model : 'visual-reference', units : 'mm', totalCaliperMm : t, outsideLinerMm : material.outsideLinerMm, insideLinerMm : material.insideLinerMm, mediumPaperMm : material.mediumPaperMm, flute : { pitchMm : material.flutePitchMm, axisRadians : material.fluteDirectionDegrees * Math.PI / 180, heightMm : t - material.outsideLinerMm - material.insideLinerMm }, scoreWidthMm : material.scoreWidthMm }; }
     rig.presentationMeshes = meshes.map ((mesh, i) => BoardAppearanceMesh (mesh, profile, panels[i].solid.vertices.slice (0, panels[i].solid.vertices.length / 2)));
+    rig.presentationMeshes = TrimScoreDisplay (rig);
     rig.visualMeshes = CreaseVisualMeshes (rig, { matrices : panels.map (() => new THREE.Matrix4 ().toArray ()) }); return rig;
 }
 

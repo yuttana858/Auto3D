@@ -1,7 +1,12 @@
+// One phase convention for exposed-edge maps and actual medium specimens.
+export function FlutePhaseAt (x, y, pitchMm, axisRadians, phaseRadians = 0)
+{
+    return (-Math.sin (axisRadians) * x + Math.cos (axisRadians) * y) * 2 * Math.PI / pitchMm + phaseRadians;
+}
 export function VisualBoardSpecification (profile)
 {
     const board = profile.engineering?.materials.find (m => m.id === profile.engineering.activeMaterialId);
-    return { pitchMm : board?.flutePitchMm || 7.7, directionDegrees : board?.fluteDirectionDegrees ?? 90, caliperMm : profile.thickness };
+    return { pitchMm : board?.flutePitchMm || 7.7, directionDegrees : board?.fluteDirectionDegrees ?? 90, caliperMm : profile.thickness, outsideLinerMm : board?.outsideLinerMm ?? profile.thickness * .08, insideLinerMm : board?.insideLinerMm ?? profile.thickness * .08, mediumPaperMm : board?.mediumPaperMm ?? profile.thickness * .06 };
 }
 export function ExposedEdgeUV (x, y, depth, board)
 {

@@ -1,3 +1,5 @@
+import { BoardMaterials } from './material.js';
+import { FlutePhaseAt } from './flutemapping.js';
 // Corrugated layer stack and score-strip sampling. All dimensions are millimetres.
 // This is a visual/kinematic model, NOT calibrated crease mechanics.
 export function ValidateBoardStack (input)
@@ -19,7 +21,7 @@ export function FluteWaveAt (board, x, y)
 {
     const { flute } = board;
     const crossFlute = -Math.sin (flute.axisRadians) * x + Math.cos (flute.axisRadians) * y;
-    const phase = crossFlute * 2 * Math.PI / flute.pitchMm + flute.phaseRadians;
+    const phase = FlutePhaseAt (x, y, flute.pitchMm, flute.axisRadians, flute.phaseRadians);
     return { phase, normalizedHeight : Math.cos (phase), crossFluteMm : crossFlute };
 }
 
@@ -108,10 +110,11 @@ export function CreateCorrugatedSample (options = {})
     const amplitude = (outer - inner - mediumPaperMm) / 2;
     const flute = { pitchMm : flutePitchMm, heightMm : outer - inner, axisRadians : fluteAxisRadians, phaseRadians : 0 };
     const board = { flute };
+    const paperMaterials = BoardMaterials ({ caliperMm, outsideLinerMm, insideLinerMm, mediumPaperMm, pitchMm : flutePitchMm, directionDegrees : fluteAxisRadians * 180 / Math.PI });
     const materialDefinitions = [
-        { role : 'outside-liner', name : 'Outside liner', color : [204, 174, 131], roughness : 0.92, metalness : 0 },
-        { role : 'fluted-medium', name : 'Directional corrugating medium', color : [171, 133, 84], roughness : 0.98, metalness : 0 },
-        { role : 'inside-liner', name : 'Inside liner', color : [197, 165, 120], roughness : 0.94, metalness : 0 }
+        { ...paperMaterials[0], role : 'outside-liner', name : 'Outside liner', color : [204, 174, 131], roughness : 0.92, metalness : 0 },
+        { ...paperMaterials[2], role : 'fluted-medium', name : 'Directional corrugating medium', color : [171, 133, 84], roughness : 0.98, metalness : 0 },
+        { ...paperMaterials[2], role : 'inside-liner', name : 'Inside liner', color : [197, 165, 120], roughness : 0.94, metalness : 0 }
     ];
     const meshes = [];
     const addLayer = (name, material, elevation) => {
@@ -126,20 +129,26 @@ export function CreateCorrugatedSample (options = {})
                 const [low, high] = elevation (x, z);
                 for (const y of [low, high]) {
                     data.vertices.push ([x, y, -z]);
-                    data.uvs.push ([x / widthMm, z / lengthMm]);
+                    data.uvs.push ([x / 50, z / 50]);
                 }
             }
         }
-        const face = (a, b, c) => {
+        const face = (a, b, c, cap = false) => {
             const p = data.vertices[a], q = data.vertices[b], r = data.vertices[c];
             const u = q.map ((v, i) => v - p[i]), v = r.map ((n, i) => n - p[i]);
             const cross = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
             const length = Math.hypot (...cross) || 1;
             const index = data.normals.length;
             for (let i = 0; i < 3; i++) { data.normals.push (cross.map (value => value / length)); }
-            data.triangles.push ({ vertices : [a, b, c], normals : [index, index + 1, index + 2], uvs : [a, b, c], material });
+            let uvs = [a, b, c];
+            if (cap) {
+                // Cut paper has its own through-thickness coordinates instead
+                // of collapsing both paper faces onto one line in UV space.
+                uvs = [a, b, c].map (id => { const point = data.vertices[id], uv = data.uvs.length; data.uvs.push ([(Math.abs (cross[0]) > Math.abs (cross[2]) ? -point[2] : point[0]) / 50, point[1] / 50]); return uv; });
+            }
+            data.triangles.push ({ vertices : [a, b, c], normals : [index, index + 1, index + 2], uvs, material });
         };
-        const quad = (a, b, c, d) => { face (a, b, c); face (a, c, d); };
+        const quad = (a, b, c, d, cap = false) => { face (a, b, c, cap); face (a, c, d, cap); };
         for (let j = 0; j < samplesAlong; j++) {
             for (let i = 0; i < samplesAcross; i++) {
                 const a = index (i, j, 1), b = index (i + 1, j, 1), c = index (i + 1, j + 1, 1), d = index (i, j + 1, 1);
@@ -148,12 +157,12 @@ export function CreateCorrugatedSample (options = {})
             }
         }
         for (let i = 0; i < samplesAcross; i++) {
-            quad (index (i, 0, 0), index (i, 0, 1), index (i + 1, 0, 1), index (i + 1, 0, 0));
-            quad (index (i + 1, samplesAlong, 0), index (i + 1, samplesAlong, 1), index (i, samplesAlong, 1), index (i, samplesAlong, 0));
+            quad (index (i, 0, 0), index (i, 0, 1), index (i + 1, 0, 1), index (i + 1, 0, 0), true);
+            quad (index (i + 1, samplesAlong, 0), index (i + 1, samplesAlong, 1), index (i, samplesAlong, 1), index (i, samplesAlong, 0), true);
         }
         for (let j = 0; j < samplesAlong; j++) {
-            quad (index (0, j + 1, 0), index (0, j + 1, 1), index (0, j, 1), index (0, j, 0));
-            quad (index (samplesAcross, j, 0), index (samplesAcross, j, 1), index (samplesAcross, j + 1, 1), index (samplesAcross, j + 1, 0));
+            quad (index (0, j + 1, 0), index (0, j + 1, 1), index (0, j, 1), index (0, j, 0), true);
+            quad (index (samplesAcross, j, 0), index (samplesAcross, j, 1), index (samplesAcross, j + 1, 1), index (samplesAcross, j + 1, 0), true);
         }
         meshes.push (data);
     };

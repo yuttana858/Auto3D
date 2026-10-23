@@ -1,3 +1,4 @@
+import { FoldScorePairs, ScoreBandTrim } from '../src/scorebands.js';
 import { CreateBoard } from '../src/geometry.js';
 import assert from 'node:assert/strict';
 import { CreateFefcoFoldRig, FefcoFoldFrame } from '../src/folding.js';
@@ -15,9 +16,9 @@ describe ('Realistic board appearance independent of CAD', () => {
         for (const progress of [0, .23, .72, 1]) { const frame = FefcoFoldFrame (rig, progress); assert.ok (frame.presentationMeshes[0].normals.every (n => Math.abs (Math.hypot (...n) - 1) < 1e-8)); }
         assert.equal (JSON.stringify (rig.meshes), canonical); assert.equal (JSON.stringify (profile), original); assert.equal (ExportPackagingSVG (profile), svg);
     });
-    it ('Pins shared score faces and compresses only free cut boundaries', () => {
+    it ('Pins the trimmed score-band faces and compresses only free cut boundaries', () => {
         const p = { length : 100, width : 80, height : 60 }; const profile = { ...FefcoProfile (p), appearance : { panelBow : 0, cutCompression : 1 } }; const rig = CreateFefcoFoldRig (p, profile);
-        const wall = rig.presentationMeshes[0]; const faceVertices = new Set (wall.triangles.filter (triangle => triangle.material !== 1).flatMap (triangle => triangle.vertices)); const atScore = wall.vertices.filter ((v, index) => faceVertices.has (index) && Math.abs (v[0] - 100) < 1e-7 && Math.abs (v[2] + 30) < 1e-7); assert.ok (atScore.length); assert.ok (atScore.every (v => v[1] === 0 || Math.abs (v[1] - 3) < 1e-8));
+        const wall = rig.presentationMeshes[0]; const faceVertices = new Set (wall.triangles.filter (triangle => triangle.material !== 1).flatMap (triangle => triangle.vertices)); const atScore = wall.vertices.filter ((v, index) => faceVertices.has (index) && Math.abs (v[0] - (100 - ScoreBandTrim (rig, FoldScorePairs (rig)[0]))) < 1e-7 && Math.abs (v[2] + 30) < 25); assert.ok (atScore.length); assert.ok (atScore.every (v => v[1] === 0 || Math.abs (v[1] - 3) < 1e-8));
         const flapIndex = rig.panels.findIndex (p => p.kind === 'base'); const flap = rig.presentationMeshes[flapIndex]; const minZ = Math.min (...flap.vertices.map (p => p[2]));
         const maxZ = Math.max (...flap.vertices.map (p => p[2])); const cutZ = Math.abs (minZ) > Math.abs (maxZ) ? minZ : maxZ;
         assert.ok (flap.vertices.some (v => Math.abs (v[2] - cutZ) < 1e-8 && v[1] > 0 && v[1] < 3));

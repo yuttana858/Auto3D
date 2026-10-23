@@ -33,7 +33,7 @@ describe ('Local surface texture generation', () => {
     });
     it ('Provides every board map with restrained matte nonmetallic defaults and independent mapping definitions', () => {
         const a = BoardMaterials (); const b = BoardMaterials ();
-        for (const material of a) { for (const key of ['diffuseMap', 'roughnessMap', 'metalnessMap', 'normalMap', 'bumpMap', 'specularMap', 'aoMap', 'displacementMap']) { assert.equal (Pixels (material[key]).width, 128); } assert.equal (material.metalness, 0); assert.equal (material.displacementScale, 0); assert.ok (material.roughness >= .9); }
+        for (const material of a) { for (const key of ['diffuseMap', 'roughnessMap', 'metalnessMap', 'normalMap', 'bumpMap', 'specularMap', 'aoMap', 'displacementMap']) { assert.equal (Pixels (material[key]).width, material.role === 'edge' && key === 'diffuseMap' ? 512 : 256); } assert.equal (material.metalness, 0); assert.equal (material.displacementScale, 0); assert.ok (material.roughness >= .9); }
         a[0].normalMap.name = 'changed.png'; assert.notEqual (b[0].normalMap.name, a[0].normalMap.name);
     });
 });
