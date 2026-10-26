@@ -1,6 +1,6 @@
 # Project orientation
 
-Read `docs/project-status.md` for the current release, development log, validation and outstanding work, then `docs/agent-project-overview.md` for architecture and data flows. Production uses Cloudflare Pages Functions, private R2, Supabase account metadata and temporary approved-account sign-in; Microsoft Entra ID remains future work. Current main includes merged PR #37 (Auto3D 0.37.0 / Packaging 1.7.0). The stability release candidate in PR #38 is Auto3D v0.37.1 with Packaging module v1.7.1; report both versions and the PR number for every new PR. Read `docs/pr16-reconciliation.md` before changing legacy published Library storage. Historical SQL in `database/history/pr16/` must not be replayed.
+Read `docs/project-status.md` for the current release, development log, validation and outstanding work, then `docs/agent-project-overview.md` for architecture and data flows. Production uses Cloudflare Pages Functions, private R2, Supabase account metadata and temporary approved-account sign-in; Microsoft Entra ID remains future work. Current main includes merged PR #40 (Auto3D 0.37.2 / Packaging 1.7.1). The corrugate texture release candidate in PR #41 is Auto3D 0.37.3 with Packaging 1.7.2; report both versions and the PR number for every new PR. Read `docs/pr16-reconciliation.md` before changing legacy published Library storage. Historical SQL in `database/history/pr16/` must not be replayed.
 
 # Agent-accessible features
 

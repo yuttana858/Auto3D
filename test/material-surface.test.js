@@ -100,7 +100,7 @@ describe ('Editable generated surface maps', () => {
         const { panel, editor } = Panel (); const doc = new SceneDocument (); const object = doc.AddImported (await CreateFefcoModel ({}), 'Generated object'); editor.document = doc; panel.website.model = doc.model;
         for (const material of doc.model.materials) { material.normalMap = null; }
         panel.AllEntries = () => doc.model.materials.map ((original, index) => ({ original, index, meshes : [], material : new THREE.MeshPhysicalMaterial () }));
-        const result = await AutoGenerateTextures (panel, { objectId : object.id }); assert.equal (result.generated, true); assert.equal (result.materials.length, 4); assert.equal (editor.history.undo.length, 1); assert.ok (doc.model.materials.every (m => m.normalMap));
+        const result = await AutoGenerateTextures (panel, { objectId : object.id }); assert.equal (result.generated, true); assert.equal (result.materials.length, 3); assert.equal (editor.history.undo.length, 1); assert.ok (doc.model.materials.slice (0, 3).every (m => m.normalMap)); assert.equal (doc.model.materials[3].normalMap, null);
         await editor.history.Undo (); assert.ok (doc.model.materials.every (m => !m.normalMap));
     });
     it ('Retains solid material tint, rejects stale-account results and rolls back renderer failures', async () => {

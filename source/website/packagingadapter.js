@@ -45,6 +45,15 @@ export function PackagingModel (data, unit = Unit.Millimeter, surfaces = {})
         if (surfaces[definition.role]) {
             const material = CloneSurface (surfaces[definition.role]); material.boardSurfaceRole = definition.role;
             if (material.boardFluteLinked) { for (const key of ['normalMap', 'bumpMap']) { if (definition[key]) { material[key] = PackagingTexture (definition[key]); } } }
+            // Rebuild recognized default edge pixels when measured paper layers
+            // change, retaining authored maps and all existing UV adjustments.
+            if (definition.role === 'edge') {
+                for (const [key, map] of Object.entries (definition)) {
+                    const previous = material[key];
+                    if (!key.endsWith ('Map') || !map || previous?.name !== map.name || !/^corrugated-edge(?:-[a-z]+)?\.png$/.test (previous.name)) { continue; }
+                    material[key] = PackagingTexture ({ ...map, offset : previous.offset, scale : previous.scale, rotation : previous.rotation });
+                }
+            }
             model.AddMaterial (material); continue;
         }
         const material = new PhysicalMaterial (); material.name = definition.name; material.color = new RGBColor (...definition.color);
