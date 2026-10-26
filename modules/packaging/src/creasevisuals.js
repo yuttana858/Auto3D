@@ -58,6 +58,12 @@ export function CreaseVisualMeshes (rig, pose)
         const face = (a, b, c, cap = false) => {
             let flat;
             if (cap) { flat = axis.clone ().multiplyScalar (a % 4 < 2 ? -1 : 1).toArray (); }
+            // Top and glue-tab rails can reverse the surface winding. Keep
+            // geometric orientation aligned with the outward shading normal
+            // so DoubleSide does not invert otherwise correct liner lighting.
+            const normal = cap ? new Vector3 (...flat) : [a, b, c].reduce ((sum, id) => sum.add (new Vector3 (...surfaceNormals[id])), new Vector3 ());
+            const va = new Vector3 (...mesh.vertices[a]), vb = new Vector3 (...mesh.vertices[b]), vc = new Vector3 (...mesh.vertices[c]);
+            if (vb.sub (va).cross (vc.sub (va)).dot (normal) < 0) { [b, c] = [c, b]; }
             const start = mesh.normals.length;
             for (const index of [a, b, c]) { mesh.normals.push (cap ? flat : surfaceNormals[index]); }
             let uvs = [a, b, c];
