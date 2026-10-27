@@ -241,10 +241,12 @@ export class SessionEditor
         this.strip = Element ('div', 'scene_tools', undefined, this.website.parameters.rightContainerDiv); this.strip.setAttribute ('role', 'toolbar'); this.strip.setAttribute ('aria-label', 'Object tools');
         this.processing = new ProcessingFeedback ();
         const stripHidden = new Set (['visible', 'remove', 'library', 'save', 'export', 'add']);
+        const moduleTools = Element ('div', 'scene_module_tools', undefined, this.strip); moduleTools.setAttribute ('role', 'group'); moduleTools.setAttribute ('aria-label', 'Generation modules');
+        const historyTools = Element ('div', 'session_history_tools', undefined, document.getElementById ('toolbar')); historyTools.setAttribute ('role', 'group'); historyTools.setAttribute ('aria-label', 'Edit history'); document.getElementById ('toolbar').prepend (historyTools);
         const tools = this.ModelTools ().filter (([key]) => !stripHidden.has (key));
         for (const [key, label, action] of tools) {
-            const button = Element ('button', 'scene_tool', undefined, this.strip); button.title = label; button.setAttribute ('aria-label', label); button.innerHTML = '<svg viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">' + Icons[key] + '</svg>';
-            button.addEventListener ('click', () => this.Run (action)); this.buttons.set (key, button);
+            const button = Element ('button', 'scene_tool', undefined, ['ai', 'packaging'].includes (key) ? moduleTools : ['undo', 'redo'].includes (key) ? historyTools : this.strip); button.title = label; button.setAttribute ('aria-label', label); button.innerHTML = '<svg viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">' + Icons[key] + '</svg>';
+            button.addEventListener ('click', async () => { if (['undo', 'redo'].includes (key)) { button.setAttribute ('aria-busy', 'true'); button.disabled = true; try { await this.Run (action); } finally { button.removeAttribute ('aria-busy'); this.RefreshButtons (); } } else { await this.Run (action); } }); this.buttons.set (key, button);
         }
         this.transformPanel = Element ('div', 'scene_transform_panel', undefined, this.website.parameters.viewerDiv); this.transformPanel.hidden = true;
         Element ('strong', null, 'Object transform', this.transformPanel); this.inputs = [];
@@ -663,7 +665,7 @@ export class SessionEditor
         this.processing?.Sync (this.busy && !this.packaging?.foldOperation && !this.packaging?.dimensionUpdating && this.arrayOperation?.stage !== 'revealing' && !this.website?.rendering?.running); this.commandBar?.SetBusy (this.busy);
         this.website?.packagingPanel?.fefcoPanel?.SetDisabled ();
         for (const [key, button] of this.buttons) {
-            button.disabled = this.ToolDisabled (key);
+            button.disabled = this.ToolDisabled (key) || button.hasAttribute?.('aria-busy') === true;
             if (['select', 'move', 'rotate', 'scale'].includes (key)) { button.setAttribute ('aria-pressed', String ((key === 'move' ? 'translate' : key) === this.mode)); }
         }
         const groupButtons = this.objectList?.querySelectorAll ('.selection_group_tools button');

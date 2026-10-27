@@ -90,3 +90,7 @@ Auto3D exposes the controls under Packaging Designer → Measurement layer. The 
 ## Realistic board surfaces in v1.7.0
 
 Optional presentation meshes add restrained panel bowing, score fillets and compressed cut shoulders without modifying CAD or collision meshes. Four independent outer/inner/exposed/wrapped material roles use seamless procedural textures and global flute registration. The neutral panel exposes saved visual controls; Auto3D adds timeline Actions, texture effect controls and strict shared commands. See [board-surface-appearance.md](../../docs/board-surface-appearance.md). API v1 remains compatible.
+
+### State-aware fold control (1.9.1)
+
+`FefcoPanel` uses `animation().action` to label the idle Fold/Unfold button and `playback().state` for Pause/Resume. A host may supply `toggleFold()` to own the shared state-aware action and `playbackBlocked()` to report authentication/read-only restrictions separately from ordinary busy state. Existing hosts without `toggleFold()` use `run(animate)` when idle and `control('pause'/'resume')` during playback. The host's control service must enforce its own editing permissions. Idle playback status/progress/cancel UI is hidden; manufacturing and CAD state remain host-owned.

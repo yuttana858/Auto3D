@@ -29,23 +29,20 @@ export class FefcoPanel
         Element ('strong', root, 'FEFCO catalog');
         const family = Element ('label', root, 'Box family', 'fefco_field'); const select = Element ('select', family); select.setAttribute ('aria-label', 'FEFCO box family');
         for (const item of FefcoFamilies) { const option = new Option (item.id + ' · ' + item.name + (item.available ? '' : ' · coming later'), item.id); option.disabled = !item.available; select.add (option); } select.value = '02';
-        Element ('p', root, '0200 series · first set', 'section_hint');
         Element ('strong', root, 'Box Dimensions');
-        Element ('p', root, 'Enter dimensions, then click a box below to generate it.', 'section_hint');
         const dimensions = Element ('div', root, undefined, 'fefco_dimension_row');
         for (const [key, text, value] of [['width', 'Width (W)', '300'], ['length', 'Length (L)', '400'], ['height', 'Height (H)', '250'], ['overlap', 'Flap overlap', '25']]) {
             const label = Element ('label', key === 'overlap' ? root : dimensions, text, 'fefco_field'); const input = Element ('input', label); input.type = 'number'; input.step = 'any'; input.value = value; input.required = true; input.setAttribute ('aria-label', 'FEFCO ' + text); this.fields.set (key, { label, input }); this.controls.push (input);
             input.addEventListener ('input', () => this.draftDirty.add (key));
         }
         this.newBoardSelect = this.CreateBoardSelector (root, 'Board', 'generation');
-        this.units = Element ('p', root, undefined, 'section_hint');
-        this.closureLabel = Element ('label', root, 'Top flaps', 'fefco_field'); this.closure = Element ('select', this.closureLabel); this.closure.setAttribute ('aria-label', 'FEFCO top flaps'); this.closure.add (new Option ('Open · show inside', 'open')); this.closure.add (new Option ('Closed · shipping box', 'closed')); this.controls.push (this.closure);
+        this.closureLabel = Element ('label', root, undefined, 'fefco_field'); this.closure = Element ('select', this.closureLabel); this.closure.setAttribute ('aria-label', 'FEFCO top flaps'); this.closure.add (new Option ('Open · show inside', 'open')); this.closure.add (new Option ('Closed · shipping box', 'closed')); this.controls.push (this.closure);
         this.closure.addEventListener ('change', () => this.draftDirty.add ('closure'));
         const grid = Element ('div', root, undefined, 'fefco_cards');
         for (const style of FefcoStyles) {
             const button = Element ('button', grid, undefined, 'fefco_card'); button.type = 'button'; button.setAttribute ('aria-label', 'FEFCO ' + style.code + ' ' + style.acronym); button.title = style.description;
             const image = Element ('img', button); image.alt = ''; image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent (FefcoThumbnail (style.code)); image.width = 176; image.height = 140;
-            Element ('strong', button, style.code + ' · ' + style.acronym); Element ('span', button, style.name); Element ('small', button, style.category + (style.priority ? ' · Priority' : ''));
+            Element ('strong', button, style.code + ' · ' + style.acronym); Element ('span', button, style.name);
             button.addEventListener ('click', () => this.RunGeneration (async () => {
                 const changes = this.DraftParameters ();
                 let result;
@@ -54,7 +51,6 @@ export class FefcoPanel
             })); this.cards.set (style.code, button); this.controls.push (button);
         }
         this.generationStatus = Element ('p', root, '', 'section_hint'); this.generationStatus.setAttribute ('role', 'status'); this.generationStatus.setAttribute ('aria-live', 'polite');
-        this.description = Element ('p', root, undefined, 'section_hint');
         this.appearanceControls = new Map ();
         const appearance = Element ('details', root, undefined, 'board_appearance'); Element ('summary', appearance, 'Realistic board surface');
         Element ('p', appearance, 'Visual bowing, soft scores and compressed cut edges. CAD dimensions stay exact.', 'section_hint');
@@ -65,15 +61,12 @@ export class FefcoPanel
         const scrubLabel = Element ('label', root, 'Fold / unfold', 'fold_scrub'); this.foldScrub = Element ('input', scrubLabel); this.foldScrub.type = 'range'; this.foldScrub.min = '0'; this.foldScrub.max = '1'; this.foldScrub.step = '0.005'; this.foldScrub.value = '1'; this.foldScrub.setAttribute ('aria-label', 'Fold / unfold position'); this.controls.push (this.foldScrub);
         const scrub = commit => { if (!workspace.scrub) { return; } Promise.resolve (workspace.scrub (Number (this.foldScrub.value), commit)).catch (error => { this.foldStatus.textContent = error.message; }); };
         this.foldScrub.addEventListener ('input', () => scrub (false)); this.foldScrub.addEventListener ('change', () => scrub (true));
-        this.animate = Element ('button', root, 'Animate', 'fefco_animate'); this.animate.type = 'button'; this.controls.push (this.animate); this.animate.addEventListener ('click', () => workspace.run (() => workspace.animate ()));
+        this.animate = Element ('button', root, 'Unfold', 'fefco_animate'); this.animate.type = 'button'; this.controls.push (this.animate); this.animate.addEventListener ('click', () => { const state = workspace.playback?.().state; const action = workspace.toggleFold ? () => workspace.toggleFold () : () => state === 'playing' ? workspace.control ('pause') : state === 'paused' ? workspace.control ('resume') : workspace.run (() => workspace.animate ()); Promise.resolve ().then (action).catch (error => { this.generationStatus.textContent = 'Cannot fold: ' + error.message; }).finally (() => this.SetDisabled ()); });
         if (workspace.designer) { this.designer = Element ('button', root, 'View dieline in CAD', 'fefco_animate'); this.designer.type = 'button'; this.controls.push (this.designer); this.designer.addEventListener ('click', () => workspace.run (() => workspace.designer ())); }
-        Element ('p', root, 'Animate unfolds the selected box to its saved CAD dieline. Click again to assemble it. Board surfaces are checked before playback; overlapping flaps fold in separate layers.', 'section_hint');
-        const playback = Element ('div', root, undefined, 'fefco_playback');
+        const playback = Element ('div', root, undefined, 'fefco_playback'); this.playback = playback;
         this.foldStatus = Element ('p', playback, 'Select a box or dieline to animate.', 'section_hint'); this.foldStatus.setAttribute ('role', 'status');
         this.foldProgress = Element ('progress', playback); this.foldProgress.max = 1; this.foldProgress.value = 0; this.foldProgress.setAttribute ('aria-label', 'Box folding progress');
-        this.pause = Element ('button', playback, 'Pause folding'); this.pause.type = 'button'; this.pause.addEventListener ('click', () => { try { workspace.control (workspace.playback ().state === 'paused' ? 'resume' : 'pause'); } catch (error) { this.foldStatus.textContent = error.message; } });
         this.cancel = Element ('button', playback, 'Cancel folding'); this.cancel.type = 'button'; this.cancel.addEventListener ('click', () => { try { workspace.control ('cancel'); } catch (error) { this.foldStatus.textContent = error.message; } });
-        Element ('p', root, 'Kraft board, folded flaps and exposed corrugated edges. The generated profile replaces the current drawing. Dielines are design previews; verify production allowances with your converter.', 'section_hint');
         const source = Element ('a', root, 'FEFCO reference · 12th edition', 'fefco_reference'); source.href = FefcoSource; source.target = '_blank'; source.rel = 'noopener noreferrer'; this.Refresh ();
     }
     BoardRecords () { return this.host.boards?.().records || this.localBoardRecords || DefaultBoardDatabase (); }
@@ -107,7 +100,7 @@ export class FefcoPanel
     Refresh ()
     {
         const data = this.host.inspect (); const factor = this.host.factor (); const style = FefcoStyles.find (item => item.code === data.code);
-        this.description.textContent = style.description; this.units.textContent = 'W × L × H in ' + (factor === 25.4 ? 'inches' : 'mm') + ' · CAD score-to-score spans';
+        this.root.title = 'Dimensions use ' + (factor === 25.4 ? 'inches' : 'mm') + ' · CAD score-to-score spans';
         for (const [key, field] of this.fields) { if (!this.draftDirty.has (key)) { field.input.value = String (Number ((data[key] / factor).toFixed (6))); } else if (this.draftFactor && this.draftFactor !== factor && Number.isFinite (field.input.valueAsNumber)) { field.input.value = String (Number ((field.input.valueAsNumber * this.draftFactor / factor).toFixed (6))); } field.input.min = String ((key === 'thickness' ? 0.5 : key === 'overlap' ? 0 : 20) / factor); field.input.max = String ((key === 'thickness' ? 15 : 10000) / factor); }
         this.fields.get ('overlap').label.hidden = data.code !== '0202'; this.closureLabel.hidden = data.code === '0200'; if (!this.draftDirty.has ('closure')) { this.closure.value = data.closure; } this.draftFactor = factor;
         for (const [code, button] of this.cards) { button.setAttribute ('aria-pressed', String (code === data.code)); }
@@ -128,6 +121,16 @@ export class FefcoPanel
         this.dimensionMode.disabled = !data || this.host.dimensionsBlocked ();
     }
     RefreshAppearance () { const state = this.host.appearance?.(); for (const [key, input] of this.appearanceControls || []) { input.disabled = this.generating || this.host.blocked () || !state?.available || !this.host.updateAppearance; if (key === 'enabled') { input.checked = state?.settings.enabled ?? true; } else { input.value = String (state?.settings[key] ?? 0); } } }
-    RefreshPlayback () { this.RefreshAppearance (); const scrub = this.host.scrubInspect?.(); if (this.foldScrub) { this.foldScrub.disabled = this.generating || this.host.blocked () || !this.host.scrub || !scrub?.available; if (document.activeElement !== this.foldScrub) { this.foldScrub.value = String (scrub?.progress ?? 1); } } const state = this.host.playback?.() || { state : 'idle', progress : 0 }; const active = ['playing', 'paused'].includes (state.state); this.pause.disabled = this.cancel.disabled = !active; this.pause.textContent = state.state === 'paused' ? 'Resume folding' : 'Pause folding'; this.foldProgress.value = state.progress || 0; this.foldStatus.textContent = state.state === 'idle' ? 'Select a box or dieline to animate.' : state.state + ' · ' + (state.stage || 'folding') + ' · ' + Math.round ((state.progress || 0) * 100) + '%'; }
+    RefreshPlayback ()
+    {
+        this.RefreshAppearance (); const scrub = this.host.scrubInspect?.();
+        if (this.foldScrub) { this.foldScrub.disabled = this.generating || this.host.blocked () || !this.host.scrub || !scrub?.available; if (document.activeElement !== this.foldScrub) { this.foldScrub.value = String (scrub?.progress ?? 1); } }
+        const state = this.host.playback?.() || { state : 'idle', progress : 0 }; const active = ['playing', 'paused'].includes (state.state); const preparing = ['preparing', 'finishing', 'cancelling', 'restoring'].includes (state.state);
+        this.playback.hidden = !active && !preparing; this.cancel.disabled = !active; this.foldProgress.value = state.progress || 0;
+        this.foldStatus.textContent = active || preparing ? state.state + ' · ' + (state.stage || 'folding') + ' · ' + Math.round ((state.progress || 0) * 100) + '%' : '';
+        const action = this.host.animation?.()?.action; this.animate.textContent = state.state === 'playing' ? 'Pause' : state.state === 'paused' ? 'Resume' : preparing ? 'Preparing…' : action === 'fold' ? 'Fold' : 'Unfold';
+        this.animate.disabled = this.generating || (active ? !!this.host.playbackBlocked?.() : this.host.blocked () || !this.host.canAnimate?.()) || preparing;
+        this.animate.title = active ? (state.state === 'paused' ? 'Resume folding animation' : 'Pause folding animation') : this.host.animation?.()?.stages.join (' → ') || 'Select a box to fold or unfold';
+    }
     SetDisabled () { const blocked = this.generating || this.host.blocked (); for (const control of this.controls) { control.disabled = blocked; } this.animate.disabled = blocked || !this.host.canAnimate?.(); if (this.designer) { this.designer.disabled = blocked || !this.host.canAnimate?.(); } this.animate.title = this.host.animation?.()?.stages.join (' → ') || 'Animate selected box or dieline'; this.RefreshDimensions (); this.RefreshPlayback (); }
 }
