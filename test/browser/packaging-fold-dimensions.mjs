@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { AppVersion } from '../../source/website/preferences.js';
 import { chromium } from 'playwright-core';
 import { PNG } from 'pngjs';
 const browser = await chromium.launch ({ executablePath : '/usr/bin/chromium', args : ['--no-sandbox', '--enable-unsafe-swiftshader'] });
@@ -12,7 +13,7 @@ try {
     const call = async (id, args = {}) => { const result = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (result.ok, true, JSON.stringify (result)); return result.result; };
     await page.goto (process.env.AUTO3D_TEST_URL || 'http://127.0.0.1:8080/website/index.html'); await ready ();
     const brightness = async () => { const png = PNG.sync.read (await page.locator ('#viewer').screenshot ()); const values = []; for (let y = 0.15; y < 0.7; y += 0.1) { for (let x = 0.2; x < 0.8; x += 0.1) { const at = (Math.floor (png.height * y) * png.width + Math.floor (png.width * x)) * 4; values.push ((png.data[at] + png.data[at + 1] + png.data[at + 2]) / 3); } } return values.sort ((a, b) => a - b)[Math.floor (values.length / 2)]; };
-    assert.equal ((await call ('app.version.inspect')).version, '0.36.0'); assert.equal ((await call ('preferences.inspect')).theme, 'dark'); assert.equal ((await call ('preferences.viewport.inspect')).view.backgroundPreset, 'standard'); assert.ok (await brightness () < 70, 'Actual viewer pixels must be dark');
+    assert.equal ((await call ('app.version.inspect')).version, AppVersion); assert.equal ((await call ('preferences.inspect')).theme, 'dark'); assert.equal ((await call ('preferences.viewport.inspect')).view.backgroundPreset, 'standard'); assert.ok (await brightness () < 70, 'Actual viewer pixels must be dark');
     await page.reload (); await ready (); assert.ok (await brightness () < 70); await page.screenshot ({ path : 'work/dark-startup-fixed.png' }); console.log ('Dark UI with a saved Light background now renders a dark viewer on startup and reload.');
     preferences = { theme : 2, view : { backgroundPreset : 'custom', horizonGradient : false, backgroundColor : [235, 230, 225, 255] } }; await page.reload (); await ready (); assert.equal ((await call ('preferences.viewport.inspect')).view.backgroundPreset, 'custom'); assert.ok (await brightness () > 180, 'Saved custom color must stay chosen');
     preferences = { theme : 2, view : { backgroundPreset : 'light' } }; await page.reload (); await ready (); await call ('ui.ai.packaging');
@@ -33,6 +34,6 @@ try {
     await call ('history.undo'); assert.equal ((await call ('scene.inspect')).objects[0].id, flat.id); await call ('history.redo'); assert.equal ((await call ('scene.inspect')).objects[0].id, finished.id);
     await page.evaluate (async () => { await Auto3D.execute ('packaging.fefco.animate', { duration : 6 }); await Auto3D.execute ('packaging.fefco.playback', { action : 'pause' }); }); await page.getByRole ('button', { name : 'Cancel folding', exact : true }).click (); await page.waitForFunction (() => document.querySelector ('.scene_status')?.textContent.startsWith ('Folding cancelled')); assert.equal ((await call ('scene.inspect')).objects[0].id, finished.id);
     await call ('packaging.fefco.generate', { code : '0200' }); await call ('packaging.fefco.unfold'); await call ('packaging.fefco.animate', { duration : 1 }); await page.waitForFunction (() => document.querySelector ('.scene_status')?.textContent.startsWith ('Folding complete')); assert.equal ((await call ('packaging.fefco.playback.inspect')).stage, 'open HSC');
-    await page.setViewportSize ({ width : 390, height : 844 }); assert.equal (await page.locator ('.ai_workspace_panel').evaluate (node => node.scrollWidth <= node.clientWidth + 1), true); await page.screenshot ({ path : 'work/packaging-dimensions-mobile.png' }); assert.deepEqual (errors, []);
+    await page.setViewportSize ({ width : 390, height : 844 }); assert.equal (await page.locator ('#packaging_module_panel').evaluate (node => node.scrollWidth <= node.clientWidth + 1), true); await page.screenshot ({ path : 'work/packaging-dimensions-mobile.png' }); assert.deepEqual (errors, []);
     console.log ('Live inside/outside editing, tolerance, material-bearing model regeneration, folding stages, pause/resume/cancel, HSC, Undo/Redo and mobile passed.');
 } finally { await browser.close (); }

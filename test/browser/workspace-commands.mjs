@@ -37,16 +37,16 @@ try {
     await input.fill ('array model 99x4x6'); await input.press ('Enter'); await page.waitForFunction (() => /Array counts/.test (document.querySelector ('.scene_status')?.textContent || '')); assert.equal ((await call ('scene.inspect')).objects.length, 1);
     await call ('macro.save', { name : 'Frame model', definition : JSON.stringify ({ version : 1, steps : [{ id : 'fit', command : 'view.fit' }] }) });
     await input.fill ('run macro Frame model'); await input.press ('Enter'); await page.waitForFunction (() => document.querySelector ('.scene_status')?.textContent === 'Completed · 1 command');
-    await call ('ui.ai'); assert.equal (await page.getByRole ('tab', { name : 'AI', exact : true }).getAttribute ('aria-selected'), 'true');
+    await call ('ui.ai'); assert.equal (await page.locator ('#ai_module_panel').isVisible (), true);
     await page.locator ('.ai_connection_badge').evaluate (node => { node.textContent = 'Meshy through Auto3D with a long connection description'; });
     await page.screenshot ({ path : 'work/workspace-ai.png' });
     assert.equal (await page.locator ('.ai_workspace_panel').evaluate (node => node.scrollWidth <= node.clientWidth + 1), true);
     assert.equal (await page.locator ('.ai_connection_badge').evaluate (node => node.scrollWidth <= node.clientWidth + 1), true);
-    await page.getByRole ('tab', { name : 'Packaging', exact : true }).click (); await page.screenshot ({ path : 'work/workspace-packaging-tab.png' });
+    await call ('ui.packaging'); await page.screenshot ({ path : 'work/workspace-packaging-tab.png' });
     await page.getByRole ('button', { name : 'Open packaging designer', exact : true }).click (); await page.getByRole ('dialog').filter ({ has : page.getByText ('Packaging', { exact : true }) }).waitFor ();
     await page.keyboard.press ('Escape'); await page.locator ('.packaging_dialog').waitFor ({ state : 'detached' });
     await page.setViewportSize ({ width : 390, height : 844 }); await call ('ui.ai');
     assert.equal (await page.locator ('.ai_workspace_panel').evaluate (node => node.scrollWidth <= node.clientWidth + 1), true);
     await page.screenshot ({ path : 'work/workspace-mobile-ai.png' }); assert.deepEqual (errors, []);
-    console.log ('Clean startup, shared context tools, 4×4×6 array feedback/undo, saved macros, and desktop/mobile AI/Packaging tabs passed.');
+    console.log ('Clean startup, shared context tools, 4×4×6 array feedback/undo, saved macros, and desktop/mobile independent AI/Packaging panels passed.');
 } finally { await browser.close (); }

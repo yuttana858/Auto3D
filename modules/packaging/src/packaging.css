@@ -38,3 +38,17 @@
 
 .fold_scrub { display: grid; gap: 6px; margin: 10px 0; }
 .fold_scrub input { width: 100%; }
+
+/* Packaging module panel: host-independent content and layout. */
+.packaging_workspace { --packaging-menu-font: var(--workspace-menu-font-size, 12px); display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.packaging_workspace .fefco_catalog { font-size: var(--packaging-menu-font); }
+.packaging_workspace .fefco_field, .packaging_workspace strong, .packaging_workspace button, .packaging_workspace input, .packaging_workspace select, .packaging_workspace .fefco_card span { font-size: var(--packaging-menu-font); font-family: inherit; }
+.packaging_workspace .module_version { font-size: var(--workspace-meta-font-size, 10px); opacity: .65; }
+.packaging_workspace .section_hint { font-size: var(--workspace-help-font-size, 11px); }
+.packaging_profile_actions { display: flex; flex-direction: column; gap: 8px; }
+.packaging_profile_actions button { padding: 8px; color: inherit; border: 1px solid var(--packaging-border, var(--ov_border_color, #aaa)); border-radius: 4px; background: transparent; cursor: pointer; }
+.packaging_generator_layout, .packaging_generator_column, .packaging_selected_column { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.packaging_module_panel[data-mode="extended"] .packaging_generator_layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; }
+.packaging_workspace .fefco_catalog button { background: var(--packaging-background, var(--ov_background_color, #fff)); border: 1px solid var(--packaging-border, var(--ov_border_color, #aaa)); border-radius: 4px; padding: 8px; }
+.packaging_workspace .fefco_catalog button[aria-pressed="true"] { border-color: #bc8d52; }
+@media (max-width: 650px) { .packaging_module_panel[data-mode="extended"] .packaging_generator_layout { display: flex; } }

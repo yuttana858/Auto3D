@@ -37,6 +37,8 @@ import { AxisIndicator } from './axisindicator.js';
 import { GetBackgroundPreset, GetBackgroundGradientCSS } from '../engine/viewer/background.js';
 import { SessionEditor } from './sessioneditor.js';
 import { Preferences } from './preferences.js';
+import { ModulePanels } from './modulepanels.js';
+import { PackagingPanel } from './packagingpanel.js';
 import { AIWorkspace } from './aiworkspace.js';
 import { SceneEffects } from '../engine/viewer/sceneeffects.js';
 
@@ -243,6 +245,7 @@ export class Website
 
     InitWorkspace ()
     {
+        this.modulePanels = new ModulePanels (this);
         this.sceneEffects = new SceneEffects (this.viewer);
         this.lightingPanel = new LightingPanel (this);
         this.materialPanel = new MaterialPanel (this);
@@ -251,7 +254,7 @@ export class Website
         this.cameraPanel = new CameraPanel (this);
         this.rendering = new RenderQueue (this); this.renderingPanel = new RenderingPanel (this);
         this.preferences = new Preferences (this);
-        this.aiWorkspace = new AIWorkspace (this);
+        this.aiWorkspace = new AIWorkspace (this); this.packagingPanel = new PackagingPanel (this);
         for (const [id, setting] of [['horizon_gradient', 'horizonGradient'], ['ground_grid', 'showGroundGrid']]) {
             const checkbox = document.getElementById (id);
             checkbox.addEventListener ('change', () => {
@@ -270,29 +273,7 @@ export class Website
         const formats = document.getElementById ('supported_formats');
         if (formats) { formats.textContent = SupportedFormatsText; }
         document.getElementById ('workspace_upload').addEventListener ('click', () => this.OpenFileBrowserDialog ());
-        for (const [side, toggleId] of [['left', 'upload_panel_toggle'], ['right', 'data_panel_toggle']]) {
-            const container = side === 'left' ? this.parameters.leftContainerDiv : this.parameters.rightContainerDiv;
-            const toggle = document.getElementById (toggleId);
-            const apply = (collapsed) => {
-                container.classList.toggle ('collapsed', collapsed);
-                toggle.setAttribute ('aria-expanded', String (!collapsed));
-                toggle.setAttribute ('aria-label', (collapsed ? 'Expand ' : 'Collapse ') + (side === 'left' ? 'model upload panel' : 'model data panel'));
-                toggle.querySelector ('.panel_chevron').textContent = (side === 'left') === collapsed ? '›' : '‹';
-            };
-            apply (side !== 'left');
-            toggle.addEventListener ('click', () => {
-                const collapsed = !container.classList.contains ('collapsed');
-                if (!collapsed && window.innerWidth < 800) {
-                    const other = side === 'left' ? this.parameters.rightContainerDiv : this.parameters.leftContainerDiv;
-                    if (!other.classList.contains ('collapsed')) {
-                        document.getElementById (side === 'left' ? 'data_panel_toggle' : 'upload_panel_toggle').click ();
-                    }
-                }
-                apply (collapsed);
-                if (side === 'right' && !collapsed) { this.sessionEditor?.UpdateDetails (); }
-                this.layouter.Resize ();
-            });
-        }
+        this.modulePanels.Render ();
         this.sidebar.detailsPanel.SetCollapsed (true);
         this.sidebar.detailsPanel.contentDiv.textContent = 'Load a model to view geometry, dimensions, materials and properties.';
     }

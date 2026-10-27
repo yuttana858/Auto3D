@@ -1,0 +1,24 @@
+:root { --workspace-menu-font-size: 12px; --workspace-help-font-size: 11px; --workspace-meta-font-size: 10px; --workspace-title-font-size: 13px; }
+.module_panel_header { display: flex; align-items: center; height: 48px; min-height: 48px; border-bottom: 1px solid var(--ov_border_color); background: var(--ov_toolbar_background_color); }
+.module_panel_header .workspace_panel_toggle { flex: 1; min-width: 0; width: auto; height: 100%; border: 0; padding: 8px; gap: 4px; font-size: var(--workspace-title-font-size); }
+.module_panel_header .workspace_panel_toggle > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.module_panel_controls { display: flex; flex: 0 0 auto; gap: 2px; padding: 0 4px; }
+.module_panel_controls[hidden], .module_panel_body[hidden] { display: none !important; }
+.module_panel_controls button { display: grid; place-items: center; width: 26px; height: 28px; padding: 3px; color: var(--ov_foreground_color); background: transparent; border: 1px solid transparent; border-radius: 4px; cursor: pointer; }
+.module_panel_controls button:hover, .module_panel_controls button[aria-pressed="true"] { background: var(--ov_hover_color); border-color: var(--ov_border_color); }
+.module_panel_controls button:focus-visible { outline: 2px solid var(--ov_button_color); }
+div.workspace_panel:not(.collapsed) { flex-basis: min(320px, calc(100vw - 80px)); width: min(320px, calc(100vw - 80px)); }
+div.workspace_panel[data-panel-mode="extended"] { flex-basis: min(760px, 55vw, calc(100vw - 80px)); width: min(760px, 55vw, calc(100vw - 80px)); }
+div.workspace_panel.collapsed { flex-basis: 40px; width: 40px; }
+.module_panel_body { min-width: 0; min-height: 0; }
+.packaging_module_panel { flex: 1; margin-left: 40px; width: calc(100% - 40px); box-sizing: border-box; padding: 10px; overflow: auto; color: var(--ov_foreground_color); background: var(--ov_background_color); }
+.workspace_panel { font-size: var(--workspace-menu-font-size); }
+.workspace_panel :is(summary, label, button, input, select, textarea, strong, .ov_treeview_item_name, .ov_property_table) { font-size: var(--workspace-menu-font-size); font-family: inherit; }
+.workspace_panel .workspace_panel_toggle { font-size: var(--workspace-title-font-size); }
+.workspace_panel :is(.section_hint, .ai_status, .ai_image_name, .ai_connection_badge) { font-size: var(--workspace-help-font-size); }
+.workspace_panel .module_version { font-size: var(--workspace-meta-font-size); }
+.workspace_panel :is(.panel_chevron) { font-size: 18px; }
+.workspace_panel .scene_tool { font-size: 12px; }
+@media (max-width: 650px) { div.workspace_panel[data-panel-mode="extended"] { flex-basis: calc(100vw - 80px); width: calc(100vw - 80px); } }
+
+.workspace_panel :is(.main_sidebar, .main_navigator) { width: 100%; max-width: 100%; box-sizing: border-box; }

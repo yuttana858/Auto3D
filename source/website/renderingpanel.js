@@ -17,7 +17,7 @@ export class RenderingPanel
     }
     RevealQueue ()
     {
-        if (document.getElementById ('data_panel_toggle').getAttribute ('aria-expanded') === 'false') { document.getElementById ('data_panel_toggle').click (); }
+        this.website.modulePanels.Open ('data');
         this.website.sidebar.panelSet.ShowPanels (true); this.website.sidebar.panelSet.ShowPanel (this.website.sidebar.detailsPanel);
         this.queueRoot.open = true; this.queueRoot.scrollIntoView ({ block : 'start' });
         this.status.textContent = 'Render workspace opened on the right.';

@@ -70,7 +70,7 @@ export class PackagingWorkspace
         const object = this.editor.selected; if (!object?.userData?._auto3dFefco) { return null; }
         try { if (object.packagingProfile?.engineering) { const e = EngineeringMeasurements (object.packagingProfile); const dimensions = key => Object.fromEntries (e.dimensions.map (d => [d.id, d[key]])); return { ...FefcoDimensions (JSON.parse (object.userData._auto3dFefco)), inside : dimensions ('insideMm'), outside : dimensions ('outsideMm'), objectId : object.id, name : object.name, code : JSON.parse (object.userData._auto3dFefco).code, basis : this.dimensionBasis || 'inside', editable : false, editReason : 'Edit in Packaging Designer → Measurement layer' }; } const p = ValidateFefco (JSON.parse (object.userData._auto3dFefco)); const tolerance = Number (object.userData._auto3dFitTolerance || 0); return { ...FefcoDimensions (p, tolerance), objectId : object.id, name : object.name, code : p.code, basis : this.dimensionBasis || 'inside', editable : object.scale.every (v => Math.abs (v - 1) < 1e-6) }; } catch { return null; }
     }
-    DimensionMode (basis) { if (!['inside', 'outside'].includes (basis)) { throw new Error ('Choose inside or outside dimensions.'); } this.dimensionBasis = basis; this.editor.website.aiWorkspace?.fefcoPanel?.RefreshDimensions (); return this.DimensionsInspect (); }
+    DimensionMode (basis) { if (!['inside', 'outside'].includes (basis)) { throw new Error ('Choose inside or outside dimensions.'); } this.dimensionBasis = basis; this.editor.website.packagingPanel?.fefcoPanel?.RefreshDimensions (); return this.DimensionsInspect (); }
     async UpdateDimensions (changes, objectId = null)
     {
         this.Editable (); const editor = this.editor; const target = editor.document; const source = objectId ? target.objects.find (item => item.id === objectId) : editor.selected;
@@ -87,8 +87,8 @@ export class PackagingWorkspace
         try {
             replacement = target.AddImported (model, source.name); Object.assign (replacement, { id : source.id, source : source.source, position : [...source.position], rotation : [...source.rotation], visible : source.visible, castShadow : source.castShadow !== false, receiveShadow : source.receiveShadow !== false, packagingProfile : data.profile, userData : { ...source.userData, _auto3dFefco : JSON.stringify (parameters), _auto3dFitTolerance : String (tolerance) } });
             target.ApplyTransform (replacement); target.Remove (replacement); target.Remove (source); target.Restore (replacement, index); target.packaging = data.profile; editor.selected = replacement; await editor.Render ();
-            const apply = async forward => { target.Remove (forward ? source : replacement); target.Restore (forward ? replacement : source, index); target.packaging = forward ? data.profile : before; editor.selected = forward ? replacement : previous; await editor.Render (); this.Refresh (); editor.website.aiWorkspace?.RefreshPackaging (); };
-            editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); this.dimensionBasis = basis; this.fefco = parameters; editor.Status ('Updated box dimensions · ' + basis + ' · tolerance ±' + tolerance + ' mm'); this.Refresh (); editor.website.aiWorkspace?.RefreshPackaging ();
+            const apply = async forward => { target.Remove (forward ? source : replacement); target.Restore (forward ? replacement : source, index); target.packaging = forward ? data.profile : before; editor.selected = forward ? replacement : previous; await editor.Render (); this.Refresh (); editor.website.packagingPanel?.Refresh (); };
+            editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); this.dimensionBasis = basis; this.fefco = parameters; editor.Status ('Updated box dimensions · ' + basis + ' · tolerance ±' + tolerance + ' mm'); this.Refresh (); editor.website.packagingPanel?.Refresh ();
             return { objectId : replacement.id, basis, dimensions : FefcoDimensions (parameters, tolerance), state : flat ? 'flat' : 'folded' };
         } catch (error) { if (replacement) { target.Remove (replacement); if (!target.objects.includes (source)) { target.Restore (source, index); } target.packaging = before; editor.selected = previous; await editor.Render (); } throw error; }
         finally { this.dimensionUpdating = false; editor.busy = false; editor.RefreshButtons?.(); }
@@ -108,9 +108,9 @@ export class PackagingWorkspace
         this.presentation.manual.set (object.id, progress); await this.presentation.Prepare (object);
         if (editor.website.auth.user?.id !== owner || editor.website.accountReady === false || editor.readOnly || !editor.document.objects.includes (object)) { throw new Error ('The account or model changed while scrubbing.'); }
         if (first && editor.timeline.foldAutoFit !== false && !editor.timeline.cameraKeyframes.length) { const record = this.presentation.records.get (object.id); record.root.updateMatrixWorld (true); const sphere = record.sweep.clone ().applyMatrix4 (record.root.matrixWorld).getBoundingSphere (new Sphere ()); editor.website.viewer.FitSphereToWindow (sphere, true); }
-        this.presentation.Apply (editor.timeline.time, false); editor.UpdateSelectionBox (); editor.website.viewer.RequestRender (); editor.website.aiWorkspace?.fefcoPanel?.RefreshPlayback ();
+        this.presentation.Apply (editor.timeline.time, false); editor.UpdateSelectionBox (); editor.website.viewer.RequestRender (); editor.website.packagingPanel?.fefcoPanel?.RefreshPlayback ();
         if (commit) {
-            const before = this.scrubEdit.before; const after = String (progress); const apply = value => { if (value === undefined) { delete object.userData._auto3dFoldPreview; } else { object.userData._auto3dFoldPreview = value; } this.presentation.manual.delete (object.id); this.presentation.Apply (editor.timeline.time, false); editor.UpdateSelectionBox (); editor.website.viewer.Render (); editor.website.aiWorkspace?.fefcoPanel?.RefreshPlayback (); };
+            const before = this.scrubEdit.before; const after = String (progress); const apply = value => { if (value === undefined) { delete object.userData._auto3dFoldPreview; } else { object.userData._auto3dFoldPreview = value; } this.presentation.manual.delete (object.id); this.presentation.Apply (editor.timeline.time, false); editor.UpdateSelectionBox (); editor.website.viewer.Render (); editor.website.packagingPanel?.fefcoPanel?.RefreshPlayback (); };
             object.userData._auto3dFoldPreview = after; this.presentation.manual.delete (object.id); this.scrubEdit = null;
             if (before !== after) { editor.history.Push ({ undo : () => apply (before), redo : () => apply (after) }); } editor.MarkDirty ();
         }
@@ -138,7 +138,7 @@ export class PackagingWorkspace
         if (!this.editor.website.auth?.user || this.editor.readOnly || this.editor.website.accountReady === false) { throw new Error ('Sign in to an editable workspace.'); }
         if (!operation?.player || !['pause', 'resume', 'cancel'].includes (action)) { throw new Error ('Start a folding animation first; use pause, resume or cancel.'); }
         if (action === 'pause') { operation.player.Pause (); } else if (action === 'resume') { operation.player.Resume (); } else { operation.player.Stop (); }
-        this.editor.website.aiWorkspace?.fefcoPanel?.RefreshPlayback (); return this.FoldInspect ();
+        this.editor.website.packagingPanel?.fefcoPanel?.RefreshPlayback (); return this.FoldInspect ();
     }
     AnimationInspect () { try { const source = this.editor.selected; return source?.userData?._auto3dFefco ? FefcoAnimationPlan (JSON.parse (source.userData._auto3dFefco), source.userData._auto3dPackagingState || 'folded') : null; } catch { return null; } }
     async CheckFolds (objectId = null)
@@ -165,7 +165,7 @@ export class PackagingWorkspace
         // Audit while the original is still in the scene. Keep saving/editing
         // blocked during this preparation, and recheck account/scene on yields.
         let clearance; this.foldOperation = { source, action : plan.action, stage : 'checking surfaces' }; editor.UpdateSelectionBox?.(); editor.website.viewer?.Render (); editor.busy = true; editor.RefreshButtons?.();
-        try { clearance = await module.InspectFefcoFold (rig, async progress => { if (editor.document !== target || !target.objects.includes (source) || editor.website.auth?.user?.id !== accountId || editor.website.accountReady === false || editor.readOnly) { throw new Error ('The workspace or account changed while checking folding.'); } editor.Status ('Processing · checking fold surfaces · ' + Math.round (progress * 100) + '%'); editor.website.aiWorkspace?.fefcoPanel?.RefreshPlayback (); await new Promise (resolve => setTimeout (resolve, 0)); }); }
+        try { clearance = await module.InspectFefcoFold (rig, async progress => { if (editor.document !== target || !target.objects.includes (source) || editor.website.auth?.user?.id !== accountId || editor.website.accountReady === false || editor.readOnly) { throw new Error ('The workspace or account changed while checking folding.'); } editor.Status ('Processing · checking fold surfaces · ' + Math.round (progress * 100) + '%'); editor.website.packagingPanel?.fefcoPanel?.RefreshPlayback (); await new Promise (resolve => setTimeout (resolve, 0)); }); }
         finally { this.foldOperation = null; editor.busy = false; editor.RefreshButtons?.(); }
         this.Editable (); if (!clearance.clear) { throw new Error ('Fold blocked: ' + clearance.intersections[0].panels.join (' / ') + ' intersect.'); }
         const surfaces = FefcoSurfaces (target.CompactModel ([source], true)); const unit = target.model.GetUnit ();
@@ -197,17 +197,17 @@ export class PackagingWorkspace
                     if (operation.cameraAutoFit && cameraBefore) { const viewer = editor.website.viewer; const sphere = new Box3 ().setFromObject (preview.threeObject).getBoundingSphere (new Sphere ()); const size = viewer.GetImageSize (); viewer.SetCamera (FoldCameraFrame (cameraBefore, sphere, sweepRadius, progress, size.width / size.height, CameraBottomInset (viewer, editor.status))); }
                     else if (!operation.cameraManual && editor.timeline?.cameraKeyframes?.length) { const timeline = editor.timeline; ApplyCameraState (editor.website.viewer, timeline.CameraStateAt (timeline.rangeStart + progress * (timeline.rangeEnd - timeline.rangeStart))); }
                     else { editor.website.viewer.Render (); }
-                } else { editor.website.viewer?.Render (); } editor.Status ('Folding · ' + operation.stage + ' · ' + Math.round (progress * 100) + '%'); editor.website.aiWorkspace?.fefcoPanel?.RefreshPlayback ();
+                } else { editor.website.viewer?.Render (); } editor.Status ('Folding · ' + operation.stage + ' · ' + Math.round (progress * 100) + '%'); editor.website.packagingPanel?.fefcoPanel?.RefreshPlayback ();
             }, duration);
             // Playback controls remain accessible while ordinary editing/saving is blocked.
             operation.completion = operation.player.Start ().then (async result => {
                 if (!result.completed) { await restore (); this.lastFold = { state : 'cancelled', progress : 0, objectId : source.id }; editor.Status ('Folding cancelled · original object restored'); return; }
                 const next = { ...parameters, closure : plan.targetClosure }; const data = plan.targetState === 'flat' ? module.UnfoldFefco (next, profile) : module.CreateFefcoBox (next, profile); final = target.AddImported (PackagingModel (data, unit, surfaces), source.name.replace (/ · (Dieline|Folded|Open|Closed)$/, '') + (plan.targetState === 'flat' ? ' · Dieline' : plan.targetClosure === 'open' ? ' · Open' : ' · Closed')); assign (final, plan.targetState, data.parameters); final.source = 'FEFCO ' + parameters.code + ' ' + plan.targetState;
                 target.Remove (final); target.Remove (preview); target.Restore (final, index); target.packaging = profile; editor.selected = final; await editor.Render ();
-                const apply = async forward => { target.Remove (forward ? source : final); target.Restore (forward ? final : source, index); target.packaging = forward ? profile : before; editor.selected = forward ? final : previous; await editor.Render (true); this.Refresh (); editor.website.aiWorkspace?.RefreshPackaging (); };
+                const apply = async forward => { target.Remove (forward ? source : final); target.Restore (forward ? final : source, index); target.packaging = forward ? profile : before; editor.selected = forward ? final : previous; await editor.Render (true); this.Refresh (); editor.website.packagingPanel?.Refresh (); };
                 editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); this.lastFold = { state : 'completed', progress : 1, stage : plan.stages.at (-1), action : plan.action, objectId : final.id }; editor.Status ('Folding complete · ' + plan.stages.at (-1) + ' · Undo available');
-            }).catch (async error => { try { await restore (); } catch { /* Retain the playback error. */ } this.lastFold = { state : 'failed', progress : 0, error : error.message }; editor.website.errorLogs?.Record ('error', 'packaging-fold', error.message); editor.Status (error.message); }).finally (() => { removeCameraListeners (); this.foldOperation = null; editor.UpdateSelectionBox?.(); editor.busy = false; editor.RefreshButtons?.(); this.Refresh (); editor.website.aiWorkspace?.RefreshPackaging (); });
-            editor.website.aiWorkspace?.fefcoPanel?.RefreshPlayback (); return { started : true, objectId : source.id, duration, action : plan.action, stages : plan.stages, clearance };
+            }).catch (async error => { try { await restore (); } catch { /* Retain the playback error. */ } this.lastFold = { state : 'failed', progress : 0, error : error.message }; editor.website.errorLogs?.Record ('error', 'packaging-fold', error.message); editor.Status (error.message); }).finally (() => { removeCameraListeners (); this.foldOperation = null; editor.UpdateSelectionBox?.(); editor.busy = false; editor.RefreshButtons?.(); this.Refresh (); editor.website.packagingPanel?.Refresh (); });
+            editor.website.packagingPanel?.fefcoPanel?.RefreshPlayback (); return { started : true, objectId : source.id, duration, action : plan.action, stages : plan.stages, clearance };
         } catch (error) { removeCameraListeners (); try { await restore (); } finally { this.foldOperation = null; editor.busy = false; editor.RefreshButtons?.(); } throw error; }
     }
     SetFoldCameraAutoFit (autoFit)
@@ -238,19 +238,19 @@ export class PackagingWorkspace
             flat.userData = { ...source.userData, _auto3dPackagingState : 'flat' }; flat.visible = source.visible; flat.position = [...source.position]; flat.castShadow = source.castShadow !== false; flat.receiveShadow = source.receiveShadow !== false;
             target.ApplyTransform (flat); target.Remove (flat); target.Remove (source); target.Restore (flat, index); target.packaging = profile; editor.selected = flat;
             await editor.Render (true);
-            const apply = async forward => { target.Remove (forward ? source : flat); target.Restore (forward ? flat : source, index); target.packaging = forward ? profile : before; editor.selected = forward ? flat : previous; await editor.Render (); this.Refresh (); editor.website.aiWorkspace?.RefreshPackaging (); };
+            const apply = async forward => { target.Remove (forward ? source : flat); target.Restore (forward ? flat : source, index); target.packaging = forward ? profile : before; editor.selected = forward ? flat : previous; await editor.Render (); this.Refresh (); editor.website.packagingPanel?.Refresh (); };
             editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) });
             this.Refresh (); editor.Status ('Unfolded FEFCO ' + parameters.code + ' · kraft dieline · CUT red / SCORE blue');
             return { objectId : flat.id, replacedObjectId : source.id, code : parameters.code, state : 'flat', units : 'mm', thicknessMM : profile.thickness, profilePaths : profile.paths.length, materialPreserved : true };
         } catch (error) {
             if (flat) { target.Remove (flat); if (!target.objects.includes (source)) { target.Restore (source, index); } target.packaging = before; editor.selected = previous; await editor.Render (); } throw error;
-        } finally { editor.busy = false; editor.RefreshButtons?.(); editor.website.aiWorkspace?.RefreshPackaging (); }
+        } finally { editor.busy = false; editor.RefreshButtons?.(); editor.website.packagingPanel?.Refresh (); }
     }
     FefcoInspect () { return { ...ValidateFefco (this.fefco || DefaultFefco), units : 'mm', dimensions : 'internal', axes : 'W=X, L=Z, H=Y' }; }
     async FefcoCatalog () { const module = await LoadPackagingModule (); return module.FefcoCatalog (); }
     ConfigureFefco (changes)
     {
-        this.Editable (); this.fefco = ValidateFefco ({ ...(this.fefco || DefaultFefco), ...changes }); this.editor.website.aiWorkspace?.fefcoPanel?.Refresh (); return this.FefcoInspect ();
+        this.Editable (); this.fefco = ValidateFefco ({ ...(this.fefco || DefaultFefco), ...changes }); this.editor.website.packagingPanel?.fefcoPanel?.Refresh (); return this.FefcoInspect ();
     }
     GeneratePreset (code, changes = {}) { this.Editable (); return this.GenerateFefco (FefcoPreset ({ ...(this.fefco || DefaultFefco), ...changes }, code)); }
     async GenerateFefco (changes = {})
@@ -271,13 +271,13 @@ export class PackagingWorkspace
             object = target.AddImported (model, profile.name); object.source = 'FEFCO ' + data.code; object.packagingProfile = profile; object.userData._auto3dFefco = JSON.stringify (data); target.packaging = profile;
             const index = target.objects.indexOf (object); editor.selected = object;
             await editor.Render (true);
-            const apply = async (add) => { if (add) { target.Restore (object, index); target.packaging = profile; editor.selected = object; } else { target.Remove (object); target.packaging = before; editor.selected = previous && target.objects.includes (previous) ? previous : null; } await editor.Render (); this.Refresh (); editor.website.aiWorkspace?.RefreshPackaging (); };
+            const apply = async (add) => { if (add) { target.Restore (object, index); target.packaging = profile; editor.selected = object; } else { target.Remove (object); target.packaging = before; editor.selected = previous && target.objects.includes (previous) ? previous : null; } await editor.Render (); this.Refresh (); editor.website.packagingPanel?.Refresh (); };
             editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); this.fefco = data;
-            this.Refresh (); editor.website.aiWorkspace?.RefreshPackaging (); editor.Status ('Added FEFCO ' + data.code + ' · ' + data.length + ' × ' + data.width + ' × ' + data.height + ' mm');
+            this.Refresh (); editor.website.packagingPanel?.Refresh (); editor.Status ('Added FEFCO ' + data.code + ' · ' + data.length + ' × ' + data.width + ' × ' + data.height + ' mm');
             return { objectId : object.id, ...data, units : 'mm', sceneUnit : unit, profilePaths : profile.paths.length };
         } catch (error) {
             if (object) { target.Remove (object); target.packaging = before; editor.selected = previous; await editor.Render (); } throw error;
-        } finally { editor.busy = false; editor.RefreshButtons?.(); editor.website.aiWorkspace?.RefreshPackaging (); }
+        } finally { editor.busy = false; editor.RefreshButtons?.(); editor.website.packagingPanel?.Refresh (); }
     }
     EngineeringInspect ()
     {
@@ -545,7 +545,7 @@ export class PackagingWorkspace
     }
     Refresh ()
     {
-        this.editor.website.aiWorkspace?.fefcoPanel?.Refresh ();
+        this.editor.website.packagingPanel?.fefcoPanel?.Refresh ();
         if (!this.dialog?.isConnected || this.refreshing) { return; } this.refreshing = true; try { this.RenderControls (); } finally { this.refreshing = false; }
     }
     RenderControls ()

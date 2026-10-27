@@ -20,3 +20,5 @@ export { EngineeringPanel } from './engineeringpanel.js';
 
 export { DefaultBoardAppearance, ValidateBoardAppearance } from './appearancesettings.js';
 export { BoardAppearanceMesh, TransformAppearanceMesh } from './boardappearance.js';
+
+export { PackagingPanel } from './workspacepanel.js';
