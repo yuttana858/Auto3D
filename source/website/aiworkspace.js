@@ -1,3 +1,5 @@
+import { OpenSessionArchive } from './sessionarchive.js';
+import { AIProjectArchive } from './aiproject.js';
 import { AppVersion } from './preferences.js';
 
 const AIStorageKey = 'auto3d-ai-connections-v1';
@@ -22,7 +24,7 @@ export class AIWorkspace
     {
         this.website = website;
         this.imageFile = null;
-        this.recent = [];
+        this.recent = []; this.assets = new Map (); this.selectedTask = null; this.previewSequence = 0;
         this.settings = this.LoadSettings ();
         this.CreateHeaderButton ();
         this.CreatePanel ();
@@ -30,7 +32,7 @@ export class AIWorkspace
 
     InitializeAccount (id)
     {
-        this.storageKey = AIStorageKey + ':' + id; this.settings = this.LoadSettings (); this.RefreshConnection (); this.RefreshActions ();
+        this.previewSequence++; this.preview?.Clear (); this.assets.clear (); this.recent = []; this.selectedTask = null; this.RenderRecent (); this.storageKey = AIStorageKey + ':' + id; this.settings = this.LoadSettings (); this.RefreshConnection (); this.RefreshActions ();
     }
 
     LoadSettings ()
@@ -88,8 +90,16 @@ export class AIWorkspace
         const right = this.website.parameters.rightContainerDiv;
         const panel = Element ('div', 'ai_workspace_panel', undefined, right); panel.hidden = true;
         const header = Element ('div', 'ai_workspace_header', undefined, panel); Element ('span', 'module_version', 'AI v' + AppVersion, header); this.connectionBadge = Element ('span', 'ai_connection_badge', 'Not connected', header);
+        const toolbar = Element ('div', 'ai_project_toolbar', undefined, panel);
+        this.addButton = Element ('button', null, 'Add to session', toolbar); this.addButton.disabled = true; this.addButton.addEventListener ('click', () => this.Run (() => this.AddSelected ()));
+        const save = Element ('button', null, 'Save project to Library', toolbar); save.addEventListener ('click', () => this.Run (() => this.SaveProject ({ name : this.projectName.value.trim () || 'AI project' })));
+        const open = Element ('button', null, 'Open AI project', toolbar); this.projectInput = Element ('input', null, undefined, toolbar); this.projectInput.type = 'file'; this.projectInput.accept = '.auto3d'; this.projectInput.hidden = true; open.addEventListener ('click', () => this.projectInput.click ()); this.projectInput.addEventListener ('change', () => this.Run (async () => { const file = this.projectInput.files[0]; if (file) { await this.OpenProject (await file.arrayBuffer ()); } this.projectInput.value = ''; }));
+        Element ('span', 'section_hint', 'Library save includes all completed 3D creations below.', toolbar);
+        this.projectName = Element ('input', null, undefined, toolbar); this.projectName.placeholder = 'AI project'; this.projectName.maxLength = 120; this.projectName.setAttribute ('aria-label', 'AI project name');
         this.aiPane = Element ('div', 'ai_workspace_pane', undefined, panel);
-        const inputSection = Element ('div', 'ai_workspace_section', undefined, this.aiPane);
+        this.previewHost = Element ('div', 'ai_preview_host', undefined, this.aiPane); this.previewHost.setAttribute ('aria-label', 'AI model viewer'); this.previewHost.tabIndex = 0;
+        this.previewMessage = Element ('p', 'ai_preview_message', 'Select a completed creation to preview', this.previewHost);
+        const inputSection = Element ('div', 'ai_workspace_section ai_input_section', undefined, this.aiPane);
         Element ('strong', null, 'Create', inputSection);
         this.prompt = Element ('textarea', 'ai_prompt', undefined, inputSection); this.prompt.rows = 4; this.prompt.maxLength = 800; this.prompt.placeholder = 'Describe the object, image, or texture you want to create…'; this.prompt.setAttribute ('aria-label', 'AI generation prompt'); this.prompt.addEventListener ('input', () => this.RefreshActions ());
 
@@ -116,19 +126,26 @@ export class AIWorkspace
 
         const actions = Element ('div', 'ai_generation_actions', undefined, inputSection);
         this.actionButtons = new Map ();
-        for (const [id, label] of [['text3d', 'Text to 3D'], ['image3d', 'Image to 3D'], ['textimage', 'Text to image'], ['texture', 'Texture generation']]) {
+        for (const [id, label] of [['text3d', 'Text to 3D'], ['image3d', 'Image to 3D'], ['textimage', 'Text to image'], ['texture', 'Texture generation'], ['rigging', 'Rig character'], ['animations', 'Animate character']]) {
             const button = Element ('button', 'ai_generation_action', label, actions);
-            button.addEventListener ('click', () => id === 'text3d' ? this.StartTextTo3D () : this.PendingAction (id));
+            button.addEventListener ('click', () => this.Run (() => this.Generate (this.UIOptions (id))));
             this.actionButtons.set (id, button);
         }
+        const scaleLabel = Element ('label', null, 'Model scale', inputSection); this.scaleInput = Element ('input', null, undefined, scaleLabel); this.scaleInput.type = 'number'; this.scaleInput.min = '.001'; this.scaleInput.max = '1000'; this.scaleInput.step = '.01'; this.scaleInput.value = '1'; this.scaleInput.setAttribute ('aria-label', 'AI model scale'); this.scaleInput.addEventListener ('change', () => this.Run (() => this.SetScale (Number (this.scaleInput.value))));
+        const imageLabel = Element ('label', null, 'Image model', inputSection); this.imageModel = Element ('select', null, undefined, imageLabel); for (const name of ['nano-banana', 'nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2']) { this.imageModel.add (new Option (name, name)); }
+        const aspectLabel = Element ('label', null, 'Image aspect ratio', inputSection); this.aspect = Element ('select', null, undefined, aspectLabel); for (const ratio of ['1:1', '16:9', '9:16', '4:3', '3:4']) { this.aspect.add (new Option (ratio, ratio)); }
+        const textureLabel = Element ('label', null, 'Texture resolution', inputSection); this.textureResolution = Element ('select', null, undefined, textureLabel); for (const res of ['2k', '4k']) { this.textureResolution.add (new Option (res.toUpperCase (), res)); }
+        const actionLabel = Element ('label', null, 'Animation action ID', inputSection); this.animationAction = Element ('input', null, undefined, actionLabel); this.animationAction.type = 'number'; this.animationAction.min = '0'; this.animationAction.step = '1'; this.animationAction.value = '92';
+        const heightLabel = Element ('label', null, 'Character height (meters)', inputSection); this.rigHeight = Element ('input', null, undefined, heightLabel); this.rigHeight.type = 'number'; this.rigHeight.min = '.01'; this.rigHeight.step = '.1'; this.rigHeight.value = '1.7';
+        Element ('p', 'section_hint', 'Rigging requires a textured humanoid. Animation uses a completed rig and a Meshy animation action ID. Generation uses provider credits.', inputSection);
         this.status = Element ('p', 'section_hint ai_status', 'Connect a provider in Preferences to enable the generation workspace.', inputSection);
 
         const recentSection = Element ('div', 'ai_workspace_section ai_recent_section', undefined, this.aiPane);
-        const recentHeader = Element ('div', 'ai_recent_header', undefined, recentSection); Element ('strong', null, 'Latest creations', recentHeader); const refresh = Element ('button', null, 'Refresh', recentHeader); refresh.addEventListener ('click', () => this.RefreshRecent ());
+        const recentHeader = Element ('div', 'ai_recent_header', undefined, recentSection); Element ('strong', null, 'Latest creations', recentHeader); const refresh = Element ('button', null, 'Refresh', recentHeader); refresh.addEventListener ('click', () => this.Run (() => this.RefreshRecent ()));
         this.recentGrid = Element ('div', 'ai_recent_grid', undefined, recentSection);
         this.RenderRecent (); this.RefreshConnection ();
         this.panel = panel; panel.id = 'ai_module_panel'; panel.setAttribute ('aria-label', 'AI Generative');
-        this.website.modulePanels.Register ('ai', { title : 'AI Generative', body : panel, onOpen : () => this.RefreshConnection (), onMode : state => this.headerButton?.setAttribute ('aria-pressed', String (state.visible)) });
+        this.website.modulePanels.Register ('ai', { title : 'AI Generative', body : panel, onOpen : () => this.RefreshConnection (), onMode : state => { this.headerButton?.setAttribute ('aria-pressed', String (state.visible)); this.preview?.Resize (); } });
     }
 
     Open () { return this.website.modulePanels.Open ('ai'); }
@@ -137,6 +154,7 @@ export class AIWorkspace
     Headers (json = false)
     {
         const headers = {};
+        if (this.website.auth?.user?.id) { headers['X-Auto3D-Account'] = this.website.auth.user.id; }
         if (this.settings.apiKey) { headers['X-Auto3D-AI-Key'] = this.settings.apiKey; }
         if (json) { headers['Content-Type'] = 'application/json'; }
         return headers;
@@ -144,12 +162,13 @@ export class AIWorkspace
 
     async RequestJSON (url, options = {})
     {
-        const response = await fetch (url, options);
+        const owner = this.website.auth?.user?.id; const response = await fetch (url, { credentials : 'same-origin', ...options });
         const text = await response.text ();
         let result = null;
         if (text) {
             try { result = JSON.parse (text); } catch { result = { message : text }; }
         }
+        if (owner !== this.website.auth?.user?.id) { throw new Error ('Account changed. Reopen AI Generative.'); }
         if (!response.ok) {
             const message = result?.error || result?.message || result?.task_error?.message || ('Provider request failed (' + response.status + ').');
             throw new Error (message);
@@ -181,9 +200,13 @@ export class AIWorkspace
         if (!this.actionButtons) { return; }
         const connected = this.settings.provider === 'meshy';
         this.actionButtons.get ('text3d').disabled = !connected || !this.prompt?.value.trim ();
-        this.actionButtons.get ('image3d').disabled = !connected || !this.imageFile;
+        this.actionButtons.get ('image3d').disabled = !connected || (!this.imageFile && !this.recent.find (item => item.id === this.selectedTask)?.imageUrl);
         this.actionButtons.get ('textimage').disabled = !connected || !this.prompt?.value.trim ();
-        this.actionButtons.get ('texture').disabled = !connected || (!this.prompt?.value.trim () && !this.imageFile);
+        const selected = this.recent.find (item => item.id === this.selectedTask);
+        this.actionButtons.get ('texture').disabled = !connected || (!selected?.modelUrl && !this.assets.has (selected?.id)) || (!this.prompt?.value.trim () && !this.imageFile);
+        this.actionButtons.get ('rigging').disabled = !connected || (!selected?.modelUrl && !this.assets.has (selected?.id));
+        this.actionButtons.get ('animations').disabled = !connected || selected?.route !== 'rigging' || selected.status !== 'SUCCEEDED';
+        if (this.addButton) { this.addButton.disabled = !this.assets.has (this.selectedTask); }
     }
 
     TextTo3DOptions ()
@@ -206,120 +229,21 @@ export class AIWorkspace
         };
     }
 
-    async StartTextTo3D ()
-    {
-        const prompt = this.prompt.value.trim ();
-        if (!prompt) { return; }
-        if (this.settings.provider !== 'meshy') { this.status.textContent = 'Text to 3D submission is currently wired for Meshy only.'; return; }
-
-        const button = this.actionButtons.get ('text3d');
-        button.disabled = true;
-        this.status.textContent = 'Submitting Text to 3D preview…';
-        try {
-            const payload = {
-                mode : 'preview',
-                prompt,
-                target_formats : ['glb'],
-                ...this.TextTo3DOptions ()
-            };
-            const { result } = await this.RequestJSON (this.settings.baseUrl + '/text-to-3d', {
-                method : 'POST',
-                headers : this.Headers (true),
-                body : JSON.stringify (payload)
-            });
-            const task = {
-                id : result.result,
-                name : prompt,
-                status : 'PENDING',
-                progress : 0,
-                type : 'text-to-3d-preview',
-                provider : 'Meshy',
-                createdAt : Date.now ()
-            };
-            this.UpsertTask (task);
-            this.status.textContent = 'Preview queued · 0%';
-            await this.PollTextTo3DTask (task.id);
-        } catch (error) {
-            this.status.textContent = 'Text to 3D failed: ' + error.message;
-        } finally {
-            this.RefreshActions ();
-        }
-    }
-
-    async PollTextTo3DTask (taskId)
-    {
-        for (let attempt = 0; attempt < 720; attempt++) {
-            const { result, response } = await this.RequestJSON (this.settings.baseUrl + '/text-to-3d/' + encodeURIComponent (taskId), { headers : this.Headers () });
-            const task = this.NormalizeMeshyTask (result);
-            this.UpsertTask (task);
-            const progress = Number.isFinite (task.progress) ? task.progress : 0;
-            this.status.textContent = (task.type === 'text-to-3d-refine' ? 'Refining' : 'Generating preview') + ' · ' + progress + '%';
-            if (task.status === 'SUCCEEDED') {
-                this.status.textContent = task.type === 'text-to-3d-refine' ? 'Refine complete. Ready to import GLB.' : 'Preview complete. Review it, refine for PBR textures, or import the mesh.';
-                return task;
-            }
-            if (task.status === 'FAILED' || task.status === 'CANCELED') {
-                throw new Error (result.task_error?.message || ('Task ' + task.status.toLowerCase () + '.'));
-            }
-            const retryAfter = Number (response.headers.get ('Retry-After'));
-            await Delay (Number.isFinite (retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 4000);
-        }
-        throw new Error ('Generation timed out before reaching a terminal state.');
-    }
+    async StartTextTo3D () { return this.Generate (this.UIOptions ('text3d')); }
+    async PollTextTo3DTask (id) { return this.PollTask ('text-to-3d', id); }
 
     async RefineTask (item)
     {
-        if (!item?.id || item.status !== 'SUCCEEDED') { return; }
-        this.status.textContent = 'Submitting textured refine…';
-        try {
-            const { result } = await this.RequestJSON (this.settings.baseUrl + '/text-to-3d', {
-                method : 'POST',
-                headers : this.Headers (true),
-                body : JSON.stringify ({
-                    mode : 'refine',
-                    preview_task_id : item.id,
-                    enable_pbr : this.pbrCheckbox.checked,
-                    texture_resolution : '2k',
-                    target_formats : ['glb']
-                })
-            });
-            const task = {
-                id : result.result,
-                name : item.name,
-                status : 'PENDING',
-                progress : 0,
-                type : 'text-to-3d-refine',
-                provider : 'Meshy',
-                createdAt : Date.now ()
-            };
-            this.UpsertTask (task);
-            await this.PollTextTo3DTask (task.id);
-        } catch (error) {
-            this.status.textContent = 'Refine failed: ' + error.message;
-        }
+        this.AssertEditable ();
+        if (!item?.id || item.status !== 'SUCCEEDED' || item.type !== 'text-to-3d-preview') { throw new Error ('Select a completed Text to 3D preview.'); }
+        const owner = this.website.auth.user.id;
+        const { result } = await this.RequestJSON (this.settings.baseUrl + '/text-to-3d', { method : 'POST', headers : this.Headers (true), body : JSON.stringify ({ mode : 'refine', preview_task_id : item.id, enable_pbr : this.pbrCheckbox.checked, texture_resolution : this.textureResolution.value, target_formats : ['glb'] }) });
+        if (typeof result.result !== 'string' || !result.result) { throw new Error ('Provider did not return a task ID.'); }
+        const task = { id : result.result, name : item.name, status : 'PENDING', progress : 0, route : 'text-to-3d', type : 'text-to-3d-refine', provider : 'Meshy', createdAt : Date.now () }; this.UpsertTask (task);
+        this.PollTask ('text-to-3d', task.id, owner).catch (error => { if (owner === this.website.auth?.user?.id) { this.status.textContent = error.message; } }); return { queued : task.id, route : task.route };
     }
 
-    async ImportTask (item)
-    {
-        if (!item?.modelUrl) { this.status.textContent = 'This task does not have a GLB result yet.'; return; }
-        this.status.textContent = 'Importing generated GLB into the current session…';
-        try {
-            const response = await fetch (this.settings.baseUrl + '/model?url=' + encodeURIComponent (item.modelUrl), { headers : this.Headers () });
-            if (!response.ok) {
-                let message = 'Generated model download failed (' + response.status + ').';
-                try { const body = await response.json (); message = body.error || body.message || message; } catch { /* Keep fallback. */ }
-                throw new Error (message);
-            }
-            const blob = await response.blob ();
-            const file = new File ([blob], 'meshy-' + item.id + '.glb', { type : blob.type || 'model/gltf-binary' });
-            const previousObjects = [...this.website.sessionEditor.document.objects];
-            await this.website.LoadModelFromFileList ([file]);
-            if (!this.website.sessionEditor.selected || previousObjects.includes (this.website.sessionEditor.selected)) { throw new Error ('Generated model was not added to the session.'); }
-            try { await this.website.materialPanel.GenerateTextures ({ objectId : this.website.sessionEditor.selected.id }); this.status.textContent = 'Generated GLB imported with editable surface maps.'; } catch (error) { this.status.textContent = 'Generated GLB imported. Surface maps: ' + error.message; }
-        } catch (error) {
-            this.status.textContent = 'Import failed: ' + error.message;
-        }
-    }
+    async ImportTask (item) { await this.SelectTask (item.id); return this.AddSelected (); }
 
     NormalizeMeshyTask (item)
     {
@@ -328,8 +252,10 @@ export class AIWorkspace
             name : item.prompt || (item.type === 'image-to-3d' ? 'Image to 3D' : 'Text to 3D'),
             status : item.status || 'UNKNOWN',
             progress : Number.isFinite (item.progress) ? item.progress : null,
-            thumbnail : item.thumbnail_url || null,
-            modelUrl : item.model_urls?.glb || null,
+            thumbnail : item.thumbnail_url || item.image_urls?.[0] || null,
+            imageUrl : item.image_urls?.[0] || null,
+            route : item.route || (item.type?.startsWith ('text-to-3d') ? 'text-to-3d' : item.type === 'animate' ? 'animations' : item.type),
+            modelUrl : item.model_urls?.glb || item.result?.rigged_character_glb_url || item.result?.animation_glb_url || null,
             createdAt : item.created_at || null,
             type : item.type || null,
             credits : Number.isFinite (item.consumed_credits) ? item.consumed_credits : null,
@@ -343,36 +269,136 @@ export class AIWorkspace
         if (index === -1) { this.recent.unshift (task); }
         else { this.recent[index] = { ...this.recent[index], ...task }; }
         this.recent.sort ((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-        this.recent = this.recent.slice (0, 12);
+        this.recent = this.recent.filter ((item, index) => index < 48 || this.assets.has (item.id));
         this.RenderRecent ();
     }
 
-    PendingAction (id)
+    async Run (action) { try { return await action (); } catch (error) { this.status.textContent = error.message; return null; } }
+    AssertEditable () { if (this.website.sessionEditor.readOnly || !this.website.auth?.user?.id) { throw new Error ('Sign in to an editable workspace.'); } }
+    Inspect () { return { selected : this.selectedTask, tasks : this.recent.map (item => ({ ...item, loaded : this.assets.has (item.id), scale : this.assets.get (item.id)?.scale || 1 })), models : this.assets.size }; }
+    UIOptions (action)
     {
-        const labels = { image3d : 'Image to 3D', textimage : 'Text to image', texture : 'Texture generation' };
-        this.status.textContent = labels[id] + ' is next in the provider wiring sequence. Text to 3D is now fully connected first so its task lifecycle can be validated before sharing the same queue/import path.';
+        return { action, prompt : this.prompt.value.trim (), detail : this.detailSelect.value, pbr : this.pbrCheckbox.checked, textureResolution : this.textureResolution.value, imageModel : this.imageModel.value, aspect : this.aspect.value, taskId : this.selectedTask, actionId : Number (this.animationAction.value), height : Number (this.rigHeight.value) };
+    }
+    async ReferenceImage ()
+    {
+        if (!this.imageFile) { return null; }
+        if (!['image/png', 'image/jpeg', 'image/webp'].includes (this.imageFile.type) || this.imageFile.size > 20 * 1024 * 1024) { throw new Error ('Choose a PNG, JPG or WebP image up to 20 MB.'); }
+        return new Promise ((resolve, reject) => { const reader = new FileReader (); reader.onload = () => resolve (reader.result); reader.onerror = () => reject (new Error ('Cannot read reference image.')); reader.readAsDataURL (this.imageFile); });
+    }
+    async Generate (options)
+    {
+        this.AssertEditable (); if (this.submitting) { throw new Error ('A generation is already being submitted.'); }
+        const { action, prompt = '', detail = 'standard:30000', pbr = true, textureResolution = '2k', imageModel = 'nano-banana', aspect = '1:1', taskId = this.selectedTask, actionId = 92, height = 1.7 } = options;
+        if (this.settings.provider !== 'meshy') { throw new Error ('Choose Meshy in AI connections.'); }
+        if (!['text3d', 'image3d', 'textimage', 'texture', 'rigging', 'animations'].includes (action) || typeof prompt !== 'string' || prompt.length > 800 || !['2k', '4k'].includes (textureResolution)) { throw new Error ('Invalid AI generation options.'); }
+        const selected = this.recent.find (item => item.id === taskId); let route, payload;
+        const [mode, faces] = detail.split (':'); if (!['smart', 'standard'].includes (mode) || ![4000, 10000, 30000, 75000, 150000].includes (Number (faces))) { throw new Error ('Choose a supported detail preset.'); }
+        const topology = { model_type : mode === 'smart' ? 'smart-topology' : 'standard', ai_model : mode === 'smart' ? 'meshy-t2' : 'latest', ...(mode === 'smart' ? { topology : 'triangle' } : { should_remesh : true }), target_polycount : Number (faces) };
+        if (action === 'text3d') { if (!prompt.trim ()) { throw new Error ('Enter a prompt.'); } route = 'text-to-3d'; payload = { mode : 'preview', prompt, target_formats : ['glb'], ...topology }; }
+        if (action === 'textimage') { if (!prompt.trim () || !['nano-banana', 'nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2'].includes (imageModel) || !['1:1', '16:9', '9:16', '4:3', '3:4'].includes (aspect)) { throw new Error ('Choose an image model, aspect and prompt.'); } route = 'text-to-image'; payload = { prompt, ai_model : imageModel, aspect_ratio : aspect }; }
+        if (action === 'image3d') { const image = await this.ReferenceImage (); if (!image && !selected?.imageUrl) { throw new Error ('Upload an image or select a generated image.'); } route = 'image-to-3d'; payload = { ...(image ? { image_url : image } : { input_task_id : selected.id }), ...topology, should_texture : true, enable_pbr : pbr, texture_resolution : textureResolution, target_formats : ['glb'] }; }
+        if (['texture', 'rigging', 'animations'].includes (action) && (!selected || selected.status !== 'SUCCEEDED' || (!selected.modelUrl && !this.assets.has (selected.id)))) { throw new Error ('Select a completed 3D model.'); }
+        if (action === 'texture') { const image = await this.ReferenceImage (); if (!image && !prompt.trim ()) { throw new Error ('Enter a texture prompt or reference image.'); } route = 'retexture'; payload = { input_task_id : selected.id, ...(image ? { image_style_url : image } : { text_style_prompt : prompt }), enable_original_uv : true, enable_pbr : pbr, texture_resolution : textureResolution }; }
+        if (action === 'rigging') { if (!Number.isFinite (height) || height <= 0 || height > 100) { throw new Error ('Enter a positive character height up to 100 meters.'); } route = 'rigging'; payload = { input_task_id : selected.id, height_meters : height }; }
+        if (action === 'animations') { if (selected.route !== 'rigging' || !Number.isInteger (actionId) || actionId < 0) { throw new Error ('Select a completed rig and a valid animation action ID.'); } route = 'animations'; payload = { rig_task_id : selected.id, action_id : actionId }; }
+        const owner = this.website.auth.user.id; this.submitting = true; this.status.textContent = 'Submitting ' + route + '…';
+        try { const { result } = await this.RequestJSON (this.settings.baseUrl + '/' + route, { method : 'POST', headers : this.Headers (true), body : JSON.stringify (payload) });
+            if (typeof result.result !== 'string' || !result.result) { throw new Error ('Provider did not return a task ID.'); }
+            const task = { id : result.result, route, type : action === 'text3d' ? 'text-to-3d-preview' : route, name : prompt || selected?.name || route, status : 'PENDING', progress : 0, createdAt : Date.now (), provider : 'Meshy' }; this.UpsertTask (task);
+            // Poll independently; callers receive the real queued task without waiting for a long generation.
+            this.PollTask (route, task.id, owner).catch (error => { if (owner === this.website.auth?.user?.id) { this.status.textContent = error.message; } }); return { queued : task.id, route };
+        } finally { this.submitting = false; this.RefreshActions (); }
+    }
+    async PollTask (route, id, owner = this.website.auth?.user?.id)
+    {
+        for (let attempt = 0; attempt < 720; attempt++) {
+            if (owner !== this.website.auth?.user?.id) { throw new Error ('Account changed.'); }
+            const { result, response } = await this.RequestJSON (this.settings.baseUrl + '/' + route + '/' + encodeURIComponent (id), { headers : this.Headers () });
+            const existing = this.recent.find (item => item.id === id); const task = this.NormalizeMeshyTask ({ ...result, route, type : existing?.type || result.type, prompt : result.prompt || existing?.name }); this.UpsertTask (task); this.status.textContent = route + ' · ' + (task.progress || 0) + '%';
+            if (task.status === 'SUCCEEDED') { this.status.textContent = 'Complete · select Preview to review'; return task; }
+            if (['FAILED', 'CANCELED'].includes (task.status)) { throw new Error (result.task_error?.message || 'Generation ' + task.status.toLowerCase ()); }
+            const retry = Number (response.headers.get ('Retry-After')); await Delay (Number.isFinite (retry) && retry > 0 ? Math.min (retry, 60) * 1000 : 4000);
+        }
+        throw new Error ('Generation polling timed out. Refresh creations to check its status.');
+    }
+    async EnsurePreview () { if (!this.preview) { const { AIPreview } = await import ('./aipreview.js'); this.preview = new AIPreview (this.previewHost); } return this.preview; }
+    async SelectTask (id)
+    {
+        const task = this.recent.find (item => item.id === id); if (!task) { throw new Error ('Creation not found.'); }
+        this.selectedTask = id; const sequence = ++this.previewSequence; const owner = this.website.auth?.user?.id;
+        this.RenderRecent (); this.previewMessage.hidden = false; this.previewMessage.textContent = 'Loading ' + task.name + '…';
+        if (!task.modelUrl && !this.assets.has (id)) { this.preview?.Clear (); this.previewImage?.remove (); if (task.imageUrl) { this.previewImage = Element ('img', 'ai_image_preview', undefined, this.previewHost); this.previewImage.src = task.imageUrl; } this.previewMessage.textContent = task.imageUrl ? 'Generated reference image' : task.status; return { selected : id, image : !!task.imageUrl }; }
+        this.previewImage?.remove ();
+        let asset = this.assets.get (id);
+        if (!asset) { const response = await fetch (this.settings.baseUrl + '/model?url=' + encodeURIComponent (task.modelUrl), { headers : this.Headers () }); if (!response.ok) { throw new Error ('Model download failed (' + response.status + '). Refresh expired creations.'); } const buffer = await response.arrayBuffer (); if (owner !== this.website.auth?.user?.id) { throw new Error ('Account changed.'); } asset = { ...task, buffer, scale : 1 }; this.assets.set (id, asset); }
+        if (sequence !== this.previewSequence) { return { superseded : true }; }
+        const preview = await this.EnsurePreview (); if (sequence !== this.previewSequence) { return { superseded : true }; }
+        const loaded = await preview.Load (asset.buffer, asset.scale, (done, total) => { this.previewMessage.textContent = 'Loading model ' + done + ' / ' + total; });
+        if (sequence !== this.previewSequence || !loaded) { return { superseded : true }; }
+        if (!task.thumbnail) { task.thumbnail = preview.Thumbnail (); this.RenderRecent (); } this.previewMessage.hidden = true; this.scaleInput.value = String (asset.scale); this.RefreshActions (); return { selected : id, loaded : true, scale : asset.scale, animations : preview.clipCount };
+    }
+    async SetScale (scale) { this.AssertEditable (); if (!Number.isFinite (scale) || scale < .001 || scale > 1000) { throw new Error ('Scale must be between 0.001 and 1000.'); } const asset = this.assets.get (this.selectedTask); if (!asset) { throw new Error ('Preview a 3D model first.'); } asset.scale = scale; await this.SelectTask (asset.id); return { id : asset.id, scale }; }
+    async AddSelected ()
+    {
+        this.AssertEditable (); const asset = this.assets.get (this.selectedTask); if (!asset) { throw new Error ('Preview a completed 3D model first.'); } const editor = this.website.sessionEditor;
+        if (editor.busy || this.adding) { throw new Error ('Wait for the current session operation.'); }
+        const owner = this.website.auth.user.id; const document = editor.document; this.adding = true;
+        try {
+            const { archive } = await AIProjectArchive ([{ ...asset }], asset.name || 'AI model');
+            this.AssertEditable (); if (owner !== this.website.auth.user?.id || document !== editor.document || editor.busy) { throw new Error ('Account or workspace changed. Retry adding the model.'); }
+            const result = await editor.OpenArchive (archive, true); this.status.textContent = 'Model added to session with textures and scale.'; return result;
+        } finally { this.adding = false; }
+    }
+    async OpenProject (buffer)
+    {
+        this.AssertEditable (); const session = OpenSessionArchive (buffer); const assets = new Map (); const tasks = [];
+        for (const object of session.document.objects) {
+            if (!object.userData.ai || !object.animationAsset) { continue; }
+            let metadata; try { metadata = JSON.parse (object.userData.ai); } catch { continue; }
+            const file = object.animationAsset.files.find (file => file.name === object.animationAsset.main); if (!file || typeof metadata.id !== 'string' || !metadata.id || metadata.id.length > 200) { continue; }
+            if (!object.scale.every (value => value === object.scale[0]) || object.scale[0] < .001 || object.scale[0] > 1000) { throw new Error ('AI project requires a uniform model scale between 0.001 and 1000.'); }
+            const task = { id : metadata.id, name : object.name, type : metadata.type, route : metadata.route, status : 'SUCCEEDED', provider : 'Meshy', createdAt : Date.now () };
+            assets.set (task.id, { ...task, buffer : file.buffer, scale : object.scale[0] }); tasks.push (task);
+        }
+        if (!assets.size) { throw new Error ('This archive does not contain an AI project.'); }
+        this.previewSequence++; this.preview?.Clear (); this.assets = assets; this.recent = tasks; this.projectName.value = session.document.name; this.RenderRecent (); await this.SelectTask (tasks[0].id); this.status.textContent = 'AI project opened · ' + assets.size + ' models'; return { opened : true, models : assets.size };
+    }
+    async OpenLibraryProject (id) { const owner = this.website.auth?.user?.id; this.AssertEditable (); const library = this.website.sessionEditor.library; const item = await library.FindItem ('account', id); const buffer = await library.ArchiveForItem (item); if (owner !== this.website.auth?.user?.id) { throw new Error ('Account changed.'); } return this.OpenProject (buffer); }
+
+    async SaveProject ({ name = 'AI project', category = 'Uncategorized' } = {})
+    {
+        this.AssertEditable (); const owner = this.website.auth.user.id; if (this.saving) { throw new Error ('Project save already in progress.'); } this.saving = true;
+        try { this.status.textContent = 'Saving AI project…'; for (const task of this.recent.filter (item => item.status === 'SUCCEEDED' && item.modelUrl && !this.assets.has (item.id))) {
+                this.status.textContent = 'Saving project · downloading ' + task.name + '…'; const response = await fetch (this.settings.baseUrl + '/model?url=' + encodeURIComponent (task.modelUrl), { headers : this.Headers () }); if (!response.ok) { throw new Error ('Cannot save ' + task.name + ': model unavailable. Refresh creations and retry.'); } const buffer = await response.arrayBuffer (); if (owner !== this.website.auth.user?.id) { throw new Error ('Account changed.'); } this.assets.set (task.id, { ...task, buffer, scale : 1 });
+            }
+            const { archive, objects } = await AIProjectArchive ([...this.assets.values ()].map (asset => ({ ...asset })), name, this.recent);
+            if (owner !== this.website.auth.user?.id) { throw new Error ('Account changed.'); } if (!this.preview?.root) { const first = [...this.assets.keys ()][0]; if (first) { await this.SelectTask (first); } } if (!this.preview?.root) { throw new Error ('Preview a model first.'); }
+            if (owner !== this.website.auth.user?.id) { throw new Error ('Account changed.'); }
+            const result = await this.website.sessionEditor.library.accountStorage.Save ({ name, category, kind : 'session', objects, archive : new Blob ([archive]), thumbnail : this.preview.Thumbnail () }); this.status.textContent = 'AI project saved to Library.'; return result;
+        } finally { this.saving = false; }
     }
 
     async RefreshRecent ()
     {
         if (this.settings.provider !== 'meshy') { this.status.textContent = 'Connect a supported AI provider before loading recent creations.'; return; }
-        if (this.settings.provider !== 'meshy') { this.status.textContent = 'Recent-model discovery for custom providers will be added with the provider adapter.'; return; }
         this.status.textContent = 'Loading recent Meshy creations…';
         try {
             const urls = [
                 this.settings.baseUrl + '/text-to-3d?page_size=8&sort_by=-created_at',
-                this.settings.baseUrl + '/image-to-3d?page_size=4&sort_by=-created_at'
+                ...['image-to-3d', 'text-to-image', 'retexture', 'rigging', 'animations'].map (route => this.settings.baseUrl + '/' + route + '?page_size=4&sort_by=-created_at')
             ];
             const groups = [];
             for (const url of urls) {
                 const { result } = await this.RequestJSON (url, { headers : this.Headers () });
                 groups.push (Array.isArray (result) ? result : []);
             }
-            this.recent = groups.flat ().filter ((item) => item && item.id).map ((item) => this.NormalizeMeshyTask (item)).sort ((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice (0, 12);
+            const loaded = groups.flat ().filter ((item) => item && item.id).map ((item) => this.NormalizeMeshyTask (item)).sort ((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice (0, 12);
+            for (const task of loaded) { this.UpsertTask (task); }
             this.RenderRecent ();
             this.status.textContent = this.recent.length ? 'Loaded ' + this.recent.length + ' recent creations.' : 'No recent Meshy 3D creations found.';
         } catch (error) {
-            this.status.textContent = error.message;
+            this.status.textContent = error.message; throw error;
         }
     }
 
@@ -383,8 +409,10 @@ export class AIWorkspace
         if (!this.recent.length) {
             const empty = Element ('div', 'ai_recent_empty', undefined, this.recentGrid); Element ('strong', null, 'No AI creations yet', empty); Element ('span', null, 'Completed generations will appear here with thumbnail, status, provider, and import action.', empty); return;
         }
-        for (const item of this.recent.slice (0, 12)) {
+        for (const item of this.recent.slice (0, 48)) {
             const card = Element ('div', 'ai_recent_card', undefined, this.recentGrid);
+            card.dataset.taskId = item.id; card.classList.toggle ('selected', item.id === this.selectedTask);
+            const previewButton = Element ('button', 'ai_preview_button', 'Preview', card); previewButton.addEventListener ('click', () => this.Run (() => this.SelectTask (item.id)));
             if (item.thumbnail) { const image = Element ('img', null, undefined, card); image.src = item.thumbnail; image.alt = ''; }
             else {
                 const placeholder = Element ('div', 'ai_recent_placeholder', undefined, card);
@@ -395,11 +423,12 @@ export class AIWorkspace
             Element ('span', 'ai_recent_meta', meta, card);
             const actions = Element ('div', 'ai_recent_actions', undefined, card);
             if (item.status === 'SUCCEEDED' && item.type === 'text-to-3d-preview') {
-                const refine = Element ('button', null, 'Refine', actions); refine.addEventListener ('click', () => this.RefineTask (item));
+                const refine = Element ('button', null, 'Refine', actions); refine.addEventListener ('click', () => this.Run (() => this.RefineTask (item)));
             }
             if (item.status === 'SUCCEEDED' && item.modelUrl) {
-                const importButton = Element ('button', null, 'Import GLB', actions); importButton.addEventListener ('click', () => this.ImportTask (item));
+                const importButton = Element ('button', null, 'Import GLB', actions); importButton.addEventListener ('click', () => this.Run (() => this.ImportTask (item)));
             }
         }
+        this.RefreshActions ();
     }
 }

@@ -81,6 +81,11 @@ describe ('Private account storage', () => {
         const client = new AccountLibrary (auth, async () => ({ ok : true, arrayBuffer : async () => new Promise ((resolve) => { release = resolve; }) }));
         const downloading = client.Archive ({ id : A }); await new Promise ((resolve) => setImmediate (resolve)); auth.user = { id : B }; release (new ArrayBuffer (1)); await assert.rejects (() => downloading, /Account changed/);
     });
+    it ('does not upload a prepared archive under a different account after thumbnail loading', async () => {
+        const auth = { user : { id : A } }; const previous = globalThis.fetch; let uploaded = false;
+        const client = new AccountLibrary (auth, async () => { uploaded = true; return Response.json ({}); });
+        try { globalThis.fetch = async () => { auth.user = { id : B }; return new Response ('image'); }; await assert.rejects (() => client.Save ({ name : 'AI project', category : 'Projects', kind : 'session', objects : 1, archive : new Blob (['archive']), thumbnail : 'data:image/png;base64,eA==' }), /Account changed/); assert.equal (uploaded, false); } finally { globalThis.fetch = previous; }
+    });
     it ('includes HTTP status for both JSON and non-JSON Library failures', async () => {
         const auth = { user : { id : A } };
         const json = new AccountLibrary (auth, async () => Response.json ({ error : 'Storage unavailable.' }, { status : 503 }));

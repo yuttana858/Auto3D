@@ -22,3 +22,12 @@ div.workspace_panel.collapsed { flex-basis: 40px; width: 40px; }
 @media (max-width: 650px) { div.workspace_panel[data-panel-mode="extended"] { flex-basis: calc(100vw - 80px); width: calc(100vw - 80px); } }
 
 .workspace_panel :is(.main_sidebar, .main_navigator) { width: 100%; max-width: 100%; box-sizing: border-box; }
+
+/* One modal shell for every extended module. Content remains owned by its module. */
+dialog.module_extended_view { position: fixed; inset: 0; margin: 0; padding: 0; border: 0; width: 100vw; max-width: none; height: 100dvh; max-height: none; box-sizing: border-box; color: var(--ov_foreground_color); background: var(--ov_background_color); overflow: hidden; }
+dialog.module_extended_view[open] { display: flex; flex-direction: column; animation: module_slide_in .28s ease-out; }
+dialog.module_extended_view::backdrop { background: var(--ov_background_color); }
+.module_extended_view > .module_panel_header { flex-shrink: 0; }
+.module_extended_view > .module_panel_body { flex: 1; width: 100%; margin: 0; min-height: 0; overflow: auto; box-sizing: border-box; }
+@keyframes module_slide_in { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) { dialog.module_extended_view[open] { animation: none; } }

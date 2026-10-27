@@ -54,7 +54,7 @@ function ReadMaterial (data)
     for (const key of Object.keys (material)) {
         const value = data[key];
         if (value === undefined) { continue; }
-        if (key.endsWith ('Map') && value) {
+        if (key.endsWith ('Map') && value && typeof value === 'object') {
             const map = new TextureMap ();
             map.name = String (value.name || 'texture.png'); map.mimeType = value.mimeType || null;
             map.buffer = value.buffer ? DecodeBuffer (value.buffer) : null;

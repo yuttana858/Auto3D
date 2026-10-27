@@ -19,9 +19,11 @@ export class AccountLibrary
     async Save (item)
     {
         if (item.personal) { return this.Update (item.id, { name : item.name, category : item.category }); }
+        const owner = this.auth.user?.id; if (!owner) { throw new Error ('Sign in to use your account Library.'); }
         const form = new FormData (); for (const key of ['name', 'category', 'kind', 'objects']) { form.append (key, String (item[key])); }
         form.append ('archive', item.archive, 'session.auto3d');
         const preview = await (await fetch (item.thumbnail)).blob (); form.append ('thumbnail', preview, 'thumbnail.png');
+        if (this.auth.user?.id !== owner) { throw new Error ('Account changed. Reopen your Library.'); }
         return (await this.Request ('/api/personal/items', { method : 'POST', body : form })).json ();
     }
     async Update (id, changes) { return (await this.Request ('/api/personal/items/' + encodeURIComponent (id), { method : 'PATCH', headers : { 'Content-Type' : 'application/json' }, body : JSON.stringify (changes) })).json (); }

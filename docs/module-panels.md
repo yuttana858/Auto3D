@@ -27,3 +27,7 @@ Use `--workspace-menu-font-size` (12px), `--workspace-help-font-size` (11px), `-
 - `ui.module.mode { module, mode }`: registered module ID plus `minimal`, `extended` or `closed`. Strict arguments are validated; unknown modules/modes do not mutate UI. Shared methods drive header buttons and commands. Opening a panel is interactive and does not generate, save, upload or publish anything.
 
 Future modules register their own stable ID and use the generic mode command. Add feature-specific commands for their user actions. Session state and saved macros continue using stable commands rather than DOM selectors.
+
+## Full-viewport extended mode (0.40.0)
+
+ModulePanels moves the active module body and its shared header into one native modal dialog. It fills 100vw × 100dvh and slides from the left, with a reduced-motion alternative. Native modal inertness blocks background buttons, focus and pointers; event containment and SessionEditor shortcut gating prevent scene actions. Minimal/Close restore the original DOM locations and preserve module state. Only one extended module may be active. Nested feature dialogs can still open above it. AI owns its viewer/history/input layout; Packaging owns all of its content and styles.
