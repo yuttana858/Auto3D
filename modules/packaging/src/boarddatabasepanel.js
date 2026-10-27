@@ -1,0 +1,17 @@
+import { ExportBoardCSV, ImportBoardCSV } from './boarddatabase.js';
+export function OpenBoardDatabaseEditor ({ records, save, readOnly = false })
+{
+    const existing = document.querySelector ('dialog.packaging_board_database'); if (existing) { existing.focus (); return { opened : true }; }
+    const dialog = document.createElement ('dialog'); dialog.className = 'packaging_board_database'; dialog.setAttribute ('aria-label', 'Board database CSV');
+    const add = (tag, text, parent = dialog) => { const node = document.createElement (tag); if (text !== undefined) { node.textContent = text; } parent.appendChild (node); return node; };
+    const header = add ('div'); header.className = 'packaging_board_database_header'; add ('h2', 'Board database · CSV', header); const close = add ('button', '×', header); close.type = 'button'; close.setAttribute ('aria-label', 'Close Board database CSV'); close.onclick = () => dialog.close ();
+    add ('p', 'Edit measured board specifications. Units are millimeters and g/m². Nominal defaults are starting points; allowance factors remain specific to each design.');
+    const input = add ('textarea'); input.setAttribute ('aria-label', 'Board database CSV'); input.maxLength = 65536; input.value = ExportBoardCSV (records); input.readOnly = readOnly; input.spellcheck = false;
+    const actions = add ('div'); actions.className = 'packaging_board_database_actions'; const file = add ('input', undefined, actions); file.type = 'file'; file.accept = '.csv,text/csv'; file.hidden = true;
+    const load = add ('button', 'Open CSV file', actions); load.type = 'button'; load.disabled = readOnly; load.onclick = () => file.click ();
+    const download = add ('button', 'Download CSV', actions); download.type = 'button'; download.onclick = () => { try { const data = ExportBoardCSV (ImportBoardCSV (input.value)); const url = URL.createObjectURL (new Blob ([data], { type : 'text/csv;charset=utf-8' })); const anchor = document.createElement ('a'); anchor.href = url; anchor.download = 'auto3d-board-database.csv'; anchor.click (); setTimeout (() => URL.revokeObjectURL (url), 1000); } catch (error) { status.textContent = error.message; } };
+    const saveButton = add ('button', 'Save database', actions); saveButton.type = 'button'; saveButton.disabled = readOnly; const status = add ('p', ''); status.setAttribute ('role', 'status');
+    file.onchange = async () => { try { const source = file.files[0]; if (!source) { return; } if (source.size > 65536) { throw new Error ('Use a CSV file up to 64 KiB.'); } input.value = ExportBoardCSV (ImportBoardCSV (await source.text ())); status.textContent = 'CSV loaded. Save database to commit changes.'; } catch (error) { status.textContent = error.message; } finally { file.value = ''; } };
+    saveButton.onclick = async () => { saveButton.disabled = true; input.disabled = true; load.disabled = true; status.textContent = 'Saving database…'; try { const next = ImportBoardCSV (input.value); await save (next); input.value = ExportBoardCSV (next); status.textContent = 'Board database saved.'; } catch (error) { status.textContent = error.message; } finally { saveButton.disabled = readOnly; input.disabled = false; load.disabled = readOnly; } };
+    dialog.addEventListener ('close', () => dialog.remove (), { once : true }); document.body.appendChild (dialog); dialog.showModal (); return { opened : true };
+}

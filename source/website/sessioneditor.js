@@ -1,3 +1,5 @@
+import { VisibleSceneBounds } from '../engine/viewer/fitview.js';
+import { Coord3D } from '../engine/geometry/coord3d.js';
 import { CapturePresentationBackground } from './sharedpresentation.js';
 import { Theme } from './settings.js';
 import { PreparePackagingPresentations } from './packagingadapter.js';
@@ -84,6 +86,7 @@ export class SessionEditor
         }
         viewer.scene.add (this.selectionBox);
         this.controls = new TransformControls (viewer.camera, viewer.renderer.domElement); this.controls.setSize (0.8); this.helper = this.controls.getHelper (); viewer.scene.add (this.helper);
+        viewer.navigation.onOrbitStart = () => this.OrbitSelected ();
         let panControlsEnabled = null;
         viewer.navigation.onPanModifier = active => {
             if (active && panControlsEnabled === null) { panControlsEnabled = this.controls.enabled; this.controls.enabled = false; }
@@ -237,7 +240,8 @@ export class SessionEditor
     {
         this.strip = Element ('div', 'scene_tools', undefined, this.website.parameters.rightContainerDiv); this.strip.setAttribute ('role', 'toolbar'); this.strip.setAttribute ('aria-label', 'Object tools');
         this.processing = new ProcessingFeedback ();
-        const tools = this.ModelTools ();
+        const stripHidden = new Set (['visible', 'remove', 'library', 'save', 'export', 'add']);
+        const tools = this.ModelTools ().filter (([key]) => !stripHidden.has (key));
         for (const [key, label, action] of tools) {
             const button = Element ('button', 'scene_tool', undefined, this.strip); button.title = label; button.setAttribute ('aria-label', label); button.innerHTML = '<svg viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">' + Icons[key] + '</svg>';
             button.addEventListener ('click', () => this.Run (action)); this.buttons.set (key, button);
@@ -1203,6 +1207,12 @@ export class SessionEditor
         if (this.readOnly || this.busy || !this.selected) { return; }
         const objects = this.SelectedObjects ().length ? this.SelectedObjects () : [this.selected]; const records = objects.map ((object) => ({ object, before : object.visible })); const after = !this.selected.visible;
         const apply = (restore) => { records.forEach ((item) => { item.object.visible = restore ? item.before : after; item.object.threeObject.visible = item.object.visible; }); this.website.UpdateMeshesVisibility (); this.Select (this.selected, false, true); }; apply (false); this.history.Push ({ undo : () => apply (true), redo : () => apply (false) }); this.RefreshButtons ();
+    }
+    OrbitSelected ()
+    {
+        const navigation = this.website.viewer.navigation; navigation.StopCameraMovement (); const bounds = this.selected?.visible !== false ? VisibleSceneBounds (this.selected?.threeObject) : null;
+        const center = bounds?.getCenter (new THREE.Vector3 ()); navigation.orbitCenter = center ? new Coord3D (center.x, center.y, center.z) : null;
+        return { focused : Boolean (center), objectId : center ? this.selected.id : null, pivot : center ? center.toArray () : null };
     }
     Focus () { if (!this.selected) { return; } this.UpdateSelectionBox (); if (!this.selectionBounds.isEmpty ()) { this.website.viewer.FitSphereToWindow (this.selectionBounds.getBoundingSphere (new THREE.Sphere ()), true); } }
     async Undo () { await this.history.Undo (); this.RefreshUI (); }

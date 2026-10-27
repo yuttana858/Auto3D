@@ -697,7 +697,7 @@
       "id": "packaging.fefco.inspect",
       "title": "Inspect FEFCO dimensions",
       "category": "Packaging",
-      "description": "Read the currently configured internal dimensions and caliper in canonical mm; W=X, L=Z, H=Y.",
+      "description": "Read configured FEFCO dimensions/caliper in canonical mm and their interpretation. Board-catalog generation uses CAD score spans; legacy inputs retain their reported interpretation.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -1305,6 +1305,112 @@
         "kind": "perforation",
         "cutMm": 3,
         "tieMm": 1
+      }
+    },
+    {
+      "id": "packaging.boards.inspect",
+      "title": "Inspect account board database",
+      "category": "Packaging",
+      "description": "Load the account board catalog and revision. Returns nominal defaults until the account saves its own records.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.boards.select",
+      "title": "Select board specification",
+      "category": "Packaging",
+      "description": "Select an account board for generation or apply its material snapshot to the selected linked box. Caliper comes from the record; selected-box changes support Undo.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string",
+            "enum": [
+              "generation",
+              "selected"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "nominal-b",
+        "target": "generation"
+      }
+    },
+    {
+      "id": "packaging.boards.open",
+      "title": "Edit board database CSV",
+      "category": "Packaging",
+      "description": "Open an interactive CSV editor. Save database explicitly persists the account catalog; opening does not write or alter existing models.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.boards.export",
+      "title": "Export board database CSV",
+      "category": "Packaging",
+      "description": "Return the account board catalog as editable CSV with canonical mm/gsm values; does not publish or download.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.boards.save_csv",
+      "title": "Save account board CSV",
+      "category": "Packaging",
+      "description": "Validate and replace the signed-in account board catalog from CSV. Uses revision checking against concurrent edits. Does not retroactively change saved model material snapshots.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "csv": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "csv"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "csv": "Full CSV from packaging.boards.export"
       }
     },
     {
@@ -3864,6 +3970,20 @@
       "title": "Inspect saved cameras",
       "category": "Camera",
       "description": "List named camera views saved in the current session.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "camera.orbit.focus_selected",
+      "title": "Orbit selected object",
+      "category": "Camera",
+      "description": "Use the selected visible object world-space center as the orbit pivot. Keeps current camera position, framing and zoom; right-drag uses the same method after the drag threshold.",
       "mutates": false,
       "inputSchema": {
         "type": "object",

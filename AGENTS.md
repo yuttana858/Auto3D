@@ -1,6 +1,6 @@
 # Project orientation
 
-Read `docs/project-status.md` for the current release, development log, validation and outstanding work, then `docs/agent-project-overview.md` for architecture and data flows. Production uses Cloudflare Pages Functions, private R2, Supabase account metadata and temporary approved-account sign-in; Microsoft Entra ID remains future work. Current production includes merged PR #42 (Auto3D 0.37.4 / Packaging 1.7.3). The CAD Apply and independent module-panel candidate in PR #43 is Auto3D 0.38.0 with Packaging 1.8.0; report both versions and the PR number for every new PR. Read `docs/pr16-reconciliation.md` before changing legacy published Library storage. Historical SQL in `database/history/pr16/` must not be replayed.
+Read `docs/project-status.md` for the current release, development log, validation and outstanding work, then `docs/agent-project-overview.md` for architecture and data flows. Production uses Cloudflare Pages Functions, private R2, Supabase account metadata and temporary approved-account sign-in; Microsoft Entra ID remains future work. Current main includes merged PR #43 (Auto3D 0.38.0 / Packaging 1.8.0). The board-catalog/orbit/readability candidate is Auto3D 0.39.0 with Packaging 1.9.0; report both versions and the PR number for every new PR. Read `docs/pr16-reconciliation.md` before changing legacy published Library storage. Historical SQL in `database/history/pr16/` must not be replayed.
 
 # Agent-accessible features
 
@@ -19,3 +19,7 @@ FEFCO generators, extrusion, textures, catalog UI and module styles belong in mo
 Top-level docked modules register with `ModulePanels` and use its minimal, extended and closed controls. Do not add new feature tabs or content to AIWorkspace. AI content/styles belong to `aiworkspace.js` and `css/aiworkspace.css`. Packaging generation/panel content and styles belong inside `modules/packaging`; `packagingpanel.js` is only the host adapter for lazy loading and scene actions. Other modules keep their own content and use the shared shell instead of copying layout logic. Keep legacy command aliases working when moving UI.
 
 Use shared `--workspace-menu-font-size`, `--workspace-help-font-size`, `--workspace-meta-font-size` and `--workspace-title-font-size` tokens for left/right docked menus. Keep the mobile rail available and preserve scene state when resizing or closing a module. See `docs/module-panels.md`.
+
+# Board catalog
+
+Account catalog defaults, CSV parsing/validation, selector UI and editor styling live in `modules/packaging`. Host storage lives in `source/website/boarddatabase.js` and the authenticated Pages route; do not put it in AI. Keep allowance factors design-specific, preserve saved material snapshots when catalog records change, validate before mutation, and keep revision-based conflict checks. Never silently fall back to a local-only save if the account API fails. See `docs/board-database.md` and the applied `20261027185638_account_board_catalog` migration.

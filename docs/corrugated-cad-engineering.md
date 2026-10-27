@@ -43,3 +43,7 @@ Initially use a developable sheet deformation with the neutral surface mapped to
 - TAPPI test index (including score quality and bending): https://www.tappi.org/menus/publications-standards/tappi-publications/standard-specific-interest-group/fiberboard-shipping-containers/
 
 All flute values in the JSON catalog are indicative references; company/supplier values will override them, with provenance and measurement method stored.
+
+## Reusable account board catalog (0.39.0)
+
+The grouped right-panel Board selector and CSV editor now use an account catalog. Component/caliper records are reusable; per-style allowance factors remain in the design. Generated models and archives retain material snapshots, so updating the account catalog does not rewrite saved CAD. Explicitly selecting a board on a linked model applies it with Undo. See [board-database.md](board-database.md).

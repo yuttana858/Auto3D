@@ -52,3 +52,15 @@
 .packaging_workspace .fefco_catalog button { background: var(--packaging-background, var(--ov_background_color, #fff)); border: 1px solid var(--packaging-border, var(--ov_border_color, #aaa)); border-radius: 4px; padding: 8px; }
 .packaging_workspace .fefco_catalog button[aria-pressed="true"] { border-color: #bc8d52; }
 @media (max-width: 650px) { .packaging_module_panel[data-mode="extended"] .packaging_generator_layout { display: flex; } }
+
+.packaging_board_database { width: min(1000px, 92vw); max-width: calc(100vw - 32px); max-height: calc(100vh - 40px); box-sizing: border-box; overflow: auto; padding: 18px; color: var(--packaging-foreground, var(--ov_foreground_color, #252525)); background: var(--packaging-background, var(--ov_background_color, #fff)); border: 1px solid var(--packaging-border, var(--ov_border_color, #aaa)); border-radius: 8px; }
+.packaging_board_database_header, .packaging_board_database_actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.packaging_board_database_header { justify-content: space-between; }
+.packaging_board_database h2 { margin: 0; font-size: 16px; }
+.packaging_board_database p { font-size: 12px; line-height: 1.5; }
+.packaging_board_database textarea { display: block; width: 100%; height: min(420px, 48vh); box-sizing: border-box; margin: 14px 0; padding: 10px; white-space: pre; overflow: auto; font: 12px/1.5 monospace; color: inherit; background: transparent; border: 1px solid var(--ov_border_color, #aaa); }
+.packaging_board_database button { padding: 8px; background: transparent; color: inherit; font: inherit; font-size: 12px; border: 1px solid var(--ov_border_color, #aaa); border-radius: 4px; cursor: pointer; }
+.fefco_dimension_row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.fefco_board_row { display: flex; gap: 6px; align-items: end; }
+.fefco_board_row label { flex: 1; }
+.fefco_board_row button { flex: 0 0 32px; min-width: 32px; }

@@ -13,7 +13,8 @@ export class PackagingPanel
     {
         if (!this.loading) {
             this.panel.textContent = 'Loading Packaging…';
-            this.loading = LoadPackagingModule ().then (module => {
+            this.loading = LoadPackagingModule ().then (async module => {
+                await this.website.sessionEditor.packaging.BoardStore ();
                 this.panel.replaceChildren (); const host = this.website.sessionEditor.packaging.PanelHost ();
                 this.workspace = new module.PackagingPanel ({ ...host, version : PackagingModuleVersion, profile : () => this.website.sessionEditor.packaging.Design (), openDesigner : () => { const packaging = this.website.sessionEditor.packaging; return this.website.sessionEditor.selected?.packagingProfile ? packaging.OpenSelected () : packaging.Open (); }, download : format => this.website.sessionEditor.packaging.Download (format) }, this.panel);
                 this.fefcoPanel = this.workspace.fefcoPanel;

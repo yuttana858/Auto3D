@@ -254,6 +254,7 @@ export class Navigation
         this.suppressContextMenu = false;
         this.spacePan = false;
         this.panGesture = false;
+        this.orbitCenter = null; this.rightOrbitStarted = false;
 
 		if (this.canvas.addEventListener) {
 			this.canvas.addEventListener ('mousedown', this.OnMouseDown.bind (this));
@@ -408,6 +409,7 @@ export class Navigation
 		this.mouse.Down (this.canvas, ev);
         this.panGesture = this.spacePan && ev.which === 1;
 		this.clickDetector.Start (this.mouse.GetPosition ());
+        this.orbitCenter = null; this.rightOrbitStarted = false;
         if (ev.which === 3) { this.suppressContextMenu = false; }
 	}
 
@@ -434,8 +436,10 @@ export class Navigation
         if (mouseButton === 2 || (mouseButton === 1 && this.panGesture)) {
             navigationType = NavigationType.Pan;
         } else if (mouseButton === 3) {
-            navigationType = NavigationType.Orbit;
-            if (!this.clickDetector.IsClick ()) { this.suppressContextMenu = true; }
+            if (!this.clickDetector.IsClick ()) {
+                navigationType = NavigationType.Orbit; this.suppressContextMenu = true;
+                if (!this.rightOrbitStarted) { this.rightOrbitStarted = true; this.onOrbitStart?.(); }
+            }
         }
 
 		if (navigationType === NavigationType.Orbit) {
@@ -477,6 +481,7 @@ export class Navigation
 
 	OnTouchStart (ev)
 	{
+        this.orbitCenter = null;
         if (!this.enabled) { return; }
 		ev.preventDefault ();
 
@@ -572,6 +577,8 @@ export class Navigation
 
 	Orbit (angleX, angleY)
 	{
+        const pivot = this.orbitCenter || this.camera.center;
+        const rotate = (axis, angle) => { this.camera.eye.Rotate (axis, angle, pivot); if (pivot !== this.camera.center) { this.camera.center.Rotate (axis, angle, pivot); } };
 		let radAngleX = angleX * DegRad;
 		let radAngleY = angleY * DegRad;
 
@@ -582,13 +589,13 @@ export class Navigation
 			let originalAngle = VectorAngle3D (viewDirection, this.camera.up);
 			let newAngle = originalAngle + radAngleY;
 			if (IsGreater (newAngle, 0.0) && IsLower (newAngle, Math.PI)) {
-				this.camera.eye.Rotate (horizontalDirection, -radAngleY, this.camera.center);
+				rotate (horizontalDirection, -radAngleY);
 			}
-			this.camera.eye.Rotate (this.camera.up, -radAngleX, this.camera.center);
+			rotate (this.camera.up, -radAngleX);
 		} else if (this.navigationMode === NavigationMode.FreeOrbit) {
 			let verticalDirection = CrossVector3D (horizontalDirection, viewDirection).Normalize ();
-			this.camera.eye.Rotate (horizontalDirection, -radAngleY, this.camera.center);
-			this.camera.eye.Rotate (verticalDirection, -radAngleX, this.camera.center);
+			rotate (horizontalDirection, -radAngleY);
+			rotate (verticalDirection, -radAngleX);
 			this.camera.up = verticalDirection;
 		}
 	}
