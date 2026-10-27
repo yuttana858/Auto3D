@@ -1,6 +1,4 @@
 import { AppVersion } from './preferences.js';
-import { PackagingModuleVersion } from '../../modules/packaging/src/version.js';
-import { LoadPackagingModule } from './packagingadapter.js';
 
 const AIStorageKey = 'auto3d-ai-connections-v1';
 
@@ -89,19 +87,8 @@ export class AIWorkspace
     {
         const right = this.website.parameters.rightContainerDiv;
         const panel = Element ('div', 'ai_workspace_panel', undefined, right); panel.hidden = true;
-        const header = Element ('div', 'ai_workspace_header', undefined, panel);
-        const title = Element ('div', null, undefined, header); Element ('strong', null, 'AI & Packaging', title); this.connectionBadge = Element ('span', 'ai_connection_badge', 'Not connected', title);
-        const close = Element ('button', null, '×', header); close.title = 'Return to model data'; close.setAttribute ('aria-label', 'Close AI Generative'); close.addEventListener ('click', () => this.Close ());
-
-        const tabs = Element ('div', 'ai_workspace_tabs', undefined, panel); tabs.setAttribute ('role', 'tablist'); tabs.setAttribute ('aria-label', 'AI and Packaging');
-        this.tabButtons = new Map ();
-        for (const [id, label] of [['ai', 'AI'], ['packaging', 'Packaging']]) {
-            const button = Element ('button', null, label, tabs); Element ('span', 'module_version', 'v' + (id === 'ai' ? AppVersion : PackagingModuleVersion), button); button.setAttribute ('aria-label', label); button.id = 'workspace_tab_' + id; button.setAttribute ('role', 'tab'); button.setAttribute ('aria-controls', 'workspace_pane_' + id);
-            button.addEventListener ('click', () => this.website.sessionEditor.Run (() => this.SetTab (id)));
-            button.addEventListener ('keydown', event => { if (['ArrowLeft', 'ArrowRight'].includes (event.key)) { event.preventDefault (); const next = id === 'ai' ? 'packaging' : 'ai'; this.website.sessionEditor.Run (() => this.SetTab (next)); this.tabButtons.get (next).focus (); } });
-            this.tabButtons.set (id, button);
-        }
-        this.aiPane = Element ('div', 'ai_workspace_pane', undefined, panel); this.aiPane.id = 'workspace_pane_ai'; this.aiPane.setAttribute ('role', 'tabpanel'); this.aiPane.setAttribute ('aria-labelledby', 'workspace_tab_ai');
+        const header = Element ('div', 'ai_workspace_header', undefined, panel); Element ('span', 'module_version', 'AI v' + AppVersion, header); this.connectionBadge = Element ('span', 'ai_connection_badge', 'Not connected', header);
+        this.aiPane = Element ('div', 'ai_workspace_pane', undefined, panel);
         const inputSection = Element ('div', 'ai_workspace_section', undefined, this.aiPane);
         Element ('strong', null, 'Create', inputSection);
         this.prompt = Element ('textarea', 'ai_prompt', undefined, inputSection); this.prompt.rows = 4; this.prompt.maxLength = 800; this.prompt.placeholder = 'Describe the object, image, or texture you want to create…'; this.prompt.setAttribute ('aria-label', 'AI generation prompt'); this.prompt.addEventListener ('input', () => this.RefreshActions ());
@@ -140,69 +127,12 @@ export class AIWorkspace
         const recentHeader = Element ('div', 'ai_recent_header', undefined, recentSection); Element ('strong', null, 'Latest creations', recentHeader); const refresh = Element ('button', null, 'Refresh', recentHeader); refresh.addEventListener ('click', () => this.RefreshRecent ());
         this.recentGrid = Element ('div', 'ai_recent_grid', undefined, recentSection);
         this.RenderRecent (); this.RefreshConnection ();
-        this.packagingPane = Element ('div', 'ai_workspace_pane ai_packaging_pane', undefined, panel); this.packagingPane.id = 'workspace_pane_packaging'; this.packagingPane.setAttribute ('role', 'tabpanel'); this.packagingPane.setAttribute ('aria-labelledby', 'workspace_tab_packaging');
-        this.packagingModuleMount = Element ('div', null, undefined, this.packagingPane);
-        Element ('strong', null, 'Packaging design', this.packagingPane);
-        Element ('p', 'section_hint', 'Draw cut and score profiles, set board thickness, and export SVG or DXF patterns.', this.packagingPane);
-        this.packagingSummary = Element ('p', 'ai_packaging_summary', '', this.packagingPane);
-        this.packagingActions = [];
-        for (const [label, action] of [['Open packaging designer', () => {
-            const editor = this.website.sessionEditor; const result = editor.selected?.packagingProfile ? editor.packaging.OpenSelected () : editor.packaging.Open (); editor.packaging.dialog?.addEventListener ('close', () => this.RefreshPackaging (), { once : true }); return result;
-        }], ['Download SVG', () => this.website.sessionEditor.packaging.Download ('svg')], ['Download DXF', () => this.website.sessionEditor.packaging.Download ('dxf')]]) {
-            const button = Element ('button', 'ai_packaging_action', label, this.packagingPane); button.addEventListener ('click', () => this.website.sessionEditor.Run (action)); this.packagingActions.push (button);
-        }
-        this.panel = panel; this.SetTab ('ai');
+        this.panel = panel; panel.id = 'ai_module_panel'; panel.setAttribute ('aria-label', 'AI Generative');
+        this.website.modulePanels.Register ('ai', { title : 'AI Generative', body : panel, onOpen : () => this.RefreshConnection (), onMode : state => this.headerButton?.setAttribute ('aria-pressed', String (state.visible)) });
     }
 
-    RefreshPackaging ()
-    {
-        if (!this.packagingSummary) { return; }
-        const editor = this.website.sessionEditor; const design = editor.packaging.Design ();
-        this.packagingSummary.textContent = design.name + ' · ' + design.paths.length + ' paths · ' + design.thickness + ' mm board';
-        for (const button of this.packagingActions) { button.disabled = editor.busy || editor.readOnly; }
-        this.fefcoPanel?.Refresh ();
-    }
-
-    async EnsurePackagingPanel ()
-    {
-        if (this.fefcoPanel) { return; }
-        if (!this.packagingPanelPromise) {
-            this.packagingModuleMount.textContent = 'Loading Packaging…';
-            this.packagingPanelPromise = LoadPackagingModule ().then (module => { this.packagingModuleMount.replaceChildren (); this.fefcoPanel = new module.FefcoPanel (this.website.sessionEditor.packaging.PanelHost (), this.packagingModuleMount); }).catch (error => { this.packagingPanelPromise = null; this.packagingModuleMount.textContent = error.message + ' Open this tab again to retry.'; throw error; });
-        }
-        await this.packagingPanelPromise;
-    }
-
-    async SetTab (tab)
-    {
-        if (!['ai', 'packaging'].includes (tab)) { throw new Error ('Choose AI or Packaging.'); }
-        this.activeTab = tab;
-        for (const [id, button] of this.tabButtons) { button.setAttribute ('aria-selected', String (id === tab)); button.tabIndex = id === tab ? 0 : -1; }
-        this.aiPane.hidden = tab !== 'ai'; this.packagingPane.hidden = tab !== 'packaging';
-        if (tab === 'packaging') { await this.EnsurePackagingPanel (); this.RefreshPackaging (); }
-    }
-
-    async Open (tab = 'ai')
-    {
-        if (window.innerWidth < 800 && !this.website.parameters.leftContainerDiv.classList.contains ('collapsed')) { document.getElementById ('upload_panel_toggle').click (); }
-        const right = this.website.parameters.rightContainerDiv;
-        right.classList.remove ('collapsed');
-        document.getElementById ('data_panel_content').hidden = true;
-        this.panel.hidden = false; const ready = this.SetTab (tab);
-        const toggle = document.getElementById ('data_panel_toggle'); toggle.querySelector ('span:first-child').textContent = 'AI & Packaging'; toggle.setAttribute ('aria-expanded', 'true');
-        this.headerButton?.setAttribute ('aria-pressed', 'true');
-        this.website.layouter.Resize ();
-        this.RefreshConnection (); await ready; return { opened : true, tab };
-    }
-
-    Close ()
-    {
-        this.panel.hidden = true;
-        document.getElementById ('data_panel_content').hidden = false;
-        const toggle = document.getElementById ('data_panel_toggle'); toggle.querySelector ('span:first-child').textContent = 'Model data';
-        this.headerButton?.setAttribute ('aria-pressed', 'false');
-        this.website.layouter.Resize ();
-    }
+    Open () { return this.website.modulePanels.Open ('ai'); }
+    Close () { return this.website.modulePanels.Set ('ai', 'closed'); }
 
     Headers (json = false)
     {

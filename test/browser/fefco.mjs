@@ -33,6 +33,6 @@ try {
     await page.getByRole ('button', { name : 'FEFCO 0202 OSC', exact : true }).click (); assert.equal (await page.getByLabel ('FEFCO Flap overlap').isVisible (), true);
     await page.getByLabel ('FEFCO Flap overlap').fill ('300'); await page.getByRole ('button', { name : 'Generate OSC · 3D box', exact : true }).click (); await page.waitForFunction (() => /overlap must/.test (document.querySelector ('.scene_status')?.textContent || '')); assert.equal ((await call ('packaging.fefco.inspect')).overlap, 25);
     await call ('preferences.units', { units : 'standard' }); assert.ok (Math.abs (Number (await page.getByLabel ('FEFCO Length (L)').inputValue ()) - 400 / 25.4) < 0.000001); await call ('preferences.units', { units : 'metric' });
-    await page.setViewportSize ({ width : 390, height : 844 }); await call ('ui.ai.packaging'); assert.equal (await page.locator ('.ai_workspace_panel').evaluate (node => node.scrollWidth <= node.clientWidth + 1), true); await page.screenshot ({ path : 'work/fefco-mobile.png' });
+    await page.setViewportSize ({ width : 390, height : 844 }); await call ('ui.ai.packaging'); assert.equal (await page.locator ('#packaging_module_panel').evaluate (node => node.scrollWidth <= node.clientWidth + 1), true); await page.screenshot ({ path : 'work/fefco-mobile.png' });
     assert.deepEqual (errors, []); console.log ('v0.36.0: FEFCO thumbnails, real HSC/RSC generation, open/closed flaps, archive textures, Undo/Redo, validation, inches and mobile panel passed.');
 } finally { await browser.close (); }

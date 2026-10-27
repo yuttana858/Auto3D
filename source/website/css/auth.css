@@ -28,7 +28,8 @@
 
 .password_input { position: relative; display: flex; align-items: center; }
 .auth_panel .password_input input { width: 100%; padding-right: 44px; box-sizing: border-box; }
-.auth_panel .password_eye { position: absolute; right: 4px; width: 34px; min-height: 30px; padding: 5px; margin: 0; border: 0; background: transparent; color: inherit; }
+.auth_panel .password_eye { position: absolute; right: 4px; width: 34px; min-height: 30px; padding: 5px; margin: 0; border: 0; background: transparent; color: #253f54; }
+.auth_panel .password_eye:focus-visible { outline: 2px solid #168cc0; outline-offset: 1px; }
 .auth_header_button { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .auth_header_button { background: transparent; border: 0; color: #249dcf; box-shadow: none; }

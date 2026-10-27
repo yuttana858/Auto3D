@@ -20,3 +20,11 @@
 @media (max-width: 700px) { .packaging_body { display: flex; flex-direction: column; overflow:auto; } .packaging_controls { flex: 0 0 auto; max-height: 45vh; } .packaging_drawing { min-height: 40vh; } .packaging_canvas { min-height: 250px; } }
 
 @media (max-width: 700px) { .packaging_dialog { padding: 12px; width: 96vw; max-width: 96vw; height: 92vh; max-height: 92vh; } }
+
+.packaging_applybar select { flex: 1 1 auto; width: auto; min-width: 0; background: var(--ov_background_color); color: var(--ov_foreground_color); border: 1px solid var(--ov_border_color); border-radius: 4px; padding: 7px; }
+.packaging_applybar button { flex: 0 0 auto; min-width: 130px; white-space: nowrap; }
+.packaging_toolstrip { align-items: stretch; }
+.packaging_toolstrip label { flex: 1; }
+.packaging_toolstrip button { flex: 0 0 auto; min-width: 44px; }
+
+.packaging_toolstrip button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; }

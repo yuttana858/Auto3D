@@ -10,7 +10,7 @@ export class FefcoPanel
     constructor (workspace, parent)
     {
         this.host = workspace; this.fields = new Map (); this.cards = new Map (); this.controls = []; this.dimensionFields = new Map (); this.draftDirty = new Set ();
-        const root = Element ('section', parent, undefined, 'fefco_catalog');
+        const root = Element ('section', parent, undefined, 'fefco_catalog'); this.root = root;
         const dimensionsPanel = Element ('section', root, undefined, 'fefco_selected_dimensions'); this.dimensionsPanel = dimensionsPanel; dimensionsPanel.setAttribute ('aria-label', 'Selected box dimensions'); Element ('strong', dimensionsPanel, 'Box dimensions');
         this.dimensionName = Element ('p', dimensionsPanel, 'Generate or select a box.', 'section_hint');
         const modeLabel = Element ('label', dimensionsPanel, 'Measure', 'fefco_field'); this.dimensionMode = Element ('select', modeLabel); this.dimensionMode.setAttribute ('aria-label', 'Box dimension basis'); this.dimensionMode.add (new Option ('Inside · minimum usable', 'inside')); this.dimensionMode.add (new Option ('Outside · maximum envelope', 'outside')); this.dimensionMode.addEventListener ('change', () => workspace.dimensionMode (this.dimensionMode.value));

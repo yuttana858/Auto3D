@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { AppVersion } from '../../source/website/preferences.js';
+import { PackagingModuleVersion } from '../../modules/packaging/src/version.js';
 import { chromium } from 'playwright-core';
 import { readFile } from 'node:fs/promises';
 import { EncodeRGBTexture } from '../../modules/packaging/src/surfacetextures.js';
@@ -11,7 +13,7 @@ try {
     for (const path of ['accounts/**', 'personal/items', 'environments']) { await page.route ('**/api/' + path, route => route.fulfill ({ json : path.startsWith ('accounts') ? { isAdmin : false } : [] })); }
     await page.goto (process.env.AUTO3D_TEST_URL || 'http://127.0.0.1:8081/'); await page.locator ('#startup_splash').waitFor ({ state : 'detached' }); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
     const call = async (id, args = {}) => { console.log ('Checking', id); const result = await page.evaluate (({ id, args }) => Promise.race ([Auto3D.execute (id, args), new Promise (resolve => setTimeout (() => resolve ({ ok : false, error : { message : 'Command timeout: ' + id } }), 30000))]), { id, args }); if (!result.ok) { console.log (JSON.stringify (await page.evaluate (() => Auto3D.execute ('diagnostics.list')))); } assert.equal (result.ok, true, JSON.stringify (result)); return result.result; };
-    assert.equal ((await call ('app.version.inspect')).version, '0.36.0'); await call ('ui.ai'); assert.equal (await page.locator ('#workspace_tab_ai .module_version').textContent (), 'v0.36.0'); assert.equal (await page.locator ('#workspace_tab_packaging .module_version').textContent (), 'v1.6.0');
+    assert.equal ((await call ('app.version.inspect')).version, AppVersion); await call ('ui.ai'); assert.equal (await page.locator ('#ai_module_panel .module_version').textContent (), 'AI v' + AppVersion); await call ('ui.packaging'); assert.equal (await page.locator ('#packaging_module_panel .module_version').textContent (), 'Packaging v' + PackagingModuleVersion);
     await call ('packaging.fefco.generate', { code : '0201', closure : 'closed' }); const materials = await call ('material.list'); const liner = materials.find (m => m.name === 'Natural kraft liner'); assert.equal (Object.keys (liner.maps).length, 8);
     await call ('ui.materials'); await page.getByLabel ('Material', { exact : true }).selectOption (String (await page.getByLabel ('Material', { exact : true }).locator ('option').evaluateAll (nodes => nodes.findIndex (n => n.textContent === 'Natural kraft liner'))));
     assert.equal (await page.locator ('.surface_map_card').count (), 7); assert.equal (await page.locator ('.editor_tabs').count (), 0);

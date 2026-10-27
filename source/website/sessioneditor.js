@@ -220,7 +220,7 @@ export class SessionEditor
 
     ModelTools ()
     {
-        return [['packaging', 'Packaging design', () => this.website.aiWorkspace?.Open ('packaging')], ['select', 'Select (V)', () => this.SetMode ('select')], ['move', 'Move (W)', () => this.SetMode ('translate')], ['rotate', 'Rotate (E)', () => this.SetMode ('rotate')], ['scale', 'Scale (R)', () => this.SetMode ('scale')], ['duplicate', 'Duplicate object (Ctrl+D)', () => this.Duplicate ()], ['array', 'Array selected object', () => this.ArrayDialog ()], ['floor', 'Drop selected object to floor', () => this.DropToFloor ()], ['visible', 'Hide or show object (H)', () => this.ToggleVisibility ()], ['remove', 'Delete object', () => this.Delete ()], ['focus', 'Focus object (F)', () => this.Focus ()], ['fit', 'Fit all objects to screen', () => this.FitScene ()], ['update', 'Update selected model', () => this.UpdateModel ()], ['undo', 'Undo object edit (Ctrl+Z)', () => this.Undo ()], ['redo', 'Redo object edit (Ctrl+Shift+Z)', () => this.Redo ()], ['add', 'Add model', () => this.AddModel ()], ['save', 'Save or open session (Ctrl+S)', () => this.library.SaveDialog (true)], ['export', 'Export', () => this.Export ()], ['library', 'Model library', () => this.library.Open ()], ['ai', 'AI Generative', () => this.website.aiWorkspace?.Open ()]];
+        return [['ai', 'AI Generative', () => this.website.aiWorkspace?.Open ()], ['packaging', 'Packaging design', () => this.website.packagingPanel?.Open ()], ['select', 'Select (V)', () => this.SetMode ('select')], ['move', 'Move (W)', () => this.SetMode ('translate')], ['rotate', 'Rotate (E)', () => this.SetMode ('rotate')], ['scale', 'Scale (R)', () => this.SetMode ('scale')], ['duplicate', 'Duplicate object (Ctrl+D)', () => this.Duplicate ()], ['array', 'Array selected object', () => this.ArrayDialog ()], ['floor', 'Drop selected object to floor', () => this.DropToFloor ()], ['visible', 'Hide or show object (H)', () => this.ToggleVisibility ()], ['remove', 'Delete object', () => this.Delete ()], ['focus', 'Focus object (F)', () => this.Focus ()], ['fit', 'Fit all objects to screen', () => this.FitScene ()], ['update', 'Update selected model', () => this.UpdateModel ()], ['undo', 'Undo object edit (Ctrl+Z)', () => this.Undo ()], ['redo', 'Redo object edit (Ctrl+Shift+Z)', () => this.Redo ()], ['add', 'Add model', () => this.AddModel ()], ['save', 'Save or open session (Ctrl+S)', () => this.library.SaveDialog (true)], ['export', 'Export', () => this.Export ()], ['library', 'Model library', () => this.library.Open ()]];
     }
 
     ToolDisabled (key)
@@ -657,7 +657,7 @@ export class SessionEditor
     RefreshButtons ()
     {
         this.processing?.Sync (this.busy && !this.packaging?.foldOperation && !this.packaging?.dimensionUpdating && this.arrayOperation?.stage !== 'revealing' && !this.website?.rendering?.running); this.commandBar?.SetBusy (this.busy);
-        this.website?.aiWorkspace?.fefcoPanel?.SetDisabled ();
+        this.website?.packagingPanel?.fefcoPanel?.SetDisabled ();
         for (const [key, button] of this.buttons) {
             button.disabled = this.ToolDisabled (key);
             if (['select', 'move', 'rotate', 'scale'].includes (key)) { button.setAttribute ('aria-pressed', String ((key === 'move' ? 'translate' : key) === this.mode)); }
@@ -986,8 +986,8 @@ export class SessionEditor
         const embedded = Element ('div', 'embedded_animation', undefined, this.animationPanel);
         Element ('strong', null, 'Embedded animation', embedded);
         if (!player) {
-            if (this.selected) { Element ('p', 'section_hint', this.selected.animationError || 'No embedded animation in this model. Use Advance animation to animate scene and camera positions.', embedded); }
-            else { Element ('p', 'section_hint', 'Select a model to inspect any embedded GLB/glTF animation clips.', embedded); }
+            if (this.selected?.animationError) { Element ('p', 'section_hint', this.selected.animationError, embedded); }
+            else if (!this.selected) { Element ('p', 'section_hint', 'Select a model to inspect any embedded GLB/glTF animation clips.', embedded); }
             return;
         }
         const clips = Element ('select', null, undefined, embedded); clips.setAttribute ('aria-label', 'Animation clip'); player.clips.forEach ((clip, index) => clips.add (new Option (clip.name || 'Clip ' + (index + 1), index))); clips.value = String (player.state.clip);

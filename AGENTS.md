@@ -1,6 +1,6 @@
 # Project orientation
 
-Read `docs/project-status.md` for the current release, development log, validation and outstanding work, then `docs/agent-project-overview.md` for architecture and data flows. Production uses Cloudflare Pages Functions, private R2, Supabase account metadata and temporary approved-account sign-in; Microsoft Entra ID remains future work. Current main includes merged PR #41 (Auto3D 0.37.3 / Packaging 1.7.2). The saved/closed RSC compatibility release candidate in PR #42 is Auto3D 0.37.4 with Packaging 1.7.3; report both versions and the PR number for every new PR. Read `docs/pr16-reconciliation.md` before changing legacy published Library storage. Historical SQL in `database/history/pr16/` must not be replayed.
+Read `docs/project-status.md` for the current release, development log, validation and outstanding work, then `docs/agent-project-overview.md` for architecture and data flows. Production uses Cloudflare Pages Functions, private R2, Supabase account metadata and temporary approved-account sign-in; Microsoft Entra ID remains future work. Current production includes merged PR #42 (Auto3D 0.37.4 / Packaging 1.7.3). The CAD Apply and independent module-panel candidate in PR #43 is Auto3D 0.38.0 with Packaging 1.8.0; report both versions and the PR number for every new PR. Read `docs/pr16-reconciliation.md` before changing legacy published Library storage. Historical SQL in `database/history/pr16/` must not be replayed.
 
 # Agent-accessible features
 
@@ -13,3 +13,9 @@ Keep `website/assets/commands.json` synchronized with the registry. Document any
 # Packaging module boundary
 
 FEFCO generators, extrusion, textures, catalog UI and module styles belong in modules/packaging. Its neutral API and independent tests/build/preview must work without imports from source/engine or source/website. Auto3D integrates through source/website/packagingadapter.js and PackagingWorkspace. Load geometry/UI on demand; archive-safe pure profile validation may be shared at startup. Preserve this boundary when adding packaging features and report both app and module versions in release PRs.
+
+# Module panels and design consistency
+
+Top-level docked modules register with `ModulePanels` and use its minimal, extended and closed controls. Do not add new feature tabs or content to AIWorkspace. AI content/styles belong to `aiworkspace.js` and `css/aiworkspace.css`. Packaging generation/panel content and styles belong inside `modules/packaging`; `packagingpanel.js` is only the host adapter for lazy loading and scene actions. Other modules keep their own content and use the shared shell instead of copying layout logic. Keep legacy command aliases working when moving UI.
+
+Use shared `--workspace-menu-font-size`, `--workspace-help-font-size`, `--workspace-meta-font-size` and `--workspace-title-font-size` tokens for left/right docked menus. Keep the mobile rail available and preserve scene state when resizing or closing a module. See `docs/module-panels.md`.

@@ -6,8 +6,8 @@ export function InstallAuthGate (website)
     const panel = website.authPanel.Create (); screen.appendChild (panel); document.body.appendChild (screen);
     const retry = document.createElement ('button'); retry.textContent = 'Check saved sign-in';
     const status = document.createElement ('p'); status.setAttribute ('role', 'status'); screen.append (retry, status);
-    const check = async () => { retry.disabled = true; status.textContent = 'Checking saved sign-in…'; try { await auth.Restore (); if (auth.user && !website.accountReady) { await render (); } } catch (error) { status.textContent = error.message; } finally { retry.disabled = false; } };
-    retry.addEventListener ('click', check);
+    const check = async (silent = false) => { retry.disabled = true; status.textContent = 'Checking saved sign-in…'; try { await auth.Restore (); if (auth.user && !website.accountReady) { await render (); } } catch { status.textContent = silent ? '' : 'Could not verify saved sign-in. Please sign in again.'; } finally { retry.disabled = false; } };
+    retry.addEventListener ('click', () => check ());
     let unlocked = false;
     let generation = 0;
     website.accountReady = false;
@@ -41,7 +41,7 @@ export function InstallAuthGate (website)
     // Identity refreshes must not reload an already unlocked workspace.
     let wasSignedIn = false;
     auth.Subscribe (() => { const signedIn = Boolean (auth.user); if (signedIn !== wasSignedIn) { render (); } wasSignedIn = signedIn; });
-    render (); if (website.authPanel.recovery) { retry.hidden = true; } else { check (); }
+    render (); if (website.authPanel.recovery) { retry.hidden = true; } else { check (true); }
     const verify = () => { if (auth.user && !document.hidden) { auth.VerifyCurrentSession ().catch (() => {}); } };
     window.setInterval (verify, 30000); window.addEventListener ('focus', verify); document.addEventListener ('visibilitychange', verify);
     return { check };
