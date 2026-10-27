@@ -1,0 +1,17 @@
+# Account board catalog and CSV editing
+
+Auto3D 0.39.0 / Packaging 1.9.0.
+
+Each account has a reusable catalog of board records. Packaging shows grouped E/B/C/EB/BC choices. Select a board for the next generated box, or select it under Selected box to explicitly update the linked model. Caliper is read from the record rather than a separate right-panel numeric input. Advanced per-design measured values remain available in the CAD Measurement layer.
+
+Open the gear beside Board to view/edit CSV. **Open CSV file** replaces only the editor draft, **Download CSV** exports validated content, and **Save database** persists it to the signed-in account. Saving the catalog does not rewrite an existing box: each model carries a material snapshot. Re-select a record to apply new catalog values to that model, with Undo. Nominal entries are not supplier-certified data; supply measured caliper, component paper properties and process tolerances for engineering work.
+
+The CSV contains ID/name/flute, caliper and caliper tolerance, liner/medium grades/GSM/calipers, flute pitch/direction, score width/tolerance, residual process tolerance, conditioning, process/provenance and calibration status. Header order may change, but every supported column must appear exactly once. Quotes, commas and newlines follow CSV escaping. Numeric cells must be finite; booleans are `true`/`false`; IDs must be unique. There must be 1–32 records within 64 KiB. Paper calipers must fit within board caliper; generation supports 0.5–15 mm caliper. Allowance factors intentionally remain per design/style and are not CSV catalog columns.
+
+`modules/packaging/src/boarddatabase.js` owns defaults, CSV and validation; `boarddatabasepanel.js` owns the neutral editor. `panel.js` owns grouped selectors and W/L/H rows. No module code imports the app engine/auth/database provider. Auto3D's `AccountBoardDatabase` service and PackagingWorkspace bridge account persistence and scene updates. Standalone hosts can supply board storage/editor callbacks; without them the neutral preview uses an in-memory catalog.
+
+`GET/PUT /api/packaging/boards` is behind the existing verified-session middleware. Every query is scoped to `data.user.id`; client owner fields are rejected. PUT requires the application origin, validates the complete catalog, and conditionally updates only the board JSON field against its previous revision. A stale save returns 409. The editor retains unsaved text on errors; reopen to load the latest revision. Client responses are rejected after account changes. No browser service key or direct table permission is introduced.
+
+Migration `database/20261027185638_account_board_catalog.sql` mirrors the applied Supabase-generated migration version. It adds nullable `public.auto3d_preferences.board_database`; NULL means app nominal defaults. Do not replay historical PR16 SQL. Existing account preference/folder updates select/update their own columns and cannot overwrite the board field. Catalog requests are private/no-store. Existing RLS and service-only grants remain unchanged.
+
+Agent commands share the same service and editor callbacks: `packaging.boards.inspect`, `packaging.boards.select {id,target}`, `packaging.boards.open`, `packaging.boards.export`, and `packaging.boards.save_csv {csv,revision?}`. `target` is `generation` or `selected`; first revision may be null. The schema is strict; saves are awaited and conflict-aware. Agent macros may use the exported CSV/revision, edit the CSV externally, then explicitly save.

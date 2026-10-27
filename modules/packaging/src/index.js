@@ -22,3 +22,6 @@ export { DefaultBoardAppearance, ValidateBoardAppearance } from './appearanceset
 export { BoardAppearanceMesh, TransformAppearanceMesh } from './boardappearance.js';
 
 export { PackagingPanel } from './workspacepanel.js';
+
+export * from './boarddatabase.js';
+export { OpenBoardDatabaseEditor } from './boarddatabasepanel.js';

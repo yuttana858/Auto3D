@@ -12,14 +12,15 @@ try {
  const call = async (id, args = {}) => { const r = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (r.ok, true, JSON.stringify (r)); return r.result; };
  await call ('ui.ai.packaging');
  for (const [i, [code, acronym]] of [['0201', 'RSC'], ['0200', 'HSC'], ['0202', 'OSC'], ['0203', 'FOL']].entries ()) {
-  for (const [label, value] of [['Length (L)', '15.748031'], ['Width (W)', '11.811024'], ['Height (H)', '9.84252'], ['Board caliper', '0.11811']]) { await page.getByLabel ('FEFCO ' + label, { exact : true }).fill (value); }
+  for (const [label, value] of [['Length (L)', '15.748031'], ['Width (W)', '11.811024'], ['Height (H)', '9.84252']]) { await page.getByLabel ('FEFCO ' + label, { exact : true }).fill (value); }
+  await page.getByLabel ('Board', { exact : true }).selectOption ('nominal-b');
   await page.getByRole ('button', { name : 'FEFCO ' + code + ' ' + acronym, exact : true }).click ();
   await page.waitForFunction (code => document.querySelector ('.scene_status')?.textContent.startsWith ('Added FEFCO ' + code), code, { timeout : 120000 });
   const scene = await call ('scene.inspect'); assert.equal (scene.objects.length, i + 1); assert.equal (JSON.parse (scene.objects.at (-1).userData._auto3dFefco).code, code);
   console.log ('Generated', code); assert.equal (await page.getByText ('Box added to scene.', { exact : true }).isVisible (), true);
  }
  await call ('history.undo'); assert.equal ((await call ('scene.inspect')).objects.length, 3); await call ('history.redo'); assert.equal ((await call ('scene.inspect')).objects.length, 4);
- const before = (await call ('scene.inspect')).objects.length; await page.getByLabel ('FEFCO Board caliper', { exact : true }).fill ('100');
+ const before = (await call ('scene.inspect')).objects.length; await page.getByLabel ('FEFCO Width (W)', { exact : true }).fill ('100');
  await page.getByRole ('button', { name : 'FEFCO 0201 RSC', exact : true }).click (); await page.getByText (/Cannot generate box:/).waitFor (); assert.equal ((await call ('scene.inspect')).objects.length, before);
  assert.equal (await page.getByRole ('button', { name : 'FEFCO 0201 RSC', exact : true }).isEnabled (), true);
  assert.deepEqual (errors, []); console.log ('All four thumbnail buttons generate the exact rounded inch defaults; Undo/Redo and inline error feedback passed.');

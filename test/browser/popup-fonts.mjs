@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright-core';
+const browser = await chromium.launch ({ executablePath : '/usr/bin/chromium', args : ['--no-sandbox', '--enable-unsafe-swiftshader'] });
+try {
+    const page = await browser.newPage (); page.setDefaultTimeout (30000);
+    await page.route ('**/api/auth/**', route => route.fulfill ({ json : { user : null } }));
+    await page.goto ('http://127.0.0.1:8080/website/index.html'); await page.waitForFunction (() => window.Auto3D);
+    await page.evaluate (() => { const root = document.createElement ('div'); root.className = 'ov_dialog'; root.id = 'font-fixture'; root.innerHTML = '<label style="font-size:11px">Label <strong>Child</strong></label><input style="font-size:14px"><svg><text style="font-size:12px">CAD annotation</text></svg>'; document.body.appendChild (root); });
+    await page.waitForFunction (() => getComputedStyle (document.querySelector ('#font-fixture label')).fontSize === '14px');
+    assert.equal (await page.locator ('#font-fixture strong').evaluate (node => getComputedStyle (node).fontSize), '14px'); assert.equal (await page.locator ('#font-fixture input').evaluate (node => getComputedStyle (node).fontSize), '17px'); assert.equal (await page.locator ('#font-fixture text').evaluate (node => getComputedStyle (node).fontSize), '12px');
+    await page.locator ('#font-fixture').evaluate (node => { const text = document.createElement ('p'); text.style.fontSize = '10px'; text.textContent = 'Added later'; node.appendChild (text); }); await page.waitForFunction (() => getComputedStyle (document.querySelector ('#font-fixture p')).fontSize === '13px'); assert.equal (await page.locator ('#font-fixture strong').evaluate (node => getComputedStyle (node).fontSize), '14px');
+    await page.evaluate (() => { const menu = document.createElement ('div'); menu.className = 'auto3d_context_menu'; menu.id = 'font-context-fixture'; Object.assign (menu.style, { position : 'fixed', left : (innerWidth - 20) + 'px', top : (innerHeight - 20) + 'px' }); const button = document.createElement ('button'); button.textContent = 'Example popup action'; button.style.fontSize = '11px'; menu.appendChild (button); document.body.appendChild (menu); }); await page.waitForFunction (() => { const bounds = document.getElementById ('font-context-fixture').getBoundingClientRect (); return bounds.right <= innerWidth + 1 && bounds.bottom <= innerHeight + 1; });
+    const opened = page.waitForEvent ('popup'); await page.evaluate (async () => { const { OpenRenderedImage } = await import ('/source/website/renderimageviewer.js'); const canvas = document.createElement ('canvas'); canvas.width = canvas.height = 1; const blob = await new Promise (resolve => canvas.toBlob (resolve)); OpenRenderedImage (blob, 'Font test', { width : 1, height : 1 }); }); const popup = await opened;
+    await popup.waitForFunction (() => getComputedStyle (document.querySelector ('header span')).fontSize === '17px'); assert.ok (Math.abs (await popup.locator ('header button').first ().evaluate (node => parseFloat (getComputedStyle (node).fontSize)) - 16.3333) < .02); await popup.close ();
+    console.log ('Legacy popup +3px, inherited text without compounding, dynamic content, unchanged SVG annotation and render pop-out typography passed.');
+} finally { await browser.close (); }

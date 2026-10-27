@@ -17,6 +17,7 @@ import * as Engine from '../engine/main.js';
 export { Engine };
 
 import './css/icons.css';
+import { InstallPopupTypography } from './popuptypography.js';
 import './css/themes.css';
 import './css/core.css';
 import './css/controls.css';
@@ -76,6 +77,7 @@ export function StartWebsite ()
         document.getElementById ('intro_dragdrop_text').innerHTML = Loc ('Drop model files here');
         document.getElementById ('upload_slot').appendChild (document.getElementById ('intro'));
 
+        InstallPopupTypography ();
         const recovery = CaptureRecovery ();
         const address = new URL (window.location.href); if (address.searchParams.has ('admin')) { address.searchParams.delete ('admin'); window.history.replaceState (null, '', address); }
         let website = new Website ({

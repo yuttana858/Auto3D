@@ -69,16 +69,19 @@ export function DrivePathDimension (profile, dimension, material)
 // Small explicit edit protocol shared by hosts and strict agent commands.
 export function EditEngineering (profile, changes, code = null)
 {
-    if (!changes || Object.keys (changes).some (key => !['visible', 'material', 'activateMaterialId', 'duplicateMaterialId', 'dimension'].includes (key))) { throw new Error ('Invalid measurement-layer edit.'); }
+    if (!changes || Object.keys (changes).some (key => !['visible', 'material', 'activateMaterialId', 'duplicateMaterialId', 'dimension', 'boardRecord', 'dimensions'].includes (key))) { throw new Error ('Invalid measurement-layer edit.'); }
     const state = ValidateEngineering (profile.engineering || DefaultEngineering (profile, code), profile.paths);
     const active = state.materials.find (m => m.id === state.activeMaterialId);
     if (changes.visible !== undefined) { state.visible = changes.visible; }
     if (changes.duplicateMaterialId !== undefined) { label (changes.duplicateMaterialId, 'material ID'); if (state.materials.some (m => m.id === changes.duplicateMaterialId)) { throw new Error ('Material ID already exists.'); } state.materials.push ({ ...structuredClone (active), id : changes.duplicateMaterialId, name : active.name + ' copy' }); state.activeMaterialId = changes.duplicateMaterialId; }
+    if (changes.boardRecord !== undefined) { const record = ValidateBoardSpecification (changes.boardRecord); const index = state.materials.findIndex (item => item.id === record.id); if (index < 0) { if (state.materials.length >= 32) { throw new Error ('Material database has reached 32 records.'); } state.materials.push (record); } else { state.materials[index] = record; } state.activeMaterialId = record.id; }
     if (changes.activateMaterialId !== undefined) { state.activeMaterialId = changes.activateMaterialId; }
     let material = state.materials.find (m => m.id === state.activeMaterialId); if (!material) { throw new Error ('Unknown material record.'); }
     if (changes.material) { if (Object.keys (changes.material).some (key => !Object.hasOwn (material, key) || key === 'id')) { throw new Error ('Unknown material property.'); } material = ValidateBoardSpecification ({ ...material, ...changes.material }); state.materials[state.materials.findIndex (m => m.id === material.id)] = material; }
-    if (changes.dimension) {
-        const patch = changes.dimension;
+    const patches = changes.dimensions ?? (changes.dimension ? [changes.dimension] : []);
+    if (!Array.isArray (patches) || patches.length > 3 || new Set (patches.map (patch => patch?.id)).size !== patches.length) { throw new Error ('Use at most three unique dimension edits.'); }
+    for (const patch of patches) {
+        if (!patch || typeof patch !== 'object') { throw new Error ('Invalid dimension edit.'); }
         if (Object.keys (patch).some (key => !['id', 'mode', 'basis', 'targetMm', 'toleranceMm'].includes (key))) { throw new Error ('Unknown dimension property.'); }
         const dimension = state.dimensions.find (d => d.id === patch.id); if (!dimension) { throw new Error ('Unknown dimension.'); }
         Object.assign (dimension, patch);
@@ -86,6 +89,6 @@ export function EditEngineering (profile, changes, code = null)
         if (dimension.mode === 'auto') { dimension.targetMm = null; }
     }
     const engineering = ValidateEngineering (state, profile.paths);
-    const driving = engineering.dimensions.filter (d => d.mode === 'parametric' || d.mode === 'manual' && changes.dimension?.id === d.id && changes.dimension.targetMm !== undefined);
+    const driving = engineering.dimensions.filter (d => d.mode === 'parametric' || d.mode === 'manual' && patches.some (patch => patch.id === d.id && patch.targetMm !== undefined));
     return { engineering, material, driving };
 }

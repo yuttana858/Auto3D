@@ -1,6 +1,6 @@
 {
   "name": "@auto3d/packaging",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -11,5 +11,5 @@
     "preview": "node tools/preview.mjs"
   },
   "dependencies": { "three": "0.186.1", "fflate": "0.8.2" },
-  "devDependencies": { "esbuild": "^0.28.2", "mocha": "^11.8.0" }
+  "devDependencies": { "esbuild": "^0.28.2", "mocha": "^11.9.0" }
 }

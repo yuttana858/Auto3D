@@ -1,5 +1,7 @@
 function Validate (value, schema, path = 'arguments')
 {
+    if (schema.anyOf) { for (const alternative of schema.anyOf) { try { Validate (value, alternative, path); return; } catch { /* Try the next declared schema. */ } } throw new Error (path + ' does not match an allowed value type.'); }
+    if (schema.type === 'null') { if (value !== null) { throw new Error (path + ' must be null.'); } return; }
     if (schema.type === 'object') {
         if (!value || typeof value !== 'object' || Array.isArray (value)) { throw new Error (path + ' must be an object.'); }
         for (const key of schema.required || []) { if (!Object.hasOwn (value, key)) { throw new Error (path + '.' + key + ' is required.'); } }

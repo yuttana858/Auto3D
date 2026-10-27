@@ -1,8 +1,10 @@
+import { InstallPopupTypography } from './popuptypography.js';
 export function OpenRenderedImage (blob, name, size)
 {
     const popup = window.open ('about:blank', '_blank', 'popup=yes,width=1100,height=800,menubar=no,toolbar=no,location=no,status=no');
     if (!popup) { throw new Error ('Allow pop-ups for Auto3D to open the rendered image.'); }
     popup.opener = null; const doc = popup.document; doc.title = name + ' · Render';
+    const disposeTypography = InstallPopupTypography (doc.body, 3, true); popup.addEventListener ('pagehide', disposeTypography, { once : true });
     const style = doc.createElement ('style'); style.textContent = 'html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#17191c;color:#eee;font:14px system-ui}header{height:48px;display:flex;align-items:center;gap:8px;padding:0 12px}header span{margin-right:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}button,a{color:#eee;background:#30343a;border:1px solid #60646a;border-radius:4px;padding:6px 10px;text-decoration:none;cursor:pointer}#image_viewport{position:absolute;inset:48px 0 0;overflow:hidden;touch-action:none;background:repeating-conic-gradient(#292c31 0% 25%,#22252a 0% 50%) 0/24px 24px;cursor:grab}#image_viewport:active{cursor:grabbing}img{position:absolute;left:0;top:0;transform-origin:0 0;max-width:none;user-select:none}'; doc.head.appendChild (style);
     const bar = doc.createElement ('header'); const title = doc.createElement ('span'); title.textContent = name + ' · ' + size.width + ' × ' + size.height; bar.appendChild (title); doc.body.appendChild (bar);
     const viewport = doc.createElement ('div'); viewport.id = 'image_viewport'; viewport.setAttribute ('aria-label', 'Rendered image pan and zoom'); const img = doc.createElement ('img'); img.alt = name; img.draggable = false; viewport.appendChild (img); doc.body.appendChild (viewport);
