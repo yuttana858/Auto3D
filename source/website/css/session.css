@@ -683,3 +683,6 @@ div.main_viewer
 @media (max-width: 600px) { .scene_command_bar { left: 12px; bottom: 8px; } .scene_command_form input { flex-basis: 100%; } }
 
 .mini_shared_view .scene_command_bar { display: none; }
+.scene_module_tools { display: flex; flex-direction: column; flex: 0 0 auto; gap: 3px; margin: -2px -2px 5px; padding: 3px 2px 6px; border: 1px solid #458b9b; border-radius: 5px; background: #28718433; }
+.session_history_tools { display: inline-flex; float: left; align-items: center; gap: 3px; padding: 2px 8px 2px 0; margin-right: 7px; border-right: 1px solid var(--ov_border_color); }
+.session_history_tools .scene_tool { width: 29px; height: 29px; }

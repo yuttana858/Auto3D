@@ -16,14 +16,14 @@ export class PackagingPanel
         const layout = Element ('div', catalog, undefined, 'packaging_generator_layout'); const generator = Element ('div', layout, undefined, 'packaging_generator_column'); const selected = Element ('div', layout, undefined, 'packaging_selected_column');
         let selectedControls = false;
         for (const child of content) { if (child.classList.contains ('board_appearance')) { selectedControls = true; } (child === this.fefcoPanel.dimensionsPanel || selectedControls ? selected : generator).appendChild (child); }
-        const cad = Element ('section', this.root, undefined, 'packaging_profile_actions'); Element ('strong', cad, 'CAD profile'); this.summary = Element ('p', cad, '', 'section_hint');
+        const cad = Element ('section', this.root, undefined, 'packaging_profile_actions'); const downloads = Element ('div', cad, undefined, 'packaging_download_actions');
         for (const [title, action] of [['Open packaging designer', () => host.openDesigner ()], ['Download SVG', () => host.download ('svg')], ['Download DXF', () => host.download ('dxf')]]) {
-            const button = Element ('button', cad, title); button.type = 'button'; button.addEventListener ('click', () => host.run (action)); this.actions.push (button);
+            const button = Element ('button', title.startsWith ('Download') ? downloads : cad, title); button.type = 'button'; button.addEventListener ('click', () => host.run (action)); this.actions.push (button);
         }
-        this.Refresh ();
+        cad.appendChild (downloads); this.Refresh ();
     }
     Refresh ()
     {
-        const profile = this.host.profile (); this.summary.textContent = profile.name + ' · ' + profile.paths.length + ' paths · ' + profile.thickness + ' mm'; for (const button of this.actions) { button.disabled = this.host.blocked (); } this.fefcoPanel.Refresh ();
+        const profile = this.host.profile (); this.root.dataset.profileName = profile.name; for (const button of this.actions) { button.disabled = this.host.blocked (); } this.fefcoPanel.Refresh ();
     }
 }

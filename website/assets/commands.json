@@ -461,6 +461,20 @@
       }
     },
     {
+      "id": "packaging.fefco.toggle",
+      "title": "Fold, unfold or pause box",
+      "category": "Packaging",
+      "description": "Shared state-aware fold button: unfold or fold the selected box when idle, pause playing animation, resume paused animation. Available during playback; retains account, read-only and geometry guards.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
       "id": "packaging.fefco.playback",
       "title": "Control box folding",
       "category": "Packaging",

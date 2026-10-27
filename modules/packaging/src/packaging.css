@@ -64,3 +64,7 @@
 .fefco_board_row { display: flex; gap: 6px; align-items: end; }
 .fefco_board_row label { flex: 1; }
 .fefco_board_row button { flex: 0 0 32px; min-width: 32px; }
+.fefco_playback[hidden], .fefco_catalog p:empty { display: none !important; }
+.fefco_playback { grid-template-columns: minmax(0, 1fr); }
+.packaging_download_actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.packaging_download_actions button { min-width: 0; }
