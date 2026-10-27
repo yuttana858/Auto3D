@@ -8,4 +8,4 @@ The primary button now follows actual selected-box state: **Unfold → Pause →
 
 The board catalog still contains nominal flute/caliper records, not verified ECT combinations. `board-database.md` now distinguishes a declared ECT rating from a component basis-weight recipe, including 32-28-32 conversion under explicit US-unit assumptions. No nominal row is presented as a supplier-certified grade.
 
-Validation and PR are recorded in project-status.md. This candidate is not deployed.
+Validation: 673 unit/module tests, focused cleanup and full-preset desktop/mobile browser checks, lint, website, standalone Packaging and Pages builds. The cold board-appearance fixture is prepared in a setup hook without increasing its timeout or removing assertions. See [PR #46](https://github.com/yuttana858/Auto3D/pull/46) and project-status.md. This candidate is not deployed.

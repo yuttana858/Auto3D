@@ -11,8 +11,11 @@ import { SessionEditor } from '../source/website/sessioneditor.js';
 import { ArrayObjectBounds } from '../source/website/arraylayout.js';
 const setup = () => { const website = { auth : { user : { id : 'owner' } }, accountReady : true, preferences : { units : 'metric' } }; const editor = { website, document : new SceneDocument (), history : new SceneHistory (), Render : async () => {}, Status : () => {}, MarkDirty : () => {} }; website.sessionEditor = editor; editor.packaging = new PackagingWorkspace (editor); return editor; };
 describe ('Board appearance shared UI/Agent services', () => {
+    // Cold board/texture construction is fixture setup, separate from persistence/Undo assertions.
+    let appearanceEditor;
+    before (async () => { appearanceEditor = setup (); await appearanceEditor.packaging.GenerateFefco ({ length : 100, width : 80, height : 60 }); });
     it ('Persists independent settings and surface roles with one Undo, preserving CAD and authored maps', async () => {
-        const editor = setup (); await editor.packaging.GenerateFefco ({ length : 100, width : 80, height : 60 }); const object = editor.selected, geometry = JSON.stringify (PackSession (editor.document).model); const role = editor.document.model.materials.find (m => m.boardSurfaceRole === 'liner'); role.diffuseMap.name = 'authored-print.png'; role.normalMap.name = 'authored-normal.png';
+        const editor = appearanceEditor; const object = editor.selected, geometry = JSON.stringify (PackSession (editor.document).model); const role = editor.document.model.materials.find (m => m.boardSurfaceRole === 'liner'); role.diffuseMap.name = 'authored-print.png'; role.normalMap.name = 'authored-normal.png';
         const beforePrint = role.diffuseMap.buffer, beforeNormal = role.normalMap.buffer; const registry = CreateAgentCommands (editor.website); const count = editor.history.undo.length;
         const result = await registry.Execute ('packaging.appearance.update', { panelBow : .4, paperGrain : .7, cutCompression : .2 }); assert.equal (result.ok, true, JSON.stringify (result)); assert.equal (object.packagingProfile.appearance.panelBow, .4); assert.equal (editor.history.undo.length, count + 1);
         assert.equal (role.diffuseMap.name, 'authored-print.png'); assert.equal (role.diffuseMap.buffer, beforePrint); assert.equal (role.normalMap.buffer, beforeNormal);
