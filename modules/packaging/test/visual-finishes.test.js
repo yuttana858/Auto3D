@@ -40,6 +40,6 @@ describe ('Masked varnish and curved board presentation', () => {
         assert.equal (ExposedEdgeUV (0, 0, 1.5, board)[1], .5);
         assert.ok (Math.abs (ExposedEdgeUV (24, 0, 0, board)[0] + 1) < 1e-10);
         const profile = FefcoProfile ({}); profile.engineering = DefaultEngineering (profile, '0201'); profile.engineering.materials[0].fluteDirectionDegrees = 30; profile.engineering.materials[0].flutePitchMm = 5;
-        assert.deepEqual (VisualBoardSpecification (profile), { pitchMm : 5, directionDegrees : 30, caliperMm : 3, outsideLinerMm : .24, insideLinerMm : .24, mediumPaperMm : .18 });
+        assert.deepEqual (VisualBoardSpecification (profile), { flute : 'Custom', pitchMm : 5, directionDegrees : 30, caliperMm : 3, outsideLinerMm : .24, insideLinerMm : .24, mediumPaperMm : .18 });
     });
 });

@@ -20,7 +20,7 @@ export function DefaultEngineering (profile, code = null)
 {
     const generated = ['base-0', 'base-1', 'wall-0'].every (id => profile.paths.some (path => path.id === id));
     const references = generated ? EngineeringAxes.map ((id, i) => ({ id, pathId : ['base-0', 'base-1', 'wall-0'][i], start : 0, end : 1, axis : i })) : profile.paths.flatMap (path => path.points.slice (0, path.closed ? path.points.length : -1).map ((p, i) => ({ id : path.id + ':' + i, pathId : path.id, start : i, end : (i + 1) % path.points.length, axis : 0 }))).slice (0, 24);
-    return { version : 1, visible : true, activeMaterialId : 'board-custom', materials : [DefaultBoardSpecification (profile.thickness, code)], dimensions : references.map (ref => ({ ...ref, mode : 'auto', basis : 'score', targetMm : null, toleranceMm : null })) };
+    return { version : 1, visible : true, activeMaterialId : 'board-custom', materials : [DefaultBoardSpecification (profile.thickness, code)], dimensions : references.map (ref => ({ ...ref, mode : 'auto', basis : generated ? 'inside' : 'score', targetMm : null, toleranceMm : null })) };
 }
 export function ValidateEngineering (input, paths)
 {

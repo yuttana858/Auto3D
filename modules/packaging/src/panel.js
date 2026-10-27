@@ -1,4 +1,4 @@
-import { DefaultBoardDatabase } from './boarddatabase.js';
+import { BoardFlutes, DefaultBoardDatabase } from './boarddatabase.js';
 import { OpenBoardDatabaseEditor } from './boarddatabasepanel.js';
 import { FefcoPreset } from './fefco.js';
 import { FefcoFamilies, FefcoStyles, FefcoSource, FefcoThumbnail } from './catalog.js';
@@ -11,11 +11,11 @@ export class FefcoPanel
 {
     constructor (workspace, parent)
     {
-        this.host = workspace; this.fields = new Map (); this.cards = new Map (); this.controls = []; this.dimensionFields = new Map (); this.draftDirty = new Set ();
+        this.host = workspace; this.fields = new Map (); this.cards = new Map (); this.controls = []; this.dimensionFields = new Map (); this.draftDirty = new Set (['length', 'width', 'height']);
         const root = Element ('section', parent, undefined, 'fefco_catalog'); this.root = root;
         const dimensionsPanel = Element ('section', root, undefined, 'fefco_selected_dimensions'); this.dimensionsPanel = dimensionsPanel; dimensionsPanel.setAttribute ('aria-label', 'Selected box dimensions'); Element ('strong', dimensionsPanel, 'Selected box');
         this.dimensionName = Element ('p', dimensionsPanel, 'Generate or select a box.', 'section_hint');
-        const modeLabel = Element ('label', dimensionsPanel, 'Measure', 'fefco_field'); this.dimensionMode = Element ('select', modeLabel); this.dimensionMode.setAttribute ('aria-label', 'Box dimension basis'); this.dimensionMode.add (new Option ('Inside · minimum usable', 'inside')); this.dimensionMode.add (new Option ('Outside · maximum envelope', 'outside')); this.dimensionMode.addEventListener ('change', () => workspace.dimensionMode (this.dimensionMode.value));
+        const modeLabel = Element ('label', dimensionsPanel, 'Measure', 'fefco_field'); this.dimensionMode = Element ('select', modeLabel); this.dimensionMode.setAttribute ('aria-label', 'Box dimension basis'); this.dimensionMode.add (new Option ('Inside (ID)', 'inside')); this.dimensionMode.add (new Option ('Outside (OD)', 'outside')); this.dimensionMode.addEventListener ('change', () => workspace.dimensionMode (this.dimensionMode.value));
         const sizeFields = Element ('div', dimensionsPanel, undefined, 'fefco_dimension_row');
         for (const [key, label] of [['width', 'Width (W)'], ['length', 'Length (L)'], ['height', 'Height (H)'], ['tolerance', 'Tolerance ±']]) {
             const field = Element ('label', key === 'tolerance' ? dimensionsPanel : sizeFields, label, 'fefco_field'); const input = Element ('input', field); input.type = 'number'; input.step = 'any'; input.min = key === 'tolerance' ? '0' : '0.001'; input.setAttribute ('aria-label', 'Box ' + label); this.dimensionFields.set (key, input);
@@ -30,9 +30,16 @@ export class FefcoPanel
         const family = Element ('label', root, 'Box family', 'fefco_field'); const select = Element ('select', family); select.setAttribute ('aria-label', 'FEFCO box family');
         for (const item of FefcoFamilies) { const option = new Option (item.id + ' · ' + item.name + (item.available ? '' : ' · coming later'), item.id); option.disabled = !item.available; select.add (option); } select.value = '02';
         Element ('strong', root, 'Box Dimensions');
+        const basisLabel = Element ('label', root, 'Dimension basis', 'fefco_field'); this.generationBasis = Element ('select', basisLabel); this.generationBasis.setAttribute ('aria-label', 'New box dimension basis'); this.generationBasis.add (new Option ('Inside (ID)', 'inside')); this.generationBasis.add (new Option ('Outside (OD)', 'outside')); this.generationBasis.add (new Option ('Score / CAD', 'score')); this.controls.push (this.generationBasis);
+        this.draftBasis = workspace.generationBasis?.() || 'inside';
+        this.generationBasis.addEventListener ('change', () => {
+            const to = this.generationBasis.value, from = this.draftBasis; let message = 'Enter the desired ' + to + ' dimensions. Inside/outside values require applicable converter allowances.';
+            if (this.host.convertGenerationBasis) { try { const values = Object.fromEntries (['length', 'width', 'height'].map (key => [key, this.fields.get (key).input.valueAsNumber * this.host.factor ()])); const converted = this.host.convertGenerationBasis ({ from, to, ...values }); for (const [key, value] of Object.entries (converted.dimensions)) { this.fields.get (key).input.value = String (Number ((value / this.host.factor ()).toFixed (6))); } message = 'Converted using the current style and board allowances.'; } catch { message = 'Enter the desired ' + to + ' dimensions. Conversion needs applicable converter allowances.'; } }
+            this.draftBasis = to; this.host.setGenerationBasis?.(to); this.draftDirty.add ('basis'); this.generationStatus.textContent = message;
+        });
         const dimensions = Element ('div', root, undefined, 'fefco_dimension_row');
         for (const [key, text, value] of [['width', 'Width (W)', '300'], ['length', 'Length (L)', '400'], ['height', 'Height (H)', '250'], ['overlap', 'Flap overlap', '25']]) {
-            const label = Element ('label', key === 'overlap' ? root : dimensions, text, 'fefco_field'); const input = Element ('input', label); input.type = 'number'; input.step = 'any'; input.value = value; input.required = true; input.setAttribute ('aria-label', 'FEFCO ' + text); this.fields.set (key, { label, input }); this.controls.push (input);
+            const label = Element ('label', key === 'overlap' ? root : dimensions, text, 'fefco_field'); const input = Element ('input', label); input.type = 'number'; input.step = 'any'; input.value = String (Number ((Number (value) / workspace.factor ()).toFixed (6))); input.required = true; input.setAttribute ('aria-label', 'FEFCO ' + text); this.fields.set (key, { label, input }); this.controls.push (input);
             input.addEventListener ('input', () => this.draftDirty.add (key));
         }
         this.newBoardSelect = this.CreateBoardSelector (root, 'Board', 'generation');
@@ -46,8 +53,8 @@ export class FefcoPanel
             button.addEventListener ('click', () => this.RunGeneration (async () => {
                 const changes = this.DraftParameters ();
                 let result;
-                if (workspace.preset) { result = await workspace.preset (style.code, changes); } else { await workspace.configure (FefcoPreset (changes, style.code)); result = await workspace.generate (); }
-                this.draftDirty.clear (); this.Refresh (); return result;
+                if (workspace.preset) { result = await workspace.preset (style.code, changes); } else { const { basis, ...fields } = changes; if (basis !== 'score') { throw new Error ('This host requires a dimensional preset service to generate ID/OD targets. Select score or update the host.'); } await workspace.configure (FefcoPreset (fields, style.code)); result = await workspace.generate (); }
+                this.Refresh (); return result;
             })); this.cards.set (style.code, button); this.controls.push (button);
         }
         this.generationStatus = Element ('p', root, '', 'section_hint'); this.generationStatus.setAttribute ('role', 'status'); this.generationStatus.setAttribute ('aria-live', 'polite');
@@ -82,7 +89,7 @@ export class FefcoPanel
         if (!preferred && !material) { active = records.find (record => record.caliperMm === thickness); }
         select.replaceChildren ();
         if (!active) { const current = new Option ('Current board · ' + (thickness ?? this.host.inspect ().thickness) + ' mm', '__current__'); select.add (current); }
-        for (const flute of ['E', 'B', 'C', 'EB', 'BC']) { const group = document.createElement ('optgroup'); group.label = flute + ' flute'; for (const record of records.filter (item => item.flute === flute)) { group.appendChild (new Option (record.name + ' · ' + record.caliperMm + ' mm', record.id)); } select.appendChild (group); }
+        for (const flute of BoardFlutes) { const group = document.createElement ('optgroup'); group.label = flute + ' flute'; for (const record of records.filter (item => item.flute === flute)) { group.appendChild (new Option (record.name + ' · ' + record.caliperMm + ' mm', record.id)); } select.appendChild (group); }
         select.value = active?.id || '__current__';
     }
     async RunGeneration (action)
@@ -96,11 +103,12 @@ export class FefcoPanel
             });
         } finally { this.generating = false; this.SetDisabled (); }
     }
-    DraftParameters () { const changes = { closure : this.closure.value }; for (const [key, field] of this.fields) { changes[key] = field.input.valueAsNumber * this.host.factor (); } const board = this.BoardRecords ().find (record => record.id === this.newBoardSelect.value); changes.thickness = board?.caliperMm ?? this.host.inspect ().thickness; return changes; }
+    DraftParameters () { const changes = { closure : this.closure.value, basis : this.generationBasis.value }; for (const [key, field] of this.fields) { changes[key] = field.input.valueAsNumber * this.host.factor (); } const board = this.BoardRecords ().find (record => record.id === this.newBoardSelect.value); changes.thickness = board?.caliperMm ?? this.host.inspect ().thickness; return changes; }
     Refresh ()
     {
         const data = this.host.inspect (); const factor = this.host.factor (); const style = FefcoStyles.find (item => item.code === data.code);
-        this.root.title = 'Dimensions use ' + (factor === 25.4 ? 'inches' : 'mm') + ' · CAD score-to-score spans';
+        if (this.host.generationBasis) { this.generationBasis.value = this.host.generationBasis (); this.draftBasis = this.generationBasis.value; }
+        this.root.title = 'Dimensions use ' + (factor === 25.4 ? 'inches' : 'mm') + ' · selected inside or outside basis';
         for (const [key, field] of this.fields) { if (!this.draftDirty.has (key)) { field.input.value = String (Number ((data[key] / factor).toFixed (6))); } else if (this.draftFactor && this.draftFactor !== factor && Number.isFinite (field.input.valueAsNumber)) { field.input.value = String (Number ((field.input.valueAsNumber * this.draftFactor / factor).toFixed (6))); } field.input.min = String ((key === 'thickness' ? 0.5 : key === 'overlap' ? 0 : 20) / factor); field.input.max = String ((key === 'thickness' ? 15 : 10000) / factor); }
         this.fields.get ('overlap').label.hidden = data.code !== '0202'; this.closureLabel.hidden = data.code === '0200'; if (!this.draftDirty.has ('closure')) { this.closure.value = data.closure; } this.draftFactor = factor;
         for (const [code, button] of this.cards) { button.setAttribute ('aria-pressed', String (code === data.code)); }
@@ -112,10 +120,12 @@ export class FefcoPanel
         const data = this.host.dimensions?.(); const factor = this.host.factor (); const changed = this.dimensionObjectId !== data?.objectId; this.dimensionObjectId = data?.objectId;
         this.dimensionsPanel.hidden = !data;
         if (changed) { clearTimeout (this.dimensionTimer); this.dimensionTimer = null; this.dimensionChanges = null; }
-        this.dimensionHint.textContent = data?.editReason ? 'CAD-derived engineering dimensions. Edit each target, allowance and tolerance in the Measurement layer. The 3D crease appearance is independent.' : 'Tolerance reserves ± per overall dimension: Inside gives minimum usable size; Outside gives maximum assembled envelope. Confirm production allowances with your converter.';
+        this.dimensionHint.textContent = data?.editReason ? 'CAD-derived engineering dimensions. Edit each target, allowance and tolerance in the Measurement layer. The 3D crease appearance is independent.' : 'ID and OD values use CAD allowances. Check the Measurement layer for propagated tolerances and confirm allowances with your converter.';
         this.dimensionName.textContent = data ? data.name + ' · FEFCO ' + data.code + ' · ' + (factor === 25.4 ? 'inches' : 'mm') + (data.editable === false ? ' · ' + (data.editReason || 'reset object scaling to edit') : '') : 'Generate or select a box.'; this.dimensionMode.value = data?.basis || 'inside';
         const format = size => ['width', 'length', 'height'].map (key => Number ((size[key] / factor).toFixed (3))).join (' × ');
-        this.dimensionSummary.textContent = data ? 'Inside (W × L × H) ' + format (data.inside) + ' · Outside ' + format (data.outside) + ' · flap layers ' + data.allowance.baseLayers + ' base / ' + data.allowance.topLayers + ' top' : '';
+        const unknownInside = data?.material && !data.material.calibrated && data.material.insideFactors.some (factor => factor === 0), unknownOutside = data?.material && !data.material.calibrated && data.material.outsideFactors.some (factor => factor === 0);
+        this.dimensionSummary.textContent = data ? (unknownInside ? 'Inside allowance not entered' : 'Inside (W × L × H) ' + format (data.inside)) + (unknownOutside ? ' · Outside allowance not entered' : ' · Outside ' + format (data.outside)) + ' · flap layers ' + data.allowance.baseLayers + ' base / ' + data.allowance.topLayers + ' top' : '';
+        if (unknownInside && data.basis === 'inside' || unknownOutside && data.basis === 'outside') { this.dimensionHint.textContent = 'The selected allowance is not qualified. Enter converter factors in the Measurement layer before using these targets.'; }
         this.RefreshBoardSelector (this.selectedBoardSelect, data?.materialId, data?.thickness, data?.material); this.selectedBoardSelect.disabled = !data || data.editable === false || this.host.dimensionsBlocked ();
         for (const [key, input] of this.dimensionFields) { input.disabled = !data || data.editable === false || this.host.dimensionsBlocked (); if (changed || document.activeElement !== input) { const value = data ? data[data.basis][key] ?? data[key] : null; input.value = value === null || value === undefined ? '' : String (Number ((value / factor).toFixed (6))); if (key === 'tolerance') { input.placeholder = data?.tolerance === null ? 'Mixed · edit per axis' : ''; input.title = 'Set the same score tolerance for every axis; Measurement layer shows total material/process uncertainty.'; } } }
         this.dimensionMode.disabled = !data || this.host.dimensionsBlocked ();

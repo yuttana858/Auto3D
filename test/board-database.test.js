@@ -7,7 +7,7 @@ import * as module from '../modules/packaging/src/boarddatabase.js';
 const revision = '00000000-0000-4000-8000-000000000001';
 describe ('Board database CSV and account persistence', () => {
     it ('Round trips exact measured caliper, multiline/quoted labels and every supported flute without style allowance factors', () => {
-        const records = DefaultBoardDatabase (); records[1].name = 'B, "measured"\nlot 2'; records[1].caliperMm = 3.123456789; const csv = ExportBoardCSV (records); assert.deepEqual (ImportBoardCSV (csv), records); assert.deepEqual (records.map (record => record.flute), ['E', 'B', 'C', 'EB', 'BC']); assert.equal ('insideFactors' in records[0], false);
+        const records = DefaultBoardDatabase (); records[1].name = 'B, "measured"\nlot 2'; records[1].caliperMm = 3.123456789; const csv = ExportBoardCSV (records); assert.deepEqual (ImportBoardCSV (csv), records); assert.deepEqual (records.map (record => record.flute), ['E', 'B', 'C', 'EB', 'BC', 'ACA', 'BCB']); assert.equal ('insideFactors' in records[0], false);
         for (const bad of [csv.replace ('caliperMm', 'unsupported'), csv + '"broken', csv.replace ('3.123456789', ''), csv.replace ('3.123456789', '-1'), ExportBoardCSV (records).replace ('"nominal-b"', '"nominal-e"')]) { assert.throws (() => ImportBoardCSV (bad)); }
         assert.throws (() => ValidateBoardDatabase ([{ ...records[0], flute : 'A' }])); assert.throws (() => ValidateBoardDatabase ([]));
     });
@@ -20,7 +20,7 @@ describe ('Board database CSV and account persistence', () => {
         };
         const context = (method, body, id = 'owner-a') => ({ env, data : id ? { user : { id } } : {}, request : new Request ('https://app.example/api/packaging/boards', { method, headers : { Origin : 'https://app.example', ...(body ? { 'Content-Type' : 'application/json' } : {}) }, ...(body ? { body : JSON.stringify (body) } : {}) }) });
         try {
-            assert.equal ((await onRequest (context ('GET', null, null))).status, 401); const initial = await (await onRequest (context ('GET'))).json (); assert.equal (initial.revision, null); assert.equal (initial.records.length, 5);
+            assert.equal ((await onRequest (context ('GET', null, null))).status, 401); const initial = await (await onRequest (context ('GET'))).json (); assert.equal (initial.revision, null); assert.equal (initial.records.length, 7);
             const response = await onRequest (context ('PUT', { records, revision : null })); assert.equal (response.status, 200); const result = await response.json (); assert.equal (result.records[0].flute, 'E'); assert.equal ((await onRequest (context ('PUT', { records, revision : null }))).status, 409); assert.equal ((await onRequest (context ('PUT', { records : [{ ...records[0], caliperMm : -1 }], revision : result.revision }))).status, 400);
             assert.ok (calls.filter (call => call.options.method !== 'POST').every (call => new URL (call.url).searchParams.get ('user_id') === 'eq.owner-a'));
             const foreign = context ('PUT', { records, revision : result.revision }); foreign.request = new Request (foreign.request, { headers : { Origin : 'https://evil.example' } }); assert.equal ((await onRequest (foreign)).status, 403);
