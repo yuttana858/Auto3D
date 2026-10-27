@@ -18,7 +18,7 @@ const hinge = (matrix, pivot, rotation) => matrix.clone ().multiply (translate (
 export function CreateFefcoFoldRig (input, savedProfile = null)
 {
     const parameters = ValidateFefco (input); const expected = FefcoProfile (parameters); const profile = savedProfile ? ValidatePackaging (savedProfile) : expected;
-    if (profile.thickness !== expected.thickness || JSON.stringify (profile.paths) !== JSON.stringify (expected.paths)) { throw new Error ('Folding requires the original generated dieline. Regenerate a box after editing its cut or score paths.'); }
+    if (profile.thickness !== expected.thickness || JSON.stringify (profile.paths.map (path => { const copy = { ...path }; delete copy.process; return copy; })) !== JSON.stringify (expected.paths)) { throw new Error ('Folding requires the original generated dieline. Regenerate a box after editing its cut or score paths.'); }
     const { length : l, width : w, height : h, thickness : t } = parameters; const depth = FlapDepth (parameters); const joint = Math.min (35, w / 5); const slot = Math.max (2, t);
     const boardVisual = VisualBoardSpecification (profile);
     const spans = [l, w, l, w]; const edges = [0]; spans.forEach (span => edges.push (edges.at (-1) + span)); const panels = []; const meshes = [];

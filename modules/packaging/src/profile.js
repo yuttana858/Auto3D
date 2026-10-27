@@ -31,7 +31,16 @@ export function ValidatePackaging (data)
         if (path.closed && points.length > 1 && same (points[0], points[points.length - 1])) { points.pop (); }
         count += points.length;
         if (count > 2000 || points.length < (path.closed ? 3 : 2) || points.some ((point, index) => index > 0 && same (point, points[index - 1]))) { throw new Error ('A path needs distinct points: 2 for a line, 3 for a closed outline; maximum 2000 points per design.'); }
-        result.paths.push ({ id : path.id, type : path.type, closed : path.closed, points });
+        const normalized = { id : path.id, type : path.type, closed : path.closed, points };
+        if (path.process !== undefined) {
+            const process = path.process;
+            if (path.type !== 'score' || !process || typeof process !== 'object' || Array.isArray (process) || Object.keys (process).some (key => !['kind', 'cutMm', 'tieMm'].includes (key)) || !['crease', 'reverse-crease', 'perforation', 'crease-perforation'].includes (process.kind)) { throw new Error ('Invalid crease/perforation specification.'); }
+            normalized.process = { kind : process.kind };
+            if (process.kind.includes ('perforation')) {
+                for (const key of ['cutMm', 'tieMm']) { if (!Number.isFinite (process[key]) || process[key] < 0.01 || process[key] > 1000) { throw new Error ('Perforation cut and tie must be 0.01–1000 mm.'); } normalized.process[key] = process[key]; }
+            } else if (process.cutMm !== undefined || process.tieMm !== undefined) { throw new Error ('Cut/tie lengths apply only to perforations.'); }
+        }
+        result.paths.push (normalized);
     }
     if (data.appearance !== undefined) { result.appearance = ValidateBoardAppearance (data.appearance); }
     if (data.engineering !== undefined) { result.engineering = ValidateEngineering (data.engineering, result.paths); if (result.engineering.materials.find (m => m.id === result.engineering.activeMaterialId).caliperMm !== result.thickness) { throw new Error ('Active material caliper must match CAD board thickness.'); } }
@@ -71,16 +80,17 @@ const format = (value) => Number (value.toFixed (6)).toString ();
 export function ExportPackagingSVG (data)
 {
     const design = ValidatePackaging (data); if (!design.paths.length) { throw new Error ('Draw a path before exporting.'); } const box = PackagingBounds (design); const width = Math.max (box.maxX - box.minX, 0.2); const height = Math.max (box.maxY - box.minY, 0.2);
-    const layers = ['cut', 'score'].map ((type) => '<g id="' + type.toUpperCase () + '" fill="none" stroke="' + (type === 'cut' ? '#e34b4b' : '#318cdd') + '" stroke-width="0.2"' + (type === 'score' ? ' stroke-dasharray="3 2"' : '') + '>' + design.paths.filter ((path) => path.type === type).map ((path) => '<path d="' + path.points.map ((point, index) => (index ? 'L' : 'M') + point.map (format).join (' ')).join (' ') + (path.closed ? ' Z' : '') + '"/>').join ('') + '</g>').join ('');
+    const layerOf = path => path.process?.kind && path.process.kind !== 'crease' ? path.process.kind.replaceAll ('-', '_') : path.type;
+    const layers = [...new Set (['cut', 'score', ...design.paths.map (layerOf)])].map ((type) => '<g id="' + type.toUpperCase () + '" fill="none" stroke="' + (type === 'cut' ? '#e34b4b' : '#318cdd') + '" stroke-width="0.2"' + (type === 'score' ? ' stroke-dasharray="3 2"' : '') + '>' + design.paths.filter ((path) => layerOf (path) === type).map ((path) => '<path' + (path.process ? ' data-process="' + path.process.kind + '"' + (path.process.cutMm !== undefined ? ' data-cut-mm="' + path.process.cutMm + '" data-tie-mm="' + path.process.tieMm + '" stroke-dasharray="' + path.process.cutMm + ' ' + path.process.tieMm + '"' : '') : '') + ' d="' + path.points.map ((point, index) => (index ? 'L' : 'M') + point.map (format).join (' ')).join (' ') + (path.closed ? ' Z' : '') + '"/>').join ('') + '</g>').join ('');
     return '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="' + format (width) + 'mm" height="' + format (height) + 'mm" viewBox="' + [box.minX, -box.maxY, width, height].map (format).join (' ') + '"><g transform="scale(1,-1)">' + layers + '</g></svg>\n';
 }
 export function ExportPackagingDXF (data)
 {
     const design = ValidatePackaging (data); if (!design.paths.length) { throw new Error ('Draw a path before exporting.'); }
     const pairs = []; const pair = (code, value) => pairs.push (String (code), String (value));
-    pair (0, 'SECTION'); pair (2, 'HEADER'); pair (9, '$ACADVER'); pair (1, 'AC1015'); pair (9, '$INSUNITS'); pair (70, 4); pair (9, '$MEASUREMENT'); pair (70, 1); pair (0, 'ENDSEC'); pair (0, 'SECTION'); pair (2, 'TABLES'); pair (0, 'TABLE'); pair (2, 'LAYER'); pair (70, 2);
-    for (const [layer, color] of [['CUT', 1], ['SCORE', 5]]) { pair (0, 'LAYER'); pair (2, layer); pair (70, 0); pair (62, color); pair (6, 'CONTINUOUS'); }
+    pair (0, 'SECTION'); pair (2, 'HEADER'); pair (9, '$ACADVER'); pair (1, 'AC1015'); pair (9, '$INSUNITS'); pair (70, 4); pair (9, '$MEASUREMENT'); pair (70, 1); pair (0, 'ENDSEC'); pair (0, 'SECTION'); pair (2, 'TABLES'); pair (0, 'TABLE'); pair (2, 'LAYER'); const layerOf = path => path.process?.kind && path.process.kind !== 'crease' ? path.process.kind.replaceAll ('-', '_').toUpperCase () : path.type.toUpperCase (); const layers = [...new Set (['CUT', 'SCORE', ...design.paths.map (layerOf)])]; pair (70, layers.length);
+    for (const layer of layers) { pair (0, 'LAYER'); pair (2, layer); pair (70, 0); pair (62, layer === 'CUT' ? 1 : 5); pair (6, 'CONTINUOUS'); }
     pair (0, 'ENDTAB'); pair (0, 'ENDSEC'); pair (0, 'SECTION'); pair (2, 'ENTITIES');
-    for (const path of design.paths) { pair (0, 'LWPOLYLINE'); pair (100, 'AcDbEntity'); pair (8, path.type.toUpperCase ()); pair (100, 'AcDbPolyline'); pair (90, path.points.length); pair (70, path.closed ? 1 : 0); for (const point of path.points) { pair (10, format (point[0])); pair (20, format (point[1])); } }
+    for (const path of design.paths) { if (path.process?.cutMm !== undefined) { pair (999, 'PERFORATION cut=' + path.process.cutMm + 'mm tie=' + path.process.tieMm + 'mm'); } pair (0, 'LWPOLYLINE'); pair (100, 'AcDbEntity'); pair (8, layerOf (path)); pair (100, 'AcDbPolyline'); pair (90, path.points.length); pair (70, path.closed ? 1 : 0); for (const point of path.points) { pair (10, format (point[0])); pair (20, format (point[1])); } }
     pair (0, 'ENDSEC'); pair (0, 'EOF'); return pairs.join ('\r\n') + '\r\n';
 }

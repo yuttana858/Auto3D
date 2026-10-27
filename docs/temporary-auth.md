@@ -86,3 +86,17 @@ Apply database/admin-controls.sql (deployed as administrator_account_access_cont
 Admin endpoints themselves verify active sessions and the logout tombstone in addition to confirmed identity and the database allowlist. User listing is paginated and strips provider credentials, token data and arbitrary metadata. Authorization never uses a user-editable name or role. Provider ban alone is insufficient for strict session invalidation: see [Supabase user management](https://supabase.com/docs/guides/auth/managing-user-data) and [administrator password updates](https://supabase.com/docs/reference/javascript/auth-admin-updateuserbyid).
 
 Unlocked clients recheck their session every 30 seconds while visible and when focus/visibility returns. A revoked/reset session locks the workspace after verification; all protected API requests enforce the database guard immediately. A transient network failure during background verification keeps local work available but cannot authorize server requests. An unchanged identity does not close dialogs or reload preferences. Explicit logout still locks immediately and cannot be undone by background verification.
+
+## Deferred free SMTP option (0.38.0)
+
+The user chose administrator-assisted password reset on 2026-10-27 because no owned sending domain is available. Login Forgot Password explains that method and does not issue a recovery request. Existing email reset routes remain for future use. No email-provider setup is required now.
+
+Resend supports Supabase custom SMTP; its free transactional tier is a candidate for low-volume recovery mail. Confirm current limits in [Resend pricing](https://resend.com/pricing) before account setup. It needs a verified sending domain; the application’s shared `pages.dev` hostname is not an owned email-sending domain. Do not use the employer’s domain without its DNS/email administrator’s approval. Supabase built-in delivery only permits project team members, so it is not a general free fallback for approved application users.
+
+1. Create/access the provider account and verify an owned sender domain using the provider's DNS records. The sender may be a dedicated subdomain to isolate app mail.
+2. In Supabase project `iesepcoxqochycckbwoh`, Authentication → Emails → SMTP settings: enable custom SMTP, host `smtp.resend.com`, port `465`, username `resend`, password = the provider API key, sender name `Auto3D`, sender address on that verified domain. Enter the key directly in secure settings; never in chat, source or browser configuration. Use the provider's current SMTP documentation if these settings change.
+3. Set Site URL `https://auto3d-5av.pages.dev` and allow the exact recovery redirect `https://auto3d-5av.pages.dev/?password=recovery`. Disable email link tracking so single-use recovery links are not rewritten.
+4. Keep existing app cooldowns and Supabase email rate limits within the provider's free quota.
+5. With an approved test user, explicitly request one recovery email and verify receipt, link expiry handling, password update, revoked old sessions and new-password sign-in. Browser mocks do not establish delivery.
+
+Provider account, verified sender domain and secure credentials remain required. This documents a concrete free-service setup; it does not claim it is active. References: [Supabase SMTP](https://supabase.com/docs/guides/auth/auth-smtp), [Resend + Supabase](https://resend.com/docs/send-with-supabase-smtp).

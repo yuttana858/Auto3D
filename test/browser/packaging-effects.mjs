@@ -20,7 +20,7 @@ try {
     await call ('packaging.path.delete', { id : design.paths[0].id });
     for (const [x, y] of [[0, 0], [100, 0], [100, 60], [0, 60]]) { await dialog.getByLabel ('Point X', { exact : true }).fill (String (x)); await dialog.getByLabel ('Point Y', { exact : true }).fill (String (y)); await dialog.getByRole ('button', { name : 'Add point', exact : true }).click (); }
     await dialog.getByRole ('button', { name : 'Close outline', exact : true }).click ();
-    await dialog.getByLabel ('New path type', { exact : true }).selectOption ('score');
+    await dialog.getByLabel ('Line type', { exact : true }).selectOption ('score');
     for (const [x, y] of [[50, 0], [50, 60]]) { await dialog.getByLabel ('Point X', { exact : true }).fill (String (x)); await dialog.getByLabel ('Point Y', { exact : true }).fill (String (y)); await dialog.getByRole ('button', { name : 'Add point', exact : true }).click (); }
     await dialog.getByRole ('button', { name : 'Finish open path', exact : true }).click (); design = await call ('packaging.inspect'); assert.equal (design.paths.length, 2); assert.equal (design.paths[1].type, 'score');
     await dialog.getByLabel ('Board caliper preset').selectOption ('B flute (nominal)'); assert.equal ((await call ('packaging.inspect')).thickness, 3);

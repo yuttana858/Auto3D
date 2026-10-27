@@ -156,6 +156,20 @@
       "example": {}
     },
     {
+      "id": "auth.password_help",
+      "title": "Password reset help",
+      "category": "Account",
+      "description": "Explain the active administrator-assisted password reset method. Does not send an email or reset a password.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
       "id": "auth.recover",
       "title": "Request password recovery",
       "category": "Account",
@@ -1161,6 +1175,139 @@
       "example": {}
     },
     {
+      "id": "packaging.apply",
+      "title": "Apply CAD to 3D",
+      "category": "Packaging",
+      "description": "Replace the linked packaging object from canonical CAD, preserving identity and materials with Undo. Auto preserves supported fold state; custom edited folds require explicit flat mode.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "flat"
+            ]
+          },
+          "objectId": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "mode": "auto"
+      }
+    },
+    {
+      "id": "packaging.tool",
+      "title": "Choose CAD tool",
+      "category": "Packaging",
+      "description": "Activate the default selection arrow or point-to-point pen. Finish/cancel a pending path before switching.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string",
+            "enum": [
+              "select",
+              "pen"
+            ]
+          }
+        },
+        "required": [
+          "tool"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "tool": "pen"
+      }
+    },
+    {
+      "id": "packaging.paths.assign",
+      "title": "Assign selected CAD lines",
+      "category": "Packaging",
+      "description": "Assign cut or crease to all selected paths in a single Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "cut",
+              "score"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "type": "score"
+      }
+    },
+    {
+      "id": "packaging.crease.open",
+      "title": "Open crease settings",
+      "category": "Packaging",
+      "description": "Open the interactive CAD crease/perforation settings; does not apply changes.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.crease.configure",
+      "title": "Configure crease or perforation",
+      "category": "Packaging",
+      "description": "Set manufacturing process for selected crease paths and subsequent new creases. Perforations require cut/tie lengths in mm. Metadata and vector layers do not simulate tearing or tool crushing.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "crease",
+              "reverse-crease",
+              "perforation",
+              "crease-perforation"
+            ]
+          },
+          "cutMm": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 1000
+          },
+          "tieMm": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "kind": "perforation",
+        "cutMm": 3,
+        "tieMm": 1
+      }
+    },
+    {
       "id": "packaging.open",
       "title": "Open packaging design",
       "category": "Packaging",
@@ -1339,6 +1486,9 @@
         "properties": {
           "id": {
             "type": "string"
+          },
+          "additive": {
+            "type": "boolean"
           }
         },
         "required": [

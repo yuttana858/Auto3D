@@ -51,7 +51,7 @@ export class AuthPanel
         const password = document.createElement ('input'); password.type = 'password'; password.autocomplete = 'current-password'; password.required = true; password.maxLength = 1024; password.setAttribute ('aria-label', 'Password'); passwordLabel.appendChild (PasswordVisibility (password));
         const submit = document.createElement ('button'); submit.type = 'submit'; submit.textContent = 'Sign in';
         const status = document.createElement ('p'); status.className = 'auth_status'; status.setAttribute ('role', 'status'); status.setAttribute ('aria-live', 'polite');
-        const hint = document.createElement ('p'); hint.className = 'auth_hint'; hint.textContent = 'Use the account provided by your administrator. Request an account below. Recovery email delivery is being configured. '; const contact = document.createElement ('a'); contact.href = 'mailto:yuttana.chiaravalloti@smurfitkappa.com?subject=Auto3D%20password%20recovery'; contact.textContent = 'Contact Auto3D admin for recovery help'; hint.appendChild (contact);
+        const hint = document.createElement ('p'); hint.className = 'auth_hint'; hint.textContent = 'Use the account provided by your administrator. Request an account below.';
         const signOut = document.createElement ('button'); signOut.type = 'button'; signOut.textContent = 'Sign out';
         const requestAccount = document.createElement ('button'); requestAccount.type = 'button'; requestAccount.textContent = 'Request an account';
         requestAccount.addEventListener ('click', () => this.admin.OpenRequest ());
@@ -63,16 +63,11 @@ export class AuthPanel
             if (!busy) { status.textContent = user ? 'Signed in as ' + (user.email || 'Auto3D user') : ''; }
             email.disabled = password.disabled = submit.disabled = signOut.disabled = forgot.disabled = busy;
         };
-        forgot.addEventListener ('click', async () => {
-            if (busy || !email.reportValidity ()) { return; }
-            busy = true; render (); status.textContent = 'Requesting recovery link…';
-            try { status.textContent = (await this.auth.Recover (email.value)).message; } catch (error) { status.textContent = error.message; }
-            finally { busy = false; email.disabled = password.disabled = submit.disabled = signOut.disabled = forgot.disabled = false; }
-        });
+        forgot.addEventListener ('click', () => { if (!busy) { status.textContent = this.PasswordHelp ().message; } });
         form.addEventListener ('submit', async (event) => {
             event.preventDefault (); if (busy) { return; } busy = true; render (); status.textContent = 'Signing in…';
             try { await this.auth.SignIn (email.value, password.value); status.textContent = 'Signed in as ' + (this.auth.user.email || 'Auto3D user'); }
-            catch (error) { status.textContent = error.message; }
+            catch (error) { status.textContent = /unavailable/i.test (error.message) ? 'Sign-in could not be completed. Please try again.' : error.message; }
             finally { password.value = ''; password.type = 'password'; busy = false; email.disabled = password.disabled = submit.disabled = signOut.disabled = forgot.disabled = false; }
         });
         signOut.addEventListener ('click', async () => {
@@ -92,6 +87,7 @@ export class AuthPanel
         panel.dispose = () => { unsubscribe (); dispose?.(); password.value = ''; };
         render (); return panel;
     }
+    PasswordHelp () { return { method : 'administrator', message : 'Ask your Auto3D account administrator to reset your password.' }; }
     CreateRecovery ()
     {
         const recovery = this.recovery;

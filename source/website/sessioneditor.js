@@ -986,8 +986,8 @@ export class SessionEditor
         const embedded = Element ('div', 'embedded_animation', undefined, this.animationPanel);
         Element ('strong', null, 'Embedded animation', embedded);
         if (!player) {
-            if (this.selected) { Element ('p', 'section_hint', this.selected.animationError || 'No embedded animation in this model. Use Advance animation to animate scene and camera positions.', embedded); }
-            else { Element ('p', 'section_hint', 'Select a model to inspect any embedded GLB/glTF animation clips.', embedded); }
+            if (this.selected?.animationError) { Element ('p', 'section_hint', this.selected.animationError, embedded); }
+            else if (!this.selected) { Element ('p', 'section_hint', 'Select a model to inspect any embedded GLB/glTF animation clips.', embedded); }
             return;
         }
         const clips = Element ('select', null, undefined, embedded); clips.setAttribute ('aria-label', 'Animation clip'); player.clips.forEach ((clip, index) => clips.add (new Option (clip.name || 'Clip ' + (index + 1), index))); clips.value = String (player.state.clip);
