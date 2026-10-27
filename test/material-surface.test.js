@@ -121,20 +121,13 @@ describe ('Editable generated surface maps', () => {
         editor.readOnly = true; assert.equal ((await registry.Execute ('material.textures.generate', { index : 0 })).ok, false); await assert.rejects (() => panel.GenerateTextures ({ index : 0 }), /editable/);
         editor.readOnly = false; panel.website.auth.user = null; assert.equal ((await registry.Execute ('material.relief', { index : 0, mode : 'off' })).ok, false);
     });
-    it ('Adds maps after AI import, keeps imported models if map derivation fails and does not texture an old selection after a failed import', async () => {
-        const fetch = globalThis.fetch; globalThis.fetch = async () => new Response (new Uint8Array ([1, 2, 3]), { headers : { 'Content-Type' : 'model/gltf-binary' } });
-        try {
-            for (const mode of ['success', 'texture-failure', 'import-failure']) {
-                const old = { id : 'old' }; const added = { id : 'generated' }; const editor = { document : { objects : [old] }, selected : old }; const calls = [];
-                const workspace = Object.create (AIWorkspace.prototype); Object.assign (workspace, { settings : { baseUrl : '/api/ai' }, Headers : () => ({}), status : { textContent : '' }, website : { sessionEditor : editor,
-                    LoadModelFromFileList : async () => { if (mode !== 'import-failure') { editor.document.objects.push (added); editor.selected = added; } },
-                    materialPanel : { GenerateTextures : async (args) => { calls.push (args); if (mode === 'texture-failure') { throw new Error ('Image unavailable'); } } }
-                } });
-                await workspace.ImportTask ({ id : 'result', modelUrl : 'https://example.com/result.glb' });
-                if (mode === 'import-failure') { assert.deepEqual (calls, []); assert.match (workspace.status.textContent, /Import failed/); }
-                else { assert.deepEqual (calls, [{ objectId : added.id }]); assert.equal (editor.selected, added); assert.match (workspace.status.textContent, mode === 'success' ? /editable surface maps/ : /Surface maps: Image unavailable/); }
-            }
-        } finally { globalThis.fetch = fetch; }
+    it ('Routes AI import through preview and the shared append service, preserving failures', async () => {
+        const workspace = Object.create (AIWorkspace.prototype); const calls = [];
+        workspace.SelectTask = async id => { calls.push (['preview', id]); };
+        workspace.AddSelected = async () => { calls.push (['append']); return { added : 'generated' }; };
+        assert.deepEqual (await workspace.ImportTask ({ id : 'result' }), { added : 'generated' }); assert.deepEqual (calls, [['preview', 'result'], ['append']]);
+        workspace.SelectTask = async () => { throw new Error ('Download unavailable'); }; calls.length = 0;
+        await assert.rejects (() => workspace.ImportTask ({ id : 'result' }), /Download unavailable/); assert.deepEqual (calls, []);
     });
     it ('Preserves every automatic box map, independent tiling and selected relief in portable archives', async () => {
         const doc = new SceneDocument (); doc.AddImported (await CreateFefcoModel ({}), 'RSC'); const material = doc.model.materials[0]; material.reliefMode = 'bump'; material.emissiveIntensity = .65; material.roughnessMap.scale.x = 2.5; material.normalMap.offset.y = .125;

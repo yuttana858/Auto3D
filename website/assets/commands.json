@@ -5426,6 +5426,290 @@
       }
     },
     {
+      "id": "ai.workspace.inspect",
+      "title": "Inspect AI project",
+      "category": "AI",
+      "description": "Read creation history, preview selection and loaded model scales. Does not submit provider tasks.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ai.creations.refresh",
+      "title": "Refresh AI creations",
+      "category": "AI",
+      "description": "Load recent Meshy tasks without generating models.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ai.creation.preview",
+      "title": "Preview AI creation",
+      "category": "AI",
+      "description": "Download and preview a task in the isolated AI viewer without changing the session.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "meshy-task-id"
+      }
+    },
+    {
+      "id": "ai.creation.scale",
+      "title": "Set AI model scale",
+      "category": "AI",
+      "description": "Set the selected AI model scale retained on Add to session and Library save.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "scale": {
+            "type": "number",
+            "minimum": 0.001,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "scale"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "scale": 1
+      }
+    },
+    {
+      "id": "ai.creation.add",
+      "title": "Add AI creation to session",
+      "category": "AI",
+      "description": "Append the previewed model with textures and scale to the session. Does not close AI.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ai.project.save",
+      "title": "Save AI project to Library",
+      "category": "AI",
+      "description": "Explicitly save all completed 3D creations, embedded textures, original GLBs and scales to private account Library. Downloads unpreviewed completed models; pending task assets are not saved.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "category": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "name": "AI concepts",
+        "category": "Projects"
+      }
+    },
+    {
+      "id": "ai.project.open_library",
+      "title": "Open AI Library project",
+      "category": "AI",
+      "description": "Open an owned AI project archive inside the AI workspace without replacing the main session.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "id": "ai.project.open_file",
+      "title": "Open AI project picker",
+      "category": "AI",
+      "description": "Open an interactive .auto3d AI project file picker. No file is opened until selected.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ai.reference.open",
+      "title": "Choose AI reference image",
+      "category": "AI",
+      "description": "Open the interactive PNG/JPEG/WebP reference image picker. Does not upload or generate until an explicit submission.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ai.creation.refine",
+      "title": "Refine AI preview",
+      "category": "AI",
+      "description": "Explicitly submit a successful Text to 3D preview for PBR texturing using the workspace texture settings.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "meshy-task-id"
+      }
+    },
+    {
+      "id": "ai.generate",
+      "title": "Generate with Meshy",
+      "category": "AI",
+      "description": "Explicit paid-provider submission: text/image to 3D, text to image, texture, humanoid rigging or animation. Image actions use the reference selected interactively or the selected generated image. Returns queued task; progress appears in history.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "text3d",
+              "image3d",
+              "textimage",
+              "texture",
+              "rigging",
+              "animations"
+            ]
+          },
+          "prompt": {
+            "type": "string",
+            "maxLength": 800
+          },
+          "detail": {
+            "type": "string",
+            "enum": [
+              "smart:4000",
+              "smart:10000",
+              "standard:30000",
+              "standard:75000",
+              "standard:150000"
+            ]
+          },
+          "pbr": {
+            "type": "boolean"
+          },
+          "textureResolution": {
+            "type": "string",
+            "enum": [
+              "2k",
+              "4k"
+            ]
+          },
+          "imageModel": {
+            "type": "string",
+            "enum": [
+              "nano-banana",
+              "nano-banana-2",
+              "nano-banana-2-lite",
+              "nano-banana-pro",
+              "gpt-image-2"
+            ]
+          },
+          "aspect": {
+            "type": "string",
+            "enum": [
+              "1:1",
+              "16:9",
+              "9:16",
+              "4:3",
+              "3:4"
+            ]
+          },
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "actionId": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "height": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "action": "text3d",
+        "prompt": "A red bottle"
+      }
+    },
+    {
       "id": "ui.ai",
       "title": "Open AI panel",
       "category": "Panels",

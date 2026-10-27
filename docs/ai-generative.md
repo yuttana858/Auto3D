@@ -1,66 +1,38 @@
-# AI Generative integration
+# AI Generative workspace
 
-Auto3D routes external generative-AI requests through same-origin endpoints under `/api/ai/*`. Meshy is the first provider adapter.
+Auto3D 0.40.0 uses a same-origin Meshy proxy under `/api/ai/*`. The independent AI workspace supports minimal docked mode and a full-viewport extended modal: interactive model preview in the center, previous creations along the bottom, inputs on the right and Add to session at the top left. Background buttons, navigation and scene keyboard shortcuts cannot receive modal interactions. Closing/minimizing preserves the project for the current account/session.
 
-## Why the proxy is required
+## Meshy capabilities reviewed 2026-10-27
 
-Meshy does not permit browser CORS requests to its public API. The browser therefore calls the Auto3D Pages Function, which forwards allow-listed requests to Meshy and returns JSON to the UI.
+| Workflow | Auto3D behavior | Official API |
+| --- | --- | --- |
+| Text to 3D | Preview, optional PBR refine, GLB output, detail budget | [Text to 3D](https://docs.meshy.ai/en/api/text-to-3d) |
+| Image to 3D | PNG/JPEG/WebP reference or selected generated image; textured GLB | [Image to 3D](https://docs.meshy.ai/en/api/image-to-3d) |
+| Text to Image | Image model and aspect ratio; reference preview for Image to 3D | [Text to Image](https://docs.meshy.ai/en/api/text-to-image) |
+| Retexture | Selected completed model, text or image style, PBR and texture resolution, original UVs | [Retexture](https://docs.meshy.ai/en/api/retexture) |
+| Rigging | Selected textured humanoid, character height in meters | [Rigging](https://docs.meshy.ai/en/api/rigging) |
+| Animation | Completed rig plus an animation action ID; embedded clip preview | [Animation](https://docs.meshy.ai/en/api/animation) |
 
-Generated GLB downloads are also streamed through `/api/ai/model` so Auto3D can import the signed result without relying on cross-origin asset access.
+Meshy also documents multi-image generation, remesh, conversion, UV unwrap and Text to Motion; these additional APIs are not wired in this release. Character rigging/animation is distinct from Packaging fold/unfold or the scene timeline. Supported details vary by the provider's current model/plan; errors remain visible. Calls can consume Meshy credits. No generation occurs merely by opening the workspace, changing fields or previewing a model.
 
-## Personal API key
+## Connection and requests
 
-Open **Preferences → AI connections** and select **Meshy**.
+Preferences → AI connections → Meshy uses `/api/ai` and a personal key. Remember key on this device is optional and account scoped; leave it disabled on shared computers. Keys travel in `X-Auto3D-AI-Key` to the authenticated proxy and never enter project archives. A deployment key is used only with `AUTO3D_AI_ALLOW_SHARED_KEY=true`; this release changes no secrets or shared-key settings. `MESHY_API_BASE_URL` remains an optional server-side test override.
 
-- Auto3D AI proxy: `/api/ai`
-- Meshy API key: enter a personal `msy_...` key
-- **Remember key on this device** is optional
+Routes: GET balance; POST/GET text-to-3d, image-to-3d, text-to-image, retexture, rigging and animations; GET each task by ID. Text to 3D maps to Meshy v2, the others to v1. Allow-listed routes do not expose arbitrary upstream URLs. JSON request bodies are bounded to 28 MiB (including base64 references), upstream metadata to 4 MiB; GLB downloads stream through `/model?url=...`, restricted to HTTPS assets.meshy.ai. Private API middleware enforces account identity and same-origin writes.
 
-The key is sent only to Auto3D's same-origin proxy in the `X-Auto3D-AI-Key` request header. It is not written into `.auto3d` session archives.
+Submission returns a queued task ID immediately. The shared poller respects bounded Retry-After intervals and stops on account changes, success, failure, cancellation or timeout. Refresh loads provider history without submitting tasks. Provider files may expire; refreshing history does not renew them.
 
-Browser persistence is appropriate for personal/local use only. Leave **Remember key** disabled on shared computers.
+## Preview, scale and persistence
 
-## Deployment-level key
+Select Preview on a completed creation. The independent viewer supports orbit and zoom, original texture maps and embedded animation clips. Uniform scale applies to that AI model and is carried into Add to session and Library save. AI previews do not mutate the main scene. After decoding a multi-part GLB, drawable parts appear across successive frames; the file is decoded once and node/skin relationships remain intact. This is visual population, not partial network decoding.
 
-A deployment may provide a server-side Meshy key:
+Save project to Library explicitly downloads every completed 3D creation currently listed, including ones not previewed. It saves original GLBs plus canonical imported geometry, embedded material maps, transforms, task names and types inside the existing portable `.auto3d` archive format. Pending tasks and generated image bytes are not saved. A failed model download stops saving instead of producing a silently incomplete project. A reopened AI project can be saved again; signed URLs are not required to reopen its downloaded models. Provider actions on an old task may still fail after Meshy expires that task.
 
-- `MESHY_API_KEY`: Meshy bearer token
-- `AUTO3D_AI_ALLOW_SHARED_KEY=true`: explicitly allows the server key to be used when the browser does not provide a personal key
-- `MESHY_API_BASE_URL`: optional override used for testing; defaults to `https://api.meshy.ai`
+Open AI project accepts an AI `.auto3d` file. `ai.project.open_library` opens an owned Library archive in the AI workspace without replacing the main session. Normal Library Open/Add also works with these project archives. Add to session appends the selected preview with textures and scale and uses existing one-step Undo/rollback. All downloads, saves and handoffs check account identity; account initialization clears the previous account's AI project.
 
-Shared-key mode is deliberately disabled unless `AUTO3D_AI_ALLOW_SHARED_KEY` is set to `true`. A public deployment with a shared key can spend provider credits for any visitor, so production use should additionally sit behind authenticated access and provider-side credit limits.
+## Agent commands
 
-## Current Text to 3D flow
+`ui.ai`, `ui.module.mode`, `ai.workspace.inspect`, `ai.creations.refresh`, `ai.creation.preview`, `ai.creation.scale`, `ai.creation.add`, `ai.creation.refine`, `ai.reference.open`, `ai.generate`, `ai.project.save`, `ai.project.open_library`, `ai.project.open_file`. The file command opens an interactive picker; generation and project saving are explicit writes. Generation fields use the same service as the UI; reference upload remains interactive.
 
-1. Enter a prompt (maximum 800 characters).
-2. Choose an output detail budget:
-   - Smart · 4k faces
-   - Smart · 10k faces
-   - Balanced · 30k faces
-   - Detailed · 75k faces
-   - High · 150k faces
-3. Choose whether PBR maps should be generated during refine.
-4. Click **Text to 3D**.
-5. Auto3D creates a Meshy preview task and polls its task endpoint, respecting `Retry-After` when provided.
-6. Progress and the resulting thumbnail appear under **Latest creations**.
-7. A successful preview can be:
-   - **Imported as GLB** immediately, or
-   - **Refined** to generate textures/PBR and then imported.
-8. **Import GLB** downloads the result through Auto3D and appends it to the current session.
-
-The standard presets use Meshy's current `latest` Text to 3D model with remeshing and an explicit target polygon count. Smart presets use `smart-topology`, `meshy-t2`, triangle topology and an explicit face target. Auto3D does not use Meshy's deprecated `lowpoly` mode.
-
-## Proxy routes
-
-- `GET /api/ai/balance`
-- `POST /api/ai/text-to-3d`
-- `GET /api/ai/text-to-3d`
-- `GET /api/ai/text-to-3d/:id`
-- `GET /api/ai/image-to-3d` (recent-task listing)
-- `GET /api/ai/model?url=<signed Meshy GLB URL>`
-
-The model proxy only accepts HTTPS URLs whose host is exactly `assets.meshy.ai`.
-
-## Next provider actions
-
-The UI already reserves actions for Image to 3D, Text to image and Texture generation. Those should reuse the same task cards, progress model and import pipeline rather than creating separate UI systems.
+Validation uses mocked provider responses and actual textured/animated GLBs. No paid live generation was submitted in development.

@@ -80,7 +80,7 @@ export async function LoadAnimationScene (object, model, render)
     if (!main) { throw new Error ('Original glTF data is missing.'); }
     const urls = [];
     const manager = new THREE.LoadingManager (); manager.setURLModifier ((url) => {
-        if (url.startsWith ('data:') || /draco_(decoder|wasm_wrapper)\.(js|wasm)$/.test (url)) { return url; }
+        if (url.startsWith ('data:') || url.startsWith ('blob:') || /draco_(decoder|wasm_wrapper)\.(js|wasm)$/.test (url)) { return url; }
         const path = decodeURIComponent (url).replace (/^\.\//, ''); const name = path.split ('/').pop ();
         const base = asset.main.includes ('/') ? asset.main.slice (0, asset.main.lastIndexOf ('/') + 1) : '';
         const file = asset.files.find ((file) => file.name === path || file.name === base + path) || asset.files.find ((file) => file.name.split ('/').pop () === name);

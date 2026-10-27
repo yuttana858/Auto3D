@@ -1357,6 +1357,7 @@ export class SessionEditor
     }
     KeyDown (event)
     {
+        if (this.website.modulePanels?.overlay?.open) { return; }
         if ((this.website?.auth && !this.website.auth.user) || this.readOnly || typeof event.key !== 'string') { return; }
         const modified = event.ctrlKey || event.metaKey; const key = event.key.toLowerCase ();
         const target = event.target;

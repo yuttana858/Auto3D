@@ -22,7 +22,7 @@ export class ModulePanels
 {
     constructor (website)
     {
-        this.website = website; this.lastSide = 'left'; this.state = new ModulePanelState (); this.entries = new Map (); this.headers = new Map ();
+        this.website = website; this.extended = null; this.lastSide = 'left'; this.state = new ModulePanelState (); this.entries = new Map (); this.headers = new Map ();
         for (const [side, toggleId] of [['left', 'upload_panel_toggle'], ['right', 'data_panel_toggle']]) {
             const toggle = document.getElementById (toggleId); const header = toggle.parentElement; header.classList.add ('module_panel_header');
             const controls = document.createElement ('div'); controls.className = 'module_panel_controls'; header.appendChild (controls); const buttons = new Map ();
@@ -34,6 +34,10 @@ export class ModulePanels
             toggle.addEventListener ('click', () => { const id = this.state.active[side]; const panel = this.state.modules.get (id); website.sessionEditor.Run (() => this.Set (id, panel.mode === 'closed' ? panel.preferred : 'closed')); });
             this.headers.set (side, { toggle, controls, buttons });
         }
+        this.overlay = document.createElement ('dialog'); this.overlay.className = 'module_extended_view workspace_panel'; this.overlay.setAttribute ('aria-label', 'Extended module'); document.body.appendChild (this.overlay);
+        this.overlay.addEventListener ('cancel', event => { event.preventDefault (); if (this.extended) { website.sessionEditor.Run (() => this.Set (this.extended.id, 'minimal')); } });
+        // Native modal inertness blocks background pointer/focus; stop bubbled scene shortcuts as well.
+        for (const type of ['keydown', 'keyup', 'wheel', 'pointerdown', 'pointerup', 'click', 'contextmenu']) { this.overlay.addEventListener (type, event => event.stopPropagation ()); }
         this.Register ('upload', { side : 'left', title : 'Model upload', body : document.getElementById ('upload_panel_content'), mode : 'minimal' });
         this.Register ('data', { side : 'right', title : 'Model data', body : document.getElementById ('data_panel_content'), onOpen : () => website.sessionEditor.UpdateDetails () });
         window.addEventListener ('resize', () => {
@@ -52,11 +56,27 @@ export class ModulePanels
     {
         const result = this.state.Set (id, mode); const panel = this.state.modules.get (id); if (mode !== 'closed') { this.lastSide = panel.side; }
         const other = this.state.active[panel.side === 'left' ? 'right' : 'left'];
-        if (mode !== 'closed' && (window.innerWidth < 800 || mode === 'extended' && (window.innerWidth < 1100 || this.state.modules.get (other).mode === 'extended'))) { this.state.Set (other, 'closed'); }
+        if (mode !== 'closed' && (window.innerWidth < 800 || mode === 'extended' || this.state.modules.get (other).mode === 'extended')) { this.state.Set (other, 'closed'); }
         this.Render (); if (mode !== 'closed') { await this.entries.get (id).onOpen?.(); } return { ...this.state.Inspect (id), opened : this.state.Inspect (id).visible, side : result.side };
+    }
+    SyncExtended ()
+    {
+        const active = this.Inspect ().find (panel => panel.visible && panel.mode === 'extended');
+        if (this.extended?.id === active?.id) { return; }
+        if (this.extended) {
+            const { body, marker, header, headerMarker } = this.extended;
+            marker.replaceWith (body); headerMarker.replaceWith (header); this.extended = null; this.overlay.close ();
+        }
+        if (!active) { return; }
+        const body = this.entries.get (active.id).body; const header = this.headers.get (active.side).toggle.parentElement;
+        const marker = document.createComment ('module body'); const headerMarker = document.createComment ('module header');
+        body.before (marker); header.before (headerMarker); this.overlay.append (header, body);
+        this.extended = { id : active.id, body, marker, header, headerMarker }; this.overlay.dataset.module = active.id;
+        this.overlay.setAttribute ('aria-label', active.title + ' extended workspace'); this.website.viewer?.navigation?.CancelPan?.(); this.overlay.showModal ();
     }
     Render ()
     {
+        this.SyncExtended ();
         for (const [id, entry] of this.entries) { const panel = this.state.Inspect (id); entry.body.hidden = !panel.visible; entry.body.dataset.mode = panel.mode; this.website.sessionEditor?.buttons?.get (id)?.setAttribute ('aria-pressed', String (panel.visible)); entry.onMode?.(panel); }
         for (const side of ['left', 'right']) {
             const panel = this.state.modules.get (this.state.active[side]); const container = side === 'left' ? this.website.parameters.leftContainerDiv : this.website.parameters.rightContainerDiv; const { toggle, controls, buttons } = this.headers.get (side);
