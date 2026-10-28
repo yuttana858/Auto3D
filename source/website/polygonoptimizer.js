@@ -1,4 +1,5 @@
 import { ArrayPlacement } from './arraylayout.js';
+import { ReleaseWebGLRenderer } from './webglcleanup.js';
 import * as THREE from 'three';
 import { Mesh } from '../engine/model/mesh.js';
 import { Triangle } from '../engine/model/triangle.js';
@@ -95,7 +96,7 @@ export class PolygonOptimizer
         const canvas = document.createElement ('canvas'); canvas.className = 'polygon_preview_canvas'; canvas.setAttribute ('aria-label', counts ? 'Optimized array preview' : 'Optimized model preview'); parent.appendChild (canvas);
         const renderer = new THREE.WebGLRenderer ({ canvas, antialias : true }); renderer.setPixelRatio (Math.min (window.devicePixelRatio, 2)); renderer.setSize (Math.min (parent.clientWidth || 550, 550), 300, false); const camera = new THREE.PerspectiveCamera (40, canvas.width / canvas.height, extent / 1000, extent * 100); camera.position.set (extent * 1.3, extent * 0.8, extent * 1.5); camera.lookAt (0, 0, 0); const render = () => renderer.render (scene, camera); render ();
         let start; canvas.onpointerdown = (event) => { start = { x : event.clientX, y : event.clientY }; canvas.setPointerCapture (event.pointerId); }; canvas.onpointermove = (event) => { if (!start) { return; } pivot.rotation.y += (event.clientX - start.x) * 0.01; pivot.rotation.x += (event.clientY - start.y) * 0.01; start = { x : event.clientX, y : event.clientY }; render (); }; canvas.onpointerup = canvas.onpointercancel = () => { start = null; };
-        return () => { scene.traverse ((mesh) => { if (mesh.isInstancedMesh) { mesh.dispose (); } }); renderer.dispose (); renderer.forceContextLoss (); root.traverse ((mesh) => { mesh.geometry?.dispose (); if (mesh.material) { (Array.isArray (mesh.material) ? mesh.material : [mesh.material]).forEach ((material) => material.dispose ()); } }); urls.forEach (URL.revokeObjectURL); canvas.remove (); };
+        return () => { scene.traverse ((mesh) => { if (mesh.isInstancedMesh) { mesh.dispose (); } }); ReleaseWebGLRenderer (renderer); root.traverse ((mesh) => { mesh.geometry?.dispose (); if (mesh.material) { (Array.isArray (mesh.material) ? mesh.material : [mesh.material]).forEach ((material) => material.dispose ()); } }); urls.forEach (URL.revokeObjectURL); canvas.remove (); };
     }
     Open ()
     {

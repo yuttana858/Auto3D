@@ -1,5 +1,17 @@
 # Auto3D development log and handoff
 
+## Preview WebGL context cleanup: Auto3D 0.45.0 / Packaging 1.10.2 (2026-10-28)
+
+The reported white viewer console showed repeated `Too many active WebGL
+contexts` warnings in `UpdateModelPreview`, followed by main renderer context
+loss. Temporary preview cleanup now releases browser contexts explicitly, and
+diagnostics distinguish intentional preview cleanup from unexpected losses.
+Model-preview setup failures also clean up the partial preview. A Chromium
+regression creates 25 successive model previews, keeps only three contexts live,
+then folds and zooms without losing the main context or producing a white frame;
+intentional releases do not create false errors. The full suite passes 687
+tests. See release-0450.md. Local work; not deployed.
+
 ## Fold camera and Packaging cleanup: Auto3D 0.44.0 / Packaging 1.10.2 (2026-10-28)
 
 Fold framing uses the current object pose with tighter fit instead of framing

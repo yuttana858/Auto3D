@@ -1,4 +1,5 @@
 import { VisibleSceneBounds } from '../engine/viewer/fitview.js';
+import { ReleaseWebGLRenderer } from './webglcleanup.js';
 import { Coord3D } from '../engine/geometry/coord3d.js';
 import { CapturePresentationBackground } from './sharedpresentation.js';
 import { Theme } from './settings.js';
@@ -811,7 +812,7 @@ export class SessionEditor
     DisposeModelPreview ()
     {
         if (!this.modelPreview) { return; }
-        this.modelPreview.renderer.dispose ();
+        ReleaseWebGLRenderer (this.modelPreview.renderer);
         this.modelPreview.element.remove ();
         this.modelPreview = null;
     }
@@ -827,7 +828,11 @@ export class SessionEditor
         panel.contentDiv.insertBefore (element, panel.contentDiv.firstChild);
 
         if (!panel.IsVisible () || this.website.parameters.rightContainerDiv.classList.contains ('collapsed')) { element.remove (); return; }
-        const renderer = new THREE.WebGLRenderer ({ canvas, antialias : true, alpha : true, preserveDrawingBuffer : false });
+        let renderer;
+        try { renderer = new THREE.WebGLRenderer ({ canvas, antialias : true, alpha : true, preserveDrawingBuffer : false }); }
+        catch (error) { element.remove (); throw error; }
+        this.modelPreview = { object, root : object.threeObject, element, renderer };
+        try {
         renderer.setPixelRatio (Math.min (window.devicePixelRatio || 1, 2)); renderer.setSize (300, 190, false); renderer.outputColorSpace = THREE.SRGBColorSpace;
         const scene = new THREE.Scene ();
         const camera = new THREE.PerspectiveCamera (32, 300 / 190, 0.01, 100); camera.position.set (1.8, 1.25, 2.6); camera.lookAt (0, 0, 0);
@@ -861,7 +866,8 @@ export class SessionEditor
         const release = (event) => { if (pointer?.id === event.pointerId) { pointer = null; } };
         canvas.addEventListener ('pointerup', release); canvas.addEventListener ('pointercancel', release); canvas.addEventListener ('contextmenu', (event) => event.preventDefault ());
         render ();
-        this.modelPreview = { object, root : object.threeObject, element, renderer, scene, camera, pivot };
+        Object.assign (this.modelPreview, { scene, camera, pivot });
+        } catch (error) { this.DisposeModelPreview (); throw error; }
     }
 
     SyncLiveDimensions ()
