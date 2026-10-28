@@ -1,5 +1,15 @@
 # Auto3D development log and handoff
 
+## Multiwall appearance and glued score: Auto3D 0.43.0 / Packaging 1.10.1 (2026-10-28)
+
+The edge texture now depicts continuous fluted media and intermediate liners
+for EB, BC, ACA and BCB, with approximate individual wave periods. The glued
+tab uses a smaller display crease and a presentation-only hinge adjustment,
+while collision geometry and CAD remain unchanged. See release-0430.md.
+Browser verification renders BC and BCB boxes through multiple fold poses and
+checks that CAD measurements stay unchanged; captures are in
+`work/multiwall-review/`. The full suite passes 682 tests. Local work; not yet deployed.
+
 ## Board-driven dimensions: Auto3D 0.42.0 / Packaging 1.10.0 (2026-10-27)
 
 The new-box panel now offers inside (default), outside and score dimension

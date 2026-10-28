@@ -9,6 +9,7 @@ import { CreaseVisualMeshes } from './creasevisuals.js';
 import { MeshData } from './mesh.js';
 import { PanelSolid, SolidIntersections } from './solid.js';
 import { VisualBoardSpecification, ExposedEdgeUV } from './flutemapping.js';
+import { ValidateBoardAppearance } from './appearancesettings.js';
 
 const ease = value => { const t = Math.max (0, Math.min (1, value)); return t * t * (3 - 2 * t); };
 const phase = (value, start, end) => ease ((value - start) / (end - start));
@@ -97,7 +98,15 @@ export function FefcoFoldPose (rig, progress)
 {
     const pose = FoldPose (rig, progress); const contacts = FefcoFoldContacts (rig, pose);
     if (!contacts.clear) { const pair = contacts.intersections[0]; throw new Error ('Fold blocked: ' + pair.panels.join (' / ') + ' intersect at ' + (progress * 100).toFixed (2) + '%.'); }
-    return { ...pose, contacts, visualMeshes : CreaseVisualMeshes (rig, pose) };
+    // Collision solids retain the clearance needed by the folding audit. For
+    // display, move only the glue tab back to its shared score so its tighter
+    // visual arc joins both trimmed panels without a perpendicular step.
+    const displayMatrices = pose.matrices.map (values => [...values]);
+    if (ValidateBoardAppearance (rig.profile.appearance).enabled) {
+        const wall = rig.panels.findIndex (panel => panel.kind === 'wall' && panel.index === 0), joint = rig.panels.findIndex (panel => panel.kind === 'joint');
+        if (wall >= 0 && joint >= 0) { const root = new THREE.Matrix4 ().fromArray (pose.matrices[wall]), tab = new THREE.Matrix4 ().fromArray (pose.matrices[joint]); const normal = new THREE.Vector3 (0, 1, 0).transformDirection (root); const origin = new THREE.Vector3 ().setFromMatrixPosition (root), tabOrigin = new THREE.Vector3 ().setFromMatrixPosition (tab); const shift = tabOrigin.sub (origin).dot (normal); const offset = normal.multiplyScalar (-shift); tab.premultiply (translate (offset.x, offset.y, offset.z)); displayMatrices[joint] = tab.toArray (); }
+    }
+    const displayPose = { ...pose, displayMatrices }; return { ...displayPose, contacts, visualMeshes : CreaseVisualMeshes (rig, displayPose) };
 }
 
 // Audit independently of display frame rate, before replacing the original.
@@ -121,5 +130,5 @@ export function FefcoFoldFrame (rig, progress)
         const matrix = new THREE.Matrix4 ().fromArray (pose.matrices[index]); const normals = new THREE.Matrix3 ().getNormalMatrix (matrix);
         return { ...mesh, vertices : mesh.vertices.map (point => new THREE.Vector3 (...point).applyMatrix4 (matrix).toArray ()), normals : mesh.normals.map (normal => new THREE.Vector3 (...normal).applyMatrix3 (normals).normalize ().toArray ()) };
     });
-    return { ...rig, meshes, presentationMeshes : rig.presentationMeshes.map ((mesh, index) => TransformAppearanceMesh (mesh, pose.matrices[index])), visualMeshes : CreaseVisualMeshes (rig, pose), state : progress === 0 ? 'flat' : 'folded', parameters : { ...rig.parameters, closure : progress === 1 && rig.parameters.code !== '0200' ? 'closed' : 'open' }, foldProgress : progress, stage : pose.stage };
+    return { ...rig, meshes, presentationMeshes : rig.presentationMeshes.map ((mesh, index) => TransformAppearanceMesh (mesh, pose.displayMatrices[index])), visualMeshes : pose.visualMeshes, state : progress === 0 ? 'flat' : 'folded', parameters : { ...rig.parameters, closure : progress === 1 && rig.parameters.code !== '0200' ? 'closed' : 'open' }, foldProgress : progress, stage : pose.stage };
 }

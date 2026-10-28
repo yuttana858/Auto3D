@@ -29,7 +29,7 @@ export function CreaseVisualMeshes (rig, pose)
     return pairs.map (pair => {
         const segments = 16;
         const mesh = { name : 'Visual crease · ' + pair.id, visualOnly : true, segments, vertices : [], normals : [], uvs : [], triangles : [], lines : [] };
-        const matrices = [pair.a, pair.b].map (index => new Matrix4 ().fromArray (pose.matrices[index]));
+        const matrices = [pair.a, pair.b].map (index => new Matrix4 ().fromArray ((pose.displayMatrices || pose.matrices)[index]));
         const localAxis = new Vector3 (pair.rail[1][0] - pair.rail[0][0], 0, pair.rail[1][1] - pair.rail[0][1]).normalize ();
         const axis = localAxis.clone ().transformDirection (matrices[0]);
         const normals = matrices.map (m => new Vector3 (0, 1, 0).transformDirection (m));

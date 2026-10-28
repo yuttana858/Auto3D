@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { Vector3 } from 'three';
+import { Matrix4, Vector3 } from 'three';
 import { GenerateSpotVarnish } from '../src/surfacerelief.js';
 import { CreaseArc, CreaseVisualMeshes } from '../src/creasevisuals.js';
 import { ExposedEdgeUV, VisualBoardSpecification } from '../src/flutemapping.js';
 import { CreateFefcoFoldRig, FefcoFoldPose } from '../src/folding.js';
 import { FefcoProfile } from '../src/fefco.js';
 import { DefaultEngineering } from '../src/engineering.js';
+import { FoldScorePairs, ScoreBandTrim, ScoreInward } from '../src/scorebands.js';
 describe ('Masked varnish and curved board presentation', () => {
     it ('Keeps the unmasked finish and only changes covered gloss/reflectivity', () => {
         const mask = { width : 2, height : 1, pixels : new Uint8Array ([255, 255, 255, 255, 255, 255, 255, 0]) };
@@ -33,6 +34,20 @@ describe ('Masked varnish and curved board presentation', () => {
     it ('Keeps crease buffers material-sorted at every pose to avoid per-segment draw calls', () => {
         const rig = CreateFefcoFoldRig ({ length : 100, width : 80, height : 60 });
         for (const progress of [0, .23, .72, 1]) { for (const mesh of CreaseVisualMeshes (rig, FefcoFoldPose (rig, progress))) { const groups = mesh.triangles.reduce ((count, triangle, index, list) => count + (index === 0 || list[index - 1].material !== triangle.material ? 1 : 0), 0); assert.ok (groups <= 3); assert.ok (mesh.triangles.every ((triangle, index, list) => index === 0 || list[index - 1].material <= triangle.material)); } }
+    });
+    it ('Rounds the glue score against both panels while leaving collision poses and CAD intact', () => {
+        for (const thickness of [1.5, 3, 7]) {
+            const rig = CreateFefcoFoldRig ({ length : 140, width : 100, height : 80, thickness }); const canonical = JSON.stringify ([rig.profile, rig.meshes, rig.panels]);
+            const pair = FoldScorePairs (rig).find (item => item.id === 'joint-score'); const trim = ScoreBandTrim (rig, pair);
+            assert.ok (trim < ScoreBandTrim (rig, FoldScorePairs (rig).find (item => item.id === 'wall-1')));
+            for (const progress of [0, .08, .12, .16, .72, 1]) {
+                const pose = FefcoFoldPose (rig, progress), crease = pose.visualMeshes.find (item => item.name.endsWith ('joint-score'));
+                const wall = new Matrix4 ().fromArray (pose.displayMatrices[pair.a]), tab = new Matrix4 ().fromArray (pose.displayMatrices[pair.b]);
+                for (const side of [0, 1]) { const point = new Vector3 (pair.rail[0][0], side * thickness, pair.rail[0][1]); const a = point.clone ().addScaledVector (ScoreInward (rig, pair, pair.a), trim).applyMatrix4 (wall); const b = point.clone ().addScaledVector (ScoreInward (rig, pair, pair.b), trim).applyMatrix4 (tab); assert.ok (a.distanceTo (new Vector3 (...crease.vertices[side])) < 1e-7); assert.ok (b.distanceTo (new Vector3 (...crease.vertices[crease.segments * 4 + side])) < 1e-7); }
+                if (progress === 1) { assert.ok (crease.insideRadiusMm > 0 && crease.insideRadiusMm < thickness / 2); assert.notDeepEqual (pose.displayMatrices[pair.b], pose.matrices[pair.b]); assert.equal (pose.contacts.clear, true); }
+            }
+            assert.equal (JSON.stringify ([rig.profile, rig.meshes, rig.panels]), canonical);
+        }
     });
     it ('Keeps flute phase in sheet coordinates and makes parallel cuts show longitudinal channels', () => {
         const board = { pitchMm : 6, caliperMm : 3, directionDegrees : 90 };

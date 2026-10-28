@@ -11,6 +11,9 @@ describe ('Sheet-continuous corrugate textures', () => {
         for (const flute of ['EB', 'BC', 'ACA', 'BCB']) {
             const image = BoardTexturePixels ('edge', 0, false, .12, { ...board, flute });
             assert.notDeepEqual (image.pixels, single.pixels);
+            let bands = 0, inBand = false;
+            for (let y = 0; y < image.height; y++) { const liner = Array.from ({ length : image.width }, (_, x) => image.pixels[(y * image.width + x) * 3]).every (value => value > 160); if (liner && !inBand) { bands++; } inBand = liner; }
+            assert.equal (bands, flute.length + 1, flute + ' outside, intermediate and inside liners');
             for (let y = 0; y < image.height; y++) { for (let c = 0; c < 3; c++) { assert.equal (image.pixels[y * image.width * 3 + c], image.pixels[(y * image.width + image.width - 1) * 3 + c]); } }
         }
     });
