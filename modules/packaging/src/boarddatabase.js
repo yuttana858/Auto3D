@@ -1,6 +1,6 @@
 import { BoardCalipers } from './profile.js';
 import { DefaultBoardSpecification, ValidateBoardSpecification } from './engineering.js';
-export const BoardFlutes = ['E', 'B', 'C', 'EB', 'BC'];
+export const BoardFlutes = ['E', 'B', 'C', 'EB', 'BC', 'ACA', 'BCB'];
 // Allowance factors stay design/style-specific; the reusable catalog holds board data.
 export const BoardCSVColumns = Object.keys (DefaultBoardSpecification ()).filter (key => !['insideFactors', 'outsideFactors'].includes (key));
 export function DefaultBoardDatabase ()
@@ -16,7 +16,7 @@ export function ValidateBoardDatabase (input)
     if (!Array.isArray (input) || !input.length || input.length > 32) { throw new Error ('Board database needs 1–32 records.'); }
     const ids = new Set ();
     return input.map (record => {
-        if (!record || Object.keys (record).some (key => !BoardCSVColumns.includes (key)) || !BoardFlutes.includes (record.flute)) { throw new Error ('Use E, B, C, EB or BC flute and the supported board columns.'); }
+        if (!record || Object.keys (record).some (key => !BoardCSVColumns.includes (key)) || !BoardFlutes.includes (record.flute)) { throw new Error ('Use E, B, C, EB, BC, ACA or BCB flute and the supported board columns.'); }
         const specification = ValidateBoardSpecification ({ ...record, insideFactors : [0, 0, 0], outsideFactors : [0, 0, 0] });
         if (specification.caliperMm < 0.5 || specification.caliperMm > 15) { throw new Error ('Packaging generation requires 0.5–15 mm board caliper.'); }
         if (ids.has (specification.id)) { throw new Error ('Board IDs must be unique.'); } ids.add (specification.id);

@@ -23,3 +23,30 @@ The shipped E/B/C/EB/BC rows are nominal flute/caliper references, not a supplie
 For a supplier specification written **B flute · 32 ECT · 32-28-32**, confirm its units and layer order. In common US containerboard notation, the three figures describe **outside liner / medium / inside liner**, in pounds per 1,000 square feet of the unfluted paper. They are distinct from the board's edge-crush rating. `GSM = lb/MSF × 4.882427636`; consequently, 32-28-32 corresponds to approximately **156.24 / 136.71 / 156.24 GSM**. These conversions identify paper basis weights; they do not certify that this combination achieves 32 ECT. Different fiber furnish, paper compression strength, flute formation, adhesive, humidity and converting processes affect performance. Double wall requires five constituent paper layers; the current three-paper specification is an approximation for EB/BC.
 
 Sources reviewed 2026-10-27: [President Container Group — basis weight and grade distinctions](https://www.presidentcontainergroup.com/basis-weight/), [Fibre Box Association — ECT Application and Reference Guide](https://store.fibrebox.org/products/ect-application-and-reference-guide-1), and [Virginia Tech research on component basis-weight notation](https://www.unitload.vt.edu/content/dam/unitload_vt_edu/graduate-research-and-subpages-pictures-and-docs/thesis-and-dissertations-/Park%20-%20ETD%20-%20Investigation%20of%20fundemental%20relationships%20to%20improve%20the%20sustainability%20of%20unit%20loads.pdf). The FBA guide is a reference listing; its purchased performance tables have not been imported. No nominal catalog row is relabeled as a tested grade.
+# Development note: multiwall previews and board changes
+
+The local Packaging changes add ACA and BCB nominal starting records alongside
+EB and BC. Existing saved account catalogs are not overwritten; users can add
+their own records through the CSV editor. Nominal calipers are placeholders,
+not certified grades or supplier measurements. Supply measured caliper and
+converter-approved allowances for production work.
+
+The exposed-edge texture illustrates intermediate liners and multiple media
+for EB, BC, ACA and BCB. Individual wall heights, intermediate liner thickness
+and flute pitches are approximated for display, not manufacturing inputs.
+Sheet direction continues to drive the edge texture mapping. CAD measurements
+remain based on the canonical profile and its engineering allowances.
+
+For a selected generated box, changing its board recalculates score spans to
+preserve the current inside or outside dimensions. This requires usable
+allowance factors for the chosen basis. Uncalibrated zero factors are rejected;
+the update leaves the model unchanged. Auto dimensions become manual targets
+when the selected board is changed; parametric dimensions remain parametric.
+New-box fields default to inside (ID). Switching basis converts the draft when
+the current style and board have the necessary factors; otherwise the user
+must enter new targets. FEFCO 0201 has a reference inside allowance; OD and other
+styles require converter-supplied allowances in the selected matching box's
+Measurement layer. The preset command accepts an explicit inside/outside basis;
+omitting it retains the existing score-to-score API behavior. Generated CAD
+measurements default to inside for new generated profiles; previously saved
+measurement bases remain intact.

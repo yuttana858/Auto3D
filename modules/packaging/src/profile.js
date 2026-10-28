@@ -1,6 +1,6 @@
 import { ValidateBoardAppearance } from './appearancesettings.js';
 import { ValidateEngineering } from './engineering.js';
-export const BoardCalipers = { Custom : null, 'E flute (nominal)' : 1.5, 'B flute (nominal)' : 3, 'C flute (nominal)' : 4, 'A flute (nominal)' : 4.8, 'EB flute (nominal)' : 4.5, 'BC flute (nominal)' : 7 };
+export const BoardCalipers = { Custom : null, 'E flute (nominal)' : 1.5, 'B flute (nominal)' : 3, 'C flute (nominal)' : 4, 'A flute (nominal)' : 4.8, 'EB flute (nominal)' : 4.5, 'BC flute (nominal)' : 7, 'ACA flute (nominal)' : 13.6, 'BCB flute (nominal)' : 10 };
 export function NewPackagingDesign () { return { version : 1, name : 'Packaging profile', grade : 'Custom', thickness : 3, paths : [] }; }
 const epsilon = 1e-7;
 const same = (a, b) => Math.hypot (a[0] - b[0], a[1] - b[1]) < epsilon;

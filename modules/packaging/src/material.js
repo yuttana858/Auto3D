@@ -16,7 +16,13 @@ export function BoardTexturePixels (edge, grain = .35, relief = false, flute = .
     const outer = (board?.outsideLinerMm ?? caliper * .08) / caliper;
     const inner = (board?.insideLinerMm ?? caliper * .08) / caliper;
     const paper = (board?.mediumPaperMm ?? caliper * .06) / caliper;
-    const middle = (inner + 1 - outer) / 2, amplitude = Math.max (0, (1 - outer - inner - paper) / 2);
+    // Intermediate liners and wall ratios are presentation approximations: the
+    // catalog does not contain individual wall heights or intermediate liners.
+    const walls = /^(EB|BC|ACA|BCB)$/.test (board?.flute) ? board.flute.split ('') : ['C'];
+    const weights = walls.map (f => ({ E : 1.5, B : 3, C : 4, A : 4.8 })[f]);
+    const separator = Math.min (paper, (1 - inner - outer) / (walls.length * 8));
+    const available = Math.max (0, 1 - inner - outer - separator * (walls.length - 1));
+    const sum = weights.reduce ((a, b) => a + b, 0);
     for (let y = 0; y < size; y++) { for (let x = 0; x < size; x++) {
         const u = x / (size - 1), v = y / (size - 1);
         const fibre = noiseAt (u, v, 48, 16, 197) + .4 * noiseAt (u, v, 61, 53, 317) + .35 * noiseAt (u, v, 113, 31, 739);
@@ -24,9 +30,16 @@ export function BoardTexturePixels (edge, grain = .35, relief = false, flute = .
         const noise = grain * (15 * fibre + 5 * mottle);
         // PNG rows run down, whereas edge UV depth runs up from the inner face.
         const depth = 1 - v;
-        const wave = middle + amplitude * Math.cos (FlutePhaseAt (0, u * 4, 1, 0));
-        const liner = depth <= inner || depth >= 1 - outer;
-        const medium = Math.max (0, Math.min (1, (paper / 2 + .004 - Math.abs (depth - wave)) / .008));
+        let start = inner, liner = depth <= inner || depth >= 1 - outer, medium = 0;
+        for (let i = 0; i < walls.length; i++) {
+            const height = available * weights[i] / sum, center = start + height / 2;
+            // Frequencies are integer multiples so the edge remains tileable.
+            const frequency = walls[i] === 'E' ? 2 : 1;
+            const wave = center + Math.max (0, (height - paper) / 2) * Math.cos (FlutePhaseAt (0, u * 4 * frequency, 1, 0));
+            medium = Math.max (medium, Math.max (0, Math.min (1, (paper / 2 + .004 - Math.abs (depth - wave)) / .008)));
+            start += height;
+            if (i < walls.length - 1) { liner ||= depth >= start && depth <= start + separator; start += separator; }
+        }
         const edgePaper = Math.max (liner ? 1 : 0, medium);
         const base = role === 'edge' ? [82 + 99 * edgePaper, 61 + 80 * edgePaper, 39 + 54 * edgePaper] : role === 'inner' ? [181, 146, 102] : [193, 155, 107];
         for (let c = 0; c < 3; c++) { pixels[(y * size + x) * 3 + c] = Math.round (relief ? 128 + grain * (28 * fibre + 5 * mottle) + flute * 6 * Math.cos (tau * 10 * u) : base[c] + noise); }
@@ -68,7 +81,7 @@ function CloneMaterial (material)
 export function BoardMaterials (board = null, appearance = {})
 {
     const grain = ValidateBoardAppearance (appearance).paperGrain, t = board?.caliperMm || 3;
-    const edgeKey = JSON.stringify ([grain, ...['outsideLinerMm', 'insideLinerMm', 'mediumPaperMm'].map ((k, i) => Number (((board?.[k] ?? t * [.08, .08, .06][i]) / t).toFixed (9)))]);
+    const edgeKey = JSON.stringify ([grain, board?.flute || 'Custom', ...['outsideLinerMm', 'insideLinerMm', 'mediumPaperMm'].map ((k, i) => Number (((board?.[k] ?? t * [.08, .08, .06][i]) / t).toFixed (9)))]);
     const papers = Remember (paperCache, grain, () => ['liner', 'inner'].map (role => PaperMaterial (role, grain)));
     const edge = Remember (edgeCache, edgeKey, () => PaperMaterial ('edge', grain, board));
     const materials = [papers[0], edge, papers[1]].map (material => {

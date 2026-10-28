@@ -5,6 +5,15 @@ import { CreateCorrugatedSample, FluteWaveAt } from '../src/boardlayers.js';
 import { CreateFefcoFoldRig, FefcoFoldPose } from '../src/folding.js';
 import { CreaseVisualMeshes } from '../src/creasevisuals.js';
 describe ('Sheet-continuous corrugate textures', () => {
+    it ('Distinguishes multiwall constructions and keeps their edge tiles periodic', () => {
+        const board = { caliperMm : 7, outsideLinerMm : .3, insideLinerMm : .3, mediumPaperMm : .15 };
+        const single = BoardTexturePixels ('edge', 0, false, .12, { ...board, flute : 'C' });
+        for (const flute of ['EB', 'BC', 'ACA', 'BCB']) {
+            const image = BoardTexturePixels ('edge', 0, false, .12, { ...board, flute });
+            assert.notDeepEqual (image.pixels, single.pixels);
+            for (let y = 0; y < image.height; y++) { for (let c = 0; c < 3; c++) { assert.equal (image.pixels[y * image.width * 3 + c], image.pixels[(y * image.width + image.width - 1) * 3 + c]); } }
+        }
+    });
     it ('shares medium phase with edge UVs for cross, along and angled cuts', () => {
         for (const directionDegrees of [0, 30, 90]) {
             const angle = directionDegrees * Math.PI / 180; const board = { pitchMm : 6, caliperMm : 3, directionDegrees };

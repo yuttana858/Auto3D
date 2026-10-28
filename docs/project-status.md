@@ -1,5 +1,27 @@
 # Auto3D development log and handoff
 
+## Board-driven dimensions: Auto3D 0.42.0 / Packaging 1.10.0 (2026-10-27)
+
+The new-box panel now offers inside (default), outside and score dimension
+bases. For ID/OD presets it resolves score distances using the same material
+factors used by the CAD Measurement layer, and generates both model and CAD
+from that result. Generated measurement defaults are inside; saved bases are
+retained. Board changes on a selected generated box hold the selected basis,
+rebuild its CAD and 3D model, and support Undo. OD and non-0201 ID targets
+require explicit converter allowances; uncalibrated zero factors are rejected.
+Score mode remains available for generating designs before those allowances are
+entered. Multiwall textures illustrate EB, BC, ACA and BCB layers, and the board
+catalog accepts ACA and BCB nominal starting records. See board-database.md for
+limitations. This is local work, not a production release.
+
+Validation: 681 unit/module tests pass. Desktop/mobile browser board-database
+regression passes using the new ID selector, ID/score round trip and actual RSC generation, board
+catalog save/reopen, linked model update, measurement edits and Undo/Redo.
+Software-rendered scene operations were slow but completed without changing
+the test assertions. The first full run found the newly added command absent
+from the generated catalog, and the version-bump run found one old version
+assertion; both were corrected before the passing run. See release-0420.md.
+
 ## Packaging control cleanup: Auto3D 0.41.0 / Packaging 1.9.1 (2026-10-27)
 
 [PR #46](https://github.com/yuttana858/Auto3D/pull/46), branch `feat/packaging-panel-cleanup`, starts from merged PR #45 (`d05e9e7`); not deployed. AI/Packaging occupy a separately colored rail group; Undo/Redo move to the toolbar below the logo. Removes repeated preset categories, unit/helper paragraphs, Top flaps text (retaining the accessible selector), Equal-depth description, idle playback space and CAD profile heading/summary. SVG/DXF downloads share a row. A single fold button starts the selected route, pauses and resumes while busy, then switches Fold/Unfold when committed. `packaging.fefco.toggle` exposes the same guarded service; legacy explicit commands remain. Board-grade documentation distinguishes tested ECT from paper basis weights without inventing certified database entries. See [release-0410.md](release-0410.md) and [board-database.md](board-database.md). Validation: 673 unit/module tests pass, including a deterministic mid-fold toggle/pause/resume/history check. Focused cleanup browser checks pass for desktop/mobile, toolbar history, text removal, grouped rail controls, side-by-side downloads, CAD-exact folding, pause/resume and cancel. The full preset browser regression also passes all four styles, exact saved CAD, folding/assembly, pause/resume, cancel, Undo and mobile. Browser fixtures await asynchronous read completion and isolate folding after the preset/history assertions; no timeouts were increased. The first GitHub validation hit the existing cold board-appearance test timeout. Its initial board/texture construction is now a separate setup hook, retaining the default timeout and every persistence/Undo assertion; the focused cold-fixture check passes. Lint, website, independent Packaging and Pages builds pass. Actual UI preview: `work/packaging-cleanup-empty.png`.

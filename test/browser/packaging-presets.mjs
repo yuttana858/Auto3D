@@ -17,6 +17,7 @@ try {
     const svg = await page.getByRole ('button', { name : 'Download SVG', exact : true }).boundingBox (); const dxf = await page.getByRole ('button', { name : 'Download DXF', exact : true }).boundingBox (); assert.equal (svg.y, dxf.y); assert.ok (dxf.x > svg.x);
     await checkGrid (); const animate = page.locator ('.fefco_animate').first (); assert.equal (await animate.isDisabled (), true); assert.equal (await page.getByRole ('button', { name : 'Unfold selected box', exact : true }).count (), 0);
     assert.equal (await page.getByLabel ('Selected box dimensions').isVisible (), false);
+    assert.equal (await page.getByLabel ('New box dimension basis').inputValue (), 'inside'); await page.getByLabel ('New box dimension basis').selectOption ('score');
     const dimsPosition = await page.getByLabel ('FEFCO Length (L)', { exact : true }).boundingBox (); const firstCard = await page.locator ('.fefco_card').first ().boundingBox (); assert.ok (dimsPosition.y < firstCard.y);
     for (const [index, [code, name]] of [['0201', 'RSC'], ['0200', 'HSC'], ['0202', 'OSC'], ['0203', 'FOL']].entries ()) {
         // Keep prior objects for history checks, but show one preset at a time; coincident boxes add unnecessary software-GPU overdraw.

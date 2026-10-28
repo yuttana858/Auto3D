@@ -22,7 +22,7 @@ export class PackagingWorkspace
 {
     constructor (editor) { this.editor = editor; this.presentation = new FoldPresentation (editor); this.dialog = null; this.refreshing = false; this.draft = []; this.active = null; this.selectedPaths = new Set (); this.cadTool = 'select'; this.creaseProcess = { kind : 'crease' }; this.linkedObjectId = null; this.draftType = 'cut'; this.gridSnapMM = 5; this.displayFactor = 1; this.view = { x : -20, y : -220, width : 340, height : 240 }; }
     Design () { return this.editor.document.packaging || NewPackagingDesign (); }
-    PanelHost () { return { boards : () => this.BoardInspect (), generationBoard : () => this.generationBoard?.id || null, selectBoard : (id, target) => this.SelectBoard (id, target), boardEditor : () => this.OpenBoardDatabase (), appearance : () => this.AppearanceInspect (), updateAppearance : changes => this.UpdateAppearance (changes), dimensions : () => this.DimensionsInspect (), dimensionMode : basis => this.DimensionMode (basis), updateDimensions : changes => this.UpdateDimensions (changes), dimensionsBlocked : () => this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false || this.editor.busy && !this.dimensionUpdating, inspect : () => this.FefcoInspect (), configure : changes => this.ConfigureFefco (changes), generate : changes => this.GenerateFefco (changes), preset : (code, changes) => this.GeneratePreset (code, changes), designer : () => this.OpenSelected (), measurements : () => { this.OpenSelected (); return this.OpenMeasurements (); }, unfold : () => this.UnfoldSelected (), scrub : (progress, commit) => this.SetFoldScrub (progress, commit), scrubInspect : () => this.FoldScrubInspect (), animate : () => this.AnimateFold (), toggleFold : () => this.ToggleFold (), playbackBlocked : () => this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false, animation : () => this.AnimationInspect (), playback : () => this.FoldInspect (), control : action => this.FoldControl (action), canAnimate : () => Boolean (this.editor.selected?.userData?._auto3dFefco), factor : () => this.Factor (), run : action => this.editor.Run (action), blocked : () => this.editor.busy || this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false, canUnfold : () => this.CanUnfold () }; }
+    PanelHost () { return { boards : () => this.BoardInspect (), generationBoard : () => this.generationBoard?.id || null, generationBasis : () => this.generationBasis || 'inside', setGenerationBasis : basis => this.SetGenerationBasis (basis), convertGenerationBasis : changes => this.ConvertGenerationBasis (changes), selectBoard : (id, target) => this.SelectBoard (id, target), boardEditor : () => this.OpenBoardDatabase (), appearance : () => this.AppearanceInspect (), updateAppearance : changes => this.UpdateAppearance (changes), dimensions : () => this.DimensionsInspect (), dimensionMode : basis => this.DimensionMode (basis), updateDimensions : changes => this.UpdateDimensions (changes), dimensionsBlocked : () => this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false || this.editor.busy && !this.dimensionUpdating, inspect : () => this.FefcoInspect (), configure : changes => this.ConfigureFefco (changes), generate : changes => this.GenerateFefco (changes), preset : (code, changes) => this.GeneratePreset (code, changes), designer : () => this.OpenSelected (), measurements : () => { this.OpenSelected (); return this.OpenMeasurements (); }, unfold : () => this.UnfoldSelected (), scrub : (progress, commit) => this.SetFoldScrub (progress, commit), scrubInspect : () => this.FoldScrubInspect (), animate : () => this.AnimateFold (), toggleFold : () => this.ToggleFold (), playbackBlocked : () => this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false, animation : () => this.AnimationInspect (), playback : () => this.FoldInspect (), control : action => this.FoldControl (action), canAnimate : () => Boolean (this.editor.selected?.userData?._auto3dFefco), factor : () => this.Factor (), run : action => this.editor.Run (action), blocked : () => this.editor.busy || this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false, canUnfold : () => this.CanUnfold () }; }
     AppearanceInspect ()
     {
         const object = this.editor.selected; const profile = object?.packagingProfile;
@@ -260,6 +260,7 @@ export class PackagingWorkspace
         } finally { editor.busy = false; editor.RefreshButtons?.(); editor.website.packagingPanel?.Refresh (); }
     }
     FefcoInspect () { return { ...ValidateFefco (this.fefco || DefaultFefco), ...(this.generationBoard ? { thickness : this.generationBoard.caliperMm } : {}), units : 'mm', dimensions : this.generationBoard ? 'score' : 'internal', axes : 'W=X, L=Z, H=Y' }; }
+    SetGenerationBasis (basis) { this.Editable (); if (!['inside', 'outside', 'score'].includes (basis)) { throw new Error ('Choose inside, outside or score dimensions.'); } this.generationBasis = basis; this.editor.website.packagingPanel?.fefcoPanel?.Refresh (); return { basis }; }
     async BoardStore (reload = false)
     {
         const module = await LoadPackagingModule (); if (!this.boardDatabase) { this.boardDatabase = new AccountBoardDatabase (this.editor.website, module); }
@@ -272,7 +273,12 @@ export class PackagingWorkspace
         if (target === 'generation') { this.generationBoard = structuredClone (record); this.Refresh (); return { target, boardId : id, caliperMm : record.caliperMm }; }
         if (!this.editor.selected?.packagingProfile) { throw new Error ('Select a packaging model first.'); }
         if (JSON.stringify (this.Design ()) !== JSON.stringify (this.editor.selected.packagingProfile)) { throw new Error ('Apply or load the selected CAD profile before changing its board.'); }
-        const base = this.EngineeringInspect ().material; const result = await this.UpdateEngineering ({ boardRecord : { ...base, ...record } }); this.Message ('Board applied · ' + record.name + ' · ' + record.caliperMm + ' mm'); return { target, boardId : id, caliperMm : result.material.caliperMm, objectId : this.editor.selected.id };
+        const inspection = this.EngineeringInspect (), base = inspection.material, basis = this.dimensionBasis || 'inside';
+        // Preserve the currently displayed box dimensions while recalculating
+        // the canonical score spans with the new caliper and allowances.
+        const dimensions = inspection.dimensions.filter (d => EngineeringAxes.includes (d.id)).map (d => ({ id : d.id, mode : d.mode === 'parametric' ? 'parametric' : 'manual', basis, targetMm : basis === 'inside' ? d.insideMm : d.outsideMm }));
+        const sameBoard = Object.keys (record).every (key => key === 'calibrated' || base[key] === record[key]);
+        const result = await this.UpdateEngineering ({ boardRecord : { ...base, ...record, calibrated : sameBoard && base.calibrated }, dimensions }); this.Message ('Board applied · ' + record.name + ' · ' + record.caliperMm + ' mm'); return { target, boardId : id, caliperMm : result.material.caliperMm, objectId : this.editor.selected.id };
     }
     async SaveBoardCSV (csv, revision)
     {
@@ -290,8 +296,36 @@ export class PackagingWorkspace
     {
         this.Editable (); this.fefco = ValidateFefco ({ ...(this.fefco || DefaultFefco), ...changes }); if (changes.thickness !== undefined && this.generationBoard?.caliperMm !== changes.thickness) { this.generationBoard = null; } this.editor.website.packagingPanel?.fefcoPanel?.Refresh (); return this.FefcoInspect ();
     }
-    GeneratePreset (code, changes = {}) { this.Editable (); return this.GenerateFefco (FefcoPreset ({ ...(this.fefco || DefaultFefco), ...(this.generationBoard ? { thickness : this.generationBoard.caliperMm } : {}), ...changes }, code)); }
-    async GenerateFefco (changes = {})
+    GenerationMaterial (input, code)
+    {
+        const state = DefaultEngineering (FefcoProfile (input), code), selected = this.editor.selected; let prior = null;
+        try { if (JSON.parse (selected?.userData?._auto3dFefco || '{}').code === code && selected?.packagingProfile?.engineering) { const existing = EngineeringMeasurements (selected.packagingProfile).material; if ((!this.generationBoard && existing.caliperMm === input.thickness) || existing.id === this.generationBoard?.id) { prior = existing; } } } catch { /* A legacy or unrelated object has no reusable allowances. */ }
+        return { ...state.materials[0], ...(prior || {}), ...(this.generationBoard || {}), caliperMm : input.thickness, calibrated : Boolean (prior?.calibrated && prior.caliperMm === input.thickness) };
+    }
+    ConvertGenerationBasis ({ from, to, length, width, height })
+    {
+        if (!['inside', 'outside', 'score'].includes (from) || !['inside', 'outside', 'score'].includes (to)) { throw new Error ('Choose valid dimension bases.'); }
+        const input = ValidateFefco ({ ...(this.fefco || DefaultFefco), ...(this.generationBoard ? { thickness : this.generationBoard.caliperMm } : {}), length, width, height });
+        const material = this.GenerationMaterial (input, input.code), dimensions = {};
+        for (const [axis, id] of EngineeringAxes.entries ()) {
+            const score = ScoreForTarget ({ axis, basis : from, targetMm : input[id] }, material);
+            if (to !== 'score') { ScoreForTarget ({ axis, basis : to, targetMm : 10000 }, material); }
+            dimensions[id] = score + (to === 'inside' ? -material.insideFactors[axis] : to === 'outside' ? material.outsideFactors[axis] : 0) * material.caliperMm;
+        }
+        return { from, to, dimensions, units : 'mm' };
+    }
+    GeneratePreset (code, changes = {})
+    {
+        this.Editable (); const { basis, ...fields } = changes;
+        const input = FefcoPreset ({ ...(this.fefco || DefaultFefco), ...(this.generationBoard ? { thickness : this.generationBoard.caliperMm } : {}), ...fields }, code);
+        if (basis === undefined || basis === 'score') { return this.GenerateFefco (input); }
+        if (!['inside', 'outside'].includes (basis)) { throw new Error ('Choose inside, outside or score dimensions.'); }
+        const material = this.GenerationMaterial (input, code);
+        const parameters = { ...input };
+        for (const [axis, id] of EngineeringAxes.entries ()) { parameters[id] = ScoreForTarget ({ axis, basis, targetMm : input[id] }, material); }
+        return this.GenerateFefco (ValidateFefco (parameters), { material, basis });
+    }
+    async GenerateFefco (changes = {}, dimensional = null)
     {
         this.Editable (); const editor = this.editor; if (editor.document.objects.length >= 1000) { throw new Error ('Session has reached the 1000 object limit.'); }
         const data = ValidateFefco ({ ...(this.fefco || DefaultFefco), ...(this.generationBoard ? { thickness : this.generationBoard.caliperMm } : {}), ...changes });
@@ -301,7 +335,7 @@ export class PackagingWorkspace
         const unit = target.objects.length ? target.model.GetUnit () : Unit.Millimeter;
         // Validate geometry and units before changing the scene or profile.
         let profile = FefcoProfile (data);
-        if (this.generationBoard?.caliperMm === data.thickness) { const engineering = DefaultEngineering (profile, data.code); engineering.materials[0] = { ...engineering.materials[0], ...this.generationBoard }; engineering.activeMaterialId = this.generationBoard.id; profile.grade = this.generationBoard.name; profile.engineering = engineering; }
+        if (dimensional || this.generationBoard?.caliperMm === data.thickness) { const engineering = DefaultEngineering (profile, data.code); engineering.materials[0] = dimensional?.material || { ...engineering.materials[0], ...this.generationBoard }; engineering.activeMaterialId = engineering.materials[0].id; if (dimensional) { engineering.dimensions.forEach (d => { d.basis = dimensional.basis; }); } profile.grade = engineering.materials[0].name; profile.engineering = engineering; }
         profile = ValidatePackaging (profile); const model = PackagingModel (module.CreateFefcoBox (data, profile), unit);
         const before = target.packaging; const previous = editor.selected;
         editor.busy = true; editor.RefreshButtons?.(); editor.Status ('Generating FEFCO ' + data.code + '…');
@@ -312,7 +346,7 @@ export class PackagingWorkspace
             const index = target.objects.indexOf (object); editor.selected = object;
             await editor.Render (true);
             const apply = async (add) => { if (add) { target.Restore (object, index); target.packaging = profile; editor.selected = object; } else { target.Remove (object); target.packaging = before; editor.selected = previous && target.objects.includes (previous) ? previous : null; } await editor.Render (); this.Refresh (); editor.website.packagingPanel?.Refresh (); };
-            editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); this.fefco = data; if (this.generationBoard?.caliperMm !== data.thickness) { this.generationBoard = null; }
+            editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); this.fefco = data; if (dimensional?.basis) { this.dimensionBasis = dimensional.basis; } if (this.generationBoard?.caliperMm !== data.thickness) { this.generationBoard = null; }
             this.Refresh (); editor.website.packagingPanel?.Refresh (); editor.Status ('Added FEFCO ' + data.code + ' · ' + data.length + ' × ' + data.width + ' × ' + data.height + ' mm');
             return { objectId : object.id, ...data, units : 'mm', sceneUnit : unit, profilePaths : profile.paths.length };
         } catch (error) {

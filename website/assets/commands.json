@@ -633,7 +633,7 @@
       "id": "packaging.fefco.preset",
       "title": "Generate box preset",
       "category": "Packaging",
-      "description": "Immediately generate a supported FEFCO preset using current draft dimensions and caliper, optionally overridden together in canonical mm. Validates the complete dimension set before generation. Repairs partial-overlap settings when switching to OSC. Adds and selects a new box with Undo; uses the same service as catalog cards.",
+      "description": "Generate a FEFCO preset in canonical mm. Optional basis selects inside, outside or score dimensions; omitted basis retains score-based compatibility. Inside/outside require applicable converter allowance factors. Uses the same service as catalog cards and supports Undo.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -678,6 +678,14 @@
               "open",
               "closed"
             ]
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "inside",
+              "outside",
+              "score"
+            ]
           }
         },
         "required": [
@@ -687,6 +695,7 @@
       },
       "example": {
         "code": "0201",
+        "basis": "inside",
         "length": 500,
         "width": 350,
         "height": 200,
@@ -706,6 +715,85 @@
         "additionalProperties": false
       },
       "example": {}
+    },
+    {
+      "id": "packaging.fefco.draft_basis",
+      "title": "Choose new box dimension basis",
+      "category": "Packaging",
+      "description": "Choose inside, outside or score interpretation for new box fields. Enter desired dimensions after changing the basis; this does not alter existing objects.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "enum": [
+              "inside",
+              "outside",
+              "score"
+            ]
+          }
+        },
+        "required": [
+          "basis"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "basis": "inside"
+      }
+    },
+    {
+      "id": "packaging.fefco.convert_basis",
+      "title": "Convert box dimension basis",
+      "category": "Packaging",
+      "description": "Convert draft L/W/H between inside, outside and score using the current style and board allowances in canonical mm. Fails when required allowance factors are unavailable; does not mutate the scene.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "enum": [
+              "inside",
+              "outside",
+              "score"
+            ]
+          },
+          "to": {
+            "type": "string",
+            "enum": [
+              "inside",
+              "outside",
+              "score"
+            ]
+          },
+          "length": {
+            "type": "number"
+          },
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "length",
+          "width",
+          "height"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "from": "inside",
+        "to": "score",
+        "length": 400,
+        "width": 300,
+        "height": 250
+      }
     },
     {
       "id": "packaging.fefco.inspect",
