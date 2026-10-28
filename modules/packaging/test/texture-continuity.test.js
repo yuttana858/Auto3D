@@ -34,6 +34,7 @@ describe ('Sheet-continuous corrugate textures', () => {
         const data = BoardTexturePixels ('edge', 0, false, .12, board);
         const at = (u, depth) => data.pixels[(Math.round ((1 - depth) * (data.height - 1)) * data.width + Math.round (u * (data.width - 1))) * 3];
         assert.ok (at (0, .87) > at (0, .5) + 50);
+        assert.ok (at (0, .87) - at (0, .5) >= 130, 'paper remains visibly distinct from the medium void');
         assert.ok (at (.125, .08) > at (.125, .5) + 50);
         assert.ok (at (.025, .94) > at (.025, .5) + 50);
         assert.notDeepEqual (BoardMaterials (board)[1].diffuseMap.buffer, BoardMaterials ({ ...board, outsideLinerMm : .45 })[1].diffuseMap.buffer);

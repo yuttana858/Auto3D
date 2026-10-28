@@ -13,8 +13,7 @@ export class FefcoPanel
     {
         this.host = workspace; this.fields = new Map (); this.cards = new Map (); this.controls = []; this.dimensionFields = new Map (); this.draftDirty = new Set (['length', 'width', 'height']);
         const root = Element ('section', parent, undefined, 'fefco_catalog'); this.root = root;
-        const dimensionsPanel = Element ('section', root, undefined, 'fefco_selected_dimensions'); this.dimensionsPanel = dimensionsPanel; dimensionsPanel.setAttribute ('aria-label', 'Selected box dimensions'); Element ('strong', dimensionsPanel, 'Selected box');
-        this.dimensionName = Element ('p', dimensionsPanel, 'Generate or select a box.', 'section_hint');
+        const dimensionsPanel = Element ('section', root, undefined, 'fefco_selected_dimensions'); this.dimensionsPanel = dimensionsPanel; dimensionsPanel.setAttribute ('aria-label', 'Selected box dimensions');
         const modeLabel = Element ('label', dimensionsPanel, 'Measure', 'fefco_field'); this.dimensionMode = Element ('select', modeLabel); this.dimensionMode.setAttribute ('aria-label', 'Box dimension basis'); this.dimensionMode.add (new Option ('Inside (ID)', 'inside')); this.dimensionMode.add (new Option ('Outside (OD)', 'outside')); this.dimensionMode.addEventListener ('change', () => workspace.dimensionMode (this.dimensionMode.value));
         const sizeFields = Element ('div', dimensionsPanel, undefined, 'fefco_dimension_row');
         for (const [key, label] of [['width', 'Width (W)'], ['length', 'Length (L)'], ['height', 'Height (H)'], ['tolerance', 'Tolerance ±']]) {
@@ -23,9 +22,6 @@ export class FefcoPanel
             input.addEventListener ('blur', () => { if (!this.dimensionTimer) { this.RefreshDimensions (); } });
         }
         this.selectedBoardSelect = this.CreateBoardSelector (dimensionsPanel, 'Selected board', 'selected');
-        this.dimensionSummary = Element ('p', dimensionsPanel, undefined, 'section_hint');
-        if (workspace.measurements) { const button = Element ('button', dimensionsPanel, 'Open Measurement layer'); button.type = 'button'; button.addEventListener ('click', () => workspace.run (() => workspace.measurements ())); this.controls.push (button); }
-        this.dimensionHint = Element ('p', dimensionsPanel, 'Tolerance reserves ± per overall dimension: Inside gives the minimum usable size; Outside gives the maximum assembled envelope. Open flaps are excluded. Confirm production allowances with your converter.', 'section_hint');
         Element ('strong', root, 'FEFCO catalog');
         const family = Element ('label', root, 'Box family', 'fefco_field'); const select = Element ('select', family); select.setAttribute ('aria-label', 'FEFCO box family');
         for (const item of FefcoFamilies) { const option = new Option (item.id + ' · ' + item.name + (item.available ? '' : ' · coming later'), item.id); option.disabled = !item.available; select.add (option); } select.value = '02';
@@ -120,12 +116,7 @@ export class FefcoPanel
         const data = this.host.dimensions?.(); const factor = this.host.factor (); const changed = this.dimensionObjectId !== data?.objectId; this.dimensionObjectId = data?.objectId;
         this.dimensionsPanel.hidden = !data;
         if (changed) { clearTimeout (this.dimensionTimer); this.dimensionTimer = null; this.dimensionChanges = null; }
-        this.dimensionHint.textContent = data?.editReason ? 'CAD-derived engineering dimensions. Edit each target, allowance and tolerance in the Measurement layer. The 3D crease appearance is independent.' : 'ID and OD values use CAD allowances. Check the Measurement layer for propagated tolerances and confirm allowances with your converter.';
-        this.dimensionName.textContent = data ? data.name + ' · FEFCO ' + data.code + ' · ' + (factor === 25.4 ? 'inches' : 'mm') + (data.editable === false ? ' · ' + (data.editReason || 'reset object scaling to edit') : '') : 'Generate or select a box.'; this.dimensionMode.value = data?.basis || 'inside';
-        const format = size => ['width', 'length', 'height'].map (key => Number ((size[key] / factor).toFixed (3))).join (' × ');
-        const unknownInside = data?.material && !data.material.calibrated && data.material.insideFactors.some (factor => factor === 0), unknownOutside = data?.material && !data.material.calibrated && data.material.outsideFactors.some (factor => factor === 0);
-        this.dimensionSummary.textContent = data ? (unknownInside ? 'Inside allowance not entered' : 'Inside (W × L × H) ' + format (data.inside)) + (unknownOutside ? ' · Outside allowance not entered' : ' · Outside ' + format (data.outside)) + ' · flap layers ' + data.allowance.baseLayers + ' base / ' + data.allowance.topLayers + ' top' : '';
-        if (unknownInside && data.basis === 'inside' || unknownOutside && data.basis === 'outside') { this.dimensionHint.textContent = 'The selected allowance is not qualified. Enter converter factors in the Measurement layer before using these targets.'; }
+        this.dimensionMode.value = data?.basis || 'inside';
         this.RefreshBoardSelector (this.selectedBoardSelect, data?.materialId, data?.thickness, data?.material); this.selectedBoardSelect.disabled = !data || data.editable === false || this.host.dimensionsBlocked ();
         for (const [key, input] of this.dimensionFields) { input.disabled = !data || data.editable === false || this.host.dimensionsBlocked (); if (changed || document.activeElement !== input) { const value = data ? data[data.basis][key] ?? data[key] : null; input.value = value === null || value === undefined ? '' : String (Number ((value / factor).toFixed (6))); if (key === 'tolerance') { input.placeholder = data?.tolerance === null ? 'Mixed · edit per axis' : ''; input.title = 'Set the same score tolerance for every axis; Measurement layer shows total material/process uncertainty.'; } } }
         this.dimensionMode.disabled = !data || this.host.dimensionsBlocked ();

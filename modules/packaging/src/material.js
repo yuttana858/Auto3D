@@ -47,7 +47,7 @@ export function BoardTexturePixels (edge, grain = .35, relief = false, flute = .
             if (i < wallSpecs.length - 1) { liner ||= depth >= wall.separatorStart && depth <= wall.separatorStart + separator; }
         } }
         const edgePaper = Math.max (liner ? 1 : 0, medium);
-        const base = role === 'edge' ? [82 + 99 * edgePaper, 61 + 80 * edgePaper, 39 + 54 * edgePaper] : role === 'inner' ? [181, 146, 102] : [193, 155, 107];
+        const base = role === 'edge' ? [72 + 139 * edgePaper, 51 + 119 * edgePaper, 32 + 88 * edgePaper] : role === 'inner' ? [181, 146, 102] : [193, 155, 107];
         for (let c = 0; c < 3; c++) { pixels[(y * size + x) * 3 + c] = Math.round (relief ? 128 + grain * (28 * fibre + 5 * mottle) + flute * 6 * Math.cos (tau * 10 * u) : base[c] + noise); }
     } }
     return { width : size, height : size, pixels };

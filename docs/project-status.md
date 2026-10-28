@@ -1,5 +1,18 @@
 # Auto3D development log and handoff
 
+## Fold camera and Packaging cleanup: Auto3D 0.44.0 / Packaging 1.10.2 (2026-10-28)
+
+Fold framing uses the current object pose with tighter fit instead of framing
+the entire unfolded sweep throughout playback. Manual scrubbing leaves camera
+position and zoom intact; Focus uses the selected object's visible bounds.
+Exposed flute paper has stronger contrast. Packaging Gen removes the repeated
+selected-box heading, description, dimension summary, measurement shortcut and
+helper text while retaining dimensional and board controls. See release-0440.md.
+Validation: 686 unit/module tests pass, including selected-object visible
+bounds, tighter camera framing, manual scrub without camera changes and edge
+contrast. Chromium verifies the slider, command scrubbing and manual timeline
+seeking, CAD invariance, and the requested panel text removal. Local work; not deployed.
+
 ## Multiwall appearance and glued score: Auto3D 0.43.0 / Packaging 1.10.1 (2026-10-28)
 
 The edge texture now depicts continuous fluted media and intermediate liners

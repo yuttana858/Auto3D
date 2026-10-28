@@ -7,6 +7,12 @@ import { Coord2D } from '../source/engine/geometry/coord2d.js';
 import { NavigationMode } from '../source/engine/viewer/camera.js';
 import { CreateAgentCommands } from '../source/website/agentcommands.js';
 describe ('Selected-object orbit', () => {
+    it ('Fits the selected visible object at the viewport center without including other or hidden objects', () => {
+        const root = new THREE.Group (); root.position.set (100, 20, -30); root.add (new THREE.Mesh (new THREE.BoxGeometry (10, 20, 30), new THREE.MeshBasicMaterial ()));
+        const hidden = new THREE.Mesh (new THREE.BoxGeometry (100, 100, 100), new THREE.MeshBasicMaterial ()); hidden.position.x = 1000; hidden.visible = false; root.add (hidden);
+        let sphere; const editor = { selected : { id : 'box', visible : true, threeObject : root }, website : { viewer : { FitSphereToWindow : value => { sphere = value; } } } };
+        SessionEditor.prototype.Focus.call (editor); assert.deepEqual (sphere.center.toArray (), [100, 20, -30]); assert.ok (sphere.radius < 20);
+    });
     it ('Uses transformed visible bounds and preserves eye/target/FOV when assigning the pivot', async () => {
         const root = new THREE.Group (); root.position.set (100, 20, -30); const box = new THREE.Mesh (new THREE.BoxGeometry (10, 20, 30), new THREE.MeshBasicMaterial ()); root.add (box); const hidden = box.clone (); hidden.position.x = 1000; hidden.visible = false; root.add (hidden);
         const navigation = { camera : { eye : new Coord3D (0, 0, 500), center : new Coord3D (0, 0, 0), fov : 45 }, StopCameraMovement () {} }; const editor = { selected : { id : 'box', visible : true, threeObject : root }, website : { viewer : { navigation } }, OrbitSelected : SessionEditor.prototype.OrbitSelected }; editor.website.sessionEditor = editor;

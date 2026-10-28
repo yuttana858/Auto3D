@@ -109,11 +109,10 @@ export class PackagingWorkspace
         this.Editable (); if (!Number.isFinite (progress) || progress < 0 || progress > 1 || typeof commit !== 'boolean') { throw new Error ('Use fold progress from 0 to 1.'); }
         const editor = this.editor; const object = objectId ? editor.document.objects.find (item => item.id === objectId) : editor.selected;
         if (!object?.userData?._auto3dFefco) { throw new Error ('Select a generated box.'); }
-        const owner = editor.website.auth.user.id; editor.timeline.Stop ();
+        const owner = editor.website.auth.user.id; editor.timeline.Stop (); editor.website.viewer?.navigation?.StopCameraMovement?.();
         const first = !this.scrubEdit || this.scrubEdit.object !== object; if (first) { this.scrubEdit = { object, before : object.userData._auto3dFoldPreview }; }
         this.presentation.manual.set (object.id, progress); await this.presentation.Prepare (object);
         if (editor.website.auth.user?.id !== owner || editor.website.accountReady === false || editor.readOnly || !editor.document.objects.includes (object)) { throw new Error ('The account or model changed while scrubbing.'); }
-        if (first && editor.timeline.foldAutoFit !== false && !editor.timeline.cameraKeyframes.length) { const record = this.presentation.records.get (object.id); record.root.updateMatrixWorld (true); const sphere = record.sweep.clone ().applyMatrix4 (record.root.matrixWorld).getBoundingSphere (new Sphere ()); editor.website.viewer.FitSphereToWindow (sphere, true); }
         this.presentation.Apply (editor.timeline.time, false); editor.UpdateSelectionBox (); editor.website.viewer.RequestRender (); editor.website.packagingPanel?.fefcoPanel?.RefreshPlayback ();
         if (commit) {
             const before = this.scrubEdit.before; const after = String (progress); const apply = value => { if (value === undefined) { delete object.userData._auto3dFoldPreview; } else { object.userData._auto3dFoldPreview = value; } this.presentation.manual.delete (object.id); this.presentation.Apply (editor.timeline.time, false); editor.UpdateSelectionBox (); editor.website.viewer.Render (); editor.website.packagingPanel?.fefcoPanel?.RefreshPlayback (); };

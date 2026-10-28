@@ -23,6 +23,27 @@ describe ('Smooth folding camera', () => {
         assert.ok (Math.hypot (narrow.eye.x, narrow.eye.y, narrow.eye.z) > Math.hypot (wide.eye.x, wide.eye.y, wide.eye.z));
         assert.ok (narrow.eye.y > 0); assert.deepEqual (original, camera ());
     });
+    it ('Keeps compact poses tight even when the unfolded sweep is very large', () => {
+        const sphere = { center : { x : 30, y : 40, z : 10 }, radius : 20 }, frame = FoldCameraFrame (camera (), sphere, 200, .5, 1);
+        const distance = Math.hypot (frame.eye.x - frame.center.x, frame.eye.y - frame.center.y, frame.eye.z - frame.center.z);
+        const previous = 200 * 1.12 / Math.sin (Math.PI / 8); const safe = 20 * 1.12 / Math.sin (Math.PI / 8);
+        assert.ok (distance <= previous / 1.5); assert.ok (distance >= safe);
+        assert.deepEqual ([frame.center.x, frame.center.y, frame.center.z], [30, 40, 10]);
+    });
+    it ('Keeps the camera unchanged during manual scrub even with auto-fit enabled', async () => {
+        const object = { id : 'box', userData : { _auto3dFefco : '{}' } }, initial = camera (), cameraState = JSON.stringify (initial); let fits = 0, stopped = 0, cameraWrites = 0;
+        const viewer = { navigation : { StopCameraMovement : () => { stopped++; } }, GetCamera : () => initial, SetCamera : () => { cameraWrites++; }, FitSphereToWindow : () => { fits++; }, RequestRender () {}, Render () {} };
+        const editor = { selected : object, document : { objects : [object] }, website : { auth : { user : { id : 'test' } }, viewer }, timeline : { foldAutoFit : true, cameraKeyframes : [], time : 0, Stop () {} }, history : new SceneHistory (), UpdateSelectionBox () {}, MarkDirty () {} };
+        const workspace = new PackagingWorkspace (editor); workspace.presentation.Prepare = async () => {}; workspace.presentation.Apply = () => {}; editor.packaging = workspace;
+        await workspace.SetFoldScrub (.2, false); await workspace.SetFoldScrub (.8, true);
+        assert.equal (fits, 0); assert.equal (cameraWrites, 0); assert.equal (stopped, 2); assert.equal (JSON.stringify (initial), cameraState); assert.equal (object.userData._auto3dFoldPreview, '0.8');
+    });
+    it ('Suppresses automatic fold framing while manually seeking the timeline', () => {
+        const calls = [], viewer = { navigation : { StopCameraMovement : () => calls.push ('stop') }, UpdateGroundGrid () {}, Render () {} };
+        const editor = { document : { objects : [] }, website : { viewer }, packaging : { presentation : { Apply : (_, camera) => calls.push (camera) } }, UpdateSelectionBox () {}, SyncInputs () {} };
+        const timeline = new SessionTimeline (editor); timeline.Seek (1); assert.deepEqual (calls, ['stop', false]); calls.length = 0;
+        timeline.playing = true; timeline.Seek (2); assert.deepEqual (calls, [true]);
+    });
     it ('Reserves camera space above an overlapping command bar without changing initial framing', () => {
         const original = camera (); const sphere = { center : { x : 0, y : 0, z : 0 }, radius : 100 };
         const viewer = { renderer : { domElement : { getBoundingClientRect : () => ({ top : 100, bottom : 900, height : 800 }) } } };
