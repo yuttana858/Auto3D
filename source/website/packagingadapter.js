@@ -77,7 +77,7 @@ export async function CreatePackagingModel (profile, unit = Unit.Millimeter) { c
 
 export function ApplyFefcoFoldPose (root, rig, pose, unit)
 {
-    const factor = PackagingUnitMM[unit]; const matrices = new Map (rig.panels.map ((panel, index) => { const values = [...pose.matrices[index]]; for (const axis of [12, 13, 14]) { values[axis] /= factor; } return [panel.name, values]; }));
+    const factor = PackagingUnitMM[unit]; const matrices = new Map (rig.panels.map ((panel, index) => { const values = [...(pose.displayMatrices || pose.matrices)[index]]; for (const axis of [12, 13, 14]) { values[axis] /= factor; } return [panel.name, values]; }));
     const visuals = new Map ((pose.visualMeshes || []).map (mesh => [mesh.name, mesh]));
     root.traverse (item => { if (item.isMesh && visuals.has (item.name)) { const data = visuals.get (item.name); const positions = item.geometry.getAttribute ('position'); const normals = item.geometry.getAttribute ('normal'); const uvs = item.geometry.getAttribute ('uv'); let i = 0; for (const triangle of data.triangles) { for (let corner = 0; corner < 3; corner++) { positions.setXYZ (i, ...data.vertices[triangle.vertices[corner]].map (value => value / factor)); normals.setXYZ (i, ...data.normals[triangle.normals[corner]]); if (uvs) { uvs.setXY (i, ...data.uvs[triangle.uvs[corner]]); } i++; } } positions.needsUpdate = true; normals.needsUpdate = true; if (uvs) { uvs.needsUpdate = true; } item.geometry.computeBoundingSphere (); } else if (item.isMesh && matrices.has (item.name)) { item.matrixAutoUpdate = false; item.matrix.copy (new Matrix4 ().fromArray (matrices.get (item.name))); } }); root.updateMatrixWorld (true);
 }

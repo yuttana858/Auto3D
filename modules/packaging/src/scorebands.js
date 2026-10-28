@@ -21,7 +21,8 @@ export function ScoreBandTrim (rig, pair)
     const pitch = board?.flutePitchMm || rig.boardStack.flute.pitchMm, direction = (board?.fluteDirectionDegrees ?? 90) * Math.PI / 180;
     const axis = new Vector3 (pair.rail[1][0] - pair.rail[0][0], 0, pair.rail[1][1] - pair.rail[0][1]).normalize ();
     const alignment = Math.abs (axis.x * Math.cos (direction) - axis.z * Math.sin (direction));
-    return Math.min (t, (settings.enabled ? settings.foldSoftness : 1) * Math.min ((board?.scoreWidthMm || t * 2) / 4, t * .14 + Math.min (pitch, t * 4) * .03 * (1 - .3 * alignment)));
+    const width = Math.min (t, settings.foldSoftness * Math.min ((board?.scoreWidthMm || t * 2) / 4, t * .14 + Math.min (pitch, t * 4) * .03 * (1 - .3 * alignment)));
+    return pair.id === 'joint-score' ? width * .55 : width;
 }
 export function ScoreInward (rig, pair, index)
 {
