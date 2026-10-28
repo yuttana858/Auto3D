@@ -22,7 +22,10 @@ export function FoldCameraFrame (initial, sphere, sweepRadius, progress, aspect 
     const elevation = Math.max (25 * Math.PI / 180, Math.min (65 * Math.PI / 180, Math.asin (Math.max (-1, Math.min (1, direction[1])))));
     const target = [horizontal > 1e-8 ? direction[0] / horizontal * Math.cos (elevation) : Math.cos (elevation) / Math.SQRT2, Math.sin (elevation), horizontal > 1e-8 ? direction[2] / horizontal * Math.cos (elevation) : Math.cos (elevation) / Math.SQRT2];
     const lead = ease (p / 0.15); const settle = ease ((p - 0.85) / 0.15);
-    const radius = sweepRadius * (1 - settle) + sphere.radius * settle;
+    // Keep the current pose comfortably visible without fitting the much
+    // larger unfolded blank while the box is still compact. The sweep still
+    // provides a gradual, tighter lead-in and settles to the current pose.
+    const radius = Math.max (sphere.radius, Math.min (sweepRadius / 1.5, sphere.radius * 1.5)) * (1 - settle) + sphere.radius * settle;
     const halfFov = Math.atan (Math.tan ((initial.fov || 45) * Math.PI / 360) * Math.min (1, Math.max (0.05, aspect)));
     const inset = Math.max (0, Math.min (0.35, bottomInset));
     const fitDistance = Math.max (1e-6, radius) * 1.12 / Math.sin (halfFov) / (1 - inset);

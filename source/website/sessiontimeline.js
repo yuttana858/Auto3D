@@ -315,7 +315,11 @@ export class SessionTimeline
         }
         const camera = this.CameraStateAt (this.time);
         if (camera) { ApplyCameraState (this.editor.website.viewer, camera); }
-        this.editor.packaging?.presentation?.Apply (this.time, render);
+        // Manual timeline seeking is used for close inspection. Automatic
+        // fold framing runs only during playback; explicit camera keyframes
+        // above remain authoritative for authored camera animation.
+        if (!this.playing) { this.editor.website.viewer?.navigation?.StopCameraMovement?.(); }
+        this.editor.packaging?.presentation?.Apply (this.time, render && this.playing);
         if (render) {
             this.editor.UpdateSelectionBox ();
             this.editor.SyncInputs ();

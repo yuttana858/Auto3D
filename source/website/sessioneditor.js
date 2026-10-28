@@ -1216,7 +1216,12 @@ export class SessionEditor
         const center = bounds?.getCenter (new THREE.Vector3 ()); navigation.orbitCenter = center ? new Coord3D (center.x, center.y, center.z) : null;
         return { focused : Boolean (center), objectId : center ? this.selected.id : null, pivot : center ? center.toArray () : null };
     }
-    Focus () { if (!this.selected) { return; } this.UpdateSelectionBox (); if (!this.selectionBounds.isEmpty ()) { this.website.viewer.FitSphereToWindow (this.selectionBounds.getBoundingSphere (new THREE.Sphere ()), true); } }
+    Focus ()
+    {
+        const object = this.selected; if (!object?.visible || !object.threeObject) { return; }
+        const bounds = VisibleSceneBounds (object.threeObject);
+        if (bounds) { this.website.viewer.FitSphereToWindow (bounds.getBoundingSphere (new THREE.Sphere ()), true); }
+    }
     async Undo () { await this.history.Undo (); this.RefreshUI (); }
     async Redo () { await this.history.Redo (); this.RefreshUI (); }
 

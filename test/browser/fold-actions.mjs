@@ -10,8 +10,12 @@ try {
     const call = async (id, args = {}) => { console.log ('Checking', id); const result = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (result.ok, true, JSON.stringify (result)); return result.result; };
     const wait = async (id, test) => { const end = Date.now () + 120000; while (Date.now () < end) { const value = await call (id); if (test (value)) { return value; } await page.waitForTimeout (150); } throw new Error ('Timed out: ' + id); };
     await call ('packaging.fefco.preset', { code : '0201', length : 100, width : 80, height : 60, thickness : 3, closure : 'closed' });
+    await call ('ui.ai.packaging'); const panel = page.locator ('#packaging_module_panel');
+    assert.equal (await panel.getByText ('Selected box', { exact : true }).count (), 0); assert.equal (await panel.getByRole ('button', { name : 'Open Measurement layer' }).count (), 0); assert.equal (await panel.getByText ('ID and OD values use CAD allowances.', { exact : false }).count (), 0);
+    await page.waitForTimeout (1000); const cameraBefore = await call ('camera.current.inspect');
     const before = await call ('packaging.measurements.inspect');
     await call ('packaging.fefco.scrub', { progress : .5 });
+    assert.deepEqual (await call ('camera.current.inspect'), cameraBefore);
     assert.equal ((await call ('packaging.fefco.scrub.inspect')).progress, .5);
     assert.deepEqual ((await call ('packaging.measurements.inspect')).dimensions, before.dimensions);
     await page.waitForTimeout (1500);
@@ -19,9 +23,12 @@ try {
     await call ('packaging.fefco.scrub', { progress : .2 });
     await page.mouse.move (600, 420); await page.mouse.wheel (0, -260); await page.waitForTimeout (1000);
     await page.screenshot ({ path : 'work/rounded-panel-bend-closeup.png', clip : { x : 235, y : 95, width : 820, height : 610 } });
-    await call ('packaging.fefco.scrub', { progress : .5 });
+    const cameraManual = await call ('camera.current.inspect'); const slider = panel.getByLabel ('Fold / unfold position'); await slider.evaluate (input => { input.value = '.5'; input.dispatchEvent (new Event ('change', { bubbles : true })); });
+    await page.waitForFunction (async () => (await Auto3D.execute ('packaging.fefco.scrub.inspect')).result.progress === .5); assert.deepEqual (await call ('camera.current.inspect'), cameraManual);
     await call ('animation.action.add', { time : 1, duration : 2, direction : 'unfold' });
+    const cameraBeforeSeek = await call ('camera.current.inspect');
     await call ('animation.timeline.seek', { time : 2 });
+    assert.deepEqual (await call ('camera.current.inspect'), cameraBeforeSeek);
     assert.ok (Math.abs ((await call ('packaging.fefco.scrub.inspect')).progress - .25) < .001);
     await call ('animation.timeline.seek', { time : 3 });
     assert.equal ((await call ('packaging.fefco.scrub.inspect')).progress, 0);
