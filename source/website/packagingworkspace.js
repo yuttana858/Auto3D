@@ -193,12 +193,6 @@ export class PackagingWorkspace
         try {
             preview = target.AddImported (PackagingModel (rig, unit, surfaces), source.name + ' · Folding'); assign (preview, 'flat'); target.packaging = profile; this.Refresh (); target.Remove (preview); target.Remove (source); target.Restore (preview, index); editor.selected = preview;
             editor.busy = true; editor.RefreshButtons?.(); await editor.Render (false, () => { if (preview.threeObject) { ApplyFefcoFoldPose (preview.threeObject, rig, module.FefcoFoldPose (rig, plan.from), unit); } }); editor.busy = true; editor.RefreshButtons?.();
-            let sweepRadius = 0;
-            if (preview.threeObject) {
-                // Fit the whole sequence so the long CAD blank remains visible while unfolding.
-                for (let sample = 0; sample <= 20; sample++) { ApplyFefcoFoldPose (preview.threeObject, rig, module.FefcoFoldPose (rig, sample / 20), unit); sweepRadius = Math.max (sweepRadius, new Box3 ().setFromObject (preview.threeObject).getBoundingSphere (new Sphere ()).radius); }
-                ApplyFefcoFoldPose (preview.threeObject, rig, module.FefcoFoldPose (rig, plan.from), unit);
-            }
             for (const event of ['pointerdown', 'wheel', 'touchstart']) { canvas?.addEventListener (event, manualCamera, { passive : true }); }
             editor.selectionBox && (editor.selectionBox.visible = false);
             operation.player = new module.FoldPlayback (progress => {
@@ -206,7 +200,7 @@ export class PackagingWorkspace
                 const motion = FoldMotionProgress (progress, autoFit); const pose = module.FefcoFoldPose (rig, plan.from + (plan.to - plan.from) * motion); operation.stage = plan.action === 'unfold' ? ({ 'closing top' : 'opening top', 'closing base' : 'opening base', 'erecting walls' : 'unwrapping walls' }[pose.stage] || pose.stage) : pose.stage;
                 if (preview.threeObject) {
                     ApplyFefcoFoldPose (preview.threeObject, rig, pose, unit);
-                    if (operation.cameraAutoFit && cameraBefore) { const viewer = editor.website.viewer; const sphere = new Box3 ().setFromObject (preview.threeObject).getBoundingSphere (new Sphere ()); const size = viewer.GetImageSize (); viewer.SetCamera (FoldCameraFrame (cameraBefore, sphere, sweepRadius, progress, size.width / size.height, CameraBottomInset (viewer, editor.status))); }
+                    if (operation.cameraAutoFit && cameraBefore) { const viewer = editor.website.viewer; const sphere = new Box3 ().setFromObject (preview.threeObject).getBoundingSphere (new Sphere ()); const size = viewer.GetImageSize (); viewer.SetCamera (FoldCameraFrame (cameraBefore, sphere, 0, progress, size.width / size.height, CameraBottomInset (viewer, editor.status))); }
                     else if (!operation.cameraManual && editor.timeline?.cameraKeyframes?.length) { const timeline = editor.timeline; ApplyCameraState (editor.website.viewer, timeline.CameraStateAt (timeline.rangeStart + progress * (timeline.rangeEnd - timeline.rangeStart))); }
                     else { editor.website.viewer.Render (); }
                 } else { editor.website.viewer?.Render (); } editor.Status ('Folding · ' + operation.stage + ' · ' + Math.round (progress * 100) + '%'); editor.website.packagingPanel?.fefcoPanel?.RefreshPlayback ();

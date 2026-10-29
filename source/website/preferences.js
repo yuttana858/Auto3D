@@ -6,7 +6,7 @@ import { WorkspaceDialog } from './modellibrary.js';
 import { Unit } from '../engine/model/unit.js';
 import { OpenCommandPanel } from './commandpanel.js';
 
-export const AppVersion = '0.45.0';
+export const AppVersion = '0.46.0';
 
 export function AppBuildInfo ()
 {
@@ -107,40 +107,24 @@ export class Preferences
             this.SetUnits (units.value).catch ((error) => { syncStatus.textContent = error.message; });
         }); unitLabel.appendChild (units);
         const aiHeading = document.createElement ('strong'); aiHeading.textContent = 'AI connections';
-        const aiProviderLabel = document.createElement ('label'); aiProviderLabel.textContent = 'Provider';
-        const aiProvider = document.createElement ('select'); aiProvider.setAttribute ('aria-label', 'AI provider'); aiProvider.add (new Option ('Meshy', 'meshy')); aiProvider.add (new Option ('Custom REST provider', 'custom')); aiProvider.value = this.website.aiWorkspace?.settings.provider || 'meshy'; aiProviderLabel.appendChild (aiProvider);
-        const aiBaseLabel = document.createElement ('label'); aiBaseLabel.textContent = 'Auto3D AI proxy';
-        const aiBase = document.createElement ('input'); aiBase.type = 'text'; aiBase.value = this.website.aiWorkspace?.settings.baseUrl || '/api/ai'; aiBase.autocomplete = 'off'; aiBase.spellcheck = false; aiBase.setAttribute ('aria-label', 'Auto3D AI proxy URL'); aiBaseLabel.appendChild (aiBase);
-        const aiKeyLabel = document.createElement ('label'); aiKeyLabel.textContent = 'Meshy API key (optional when server key is configured)';
-        const aiKey = document.createElement ('input'); aiKey.type = 'password'; aiKey.value = this.website.aiWorkspace?.settings.apiKey || ''; aiKey.placeholder = 'msy_… or leave blank for server key'; aiKey.autocomplete = 'off'; aiKey.setAttribute ('aria-label', 'AI provider API key'); aiKeyLabel.appendChild (aiKey);
-        const rememberLabel = document.createElement ('label'); rememberLabel.className = 'share_option'; const remember = document.createElement ('input'); remember.type = 'checkbox'; remember.checked = this.website.aiWorkspace?.settings.remember === true; rememberLabel.append (remember, document.createTextNode (' Remember key on this device'));
-        const aiNote = document.createElement ('p'); aiNote.className = 'section_hint'; aiNote.textContent = 'Auto3D routes Meshy requests through its same-origin server proxy because Meshy blocks browser CORS requests. API keys are never saved inside .auto3d sessions. For shared deployments, leave this field blank and configure MESHY_API_KEY as a server secret; the browser-stored key is intended only for personal/local use.';
+        const aiNote = document.createElement ('p'); aiNote.className = 'section_hint'; aiNote.textContent = 'Meshy connects through Auto3D using an administrator-configured server credential.';
         const aiActions = document.createElement ('div'); aiActions.className = 'mode_buttons';
-        const saveAI = document.createElement ('button'); saveAI.textContent = 'Save connection'; saveAI.className = 'workspace_primary';
         const testAI = document.createElement ('button'); testAI.textContent = 'Test connection';
-        const clearAI = document.createElement ('button'); clearAI.textContent = 'Clear key';
         const aiStatus = document.createElement ('p'); aiStatus.className = 'section_hint'; aiStatus.setAttribute ('role', 'status');
-        const saveConnection = () => {
-            this.website.aiWorkspace?.SaveSettings ({ provider : aiProvider.value, baseUrl : aiBase.value, apiKey : aiKey.value, remember : remember.checked });
-            aiStatus.textContent = 'AI connection settings saved for this ' + (remember.checked ? 'browser profile.' : 'browser session.');
-        };
-        saveAI.addEventListener ('click', saveConnection);
         testAI.addEventListener ('click', async () => {
-            saveConnection (); testAI.disabled = true; aiStatus.textContent = 'Testing connection…';
+            testAI.disabled = true; aiStatus.textContent = 'Testing connection…';
             try { const result = await this.website.aiWorkspace.TestConnection (); aiStatus.textContent = Number.isFinite (result.balance) ? 'Connected · ' + result.balance + ' credits available.' : 'Connection succeeded.'; }
             catch (error) { aiStatus.textContent = error.message; }
             finally { testAI.disabled = false; }
         });
-        clearAI.addEventListener ('click', () => { aiKey.value = ''; this.website.aiWorkspace?.ClearKey (); aiStatus.textContent = 'API key cleared.'; });
-        aiProvider.addEventListener ('change', () => { if (aiProvider.value === 'meshy' && (!aiBase.value || aiBase.value.includes ('meshy.ai'))) { aiBase.value = '/api/ai'; } });
-        aiActions.append (saveAI, testAI, clearAI);
+        aiActions.append (testAI);
         const syncStatus = document.createElement ('p'); syncStatus.setAttribute ('role', 'status'); syncStatus.textContent = 'Theme and units are saved automatically to your account.'; this.syncStatus = syncStatus;
         const about = document.createElement ('p'); about.className = 'preferences_about';
         about.textContent = 'SW Auto3D v' + AppVersion + ' · Build ' + AppBuildInfo ().build + ' — A browser workspace for inspecting, arranging and reviewing 3D models, materials, lighting and reusable layouts. Dimensions use the units declared by the source model; unspecified units remain model units.';
         const commands = document.createElement ('button'); commands.textContent = 'Commands and macros'; commands.className = 'workspace_primary'; commands.addEventListener ('click', () => { dialog.close (); OpenCommandPanel (this.website); });
         const errorLogs = document.createElement ('button'); errorLogs.textContent = 'Error logs'; errorLogs.addEventListener ('click', () => { dialog.close (); OpenErrorLog (this.website); });
         const recovery = document.createElement ('button'); recovery.textContent = 'Recover unsaved session'; recovery.addEventListener ('click', () => { dialog.close (); this.website.sessionEditor.OfferRecovery (true).catch (error => this.website.sessionEditor.Status (error.message)); });
-        const heading = document.createElement ('strong'); heading.textContent = 'About'; form.append (appearance, unitLabel, qualityLabel, qualityNote, syncStatus, commands, errorLogs, recovery, aiHeading, aiProviderLabel, aiBaseLabel, aiKeyLabel, rememberLabel, aiNote, aiActions, aiStatus, heading, about); dialog.appendChild (form);
+        const heading = document.createElement ('strong'); heading.textContent = 'About'; form.append (appearance, unitLabel, qualityLabel, qualityNote, syncStatus, commands, errorLogs, recovery, aiHeading, aiNote, aiActions, aiStatus, heading, about); dialog.appendChild (form);
     }
 
     async SetViewportQuality (mode)

@@ -32,6 +32,7 @@ import { ShowAdvanceAnimation, CreateTimelineTracks, UpdatePlayheads } from './a
 import { RecoveryWriter } from './sessionrecovery.js';
 import { SessionTimeline, CaptureCameraState, ApplyCameraState } from './sessiontimeline.js';
 import { ShowExportDialog } from './exportdialog.js';
+import { SessionTabs } from './sessiontabs.js';
 
 function Element (tag, className, text, parent)
 {
@@ -87,6 +88,7 @@ export class SessionEditor
         }
         viewer.scene.add (this.selectionBox);
         this.controls = new TransformControls (viewer.camera, viewer.renderer.domElement); this.controls.setSize (0.8); this.helper = this.controls.getHelper (); viewer.scene.add (this.helper);
+        viewer.renderer.domElement.addEventListener ('pointerdown', event => { this.shiftDragRequested = event.shiftKey && this.mode === 'translate'; }, true);
         viewer.navigation.onOrbitStart = () => this.OrbitSelected ();
         let panControlsEnabled = null;
         viewer.navigation.onPanModifier = active => {
@@ -115,6 +117,8 @@ export class SessionEditor
         viewer.renderer.domElement.addEventListener ('pointercancel', cancelDrag);
         viewer.renderer.domElement.addEventListener ('lostpointercapture', cancelDrag);
         window.addEventListener ('blur', cancelDrag);
+        window.addEventListener ('keyup', event => { if (['x', 'y', 'z'].includes (event.key?.toLowerCase ())) { this.SetRotationAxisOverride (null); } });
+        window.addEventListener ('blur', () => this.SetRotationAxisOverride (null));
         this.CreateUI ();
         const headerSave = Element ('button', 'header_library_button header_save_button', undefined, document.getElementById ('header_buttons'));
         headerSave.type = 'button'; headerSave.title = 'Save current session'; headerSave.setAttribute ('aria-label', 'Save current session');
@@ -136,6 +140,7 @@ export class SessionEditor
         this.shareId = query.get ('share');
         this.shareToken = query.get ('view');
         this.readOnly = this.shareId !== null || this.shareToken !== null;
+        if (!this.readOnly) { this.sessions = new SessionTabs (this, document.getElementById ('header_buttons')); }
         if (this.readOnly) {
             document.body.classList.add ('shared_view');
             if (this.shareToken !== null) {
@@ -147,7 +152,7 @@ export class SessionEditor
         }
         window.addEventListener ('keydown', (event) => this.KeyDown (event));
         window.addEventListener ('beforeunload', (event) => {
-            if (!this.dirty || this.readOnly) { return; }
+            if (!(this.sessions?.HasDirty () || this.dirty) || this.readOnly) { return; }
             event.preventDefault (); event.returnValue = '';
         });
 
@@ -374,6 +379,12 @@ export class SessionEditor
     {
         this.website.viewer.navigation.enabled = true;
         const before = this.dragStart; this.dragStart = null;
+        const shiftCopy = this.shiftDragRequested && before && this.mode === 'translate'; this.shiftDragRequested = false;
+        if (shiftCopy) {
+            const records = (this.dragObjects?.length ? this.dragObjects : [{ object : this.selected, before }]).map (item => ({ object : item.object, before : item.before, after : TransformState (item.object) }));
+            this.dragObjects = null;
+            if (records.some (item => JSON.stringify (item.before) !== JSON.stringify (item.after))) { this.busy = true; this.RefreshButtons (); this.DuplicateTransformed (records).catch (error => this.Status ('Could not duplicate: ' + error.message)).finally (() => { this.busy = false; this.RefreshButtons (); }); return; }
+        }
         if (this.dragObjects?.length > 1) { const records = this.dragObjects.map ((item) => ({ ...item, after : TransformState (item.object) })); const apply = (key) => { records.forEach ((item) => { Object.assign (item.object, JSON.parse (JSON.stringify (item[key]))); this.ApplyTransform (item.object); }); this.Select (this.selected, false, true); }; this.history.Push ({ undo : () => apply ('before'), redo : () => apply ('after') }); this.dragStart = null; }
         else if (before && this.selected) { this.RecordTransform (this.selected, before); this.UpdateDetails (); this.website.viewer.UpdateGroundGrid (); this.website.sceneEffects?.Refresh (); }
         this.dragObjects = null; this.RequestInteractionRender ();
@@ -383,6 +394,7 @@ export class SessionEditor
     {
         if (this.readOnly) { return; }
         this.dirty = true; this.recoveryRevision++;
+        this.sessions?.Refresh ();
         if (this.recoveryTimer) { clearTimeout (this.recoveryTimer); }
         if (!this.document.objects.length && !this.document.packaging?.paths?.length) { this.recoveryWriter.Cancel (); this.library.deviceStorage.ClearRecovery ().catch (() => {}); return; }
         this.recoveryTimer = setTimeout (() => this.SaveRecovery (), 1500);
@@ -408,6 +420,7 @@ export class SessionEditor
     {
         if (this.readOnly) { return; }
         this.dirty = false; this.recoveryRevision++; this.recoveryWriter.Cancel ();
+        this.sessions?.Refresh ();
         if (this.recoveryTimer) { clearTimeout (this.recoveryTimer); this.recoveryTimer = null; }
         try { await this.library.deviceStorage.ClearRecovery (); } catch { /* Recovery cleanup is best effort. */ }
     }
@@ -520,7 +533,7 @@ export class SessionEditor
 
     async Render (fit = false, beforeDisplay = null)
     {
-        this.timeline.Stop (); this.packaging.presentation?.Clear (); this.DisposeModelPreview ();
+        this.website.viewModes?.Restore (); this.timeline.Stop (); this.packaging.presentation?.Clear (); this.DisposeModelPreview ();
         this.busy = true; this.controls.detach (); this.players.forEach ((player) => player.Dispose ()); this.players = [];
         try {
             if (!this.document.objects.length) { this.selectionBox.visible = false; this.DisposeModelPreview (); this.website.ClearModel (); this.website.SetUIState (1); this.RefreshUI (); return; }
@@ -547,7 +560,7 @@ export class SessionEditor
             this.website.UpdateMeshesVisibility ();
             this.website.sceneEffects?.ApplyObjectSettings (this.document.objects);
             await this.packaging.presentation?.PrepareAll (); this.packaging.presentation?.Apply (this.timeline.time, false);
-            this.RefreshUI (); this.Select (this.selected); this.website.sceneEffects?.Refresh (); this.website.viewer.Render ();
+            this.RefreshUI (); this.Select (this.selected); this.website.sceneEffects?.Refresh (); this.website.viewModes?.Refresh (); this.website.viewer.Render ();
         } finally { this.busy = false; this.RefreshButtons (); this.website.materialPanel?.Update (); }
     }
 
@@ -578,7 +591,17 @@ export class SessionEditor
         apply ('after'); this.history.Push ({ undo : () => apply ('before'), redo : () => apply ('after') }); return { objectIds : objects.map ((object) => object.id) };
     }
 
-    SetMode (mode) { if (this.readOnly && mode !== 'select') { return; } this.mode = mode; this.Select (this.selected, false, true); }
+    SetMode (mode) { if (this.readOnly && mode !== 'select') { return; } this.SetRotationAxisOverride (null); this.mode = mode; this.Select (this.selected, false, true); }
+    SetRotationAxisOverride (axis)
+    {
+        if (axis !== null && !['X', 'Y', 'Z'].includes (axis)) { throw new Error ('Choose X, Y or Z.'); }
+        const controls = this.controls; if (!controls) { return; }
+        if (axis && this.mode === 'rotate') {
+            this.rotationAxisBefore ||= { showX : controls.showX, showY : controls.showY, showZ : controls.showZ, axis : controls.axis };
+            controls.showX = axis === 'X'; controls.showY = axis === 'Y'; controls.showZ = axis === 'Z'; if (controls.dragging) { controls.axis = axis; }
+        } else if (this.rotationAxisBefore) { Object.assign (controls, this.rotationAxisBefore); this.rotationAxisBefore = null; }
+        this.website.viewer?.RequestRender?.();
+    }
     SelectedObjects () { return this.document.objects.filter ((object) => this.selectedIds?.has (object.id)); }
     Select (object, fromNavigator = false, additive = false, single = false)
     {
@@ -1203,6 +1226,26 @@ export class SessionEditor
         const added = originals.map ((source) => { const copy = this.document.Duplicate (source); copy.position = [...source.position]; copy.position[0] += 1.1 * Math.max (...this.GetObjectBaseSize (source).map ((size, axis) => size * Math.abs (source.scale[axis])), 0.01); if (groupId) { copy.userData._auto3dGroup = groupId; } else { delete copy.userData._auto3dGroup; delete copy.userData._auto3dGroupName; } this.document.ApplyTransform (copy); return copy; });
         this.history.Push ({ undo : async () => { added.forEach ((object) => this.document.Remove (object)); this.selected = originals[0]; await this.Render (); }, redo : async () => { added.forEach ((object, index) => this.document.Restore (object, start + index)); this.selected = added[0]; await this.Render (); } }); this.selected = added[0]; await this.Render (); this.Status ('Duplicated ' + added.length + ' object(s)');
     }
+    async DuplicateTransformed (records)
+    {
+        if (this.readOnly || !Array.isArray (records) || !records.length || records.some (item => !this.document.objects.includes (item.object))) { throw new Error ('Select editable objects to duplicate.'); }
+        const document = this.document, previous = this.selected, previousIds = new Set (this.selectedIds), start = document.objects.length, meshCount = document.model.meshes.length, materialCount = document.model.materials.length, copies = [];
+        try {
+            if (start + records.length > 1000) { throw new Error ('The session supports up to 1,000 objects.'); }
+            const groupId = records.length > 1 ? crypto.randomUUID () : null;
+            for (const item of records) {
+                const copy = document.Duplicate (item.object); copies.push (copy); Object.assign (copy, structuredClone (item.after));
+                if (groupId) { copy.userData._auto3dGroup = groupId; } else { delete copy.userData._auto3dGroup; delete copy.userData._auto3dGroupName; }
+                document.ApplyTransform (copy); Object.assign (item.object, structuredClone (item.before)); document.ApplyTransform (item.object);
+            }
+            this.selected = copies[0]; this.selectedIds = new Set (copies.map (item => item.id)); await this.Render ();
+            const apply = async forward => { if (forward) { copies.forEach ((item, index) => document.Restore (item, start + index)); this.selected = copies[0]; this.selectedIds = new Set (copies.map (item => item.id)); } else { copies.forEach (item => document.Remove (item)); this.selected = previous; this.selectedIds = new Set (previousIds); } await this.Render (); };
+            this.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); this.Status ('Duplicated ' + copies.length + ' object(s)'); return { objectIds : copies.map (item => item.id) };
+        } catch (error) {
+            copies.forEach (copy => document.Remove (copy)); document.model.meshes.length = meshCount; document.model.materials.length = materialCount;
+            for (const item of records) { Object.assign (item.object, structuredClone (item.before)); document.ApplyTransform (item.object); } this.selected = previous; this.selectedIds = previousIds; try { await this.Render (); } catch { /* Preserve the original failure. */ } throw error;
+        }
+    }
     async Delete ()
     {
         if (this.readOnly || this.busy) { return; }
@@ -1277,7 +1320,7 @@ export class SessionEditor
             else { await this.MarkClean (); }
         }
     }
-    async AppendArchive (saved)
+    async AppendArchive (saved, place = null)
     {
         if (this.readOnly) { throw new Error ('This session is read-only.'); }
         const target = this.document; const owner = this.website.auth?.user?.id; const previous = this.selected; const selection = new Set (this.selectedIds || []);
@@ -1296,6 +1339,7 @@ export class SessionEditor
             if (this.timeline) { this.timeline.actions = [...previousActions, ...importedActions]; this.timeline.ExtendDurationForKeys (); }
             this.selected = added[0]; this.selectedIds = new Set ([added[0].id]); await this.Render (true);
             if (this.document !== target || this.website.auth?.user?.id !== owner || this.website.accountReady === false || this.readOnly) { throw new Error ('Account or workspace changed while adding the saved model.'); }
+            if (place) { place (this, added); }
             this.history.Push ({ undo : async () => { added.forEach (object => target.Remove (object)); if (this.timeline) { this.timeline.actions = previousActions; } this.selected = previous; this.selectedIds = new Set (selection); await this.Render (); }, redo : async () => { added.forEach ((object, index) => target.Restore (object, firstIndex + index)); if (this.timeline) { this.timeline.actions = [...previousActions, ...importedActions]; } this.selected = added[0]; this.selectedIds = new Set ([added[0].id]); await this.Render (); } });
             this.Status ('Added ' + added.length + ' model(s) from ' + saved.document.name + ' · selected ' + added[0].name);
             return { objectIds : added.map (object => object.id), objectCount : added.length };
@@ -1348,7 +1392,7 @@ export class SessionEditor
                 try {
                     if (this.arrayOperation) { throw new Error ('Finish or cancel the array animation before exporting.'); }
                     if (this.packaging?.foldOperation) { throw new Error ('Finish or cancel folding before exporting.'); }
-                    this.website.viewer.SetMeshesHighlight (this.website.highlightColor, () => false);
+                    this.website.viewModes?.Restore (); this.website.viewer.SetMeshesHighlight (this.website.highlightColor, () => false);
                     const root = this.website.viewer.mainModel.mainModel.GetRootObject (); const animations = this.players.filter ((player) => player.object.visible).flatMap ((player) => player.ExportClips ());
                     const metadata = []; root.traverse ((item) => { metadata.push ([item, item.userData]); item.userData = {}; });
                     const colors = new Map (); root.traverse ((item) => { if (item.material) { for (const material of Array.isArray (item.material) ? item.material : [item.material]) { if (!colors.has (material) && material.color) { colors.set (material, [material.color.clone (), material.emissive?.clone ()]); material.color.convertSRGBToLinear (); material.emissive?.convertSRGBToLinear (); } } } });
@@ -1361,7 +1405,7 @@ export class SessionEditor
                         definition.extras = { ...definition.extras, swAuto3D : surface };
                     } }));
                     try { result = await exporter.parseAsync (root, { binary, animations, trs : true, onlyVisible : true }); }
-                    finally { metadata.forEach (([item, data]) => { item.userData = data; }); colors.forEach (([color, emissive], material) => { material.color.copy (color); if (emissive) { material.emissive.copy (emissive); } }); this.website.UpdateMeshesSelection (); }
+                    finally { metadata.forEach (([item, data]) => { item.userData = data; }); colors.forEach (([color, emissive], material) => { material.color.copy (color); if (emissive) { material.emissive.copy (emissive); } }); this.website.UpdateMeshesSelection (); this.website.viewModes?.Refresh (); this.website.viewer.Render (); }
                     this.Download (binary ? result : JSON.stringify (result), this.document.name + (binary ? '.glb' : '.gltf'), binary ? 'model/gltf-binary' : 'model/gltf+json'); dialog.close (); this.Status ('Export downloaded.');
                 } catch (error) { this.Status ('Export failed: ' + error.message); button.disabled = false; }
             });
@@ -1377,8 +1421,9 @@ export class SessionEditor
         const textEditing = target.closest?.('textarea, [contenteditable="true"]') || (target.matches?.('input') && ['text', 'search', 'email', 'url', 'password', 'number'].includes (target.type));
         if (this.busy || (textEditing && !(modified && key === 'z' && !target.matches?.(':focus')))) { return; }
         if (target.closest?.('dialog') && !(modified && key === 'z')) { return; }
+        if (!modified && !event.altKey && ['x', 'y', 'z'].includes (key) && this.mode === 'rotate') { this.SetRotationAxisOverride (key.toUpperCase ()); return; }
         let action = null;
-        if (modified && key === 's') { action = () => this.library.SaveDialog (true); } else if (modified && key === 'd') { action = () => this.Duplicate (); } else if (modified && key === 'z') { action = () => event.shiftKey ? this.Redo () : this.Undo (); }
+        if (modified && key === 's') { action = () => this.library.SaveDialog (true); } else if (modified && key === 'd') { action = () => this.Duplicate (); } else if (modified && key === 'c' && this.SelectedObjects ().length) { action = () => this.sessions.Copy (); } else if (modified && key === 'v' && this.sessions?.clipboard) { action = () => this.sessions.Paste (); } else if (modified && key === 'z') { action = () => event.shiftKey ? this.Redo () : this.Undo (); }
         else if (!modified && !event.altKey) { action = ({ v : () => this.SetMode ('select'), w : () => this.SetMode ('translate'), e : () => this.SetMode ('rotate'), r : () => this.SetMode ('scale'), f : () => this.Focus (), h : () => this.ToggleVisibility (), delete : () => this.Delete () })[key]; }
         if (action) { event.preventDefault (); this.Run (action); }
     }

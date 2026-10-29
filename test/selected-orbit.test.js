@@ -24,6 +24,16 @@ describe ('Selected-object orbit', () => {
             const distance = (a, b) => Math.hypot (a.x - b.x, a.y - b.y, a.z - b.z); const radius = distance (nav.camera.eye, nav.orbitCenter), zoom = distance (nav.camera.eye, nav.camera.center); nav.Orbit (20, 10); assert.ok (Math.abs (distance (nav.camera.eye, nav.orbitCenter) - radius) < 1e-8); assert.ok (Math.abs (distance (nav.camera.eye, nav.camera.center) - zoom) < 1e-8);
         }
     });
+    it ('Defaults to a world-Z orbit and holds X/Y/Z as temporary axis constraints', () => {
+        const nav = Object.create (Navigation.prototype); Object.assign (nav, { navigationMode : NavigationMode.FixedUpVector, orbitCenter : new Coord3D (0, 0, 0), camera : { eye : new Coord3D (2, 3, 4), center : new Coord3D (0, 0, 0), up : new Coord3D (0, 1, 0) }, heldOrbitAxes : [] });
+        nav.Orbit (20, 0); assert.ok (Math.abs (nav.camera.eye.z - 4) < 1e-9);
+        for (const axis of ['x', 'y', 'z']) { nav.OnAxisKeyDown ({ key : axis }); const before = nav.camera.eye[axis]; nav.Orbit (15, 0); assert.ok (Math.abs (nav.camera.eye[axis] - before) < 1e-9); nav.OnAxisKeyUp ({ key : axis }); }
+        nav.OnAxisKeyDown ({ key : 'x', target : { closest : () => true } }); assert.equal (nav.heldOrbitAxes.length, 0);
+    });
+    it ('Temporarily constrains the object rotation gizmo and restores it on release', () => {
+        const controls = { showX : true, showY : true, showZ : true, axis : 'Y', dragging : true }; const editor = { controls, mode : 'rotate', website : { viewer : { RequestRender () {} } } };
+        SessionEditor.prototype.SetRotationAxisOverride.call (editor, 'X'); assert.deepEqual ([controls.showX, controls.showY, controls.showZ, controls.axis], [true, false, false, 'X']); SessionEditor.prototype.SetRotationAxisOverride.call (editor, null); assert.deepEqual ([controls.showX, controls.showY, controls.showZ, controls.axis], [true, true, true, 'Y']);
+    });
     it ('Only initializes focus once after a genuine right drag, preserving short context clicks and other gestures', () => {
         const nav = Object.create (Navigation.prototype); const calls = []; let click = true; Object.assign (nav, { enabled : true, canvas : {}, mouse : { Move () {}, GetPosition : () => new Coord2D (0, 0), GetMoveDiff : () => new Coord2D (10, 5), IsButtonDown : () => true, GetButton : () => 3 }, clickDetector : { Move () {}, IsClick : () => click }, onOrbitStart : () => calls.push ('focus'), Orbit : () => calls.push ('orbit'), Update () {} });
         nav.OnMouseMove ({}); assert.deepEqual (calls, []); click = false; nav.OnMouseMove ({}); nav.OnMouseMove ({}); assert.deepEqual (calls, ['focus', 'orbit', 'orbit']); assert.equal (nav.suppressContextMenu, true);

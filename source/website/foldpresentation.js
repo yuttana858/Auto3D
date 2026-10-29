@@ -36,8 +36,7 @@ export class FoldPresentation
             const fallback = sourceMeshes.values ().next ().value; const unused = new Set ();
             preview.traverse (child => { if (!child.isMesh) { return; } const materials = Array.isArray (child.material) ? child.material : [child.material]; child.material = materials.map (material => { const original = sourceMaterials.get (material.name); if (!original) { return material; } unused.add (material); return original.material; }); child.userData.originalMaterials = materials.map (material => sourceMaterials.get (material.name)?.index ?? 0); child.userData.originalMeshInstance = sourceMeshes.get (child.name) || fallback; child.userData.auto3dFoldPresentation = true; }); unused.forEach (material => material.dispose ());
             ApplyPackagingPresentation (preview, rig, unit, document.model.materials, true);
-            const record = { object, root, preview, rig, module, unit, urls : output.objectUrls, children : root.children.map (child => [child, child.visible]), sweep : new Box3 () };
-            for (let i = 0; i <= 20; i++) { ApplyFefcoFoldPose (preview, rig, module.FefcoFoldPose (rig, i / 20), unit); record.sweep.union (new Box3 ().setFromObject (preview)); }
+            const record = { object, root, preview, rig, module, unit, urls : output.objectUrls, children : root.children.map (child => [child, child.visible]) };
             preview.visible = false; root.add (preview); this.records.set (object.id, record); return record;
         }) ();
         this.preparing.set (object.id, work); try { return await work; } finally { if (this.preparing.get (object.id) === work) { this.preparing.delete (object.id); } }
@@ -54,21 +53,22 @@ export class FoldPresentation
     }
     Apply (time, camera = true)
     {
-        const editor = this.editor; const timeline = editor.timeline; const active = []; const currentBounds = new Box3 (), sweepBounds = new Box3 ();
+        const editor = this.editor; const timeline = editor.timeline; const active = []; const currentBounds = new Box3 ();
         for (const record of this.records.values ()) {
             if (record.root !== record.object.threeObject || !editor.document.objects.includes (record.object)) { continue; }
             const sample = TimelineFoldSample (timeline?.actions || [], record.object.id, time, BaseFoldPose (record.object), timeline?.foldAutoFit !== false);
             const manual = this.manual.get (record.object.id); const hasSaved = record.object.userData?._auto3dFoldPreview !== undefined;
             if (manual !== undefined || sample || hasSaved) {
                 this.SetPose (record, manual ?? sample?.pose ?? BaseFoldPose (record.object));
-                if (sample && record.object.visible) { active.push (sample); currentBounds.union (new Box3 ().setFromObject (record.preview)); record.root.updateMatrixWorld (true); sweepBounds.union (record.sweep.clone ().applyMatrix4 (record.root.matrixWorld)); }
+                if (sample && record.object.visible) { active.push (sample); currentBounds.union (new Box3 ().setFromObject (record.preview)); }
             } else { record.preview.visible = false; record.children.forEach (([child, visible]) => { child.visible = visible; }); }
         }
+        editor.website.viewModes?.Refresh ();
         if (!camera || !active.length || timeline?.foldAutoFit === false || timeline?.cameraKeyframes?.length) { return; }
         const key = active.map (sample => sample.action.id).join (':');
         if (!this.cameraRun || this.cameraRun.key !== key || time < this.cameraRun.time) { this.cameraRun = { key, initial : editor.website.viewer.GetCamera ().Clone (), time, manual : false }; editor.website.viewer.navigation.StopCameraMovement?.(); }
         const run = this.cameraRun; run.time = time;
-        if (!run.manual && !currentBounds.isEmpty ()) { const size = editor.website.viewer.GetImageSize (); const sphere = currentBounds.getBoundingSphere (new Sphere ()); const sweep = sweepBounds.getBoundingSphere (new Sphere ()); const progress = Math.min (...active.map (sample => sample.progress)); editor.website.viewer.SetCamera (FoldCameraFrame (run.initial, sphere, sweep.radius, progress, size.width / size.height, CameraBottomInset (editor.website.viewer, editor.status))); }
+        if (!run.manual && !currentBounds.isEmpty ()) { const size = editor.website.viewer.GetImageSize (); const sphere = currentBounds.getBoundingSphere (new Sphere ()); const progress = Math.min (...active.map (sample => sample.progress)); editor.website.viewer.SetCamera (FoldCameraFrame (run.initial, sphere, 0, progress, size.width / size.height, CameraBottomInset (editor.website.viewer, editor.status))); }
     }
     WithOriginal (object, callback)
     {

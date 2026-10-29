@@ -1,5 +1,5 @@
 import { Coord2D, CoordDistance2D, SubCoord2D } from '../geometry/coord2d.js';
-import { CoordDistance3D, CrossVector3D, SubCoord3D, VectorAngle3D } from '../geometry/coord3d.js';
+import { Coord3D, CoordDistance3D, CrossVector3D, SubCoord3D, VectorAngle3D } from '../geometry/coord3d.js';
 import { DegRad, IsGreater, IsLower, IsZero } from '../geometry/geometry.js';
 import { ParabolicTweenFunction, TweenCoord3D } from '../geometry/tween.js';
 import { CameraIsEqual3D, NavigationMode } from './camera.js';
@@ -254,7 +254,7 @@ export class Navigation
         this.suppressContextMenu = false;
         this.spacePan = false;
         this.panGesture = false;
-        this.orbitCenter = null; this.rightOrbitStarted = false;
+        this.orbitCenter = null; this.rightOrbitStarted = false; this.heldOrbitAxes = [];
 
 		if (this.canvas.addEventListener) {
 			this.canvas.addEventListener ('mousedown', this.OnMouseDown.bind (this));
@@ -267,9 +267,11 @@ export class Navigation
 		}
 		if (document.addEventListener) {
             document.addEventListener ('keydown', this.OnPanKeyDown.bind (this));
+            document.addEventListener ('keydown', this.OnAxisKeyDown.bind (this));
+            document.addEventListener ('keyup', this.OnAxisKeyUp.bind (this));
             document.addEventListener ('keyup', ev => { if (ev.code === 'Space') { this.SetSpacePan (false); } });
-            document.addEventListener ('visibilitychange', () => { if (document.hidden) { this.CancelPan (); } });
-            globalThis.window?.addEventListener ('blur', () => this.CancelPan ());
+            document.addEventListener ('visibilitychange', () => { if (document.hidden) { this.CancelPan (); this.heldOrbitAxes = []; this.onOrbitAxisChanged?.(null); } });
+            globalThis.window?.addEventListener ('blur', () => { this.heldOrbitAxes = []; this.onOrbitAxisChanged?.(null); this.CancelPan (); });
 			document.addEventListener ('mousemove', this.OnMouseMove.bind (this));
 			document.addEventListener ('mouseup', this.OnMouseUp.bind (this));
 			document.addEventListener ('mouseleave', this.OnMouseLeave.bind (this));
@@ -394,6 +396,13 @@ export class Navigation
         this.SetSpacePan (true);
         if (event.target === this.canvas || this.canvas.matches?.(':hover')) { event.preventDefault (); }
     }
+
+    OnAxisKeyDown (event)
+    {
+        const axis = event.key?.toLowerCase (); if (!['x', 'y', 'z'].includes (axis) || event.ctrlKey || event.metaKey || event.altKey || event.target?.closest?.('input,textarea,select,button,[contenteditable="true"],[role="textbox"],dialog')) { return; }
+        this.heldOrbitAxes ||= []; if (!this.heldOrbitAxes.includes (axis)) { this.heldOrbitAxes.push (axis); this.onOrbitAxisChanged?.(axis); }
+    }
+    OnAxisKeyUp (event) { this.heldOrbitAxes = (this.heldOrbitAxes || []).filter (axis => axis !== event.key?.toLowerCase ()); this.onOrbitAxisChanged?.(this.heldOrbitAxes.at (-1) || null); }
 
     CancelPan ()
     {
@@ -582,6 +591,13 @@ export class Navigation
 		let radAngleX = angleX * DegRad;
 		let radAngleY = angleY * DegRad;
 
+        const held = this.heldOrbitAxes?.at (-1);
+        if (held) {
+            const axis = new Coord3D (held === 'x' ? 1 : 0, held === 'y' ? 1 : 0, held === 'z' ? 1 : 0);
+            const angle = -(Math.abs (radAngleX) >= Math.abs (radAngleY) ? radAngleX : radAngleY);
+            rotate (axis, angle); this.camera.up.Rotate (axis, angle, new Coord3D (0, 0, 0)); return;
+        }
+
 		let viewDirection = SubCoord3D (this.camera.center, this.camera.eye).Normalize ();
 		let horizontalDirection = CrossVector3D (viewDirection, this.camera.up).Normalize ();
 
@@ -591,12 +607,11 @@ export class Navigation
 			if (IsGreater (newAngle, 0.0) && IsLower (newAngle, Math.PI)) {
 				rotate (horizontalDirection, -radAngleY);
 			}
-			rotate (this.camera.up, -radAngleX);
+			const worldZ = new Coord3D (0, 0, 1); rotate (worldZ, -radAngleX); this.camera.up.Rotate (worldZ, -radAngleX, new Coord3D (0, 0, 0));
 		} else if (this.navigationMode === NavigationMode.FreeOrbit) {
 			let verticalDirection = CrossVector3D (horizontalDirection, viewDirection).Normalize ();
 			rotate (horizontalDirection, -radAngleY);
-			rotate (verticalDirection, -radAngleX);
-			this.camera.up = verticalDirection;
+			const worldZ = new Coord3D (0, 0, 1); rotate (worldZ, -radAngleX); this.camera.up = verticalDirection; this.camera.up.Rotate (worldZ, -radAngleX, new Coord3D (0, 0, 0));
 		}
 	}
 

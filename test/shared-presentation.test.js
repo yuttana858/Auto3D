@@ -5,7 +5,7 @@ describe ('Shared presentation', () => {
         const settings = { backgroundPreset : 'standard', backgroundColor : { r : 1, g : 2, b : 3, a : 255 } };
         const saved = CapturePresentationBackground (settings, false);
         assert.equal (saved.colors[0], '#ffffff'); settings.backgroundColor.r = 8; assert.equal (saved.color.r, 1);
-        assert.equal (CapturePresentationBackground (settings, true).colors[0], '#000000');
+        assert.equal (CapturePresentationBackground (settings, true).colors[0], '#111820');
     });
     function viewer () {
         const vector = () => ({ x : 0, y : 0, z : 0 });
