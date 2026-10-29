@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ReleaseWebGLRenderer } from './webglcleanup.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -39,5 +40,5 @@ export class AIPreview
     }
     Fit () { if (!this.root) { return; } const box = new THREE.Box3 ().setFromObject (this.root); if (box.isEmpty ()) { return; } const sphere = box.getBoundingSphere (new THREE.Sphere ()); const radius = Math.max (.001, sphere.radius); const distance = radius / Math.sin (THREE.MathUtils.degToRad (this.camera.fov / 2)) / Math.min (1, this.camera.aspect) * 1.1; this.controls.target.copy (sphere.center); this.camera.position.copy (sphere.center).add (new THREE.Vector3 (1, .65, 1).normalize ().multiplyScalar (distance)); this.camera.near = radius / 1000; this.camera.far = distance + radius * 100; this.camera.updateProjectionMatrix (); this.controls.update (); this.Render (); }
     Thumbnail () { this.Render (); return this.renderer.domElement.toDataURL ('image/png'); }
-    Dispose () { this.Clear (); this.resize.disconnect (); this.controls.dispose (); this.renderer.dispose (); this.renderer.domElement.remove (); }
+    Dispose () { this.Clear (); this.resize.disconnect (); this.controls.dispose (); ReleaseWebGLRenderer (this.renderer); this.renderer.domElement.remove (); }
 }

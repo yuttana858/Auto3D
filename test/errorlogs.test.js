@@ -1,12 +1,19 @@
 import assert from 'node:assert/strict';
 import { ErrorLogs, RedactLogText } from '../source/website/errorlogs.js';
 import { CreateAgentCommands } from '../source/website/agentcommands.js';
+import { ReleaseWebGLRenderer } from '../source/website/webglcleanup.js';
 function Fixture () {
     const data = new Map (); const events = {}; const storage = { getItem : (key) => data.get (key), setItem : (key, value) => data.set (key, value), removeItem : (key) => data.delete (key) };
     const environment = { navigator : { userAgent : 'Test browser' }, console : { error : () => {}, warn : () => {} }, addEventListener : (key, callback) => { events[key] = callback; }, document : { addEventListener : (key, callback) => { events[key] = callback; } }, fetch : async () => ({ ok : false, status : 503 }) };
     return { log : new ErrorLogs (environment, storage), data, storage, environment, events };
 }
 describe ('Browser diagnostics', () => {
+    it ('Releases transient contexts without masking real viewer losses', () => {
+        const { log, events } = Fixture (); log.Install (); const canvas = {}, mainCanvas = {}, calls = [];
+        ReleaseWebGLRenderer ({ domElement : canvas, dispose : () => calls.push ('dispose'), forceContextLoss : () => calls.push ('lose') });
+        assert.deepEqual (calls, ['dispose', 'lose']); events.webglcontextlost ({ target : canvas }); assert.equal (log.List ('error').entries.length, 0);
+        events.webglcontextlost ({ target : mainCanvas }); assert.equal (log.List ('error').entries[0].source, 'WebGL');
+    });
     it ('captures runtime, rejected requests, promise and WebGL errors without request bodies', async () => {
         const { log, events, environment } = Fixture (); log.Install (); log.BindAccount ('one');
         events.error ({ message : 'Problem', error : new Error ('Problem') }); events.unhandledrejection ({ reason : new Error ('Rejected') }); events.webglcontextlost ();

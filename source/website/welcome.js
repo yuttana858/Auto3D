@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ReleaseWebGLRenderer } from './webglcleanup.js';
 import { AppVersion } from './preferences.js';
 import { WorkspaceDialog } from './modellibrary.js';
 import { EnablePopupFade, FadeOut } from './popuptransition.js';
@@ -55,7 +56,7 @@ function CreateScene (canvas, animated)
     }
     return () => {
         window.removeEventListener ('resize', resize); renderer.setAnimationLoop (null);
-        geometries.forEach ((geometry) => geometry.dispose ()); materials.forEach ((material) => material.dispose ()); renderer.dispose ();
+        geometries.forEach ((geometry) => geometry.dispose ()); materials.forEach ((material) => material.dispose ()); ReleaseWebGLRenderer (renderer);
     };
 }
 

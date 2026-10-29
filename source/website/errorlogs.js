@@ -1,3 +1,5 @@
+import { IsIntentionallyReleasedWebGLContext } from './webglcleanup.js';
+
 export function RedactLogText (value)
 {
     const sanitized = String (value ?? '').replace (/\bBearer\s+[^\s,;]+/gi, 'Bearer [redacted]');
@@ -61,7 +63,7 @@ export class ErrorLogs
         const environment = this.environment;
         this.onError = (event) => { if (event.error || event.message) { this.Record ('error', 'runtime', event.message || ErrorText (event.error), event.error?.stack || ''); } else { const target = event.target; if (target?.src || target?.href) { this.Record ('error', 'resource', 'Could not load ' + SafeLogPath (target.src || target.href)); } } };
         this.onRejection = (event) => this.Record ('error', 'promise', ErrorText (event.reason), event.reason instanceof Error ? event.reason.stack : '');
-        this.onContextLost = () => this.Record ('error', 'WebGL', 'Rendering context lost. Save work and reload the app.');
+        this.onContextLost = event => { if (!IsIntentionallyReleasedWebGLContext (event?.target)) { this.Record ('error', 'WebGL', 'Rendering context lost. Save work and reload the app.'); } };
         environment.addEventListener ('error', this.onError, true); environment.addEventListener ('unhandledrejection', this.onRejection); environment.document?.addEventListener ('webglcontextlost', this.onContextLost, true);
         this.originalFetch = environment.fetch;
         this.wrappedFetch = async (...args) => {
