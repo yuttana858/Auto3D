@@ -23,6 +23,18 @@ describe ('Realistic board appearance independent of CAD', () => {
         const maxZ = Math.max (...flap.vertices.map (p => p[2])); const cutZ = Math.abs (minZ) > Math.abs (maxZ) ? minZ : maxZ;
         assert.ok (flap.vertices.some (v => Math.abs (v[2] - cutZ) < 1e-8 && v[1] > 0 && v[1] < 3));
     });
+    it ('Rounds the exposed closing edge and minor flap cut without changing CAD', () => {
+        for (const thickness of [1.5, 3, 7]) {
+            const parameters = { length : 100, width : 80, height : 60, thickness }, profile = FefcoProfile (parameters), canonical = JSON.stringify (profile); const rig = CreateFefcoFoldRig (parameters, profile);
+            for (const index of [rig.panels.findIndex (panel => panel.kind === 'wall' && panel.index === 3), rig.panels.findIndex (panel => panel.kind === 'top' && panel.index === 1)]) {
+                const source = rig.meshes[index], visible = rig.presentationMeshes[index]; const boundary = Math.max (...source.vertices.map (point => point[0]));
+                const faceVertices = new Set (visible.triangles.filter (triangle => triangle.material !== 1).flatMap (triangle => triangle.vertices));
+                assert.ok (visible.vertices.some ((point, vertex) => faceVertices.has (vertex) && Math.abs (point[0] - boundary) < 1e-7 && point[1] > thickness * .01 && point[1] < thickness * .99), 'exposed cut should show a compressed liner shoulder');
+                assert.ok (visible.vertices.every (point => point.every (Number.isFinite)));
+            }
+            assert.equal (JSON.stringify (profile), canonical);
+        }
+    });
     it ('Retains custom cut holes while supplying compressed display shoulders', () => {
         const profile = { version : 1, name : 'Die cut', grade : 'Custom', thickness : 3, paths : [{ id : 'outer', type : 'cut', closed : true, points : [[0, 0], [100, 0], [100, 80], [0, 80]] }, { id : 'hole', type : 'cut', closed : true, points : [[30, 30], [50, 30], [50, 50], [30, 50]] }] };
         const board = CreateBoard (profile, { textured : true }); assert.equal (board.presentationMeshes.length, 1); assert.ok (board.presentationMeshes[0].vertices.flat ().every (Number.isFinite));

@@ -26,8 +26,6 @@ function json (data, status = 200, extraHeaders = null)
 
 function apiKey (context)
 {
-    const personal = String (context.request.headers.get ('X-Auto3D-AI-Key') || '').trim ();
-    if (personal) { return personal; }
     const allowShared = String (context.env.AUTO3D_AI_ALLOW_SHARED_KEY || '').toLowerCase () === 'true';
     const secret = String (context.env.MESHY_API_KEY || '').trim ();
     return allowShared ? secret : '';
@@ -90,6 +88,7 @@ async function model (context)
 export async function onRequest (context)
 {
     try {
+        if (context.request.headers.has ('X-Auto3D-AI-Key')) { return json ({ error : 'Browser-supplied AI credentials are not accepted.' }, 400); }
         const path = Array.isArray (context.params.path) ? context.params.path : [context.params.path].filter (Boolean);
         const method = context.request.method;
 

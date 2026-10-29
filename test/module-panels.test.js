@@ -3,6 +3,7 @@ import { ModulePanelState } from '../source/website/modulepanels.js';
 import { CreateAgentCommands } from '../source/website/agentcommands.js';
 function State () { const state = new ModulePanelState (); for (const [id, side] of [['upload', 'left'], ['data', 'right'], ['ai', 'right'], ['packaging', 'right']]) { state.Register (id, side, id, id === 'upload' ? 'minimal' : 'closed'); } return state; }
 describe ('Independent module panel modes', () => {
+    it ('Rejects extended mode for left panels without changing their state', () => { const state = State (); assert.throws (() => state.Set ('upload', 'extended'), /left-side/); assert.equal (state.Inspect ('upload').mode, 'minimal'); assert.throws (() => state.Register ('other', 'left', 'Other', 'extended')); });
     it ('Retains each module mode when switching without sharing content state', () => {
         const state = State (); state.Set ('ai', 'extended'); state.Set ('packaging', 'minimal'); assert.equal (state.Inspect ('ai').visible, false); assert.equal (state.Inspect ('ai').mode, 'extended'); assert.equal (state.Inspect ('packaging').visible, true); state.Set ('ai', 'extended'); assert.equal (state.Inspect ('packaging').visible, false); assert.equal (state.Inspect ('ai').visible, true); state.Set ('ai', 'closed'); assert.equal (state.modules.get ('ai').preferred, 'extended'); assert.equal (state.Inspect ('upload').visible, true);
     });

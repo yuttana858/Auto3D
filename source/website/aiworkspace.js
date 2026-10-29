@@ -1,6 +1,8 @@
 import { OpenSessionArchive } from './sessionarchive.js';
 import { AIProjectArchive } from './aiproject.js';
 import { AppVersion } from './preferences.js';
+import { UnitFactor } from './preferences.js';
+import * as THREE from 'three';
 
 const AIStorageKey = 'auto3d-ai-connections-v1';
 
@@ -18,6 +20,28 @@ function Delay (milliseconds)
     return new Promise ((resolve) => setTimeout (resolve, milliseconds));
 }
 
+export function PlaceAIModel (editor, added)
+{
+    const existing = new THREE.Box3 ().makeEmpty ();
+    for (const object of editor.document.objects) { if (!added.includes (object) && object.visible && object.threeObject) { existing.union (new THREE.Box3 ().setFromObject (object.threeObject)); } }
+    const box = new THREE.Box3 ().makeEmpty (); for (const object of added) { if (object.threeObject) { box.union (new THREE.Box3 ().setFromObject (object.threeObject)); } }
+    if (existing.isEmpty () || box.isEmpty () || !existing.intersectsBox (box)) { return; }
+    const gap = Math.max (existing.getSize (new THREE.Vector3 ()).length (), box.getSize (new THREE.Vector3 ()).length ()) * 0.05;
+    const offset = existing.max.x - box.min.x + gap;
+    for (const object of added) { object.position[0] += offset; editor.document.ApplyTransform (object); editor.ApplyTransform (object); }
+    editor.website.FitModelToWindow (true);
+}
+
+export function MatchAISceneUnits (saved, target)
+{
+    const targetUnit = target.model.GetUnit (), sourceUnit = saved.document.model.GetUnit ();
+    const sourceFactor = UnitFactor (sourceUnit, 'metric'), targetFactor = UnitFactor (targetUnit, 'metric');
+    if (!target.objects.length || !sourceFactor || !targetFactor) { return; }
+    const ratio = sourceFactor / targetFactor;
+    saved.document.objects.forEach (object => { object.scale = object.scale.map (value => value * ratio); object.unit = targetUnit; saved.document.ApplyTransform (object); });
+    saved.document.model.SetUnit (targetUnit);
+}
+
 export class AIWorkspace
 {
     constructor (website)
@@ -32,48 +56,34 @@ export class AIWorkspace
 
     InitializeAccount (id)
     {
-        this.previewSequence++; this.preview?.Clear (); this.assets.clear (); this.recent = []; this.selectedTask = null; this.RenderRecent (); this.storageKey = AIStorageKey + ':' + id; this.settings = this.LoadSettings (); this.RefreshConnection (); this.RefreshActions ();
+        this.previewSequence++; this.cacheGeneration = (this.cacheGeneration || 0) + 1; if (this.cacheTimer) { clearTimeout (this.cacheTimer); this.cacheTimer = null; } this.preview?.Clear (); this.assets.clear (); this.recent = []; this.selectedTask = null; this.RenderRecent (); this.storageKey = AIStorageKey + ':' + id; this.settings = this.LoadSettings (); this.RefreshConnection (); this.RefreshActions (); this.RestoreCachedWorkspace (id, this.cacheGeneration).catch (error => { if (this.website.auth?.user?.id === id) { this.status.textContent = 'AI workspace recovery unavailable: ' + error.message; } });
+    }
+
+    ScheduleWorkspaceSave ()
+    {
+        const owner = this.website.auth?.user?.id, storage = this.website.sessionEditor.library.deviceStorage, generation = this.cacheGeneration;
+        if (!owner || storage.accountId !== owner || this.restoringCache) { return; }
+        if (this.cacheTimer) { clearTimeout (this.cacheTimer); }
+        this.cacheTimer = setTimeout (() => {
+            this.cacheTimer = null; const record = { id : '__auto3d_ai_workspace__', tasks : this.recent.map (item => ({ ...item })), assets : [...this.assets.values ()], selected : this.selectedTask, projectName : this.projectName?.value || '', updatedAt : new Date ().toISOString () };
+            this.cacheWrites = (this.cacheWrites || Promise.resolve ()).catch (() => {}).then (() => { if (this.website.auth?.user?.id !== owner || this.cacheGeneration !== generation || this.website.sessionEditor.library.deviceStorage !== storage) { return; } return storage.Save (record); }).catch (error => { if (this.website.auth?.user?.id === owner) { this.status.textContent = 'Could not save AI workspace on this device: ' + error.message; } });
+        }, 500);
+    }
+    async RestoreCachedWorkspace (owner, generation)
+    {
+        const storage = this.website.sessionEditor.library.deviceStorage; const saved = await storage.Get ('__auto3d_ai_workspace__');
+        if (!saved || owner !== this.website.auth?.user?.id || generation !== this.cacheGeneration || storage !== this.website.sessionEditor.library.deviceStorage || this.recent.length || this.assets.size) { return; }
+        if (!Array.isArray (saved.tasks) || !Array.isArray (saved.assets)) { return; }
+        this.restoringCache = true;
+        try { this.recent = saved.tasks.filter (item => item && typeof item.id === 'string').slice (0, 48); this.assets = new Map (saved.assets.filter (item => item && typeof item.id === 'string' && item.buffer instanceof ArrayBuffer).map (item => [item.id, item])); if (typeof saved.projectName === 'string') { this.projectName.value = saved.projectName; } this.RenderRecent (); if (this.recent.some (item => item.id === saved.selected)) { await this.SelectTask (saved.selected); } this.status.textContent = 'AI workspace restored from this device.'; }
+        finally { this.restoringCache = false; }
     }
 
     LoadSettings ()
     {
-        const fallback = { provider : 'meshy', baseUrl : '/api/ai', apiKey : '', remember : false };
-        try {
-            if (!this.storageKey) { return fallback; }
-            const session = JSON.parse (sessionStorage.getItem (this.storageKey) || 'null');
-            const local = JSON.parse (localStorage.getItem (this.storageKey) || 'null');
-            const settings = { ...fallback, ...(session || local || {}) };
-            if (settings.provider === 'meshy' && String (settings.baseUrl || '').includes ('meshy.ai')) { settings.baseUrl = '/api/ai'; }
-            return settings;
-        } catch {
-            return fallback;
-        }
-    }
-
-    SaveSettings (settings)
-    {
-        const provider = settings.provider === 'custom' ? 'custom' : 'meshy';
-        let baseUrl = String (settings.baseUrl || '/api/ai').trim ().replace (/\/$/, '');
-        if (provider === 'meshy' && baseUrl.includes ('meshy.ai')) { baseUrl = '/api/ai'; }
-        this.settings = {
-            provider,
-            baseUrl,
-            apiKey : String (settings.apiKey || '').trim (),
-            remember : settings.remember === true
-        };
-        try {
-            sessionStorage.removeItem (this.storageKey);
-            localStorage.removeItem (this.storageKey);
-            const target = this.settings.remember ? localStorage : sessionStorage;
-            if (!this.storageKey) { throw new Error ('Sign in first.'); }
-            target.setItem (this.storageKey, JSON.stringify (this.settings));
-        } catch { /* Connection remains available for this page lifetime. */ }
-        this.RefreshConnection ();
-    }
-
-    ClearKey ()
-    {
-        this.SaveSettings ({ ...this.settings, apiKey : '' });
+        // Remove legacy AI connection records for all accounts on this device.
+        try { for (const storage of [sessionStorage, localStorage]) { const keys = []; for (let i = 0; i < storage.length; i++) { const key = storage.key (i); if (key === AIStorageKey || key?.startsWith (AIStorageKey + ':')) { keys.push (key); } } if (this.storageKey && !keys.includes (this.storageKey)) { keys.push (this.storageKey); } keys.forEach (key => storage.removeItem (key)); } } catch { /* Storage may be unavailable. */ }
+        return { provider : 'meshy', baseUrl : '/api/ai' };
     }
 
     CreateHeaderButton ()
@@ -92,10 +102,10 @@ export class AIWorkspace
         const header = Element ('div', 'ai_workspace_header', undefined, panel); Element ('span', 'module_version', 'AI v' + AppVersion, header); this.connectionBadge = Element ('span', 'ai_connection_badge', 'Not connected', header);
         const toolbar = Element ('div', 'ai_project_toolbar', undefined, panel);
         this.addButton = Element ('button', null, 'Add to session', toolbar); this.addButton.disabled = true; this.addButton.addEventListener ('click', () => this.Run (() => this.AddSelected ()));
-        const save = Element ('button', null, 'Save project to Library', toolbar); save.addEventListener ('click', () => this.Run (() => this.SaveProject ({ name : this.projectName.value.trim () || 'AI project' })));
+        const save = Element ('button', null, 'Save project to Library', toolbar); save.addEventListener ('click', () => this.Run (() => this.OpenSaveDialog ()));
         const open = Element ('button', null, 'Open AI project', toolbar); this.projectInput = Element ('input', null, undefined, toolbar); this.projectInput.type = 'file'; this.projectInput.accept = '.auto3d'; this.projectInput.hidden = true; open.addEventListener ('click', () => this.projectInput.click ()); this.projectInput.addEventListener ('change', () => this.Run (async () => { const file = this.projectInput.files[0]; if (file) { await this.OpenProject (await file.arrayBuffer ()); } this.projectInput.value = ''; }));
         Element ('span', 'section_hint', 'Library save includes all completed 3D creations below.', toolbar);
-        this.projectName = Element ('input', null, undefined, toolbar); this.projectName.placeholder = 'AI project'; this.projectName.maxLength = 120; this.projectName.setAttribute ('aria-label', 'AI project name');
+        this.projectName = Element ('input', null, undefined, toolbar); this.projectName.placeholder = 'AI project'; this.projectName.maxLength = 120; this.projectName.setAttribute ('aria-label', 'AI project name'); this.projectName.addEventListener ('input', () => this.ScheduleWorkspaceSave ());
         this.aiPane = Element ('div', 'ai_workspace_pane', undefined, panel);
         this.previewHost = Element ('div', 'ai_preview_host', undefined, this.aiPane); this.previewHost.setAttribute ('aria-label', 'AI model viewer'); this.previewHost.tabIndex = 0;
         this.previewMessage = Element ('p', 'ai_preview_message', 'Select a completed creation to preview', this.previewHost);
@@ -116,7 +126,7 @@ export class AIWorkspace
         this.detailSelect.value = 'standard:30000';
         const pbrLabel = Element ('label', 'ai_checkbox_label', undefined, generationOptions);
         this.pbrCheckbox = Element ('input', null, undefined, pbrLabel); this.pbrCheckbox.type = 'checkbox'; this.pbrCheckbox.checked = true;
-        pbrLabel.appendChild (document.createTextNode (' PBR on refine'));
+        pbrLabel.appendChild (document.createTextNode (' PBR textures'));
 
         const imageRow = Element ('div', 'ai_image_row', undefined, inputSection);
         this.imageInput = Element ('input', null, undefined, imageRow); this.imageInput.type = 'file'; this.imageInput.accept = 'image/png,image/jpeg,image/webp'; this.imageInput.hidden = true;
@@ -126,7 +136,7 @@ export class AIWorkspace
 
         const actions = Element ('div', 'ai_generation_actions', undefined, inputSection);
         this.actionButtons = new Map ();
-        for (const [id, label] of [['text3d', 'Text to 3D'], ['image3d', 'Image to 3D'], ['textimage', 'Text to image'], ['texture', 'Texture generation'], ['rigging', 'Rig character'], ['animations', 'Animate character']]) {
+        for (const [id, label] of [['text3d', 'Text to 3D'], ['image3d', 'Image to 3D'], ['textimage', 'Text to image'], ['texture', 'Texture generation']]) {
             const button = Element ('button', 'ai_generation_action', label, actions);
             button.addEventListener ('click', () => this.Run (() => this.Generate (this.UIOptions (id))));
             this.actionButtons.set (id, button);
@@ -135,9 +145,6 @@ export class AIWorkspace
         const imageLabel = Element ('label', null, 'Image model', inputSection); this.imageModel = Element ('select', null, undefined, imageLabel); for (const name of ['nano-banana', 'nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2']) { this.imageModel.add (new Option (name, name)); }
         const aspectLabel = Element ('label', null, 'Image aspect ratio', inputSection); this.aspect = Element ('select', null, undefined, aspectLabel); for (const ratio of ['1:1', '16:9', '9:16', '4:3', '3:4']) { this.aspect.add (new Option (ratio, ratio)); }
         const textureLabel = Element ('label', null, 'Texture resolution', inputSection); this.textureResolution = Element ('select', null, undefined, textureLabel); for (const res of ['2k', '4k']) { this.textureResolution.add (new Option (res.toUpperCase (), res)); }
-        const actionLabel = Element ('label', null, 'Animation action ID', inputSection); this.animationAction = Element ('input', null, undefined, actionLabel); this.animationAction.type = 'number'; this.animationAction.min = '0'; this.animationAction.step = '1'; this.animationAction.value = '92';
-        const heightLabel = Element ('label', null, 'Character height (meters)', inputSection); this.rigHeight = Element ('input', null, undefined, heightLabel); this.rigHeight.type = 'number'; this.rigHeight.min = '.01'; this.rigHeight.step = '.1'; this.rigHeight.value = '1.7';
-        Element ('p', 'section_hint', 'Rigging requires a textured humanoid. Animation uses a completed rig and a Meshy animation action ID. Generation uses provider credits.', inputSection);
         this.status = Element ('p', 'section_hint ai_status', 'Connect a provider in Preferences to enable the generation workspace.', inputSection);
 
         const recentSection = Element ('div', 'ai_workspace_section ai_recent_section', undefined, this.aiPane);
@@ -155,7 +162,6 @@ export class AIWorkspace
     {
         const headers = {};
         if (this.website.auth?.user?.id) { headers['X-Auto3D-Account'] = this.website.auth.user.id; }
-        if (this.settings.apiKey) { headers['X-Auto3D-AI-Key'] = this.settings.apiKey; }
         if (json) { headers['Content-Type'] = 'application/json'; }
         return headers;
     }
@@ -189,7 +195,7 @@ export class AIWorkspace
     {
         if (!this.connectionBadge) { return; }
         const configured = this.settings.provider === 'meshy';
-        this.connectionBadge.textContent = configured ? (this.settings.apiKey ? 'Meshy · personal key' : 'Meshy via Auto3D') : 'Not connected';
+        this.connectionBadge.textContent = configured ? 'Meshy via Auto3D' : 'Not connected';
         this.connectionBadge.classList.toggle ('connected', configured);
         if (this.lastBalance !== undefined && this.lastBalance !== null) { this.connectionBadge.textContent = 'Meshy · ' + this.lastBalance + ' credits'; }
         this.RefreshActions ();
@@ -204,8 +210,6 @@ export class AIWorkspace
         this.actionButtons.get ('textimage').disabled = !connected || !this.prompt?.value.trim ();
         const selected = this.recent.find (item => item.id === this.selectedTask);
         this.actionButtons.get ('texture').disabled = !connected || (!selected?.modelUrl && !this.assets.has (selected?.id)) || (!this.prompt?.value.trim () && !this.imageFile);
-        this.actionButtons.get ('rigging').disabled = !connected || (!selected?.modelUrl && !this.assets.has (selected?.id));
-        this.actionButtons.get ('animations').disabled = !connected || selected?.route !== 'rigging' || selected.status !== 'SUCCEEDED';
         if (this.addButton) { this.addButton.disabled = !this.assets.has (this.selectedTask); }
     }
 
@@ -270,7 +274,7 @@ export class AIWorkspace
         else { this.recent[index] = { ...this.recent[index], ...task }; }
         this.recent.sort ((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
         this.recent = this.recent.filter ((item, index) => index < 48 || this.assets.has (item.id));
-        this.RenderRecent ();
+        this.RenderRecent (); this.ScheduleWorkspaceSave ();
     }
 
     async Run (action) { try { return await action (); } catch (error) { this.status.textContent = error.message; return null; } }
@@ -278,7 +282,7 @@ export class AIWorkspace
     Inspect () { return { selected : this.selectedTask, tasks : this.recent.map (item => ({ ...item, loaded : this.assets.has (item.id), scale : this.assets.get (item.id)?.scale || 1 })), models : this.assets.size }; }
     UIOptions (action)
     {
-        return { action, prompt : this.prompt.value.trim (), detail : this.detailSelect.value, pbr : this.pbrCheckbox.checked, textureResolution : this.textureResolution.value, imageModel : this.imageModel.value, aspect : this.aspect.value, taskId : this.selectedTask, actionId : Number (this.animationAction.value), height : Number (this.rigHeight.value) };
+        return { action, prompt : this.prompt.value.trim (), detail : this.detailSelect.value, pbr : this.pbrCheckbox.checked, textureResolution : this.textureResolution.value, imageModel : this.imageModel.value, aspect : this.aspect.value, taskId : this.selectedTask };
     }
     async ReferenceImage ()
     {
@@ -328,7 +332,7 @@ export class AIWorkspace
         const task = this.recent.find (item => item.id === id); if (!task) { throw new Error ('Creation not found.'); }
         this.selectedTask = id; const sequence = ++this.previewSequence; const owner = this.website.auth?.user?.id;
         this.RenderRecent (); this.previewMessage.hidden = false; this.previewMessage.textContent = 'Loading ' + task.name + '…';
-        if (!task.modelUrl && !this.assets.has (id)) { this.preview?.Clear (); this.previewImage?.remove (); if (task.imageUrl) { this.previewImage = Element ('img', 'ai_image_preview', undefined, this.previewHost); this.previewImage.src = task.imageUrl; } this.previewMessage.textContent = task.imageUrl ? 'Generated reference image' : task.status; return { selected : id, image : !!task.imageUrl }; }
+        if (!task.modelUrl && !this.assets.has (id)) { this.preview?.Clear (); this.previewImage?.remove (); if (task.imageUrl) { this.previewImage = Element ('img', 'ai_image_preview', undefined, this.previewHost); this.previewImage.src = task.imageUrl; } this.previewMessage.textContent = task.imageUrl ? 'Generated reference image' : task.status; this.ScheduleWorkspaceSave (); return { selected : id, image : !!task.imageUrl }; }
         this.previewImage?.remove ();
         let asset = this.assets.get (id);
         if (!asset) { const response = await fetch (this.settings.baseUrl + '/model?url=' + encodeURIComponent (task.modelUrl), { headers : this.Headers () }); if (!response.ok) { throw new Error ('Model download failed (' + response.status + '). Refresh expired creations.'); } const buffer = await response.arrayBuffer (); if (owner !== this.website.auth?.user?.id) { throw new Error ('Account changed.'); } asset = { ...task, buffer, scale : 1 }; this.assets.set (id, asset); }
@@ -336,7 +340,7 @@ export class AIWorkspace
         const preview = await this.EnsurePreview (); if (sequence !== this.previewSequence) { return { superseded : true }; }
         const loaded = await preview.Load (asset.buffer, asset.scale, (done, total) => { this.previewMessage.textContent = 'Loading model ' + done + ' / ' + total; });
         if (sequence !== this.previewSequence || !loaded) { return { superseded : true }; }
-        if (!task.thumbnail) { task.thumbnail = preview.Thumbnail (); this.RenderRecent (); } this.previewMessage.hidden = true; this.scaleInput.value = String (asset.scale); this.RefreshActions (); return { selected : id, loaded : true, scale : asset.scale, animations : preview.clipCount };
+        if (!task.thumbnail) { task.thumbnail = preview.Thumbnail (); this.RenderRecent (); } this.previewMessage.hidden = true; this.scaleInput.value = String (asset.scale); this.RefreshActions (); this.ScheduleWorkspaceSave (); return { selected : id, loaded : true, scale : asset.scale, animations : preview.clipCount };
     }
     async SetScale (scale) { this.AssertEditable (); if (!Number.isFinite (scale) || scale < .001 || scale > 1000) { throw new Error ('Scale must be between 0.001 and 1000.'); } const asset = this.assets.get (this.selectedTask); if (!asset) { throw new Error ('Preview a 3D model first.'); } asset.scale = scale; await this.SelectTask (asset.id); return { id : asset.id, scale }; }
     async AddSelected ()
@@ -347,7 +351,8 @@ export class AIWorkspace
         try {
             const { archive } = await AIProjectArchive ([{ ...asset }], asset.name || 'AI model');
             this.AssertEditable (); if (owner !== this.website.auth.user?.id || document !== editor.document || editor.busy) { throw new Error ('Account or workspace changed. Retry adding the model.'); }
-            const result = await editor.OpenArchive (archive, true); this.status.textContent = 'Model added to session with textures and scale.'; return result;
+            const saved = OpenSessionArchive (archive); MatchAISceneUnits (saved, document);
+            const result = await editor.AppendArchive (saved, PlaceAIModel); this.status.textContent = 'Model added to session with textures and scale.'; return result;
         } finally { this.adding = false; }
     }
     async OpenProject (buffer)
@@ -362,11 +367,15 @@ export class AIWorkspace
             assets.set (task.id, { ...task, buffer : file.buffer, scale : object.scale[0] }); tasks.push (task);
         }
         if (!assets.size) { throw new Error ('This archive does not contain an AI project.'); }
-        this.previewSequence++; this.preview?.Clear (); this.assets = assets; this.recent = tasks; this.projectName.value = session.document.name; this.RenderRecent (); await this.SelectTask (tasks[0].id); this.status.textContent = 'AI project opened · ' + assets.size + ' models'; return { opened : true, models : assets.size };
+        this.previewSequence++; this.preview?.Clear (); this.assets = assets; this.recent = tasks; this.projectName.value = session.document.name; this.RenderRecent (); await this.SelectTask (tasks[0].id); this.ScheduleWorkspaceSave (); this.status.textContent = 'AI project opened · ' + assets.size + ' models'; return { opened : true, models : assets.size };
     }
     async OpenLibraryProject (id) { const owner = this.website.auth?.user?.id; this.AssertEditable (); const library = this.website.sessionEditor.library; const item = await library.FindItem ('account', id); const buffer = await library.ArchiveForItem (item); if (owner !== this.website.auth?.user?.id) { throw new Error ('Account changed.'); } return this.OpenProject (buffer); }
 
-    async SaveProject ({ name = 'AI project', category = 'Uncategorized' } = {})
+    async OpenSaveDialog ()
+    {
+        this.AssertEditable (); return this.website.sessionEditor.library.SaveDialog (false, { name : this.projectName.value.trim () || 'AI project', prepare : name => this.PrepareProject (name) });
+    }
+    async PrepareProject (name)
     {
         this.AssertEditable (); const owner = this.website.auth.user.id; if (this.saving) { throw new Error ('Project save already in progress.'); } this.saving = true;
         try { this.status.textContent = 'Saving AI project…'; for (const task of this.recent.filter (item => item.status === 'SUCCEEDED' && item.modelUrl && !this.assets.has (item.id))) {
@@ -375,8 +384,13 @@ export class AIWorkspace
             const { archive, objects } = await AIProjectArchive ([...this.assets.values ()].map (asset => ({ ...asset })), name, this.recent);
             if (owner !== this.website.auth.user?.id) { throw new Error ('Account changed.'); } if (!this.preview?.root) { const first = [...this.assets.keys ()][0]; if (first) { await this.SelectTask (first); } } if (!this.preview?.root) { throw new Error ('Preview a model first.'); }
             if (owner !== this.website.auth.user?.id) { throw new Error ('Account changed.'); }
-            const result = await this.website.sessionEditor.library.accountStorage.Save ({ name, category, kind : 'session', objects, archive : new Blob ([archive]), thumbnail : this.preview.Thumbnail () }); this.status.textContent = 'AI project saved to Library.'; return result;
+            return { archive, objects, thumbnail : this.preview.Thumbnail () };
         } finally { this.saving = false; }
+    }
+    async SaveProject ({ name = 'AI project', category = 'Uncategorized' } = {})
+    {
+        const owner = this.website.auth.user?.id; const prepared = await this.PrepareProject (name); if (!owner || owner !== this.website.auth.user?.id) { throw new Error ('Account changed.'); }
+        const result = await this.website.sessionEditor.library.accountStorage.Save ({ name, category, kind : 'session', objects : prepared.objects, archive : new Blob ([prepared.archive]), thumbnail : prepared.thumbnail }); this.status.textContent = 'AI project saved to Library.'; return result;
     }
 
     async RefreshRecent ()
@@ -386,7 +400,7 @@ export class AIWorkspace
         try {
             const urls = [
                 this.settings.baseUrl + '/text-to-3d?page_size=8&sort_by=-created_at',
-                ...['image-to-3d', 'text-to-image', 'retexture', 'rigging', 'animations'].map (route => this.settings.baseUrl + '/' + route + '?page_size=4&sort_by=-created_at')
+                ...['image-to-3d', 'text-to-image', 'retexture'].map (route => this.settings.baseUrl + '/' + route + '?page_size=4&sort_by=-created_at')
             ];
             const groups = [];
             for (const url of urls) {
@@ -423,7 +437,8 @@ export class AIWorkspace
             Element ('span', 'ai_recent_meta', meta, card);
             const actions = Element ('div', 'ai_recent_actions', undefined, card);
             if (item.status === 'SUCCEEDED' && item.type === 'text-to-3d-preview') {
-                const refine = Element ('button', null, 'Refine', actions); refine.addEventListener ('click', () => this.Run (() => this.RefineTask (item)));
+                const refine = Element ('button', null, 'Generate texture', actions); refine.addEventListener ('click', () => this.Run (() => this.RefineTask (item)));
+                const retry = Element ('button', null, 'Refine', actions); retry.disabled = true; retry.title = 'Free geometry retry is available in Meshy, but is not documented in its public API.';
             }
             if (item.status === 'SUCCEEDED' && item.modelUrl) {
                 const importButton = Element ('button', null, 'Import GLB', actions); importButton.addEventListener ('click', () => this.Run (() => this.ImportTask (item)));

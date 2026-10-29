@@ -9,7 +9,9 @@ export function BoardAppearanceMesh (mesh, profile, polygon = null)
     const width = maxX - minX, height = maxZ - minZ; const board = profile.engineering?.materials.find (m => m.id === profile.engineering.activeMaterialId); const angle = (board?.fluteDirectionDegrees ?? 90) * Math.PI / 180;
     const edges = boundaries.flatMap (boundary => boundary.points.map ((a, i) => { const b = boundary.points[(i + 1) % boundary.points.length]; const mid = [(a[0] + b[0]) / 2, 0, (a[2] + b[2]) / 2]; const score = profile.paths.some (path => path.type === 'score' && path.points.some ((p, j) => j > 0 && distance (...[mid[0], mid[2]], [path.points[j - 1][0], 0, -path.points[j - 1][1]], [p[0], 0, -p[1]]) < 1e-5)); return { a, b, score, hole : boundary.hole === true, points : boundary.points }; }));
     const amplitude = Math.min (t * .22, Math.min (width, height) * .006) * settings.panelBow;
-    const radius = Math.min (t * .24, Math.min (width, height) * .015) * settings.cutCompression;
+    // A die-cut shoulder deforms both liner faces. Bound the deformation to
+    // less than half the caliper so even maximum compression retains an edge.
+    const radius = Math.min (t * .49, Math.min (t * .9, Math.min (width, height) * .03) * settings.cutCompression);
     const field = (x, z, side) => {
         const u = Math.max (0, Math.min (1, (x - minX) / (width || 1))), v = Math.max (0, Math.min (1, (z - minZ) / (height || 1)));
         const all = Math.min (...edges.map (edge => distance (x, z, edge.a, edge.b))); const cut = Math.min (...edges.filter (edge => !edge.score).map (edge => distance (x, z, edge.a, edge.b)));

@@ -1,4 +1,5 @@
 import { RenderQueue } from './renderqueue.js';
+import { ViewModes } from './viewmodes.js';
 import { RenderingPanel } from './renderingpanel.js';
 import { CameraPanel } from './camerapanel.js';
 import { ModelExtensions, SupportedFormatsText } from './importformats.js';
@@ -252,7 +253,7 @@ export class Website
         this.axisIndicator = new AxisIndicator (this.viewer, document.getElementById ('world_axis'));
         this.sessionEditor = new SessionEditor (this);
         this.cameraPanel = new CameraPanel (this);
-        this.rendering = new RenderQueue (this); this.renderingPanel = new RenderingPanel (this);
+        this.viewModes = new ViewModes (this); this.rendering = new RenderQueue (this); this.renderingPanel = new RenderingPanel (this);
         this.preferences = new Preferences (this);
         this.aiWorkspace = new AIWorkspace (this); this.packagingPanel = new PackagingPanel (this);
         for (const [id, setting] of [['horizon_gradient', 'horizonGradient'], ['ground_grid', 'showGroundGrid']]) {
@@ -315,6 +316,7 @@ export class Website
 
     ClearModel ()
     {
+        this.viewModes?.Restore ();
         if (this.materialPanel) { this.materialPanel.Clear (); }
         CloseAllDialogs ();
 

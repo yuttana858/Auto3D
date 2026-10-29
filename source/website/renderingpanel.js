@@ -5,6 +5,9 @@ export class RenderingPanel
     {
         this.website = website; this.selectedJobs = new Set (); this.root = document.getElementById ('rendering_section');
         Element ('summary', 'Rendering', this.root); const content = Element ('div', undefined, this.root); content.className = 'section_content rendering_controls';
+        const view = Element ('label', 'View mode', content); this.viewMode = Element ('select', undefined, view); this.viewMode.setAttribute ('aria-label', 'View mode');
+        for (const [value, title] of [['default', 'Default'], ['wireframe', 'Wireframe'], ['cel', 'Cel shade'], ['xray', 'X-ray']]) { this.viewMode.add (new Option (title, value)); }
+        this.viewMode.addEventListener ('change', () => this.Action (() => website.viewModes.Set (this.viewMode.value))); this.SyncViewMode ();
         const label = Element ('label', 'Resolution', content); this.resolution = Element ('select', undefined, label); this.resolution.setAttribute ('aria-label', 'Render resolution');
         [['screen', 'Screen size'], ['hd', 'HD · 1920 × 1080'], ['4k', '4K · 3840 × 2160'], ['16k', '16K · 15360 × 8640']].forEach (([value, title]) => this.resolution.add (new Option (title, value))); this.resolution.value = 'screen';
         const camera = Element ('label', 'View', content); this.camera = Element ('select', undefined, camera); this.camera.setAttribute ('aria-label', 'Render camera'); this.SyncCameras ();
@@ -23,6 +26,7 @@ export class RenderingPanel
         this.status.textContent = 'Render workspace opened on the right.';
     }
     Options () { return { resolution : this.resolution.value, alpha : this.alpha.checked, ...(this.camera.value === 'all' ? { allCameras : true } : this.camera.value ? { cameraId : this.camera.value } : {}) }; }
+    SyncViewMode () { if (this.viewMode) { this.viewMode.value = this.website.viewModes.Inspect ().mode; } }
     Action (action) { Promise.resolve ().then (action).catch (error => { this.status.textContent = error.message; this.website.sessionEditor.Status?.(error.message); }); }
     Open () { if (document.getElementById ('upload_panel_toggle').getAttribute ('aria-expanded') === 'false') { document.getElementById ('upload_panel_toggle').click (); } this.root.open = true; this.SyncCameras (); this.root.scrollIntoView ({ block : 'nearest' }); return { opened : true }; }
     SyncCameras ()

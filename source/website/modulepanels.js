@@ -4,12 +4,12 @@ export class ModulePanelState
     constructor () { this.modules = new Map (); this.active = { left : 'upload', right : 'data' }; }
     Register (id, side, title, mode = 'closed')
     {
-        if (typeof id !== 'string' || !id || id.length > 80 || typeof title !== 'string' || !title || title.length > 80 || this.modules.has (id) || !['left', 'right'].includes (side) || !['minimal', 'extended', 'closed'].includes (mode)) { throw new Error ('Invalid or duplicate module panel.'); }
+        if (typeof id !== 'string' || !id || id.length > 80 || typeof title !== 'string' || !title || title.length > 80 || this.modules.has (id) || !['left', 'right'].includes (side) || !['minimal', 'extended', 'closed'].includes (mode) || (side === 'left' && mode === 'extended')) { throw new Error ('Invalid or duplicate module panel.'); }
         this.modules.set (id, { id, side, title, mode, preferred : mode === 'closed' ? 'minimal' : mode }); if (mode !== 'closed') { this.active[side] = id; }
     }
     Set (id, mode)
     {
-        const panel = this.modules.get (id); if (!panel || !['minimal', 'extended', 'closed'].includes (mode)) { throw new Error ('Choose an existing module and minimal, extended or closed mode.'); }
+        const panel = this.modules.get (id); if (!panel || !['minimal', 'extended', 'closed'].includes (mode)) { throw new Error ('Choose an existing module and minimal, extended or closed mode.'); } if (panel.side === 'left' && mode === 'extended') { throw new Error ('Extended mode is unavailable for left-side panels.'); }
         panel.mode = mode; if (mode !== 'closed') { panel.preferred = mode; this.active[panel.side] = id; } return this.Inspect (id);
     }
     Inspect (id)
@@ -27,6 +27,7 @@ export class ModulePanels
             const toggle = document.getElementById (toggleId); const header = toggle.parentElement; header.classList.add ('module_panel_header');
             const controls = document.createElement ('div'); controls.className = 'module_panel_controls'; header.appendChild (controls); const buttons = new Map ();
             for (const [mode, title, path] of [['extended', 'Extended', 'M4 9V4h5m6 0h5v5M4 15v5h5m6 0h5v-5'], ['minimal', 'Minimal', 'M4 12h16'], ['closed', 'Close', 'm6 6 12 12M18 6 6 18']]) {
+                if (side === 'left' && mode === 'extended') { continue; }
                 const button = document.createElement ('button'); button.type = 'button'; button.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="' + path + '"/></svg>';
                 button.addEventListener ('click', () => website.sessionEditor.Run (() => this.Set (this.state.active[side], mode)));
                 buttons.set (mode, { button, title }); controls.appendChild (button);
@@ -64,14 +65,15 @@ export class ModulePanels
         const active = this.Inspect ().find (panel => panel.visible && panel.mode === 'extended');
         if (this.extended?.id === active?.id) { return; }
         if (this.extended) {
-            const { body, marker, header, headerMarker } = this.extended;
-            marker.replaceWith (body); headerMarker.replaceWith (header); this.extended = null; this.overlay.close ();
+            const { body, marker, header, headerMarker, appHeader, appHeaderMarker } = this.extended;
+            marker.replaceWith (body); headerMarker.replaceWith (header); appHeaderMarker.replaceWith (appHeader); this.extended = null; this.overlay.close ();
         }
         if (!active) { return; }
         const body = this.entries.get (active.id).body; const header = this.headers.get (active.side).toggle.parentElement;
-        const marker = document.createComment ('module body'); const headerMarker = document.createComment ('module header');
-        body.before (marker); header.before (headerMarker); this.overlay.append (header, body);
-        this.extended = { id : active.id, body, marker, header, headerMarker }; this.overlay.dataset.module = active.id;
+        const appHeader = this.website.parameters.headerDiv;
+        const marker = document.createComment ('module body'); const headerMarker = document.createComment ('module header'); const appHeaderMarker = document.createComment ('application header');
+        body.before (marker); header.before (headerMarker); appHeader.before (appHeaderMarker); this.overlay.append (appHeader, header, body);
+        this.extended = { id : active.id, body, marker, header, headerMarker, appHeader, appHeaderMarker }; this.overlay.dataset.module = active.id;
         this.overlay.setAttribute ('aria-label', active.title + ' extended workspace'); this.website.viewer?.navigation?.CancelPan?.(); this.overlay.showModal ();
     }
     Render ()

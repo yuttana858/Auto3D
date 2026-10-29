@@ -26,7 +26,7 @@ export class FefcoPanel
         const family = Element ('label', root, 'Box family', 'fefco_field'); const select = Element ('select', family); select.setAttribute ('aria-label', 'FEFCO box family');
         for (const item of FefcoFamilies) { const option = new Option (item.id + ' · ' + item.name + (item.available ? '' : ' · coming later'), item.id); option.disabled = !item.available; select.add (option); } select.value = '02';
         Element ('strong', root, 'Box Dimensions');
-        const basisLabel = Element ('label', root, 'Dimension basis', 'fefco_field'); this.generationBasis = Element ('select', basisLabel); this.generationBasis.setAttribute ('aria-label', 'New box dimension basis'); this.generationBasis.add (new Option ('Inside (ID)', 'inside')); this.generationBasis.add (new Option ('Outside (OD)', 'outside')); this.generationBasis.add (new Option ('Score / CAD', 'score')); this.controls.push (this.generationBasis);
+        const basisLabel = Element ('label', root, undefined, 'fefco_field'); this.generationBasis = Element ('select', basisLabel); this.generationBasis.setAttribute ('aria-label', 'New box dimension basis'); this.generationBasis.add (new Option ('Inside (ID)', 'inside')); this.generationBasis.add (new Option ('Outside (OD)', 'outside')); this.generationBasis.add (new Option ('Score / CAD', 'score')); this.controls.push (this.generationBasis);
         this.draftBasis = workspace.generationBasis?.() || 'inside';
         this.generationBasis.addEventListener ('change', () => {
             const to = this.generationBasis.value, from = this.draftBasis; let message = 'Enter the desired ' + to + ' dimensions. Inside/outside values require applicable converter allowances.';
