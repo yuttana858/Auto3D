@@ -36,6 +36,10 @@
     background: var(--ov_background_color);
 }
 
+.ai_compact_settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.ai_compact_settings label { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.ai_compact_settings input, .ai_compact_settings select { width: 100%; min-width: 0; }
+
 .ai_workspace_header,
 .ai_recent_header
 {

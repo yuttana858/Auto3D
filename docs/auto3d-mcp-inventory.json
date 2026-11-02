@@ -1,0 +1,1736 @@
+{
+  "apiVersion": 1,
+  "count": 241,
+  "status": "Inventory only: no tool is exposed until individually reviewed.",
+  "categories": {
+    "Account": [
+      {
+        "id": "auth.inspect",
+        "title": "Inspect account",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "auth.verify",
+        "title": "Verify active account session",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "auth.password_help",
+        "title": "Password reset help",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "auth.recover",
+        "title": "Request password recovery",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "agent.grants.inspect",
+        "title": "List agent access",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "agent.grants.open",
+        "title": "Manage agent access",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "agent.connection.open",
+        "title": "Open agent connection",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "auth.open",
+        "title": "Open account sign-in",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "auth.request_account",
+        "title": "Request an account",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "admin.open",
+        "title": "Open account administration",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "admin.approve",
+        "title": "Review account approval",
+        "mutates": true,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "admin.requests",
+        "title": "List account requests",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "admin.reject",
+        "title": "Reject account request",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "admin.users",
+        "title": "List user accounts",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "admin.revoke",
+        "title": "Revoke user access",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "admin.restore",
+        "title": "Restore user access",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "admin.reset_password",
+        "title": "Open password reset",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "auth.sign_out",
+        "title": "Sign out",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      }
+    ],
+    "AI": [
+      {
+        "id": "ai.workspace.inspect",
+        "title": "Inspect AI project",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "ai.project.save_dialog",
+        "title": "Open AI project save dialog",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "ai.creations.refresh",
+        "title": "Refresh AI creations",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "ai.creation.preview",
+        "title": "Preview AI creation",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "ai.creation.scale",
+        "title": "Set AI model scale",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "ai.creation.add",
+        "title": "Add AI creation to session",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "ai.project.save",
+        "title": "Save AI project to Library",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "ai.project.open_library",
+        "title": "Open AI Library project",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "ai.project.open_file",
+        "title": "Open AI project picker",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "ai.reference.open",
+        "title": "Choose AI reference image",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "ai.creation.refine",
+        "title": "Refine AI preview",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "ai.creation.generate_texture",
+        "title": "Generate texture for AI preview",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "ai.generate",
+        "title": "Generate with Meshy",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      }
+    ],
+    "Animation": [
+      {
+        "id": "animation.timeline.inspect",
+        "title": "Inspect keyframe timeline",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "animation.action.open",
+        "title": "Open Action keyframe options",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "animation.action.add",
+        "title": "Add fold/unfold Action keyframe",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "animation.action.delete",
+        "title": "Delete Action keyframe",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "animation.timeline.seek",
+        "title": "Seek keyframe timeline",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "animation.panel",
+        "title": "Show Advance animation",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "animation.timeline.range",
+        "title": "Set animation range",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "animation.timeline.configure",
+        "title": "Configure Advance animation",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "animation.timeline.playback",
+        "title": "Control Advance animation playback",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "animation.keyframe.scene",
+        "title": "Save scene state keyframe",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "animation.keyframe.delete",
+        "title": "Delete animation keyframe",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "animation.embedded.inspect",
+        "title": "Inspect embedded animation",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "animation.embedded.playback",
+        "title": "Control embedded animation",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "animation.embedded.configure",
+        "title": "Configure embedded animation",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "animation.keyframe.object",
+        "title": "Save object keyframe",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "animation.keyframe.camera",
+        "title": "Save camera keyframe",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      }
+    ],
+    "Camera": [
+      {
+        "id": "camera.open",
+        "title": "Open camera settings",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "camera.inspect",
+        "title": "Inspect saved cameras",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "camera.orbit.focus_selected",
+        "title": "Orbit selected object",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "camera.current.inspect",
+        "title": "Inspect current camera",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "camera.fov",
+        "title": "Set camera field of view",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "camera.create",
+        "title": "Save camera view",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "camera.activate",
+        "title": "Go to saved camera",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "camera.update",
+        "title": "Update saved camera",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "camera.rename",
+        "title": "Rename saved camera",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "camera.delete",
+        "title": "Delete saved camera",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      }
+    ],
+    "Capture": [
+      {
+        "id": "capture.image",
+        "title": "Capture app screenshot",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      }
+    ],
+    "Commands": [
+      {
+        "id": "commands.text",
+        "title": "Run typed commands",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      }
+    ],
+    "Diagnostics": [
+      {
+        "id": "diagnostics.shadow",
+        "title": "Record shadow state",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "diagnostics.open",
+        "title": "Open error logs",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "diagnostics.list",
+        "title": "Read error logs",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "diagnostics.export",
+        "title": "Export error logs",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "diagnostics.download",
+        "title": "Download error logs",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "diagnostics.clear",
+        "title": "Clear error logs",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      }
+    ],
+    "History": [
+      {
+        "id": "history.undo",
+        "title": "Undo",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "history.redo",
+        "title": "Redo",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      }
+    ],
+    "Knowledge": [
+      {
+        "id": "knowledge.paper_packaging",
+        "title": "Search corrugated packaging knowledge",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "knowledge.paper_packaging_section",
+        "title": "Read corrugated packaging section",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      }
+    ],
+    "Library": [
+      {
+        "id": "library.account.list",
+        "title": "List account Library",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "library.account.save",
+        "title": "Save to account Library",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "library.account.open",
+        "title": "Open account Library item",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "library.saved.open",
+        "title": "Open or add saved Library model",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "library.share.open",
+        "title": "Open saved-model sharing",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "library.share.create",
+        "title": "Create protected audience link",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "library.share.list",
+        "title": "List owned audience links",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "library.share.revoke",
+        "title": "Revoke audience link",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "library.account.rename",
+        "title": "Rename account Library item",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "library.account.move",
+        "title": "Move account Library item",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "library.account.delete",
+        "title": "Delete account Library item",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "library.account.folder.create",
+        "title": "Create account Library folder",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "library.account.folder.rename",
+        "title": "Rename account Library folder",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "library.account.folder.delete",
+        "title": "Delete account Library folder",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      }
+    ],
+    "Lighting": [
+      {
+        "id": "lighting.effects",
+        "title": "Set ambient fill, reflections and shadows",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "lighting.shadow.inspect",
+        "title": "Inspect shadow visibility",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "lighting.inspect",
+        "title": "Inspect lighting",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "lighting.restore",
+        "title": "Set lighting",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      }
+    ],
+    "Macros": [
+      {
+        "id": "macro.design.edit",
+        "title": "Edit visual macro",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "macro.list",
+        "title": "List saved macros",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "macro.save",
+        "title": "Save macro",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      }
+    ],
+    "Materials": [
+      {
+        "id": "material.list",
+        "title": "List materials",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "material.set",
+        "title": "Set material property",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "material.color",
+        "title": "Set base color",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "material.texture",
+        "title": "Replace texture image",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "material.texture.inspect",
+        "title": "Inspect texture UV and effects",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "material.texture.mapping",
+        "title": "Set texture UV mapping",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "material.surface.varnish",
+        "title": "Apply spot varnish mask",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "material.surface.relief",
+        "title": "Apply corrugated surface or die impression",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "material.textures.generate",
+        "title": "Auto texture generator",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "material.texture.preview",
+        "title": "Preview texture and edit UV/effects",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "material.texture.save",
+        "title": "Save texture",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "material.texture.remove",
+        "title": "Remove texture",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "material.relief",
+        "title": "Select relief mode",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "material.uv.preview",
+        "title": "Preview UV layout",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "material.uv.generate",
+        "title": "Generate missing box UVs",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      }
+    ],
+    "Objects": [
+      {
+        "id": "object.select",
+        "title": "Select object",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "object.tool",
+        "title": "Activate model tool",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "object.transform",
+        "title": "Transform object",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "object.duplicate",
+        "title": "Duplicate object",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "object.duplicate_at",
+        "title": "Duplicate object at position",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "object.array",
+        "title": "Array object",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "object.array.playback",
+        "title": "Control array reveal",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "object.array.playback.inspect",
+        "title": "Inspect array reveal",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "object.drop_to_floor",
+        "title": "Drop object to floor",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "object.dimension",
+        "title": "Set object dimension",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "object.scaling.proportional",
+        "title": "Set proportional scaling",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "object.scaling.percent",
+        "title": "Scale by percentage",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "selection.transform",
+        "title": "Transform selected group",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "object.group",
+        "title": "Group selected objects",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "object.ungroup",
+        "title": "Ungroup selected objects",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "polygon.preview",
+        "title": "Preview polygon optimization",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "polygon.preview_array",
+        "title": "Preview array decimation",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "polygon.apply",
+        "title": "Apply polygon optimization",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "polygon.cancel",
+        "title": "Cancel polygon preview",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "object.user_data",
+        "title": "Set object user data",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "object.visibility",
+        "title": "Set visibility",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "object.delete",
+        "title": "Delete object",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      }
+    ],
+    "Packaging": [
+      {
+        "id": "packaging.fefco.unfold",
+        "title": "Unfold FEFCO box",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.fefco.animate",
+        "title": "Animate box folding",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.fefco.camera",
+        "title": "Set automatic folding camera",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.fefco.toggle",
+        "title": "Fold, unfold or pause box",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.fefco.playback",
+        "title": "Control box folding",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.fefco.playback.inspect",
+        "title": "Inspect box folding",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.fefco.folding.check",
+        "title": "Check board folding clearance",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.dimensions.inspect",
+        "title": "Inspect box dimensions",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.dimensions.basis",
+        "title": "Choose box dimension basis",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.dimensions.update",
+        "title": "Update box dimensions",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.fefco.preset",
+        "title": "Generate box preset",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.fefco.catalog",
+        "title": "Read FEFCO catalog",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.fefco.draft_basis",
+        "title": "Choose new box dimension basis",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.fefco.convert_basis",
+        "title": "Convert box dimension basis",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.fefco.inspect",
+        "title": "Inspect FEFCO dimensions",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.fefco.configure",
+        "title": "Configure FEFCO box",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.fefco.generate",
+        "title": "Generate folded FEFCO box",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.measurements.open",
+        "title": "Open CAD Measurement layer",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.layer",
+        "title": "Choose Packaging Designer layer",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.measurements.inspect",
+        "title": "Inspect CAD Measurement layer",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.measurements.visible",
+        "title": "Show CAD measurements",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.measurements.update",
+        "title": "Drive a CAD dimension",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.materials.update",
+        "title": "Update board engineering specification",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.materials.activate",
+        "title": "Activate board record",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.materials.duplicate",
+        "title": "Duplicate board record",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.open_selected",
+        "title": "Open selected packaging dieline",
+        "mutates": true,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.apply",
+        "title": "Apply CAD to 3D",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.tool",
+        "title": "Choose CAD tool",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.paths.assign",
+        "title": "Assign selected CAD lines",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.crease.open",
+        "title": "Open crease settings",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.crease.configure",
+        "title": "Configure crease or perforation",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.boards.inspect",
+        "title": "Inspect account board database",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.boards.select",
+        "title": "Select board specification",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.boards.open",
+        "title": "Edit board database CSV",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.boards.export",
+        "title": "Export board database CSV",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.boards.save_csv",
+        "title": "Save account board CSV",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.open",
+        "title": "Open packaging design",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.draft.type",
+        "title": "Choose new path type",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.view.snap",
+        "title": "Set packaging grid snap",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.draft.point",
+        "title": "Add draft point",
+        "mutates": true,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.draft.back",
+        "title": "Remove last draft point",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.draft.cancel",
+        "title": "Cancel draft path",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.draft.finish",
+        "title": "Finish draft path",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.path.select",
+        "title": "Select packaging path",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.view.fit",
+        "title": "Fit packaging drawing",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.inspect",
+        "title": "Inspect packaging profile",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.path.add",
+        "title": "Draw packaging path",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.path.edit",
+        "title": "Edit packaging path",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.path.delete",
+        "title": "Delete packaging path",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.board",
+        "title": "Set board caliper",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.name",
+        "title": "Name packaging profile",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.extrude",
+        "title": "Extrude board profile",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.load_selected",
+        "title": "Edit selected board profile",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.export",
+        "title": "Export packaging vectors",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.download",
+        "title": "Download packaging vectors",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.appearance.inspect",
+        "title": "Inspect realistic board surface",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.appearance.update",
+        "title": "Adjust realistic board surface",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.fefco.scrub",
+        "title": "Scrub box fold/unfold pose",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "packaging.fefco.scrub.inspect",
+        "title": "Inspect selected box fold pose",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      }
+    ],
+    "Panels": [
+      {
+        "id": "ui.array",
+        "title": "Open array preview tool",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "ui.polygons",
+        "title": "Open polygon optimizer",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "sidebar.details.collapse",
+        "title": "Minimize Details",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "ui.materials",
+        "title": "Open material editor",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "ui.library",
+        "title": "Open library",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "ui.save",
+        "title": "Open save dialog",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "ui.commands",
+        "title": "Open commands and macros",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "ui.packaging",
+        "title": "Open Packaging panel",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "ui.modules.inspect",
+        "title": "Inspect module panels",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "ui.module.mode",
+        "title": "Set module panel mode",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "ui.ai",
+        "title": "Open AI panel",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "ui.ai.packaging",
+        "title": "Open Packaging panel (legacy alias)",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "ui.add_model",
+        "title": "Open model picker",
+        "mutates": true,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "ui.update_model",
+        "title": "Open replacement model picker",
+        "mutates": true,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "ui.export",
+        "title": "Open export dialog",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      }
+    ],
+    "Preferences": [
+      {
+        "id": "preferences.theme",
+        "title": "Set theme",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "preferences.units",
+        "title": "Set display units",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "preferences.viewport.quality",
+        "title": "Set viewport quality",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "preferences.camera.invert",
+        "title": "Invert right-drag orbit",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "preferences.viewport.quality.inspect",
+        "title": "Inspect viewport quality",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "ai.credentials.open",
+        "title": "Open AI credential settings",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "app.version.inspect",
+        "title": "Inspect application version",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "preferences.viewport.inspect",
+        "title": "Inspect saved viewport preferences",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "preferences.inspect",
+        "title": "Inspect preferences",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      }
+    ],
+    "Rendering": [
+      {
+        "id": "render.open",
+        "title": "Open rendering",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "render.view_mode",
+        "title": "Set model view mode",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "render.view_mode.inspect",
+        "title": "Inspect model view mode",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "render.now",
+        "title": "Render scene now",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "render.queue.enqueue",
+        "title": "Queue PNG renders",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "render.queue.inspect",
+        "title": "Inspect render queue",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "render.queue.start",
+        "title": "Start render queue",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "render.queue.stop",
+        "title": "Stop rendering",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "render.queue.cancel",
+        "title": "Cancel render job",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "render.queue.clear",
+        "title": "Clear render queue",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "render.queue.delete",
+        "title": "Delete selected renders",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "render.queue.open",
+        "title": "Open rendered image",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "render.image.view",
+        "title": "Control rendered image view",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "render.queue.download",
+        "title": "Download rendered PNG",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      }
+    ],
+    "Scene": [
+      {
+        "id": "scene.inspect",
+        "title": "Inspect scene",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "scene.groups.inspect",
+        "title": "Inspect scene model groups",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "scene.group.expand",
+        "title": "Expand or collapse model group",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      }
+    ],
+    "Sessions": [
+      {
+        "id": "session.recovery.inspect",
+        "title": "Inspect unsaved recovery",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "session.recovery.open",
+        "title": "Open recovery dialog",
+        "mutates": false,
+        "interactive": true,
+        "review": "pending"
+      },
+      {
+        "id": "session.recovery.restore",
+        "title": "Restore unsaved recovery",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "session.tabs.inspect",
+        "title": "List open sessions",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "session.tabs.new",
+        "title": "New session",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "session.tabs.switch",
+        "title": "Switch session",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "session.tabs.close",
+        "title": "Close session",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "session.model.copy",
+        "title": "Copy selected models",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "session.model.paste",
+        "title": "Paste copied models",
+        "mutates": true,
+        "interactive": false,
+        "review": "pending"
+      }
+    ],
+    "View": [
+      {
+        "id": "view.focus",
+        "title": "Focus object",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "view.fit",
+        "title": "Fit scene",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "view.fullscreen",
+        "title": "Set full screen",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "view.background",
+        "title": "Set background",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      },
+      {
+        "id": "view.guides",
+        "title": "Set viewport guides",
+        "mutates": false,
+        "interactive": false,
+        "review": "pending"
+      }
+    ]
+  }
+}

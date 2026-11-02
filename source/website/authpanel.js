@@ -1,3 +1,4 @@
+import { BindAgentDialog } from './agentindicator.js';
 import { WorkspaceDialog } from './modellibrary.js';
 
 export function CaptureRecovery ()
@@ -19,9 +20,9 @@ function PasswordVisibility (password)
 
 export class AuthPanel
 {
-    constructor (auth, admin)
+    constructor (auth, admin, agentConnection = null)
     {
-        this.auth = auth; this.admin = admin; this.dialog = null;
+        this.auth = auth; this.admin = admin; this.agentConnection = agentConnection; this.dialog = null;
         const header = document.getElementById ('header_buttons');
         this.button = document.createElement ('button'); this.button.className = 'auth_header_button';
         this.button.addEventListener ('click', () => this.Open ()); header.appendChild (this.button); const fullscreen = header.querySelector ('.header_fullscreen_button'); if (fullscreen) { header.appendChild (fullscreen); }
@@ -32,7 +33,7 @@ export class AuthPanel
     Open ()
     {
         if (this.dialog?.isConnected) { this.dialog.focus (); return { opened : true }; }
-        const dialog = WorkspaceDialog ('Auto3D account'); this.dialog = dialog;
+        const dialog = WorkspaceDialog ('Auto3D account'); this.dialog = dialog; BindAgentDialog (dialog, this.agentConnection);
         const panel = this.Create (() => dialog.close ()); dialog.appendChild (panel);
         dialog.addEventListener ('close', () => { panel.dispose (); this.dialog = null; }, { once : true });
         panel.querySelector ('input, button')?.focus ();
@@ -83,8 +84,33 @@ export class AuthPanel
             proceed.addEventListener ('click', () => { if (this.auth.user) { onContinue (); } }); panel.appendChild (proceed);
             const unsubscribeContinue = this.auth.Subscribe (update); panel.dispose = () => unsubscribeContinue ();
         }
+        let unsubscribeAgent = null;
+        if (this.agentConnection) {
+            const agent = document.createElement ('section'); agent.setAttribute ('aria-label', 'Agent connection');
+            const title = document.createElement ('h3'); title.textContent = 'Agent connection';
+            const label = document.createElement ('label'); label.textContent = 'Window name'; const input = document.createElement ('input'); input.value = this.agentConnection.label || 'Auto3D window'; input.maxLength = 80; label.appendChild (input);
+            const toggle = document.createElement ('button'); toggle.type = 'button'; const agentStatus = document.createElement ('p'); agentStatus.setAttribute ('role', 'status');
+            const updateAgent = () => { const state = this.agentConnection.Inspect (); agent.hidden = !this.auth.user; toggle.textContent = state.status === 'disconnected' ? 'Connect this window' : 'Disconnect'; agentStatus.textContent = state.status === 'connected' ? state.agents.length ? 'Connected: ' + state.agents.map (agent => agent.name + (agent.domain ? '' : ' (client-reported)')).join (', ') : 'Window ready for an agent' : state.status === 'connecting' ? 'Connecting…' : 'Not connected'; input.disabled = state.status !== 'disconnected'; };
+            toggle.addEventListener ('click', () => { try { if (this.agentConnection.status === 'disconnected') { this.agentConnection.Connect (input.value); } else { this.agentConnection.Disconnect (); } } catch (error) { agentStatus.textContent = error.message; } });
+            const grantsButton = document.createElement ('button'); grantsButton.type = 'button'; grantsButton.textContent = 'Manage agent access';
+            const grants = document.createElement ('div'); grants.hidden = true; let cursor = null;
+            const loadGrants = async (append = false) => {
+                grantsButton.disabled = true; try {
+                    const page = await this.agentConnection.ListGrants (append ? cursor : null); if (!append) { grants.replaceChildren (); } cursor = page.cursor;
+                    for (const grant of page.grants) {
+                        const row = document.createElement ('div'); const text = document.createElement ('span'); text.textContent = grant.clientId + ' · ' + grant.scope.join (', '); const revoke = document.createElement ('button'); revoke.type = 'button'; revoke.textContent = 'Revoke access';
+                        revoke.addEventListener ('click', async () => { if (!window.confirm ('Revoke this agent’s access to your Auto3D account?')) { return; } revoke.disabled = true; try { await this.agentConnection.RevokeGrant (grant.id); row.remove (); agentStatus.textContent = 'Revocation requested. Access may take a moment to stop.'; } catch (error) { agentStatus.textContent = error.message; revoke.disabled = false; } }); row.append (text, revoke); grants.appendChild (row);
+                    }
+                    more.hidden = !cursor; if (!grants.children.length) { agentStatus.textContent = 'No agent authorizations found.'; }
+                } catch (error) { agentStatus.textContent = error.message; } finally { grantsButton.disabled = false; }
+            };
+            const more = document.createElement ('button'); more.type = 'button'; more.textContent = 'Load more'; more.hidden = true; more.addEventListener ('click', () => loadGrants (true));
+            grantsButton.addEventListener ('click', () => { grants.hidden = false; loadGrants (); });
+            unsubscribeAgent = this.agentConnection.Subscribe (updateAgent); agent.append (title, label, toggle, agentStatus, grantsButton, grants, more); panel.appendChild (agent); updateAgent ();
+            let agentOwner = this.auth.user?.id || null; const agentAuth = this.auth.Subscribe (user => { if (!user || user.id !== agentOwner) { grants.replaceChildren (); grants.hidden = true; more.hidden = true; cursor = null; agentOwner = user?.id || null; } updateAgent (); }); const oldUnsubscribe = unsubscribeAgent; unsubscribeAgent = () => { oldUnsubscribe (); agentAuth (); };
+        }
         const unsubscribe = this.auth.Subscribe (render); const dispose = panel.dispose;
-        panel.dispose = () => { unsubscribe (); dispose?.(); password.value = ''; };
+        panel.dispose = () => { unsubscribe (); unsubscribeAgent?.(); dispose?.(); password.value = ''; };
         render (); return panel;
     }
     PasswordHelp () { return { method : 'administrator', message : 'Ask your Auto3D account administrator to reset your password.' }; }

@@ -65,10 +65,15 @@ describe ('Account requests and administration', () => {
         const create = calls.find ((call) => call.url.endsWith ('admin/users')); const body = JSON.parse (create.options.body);
         assert.equal (body.email_confirm, true); assert.equal (body.app_metadata, undefined);
         assert.ok (calls.findIndex ((call) => call.url.includes ('status=eq.pending')) < calls.indexOf (create));
+        const defaults = calls.find (call => call.url.includes ('auto3d_preferences?on_conflict=user_id')); assert.deepEqual (JSON.parse (defaults.options.body), { user_id : 'created-id' }); assert.match (defaults.options.headers.Prefer, /ignore-duplicates/);
     });
     it ('does not create a second user after concurrent review', async () => {
         const calls = provider ([]); const response = await onRequest (context ('review', { id, decision : 'approve', password : 'initial-private-password' }));
         assert.equal (response.status, 409); assert.ok (!calls.some ((call) => call.url.endsWith ('admin/users')));
+    });
+    it ('completes approval when default preferences can be retried at first sign-in', async () => {
+        const calls = provider (); const fetchProvider = global.fetch; global.fetch = async (url, options) => url.includes ('auto3d_preferences?on_conflict=user_id') ? new Response ('unavailable', { status : 503 }) : fetchProvider (url, options);
+        const response = await onRequest (context ('review', { id, decision : 'approve', password : 'initial-private-password' })); assert.equal (response.status, 200); const result = await response.json (); assert.equal (result.preferencesReady, false); assert.equal (result.request.status, 'approved'); assert.equal (calls.filter (call => call.url.endsWith ('admin/users')).length, 1);
     });
     it ('rejects without creating a user and validates approval passwords before claim', async () => {
         const calls = provider (); assert.equal ((await onRequest (context ('review', { id, decision : 'approve', password : 'short' }))).status, 400);

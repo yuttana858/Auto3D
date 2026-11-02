@@ -1,3 +1,4 @@
+import { AgentConnection } from './agentconnection.js';
 import { ErrorLogs } from './errorlogs.js';
 import { InstallAuthGate } from './authgate.js';
 import { AccountAdmin } from './accountadmin.js';
@@ -103,7 +104,9 @@ export function StartWebsite ()
         website.Load ();
         website.sceneEffects.onDiagnostics = (diagnosis) => errorLogs.RecordShadow (diagnosis, 'Shadow controls updated');
         website.accountAdmin = new AccountAdmin (website.auth);
-        website.authPanel = new AuthPanel (website.auth, website.accountAdmin); website.authPanel.recovery = recovery;
+        website.agentConnection = new AgentConnection (website);
+        website.sessionEditor.commandBar.BindAgentConnection (website.agentConnection);
+        website.authPanel = new AuthPanel (website.auth, website.accountAdmin, website.agentConnection); website.authPanel.recovery = recovery;
         const refreshAccount = () => { if (document.visibilityState === 'visible') { website.auth.Restore ().catch (() => {}); } };
         document.addEventListener ('visibilitychange', refreshAccount);
         window.setInterval (refreshAccount, 240000);

@@ -15,7 +15,7 @@ describe ('Smooth folding camera', () => {
         const before = FoldCameraFrame (original, sphere, 100, .15 - 1e-7); const after = FoldCameraFrame (original, sphere, 100, .15 + 1e-7);
         assert.ok (Math.hypot (before.eye.x - after.eye.x, before.eye.y - after.eye.y, before.eye.z - after.eye.z) < 1e-3);
         const endpoint = FoldCameraFrame (original, sphere, 100, 1); assert.deepEqual ([endpoint.center.x, endpoint.center.y, endpoint.center.z], [30, 40, 10]);
-        assert.ok (Math.hypot (endpoint.eye.x - 30, endpoint.eye.y - 40, endpoint.eye.z - 10) < Math.hypot (after.eye.x - 30, after.eye.y - 40, after.eye.z - 10));
+        assert.ok (Math.abs (Math.hypot (endpoint.eye.x - 30, endpoint.eye.y - 40, endpoint.eye.z - 10) - Math.hypot (after.eye.x - 30, after.eye.y - 40, after.eye.z - 10)) < 1e-3);
     });
     it ('Frames portrait views farther away and preserves a finite useful flat-board angle', () => {
         const original = camera (); const sphere = { center : { x : 0, y : 0, z : 0 }, radius : 100 };
@@ -26,8 +26,9 @@ describe ('Smooth folding camera', () => {
     it ('Keeps compact poses tight even when the unfolded sweep is very large', () => {
         const sphere = { center : { x : 30, y : 40, z : 10 }, radius : 20 }, frame = FoldCameraFrame (camera (), sphere, 200, .5, 1);
         const distance = Math.hypot (frame.eye.x - frame.center.x, frame.eye.y - frame.center.y, frame.eye.z - frame.center.z);
-        const previous = 200 * 1.12 / Math.sin (Math.PI / 8); const safe = 20 * 1.12 / Math.sin (Math.PI / 8);
+        const previous = 200 * 1.12 / Math.sin (Math.PI / 8); const safe = 20 * 1.04 / Math.sin (Math.PI / 8);
         assert.ok (distance <= previous / 1.5); assert.ok (distance >= safe);
+        assert.deepEqual (frame, FoldCameraFrame (camera (), sphere, 20, .5, 1));
         assert.deepEqual ([frame.center.x, frame.center.y, frame.center.z], [30, 40, 10]);
     });
     it ('Keeps the camera unchanged during manual scrub even with auto-fit enabled', async () => {

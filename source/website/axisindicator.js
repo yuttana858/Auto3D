@@ -15,6 +15,8 @@ export class AxisIndicator
     constructor (viewer, svg)
     {
         this.svg = svg;
+        this.viewer = viewer; this.activeAxis = null;
+        viewer.navigation.onOrbitAxisChanged = (axis) => { this.activeAxis = axis?.toUpperCase () || null; this.Update (viewer.camera); };
         this.axes = [];
         for (const name of ['X', 'Y', 'Z']) {
             for (const sign of [-1, 1]) {
@@ -62,10 +64,11 @@ export class AxisIndicator
             axis.depth = direction.vector.z * axis.sign;
             axis.line.setAttribute ('x2', x.toFixed (2));
             axis.line.setAttribute ('y2', y.toFixed (2));
-            axis.line.setAttribute ('stroke', direction.color);
+            const color = axis.name === this.activeAxis ? '#ffffff' : direction.color;
+            axis.line.setAttribute ('stroke', color);
             axis.circle.setAttribute ('cx', x.toFixed (2));
             axis.circle.setAttribute ('cy', y.toFixed (2));
-            axis.circle.setAttribute ('fill', direction.color);
+            axis.circle.setAttribute ('fill', color);
             axis.text.setAttribute ('x', x.toFixed (2));
             axis.text.setAttribute ('y', y.toFixed (2));
             axis.group.setAttribute ('opacity', axis.sign < 0 ? '0.35' : axis.depth < 0 ? '0.65' : '1');

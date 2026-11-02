@@ -5,7 +5,7 @@
       "id": "capture.image",
       "title": "Capture app screenshot",
       "category": "Capture",
-      "description": "Capture PNG image content for an agent to attach in chat. Viewport captures the 3D scene; workspace captures the visible app with account dialogs and input fields omitted. No upload or chat message is sent automatically.",
+      "description": "Capture a PNG for an agent to share in chat. Viewport captures the 3D scene; workspace captures the visible app with account dialogs and input fields omitted. MCP sharing requires explicit screenshot permission.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -192,6 +192,53 @@
       "example": {
         "email": "user@example.com"
       }
+    },
+    {
+      "id": "agent.grants.inspect",
+      "title": "List agent access",
+      "category": "Account",
+      "description": "List the signed-in account’s agent authorizations without tokens. Optional cursor reads the next page.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "maxLength": 512
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "agent.grants.open",
+      "title": "Manage agent access",
+      "category": "Account",
+      "description": "Open the account dialog to review and explicitly revoke agent access. The user completes the action in the dialog.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "agent.connection.open",
+      "title": "Open agent connection",
+      "category": "Account",
+      "description": "Open the account dialog to connect or disconnect this browser window. Connection requires an explicit user action in the dialog.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
     },
     {
       "id": "auth.open",
@@ -2165,6 +2212,40 @@
       "example": {}
     },
     {
+      "id": "object.duplicate_at",
+      "title": "Duplicate object at position",
+      "category": "Objects",
+      "description": "Duplicate an object at the requested model-unit position, leaving the original in place. Shares the Shift-drag service and supports Undo.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string"
+          },
+          "position": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "position"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "position": [
+          10,
+          0,
+          0
+        ]
+      }
+    },
+    {
       "id": "object.array",
       "title": "Array object",
       "category": "Objects",
@@ -3125,10 +3206,46 @@
       }
     },
     {
+      "id": "preferences.camera.invert",
+      "title": "Invert right-drag orbit",
+      "category": "Preferences",
+      "description": "Set the direction of right-drag camera orbit.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "enabled": true
+      }
+    },
+    {
       "id": "preferences.viewport.quality.inspect",
       "title": "Inspect viewport quality",
       "category": "Preferences",
       "description": "Return effective display pixel ratio and interaction state without changing geometry.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ai.credentials.open",
+      "title": "Open AI credential settings",
+      "category": "Preferences",
+      "description": "Open Preferences for the user to manage their AI credential interactively. This command does not accept or return keys.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -3733,6 +3850,48 @@
       "title": "Open rendering",
       "category": "Rendering",
       "description": "Open PNG rendering controls in the left panel.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "render.view_mode",
+      "title": "Set model view mode",
+      "category": "Rendering",
+      "description": "Set the reversible model view to default, wireframe, cel shade or X-ray. Changes display materials without changing saved model materials.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "default",
+              "wireframe",
+              "cel",
+              "xray"
+            ]
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "mode": "wireframe"
+      }
+    },
+    {
+      "id": "render.view_mode.inspect",
+      "title": "Inspect model view mode",
+      "category": "Rendering",
+      "description": "Read the current display mode and available options.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -4944,6 +5103,105 @@
       "example": {}
     },
     {
+      "id": "session.tabs.inspect",
+      "title": "List open sessions",
+      "category": "Sessions",
+      "description": "List sessions open in this app and the active session.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "session.tabs.new",
+      "title": "New session",
+      "category": "Sessions",
+      "description": "Open an empty session in another in-app tab.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "session.tabs.switch",
+      "title": "Switch session",
+      "category": "Sessions",
+      "description": "Switch to an open in-app session.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "session.tabs.close",
+      "title": "Close session",
+      "category": "Sessions",
+      "description": "Close a session; explicitly set discard for unsaved changes.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "discard": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "session.model.copy",
+      "title": "Copy selected models",
+      "category": "Sessions",
+      "description": "Copy selected models for pasting between open sessions.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "session.model.paste",
+      "title": "Paste copied models",
+      "category": "Sessions",
+      "description": "Add copied models to the current session with undo.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
       "id": "preferences.inspect",
       "title": "Inspect preferences",
       "category": "Preferences",
@@ -5497,7 +5755,7 @@
       "id": "ui.module.mode",
       "title": "Set module panel mode",
       "category": "Panels",
-      "description": "Set a registered module to minimal, extended or closed. Each module retains its own mode and controls; opening does not generate content.",
+      "description": "Set a registered module to minimal or closed; right-side modules also support extended. Opening does not generate content.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -5532,6 +5790,20 @@
       "title": "Inspect AI project",
       "category": "AI",
       "description": "Read creation history, preview selection and loaded model scales. Does not submit provider tasks.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ai.project.save_dialog",
+      "title": "Open AI project save dialog",
+      "category": "AI",
+      "description": "Open the standard interactive session save dialog for the AI project. A user selects the destination and confirms the save.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -5703,6 +5975,30 @@
       "title": "Refine AI preview",
       "category": "AI",
       "description": "Explicitly submit a successful Text to 3D preview for PBR texturing using the workspace texture settings.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "meshy-task-id"
+      }
+    },
+    {
+      "id": "ai.creation.generate_texture",
+      "title": "Generate texture for AI preview",
+      "category": "AI",
+      "description": "Texture an existing successful Text to 3D preview using Meshy refine. Provider credits may apply.",
       "mutates": true,
       "inputSchema": {
         "type": "object",

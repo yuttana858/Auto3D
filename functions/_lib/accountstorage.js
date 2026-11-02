@@ -30,8 +30,9 @@ export function Folder (value)
 }
 export function Preferences (value)
 {
-    if (!value || typeof value !== 'object' || Array.isArray (value) || Object.keys (value).some ((key) => !['units', 'theme', 'view', 'viewportQuality'].includes (key)) || !['metric', 'standard'].includes (value.units) || ![1, 2].includes (value.theme)) { throw Failure ('Invalid account preferences.'); }
+    if (!value || typeof value !== 'object' || Array.isArray (value) || Object.keys (value).some ((key) => !['units', 'theme', 'view', 'viewportQuality', 'invertRightOrbit'].includes (key)) || !['metric', 'standard'].includes (value.units) || ![1, 2].includes (value.theme)) { throw Failure ('Invalid account preferences.'); }
     const result = { units : value.units, theme : value.theme };
+    if (value.invertRightOrbit !== undefined) { if (typeof value.invertRightOrbit !== 'boolean') { throw Failure ('Invalid camera control preference.'); } result.invertRightOrbit = value.invertRightOrbit; }
     if (value.viewportQuality !== undefined) {
         if (!['auto', 'fast', 'quality'].includes (value.viewportQuality)) { throw Failure ('Invalid viewport quality.'); }
         result.viewportQuality = value.viewportQuality;

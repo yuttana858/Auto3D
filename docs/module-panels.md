@@ -6,6 +6,8 @@ AI Generative and Packaging Gen are independent right-side modules. AI appears i
 
 Top-level Model upload (left), Model data, AI and Packaging share an upper-right **Extended / Minimal / Close** control group. Minimal uses a compact 320px dock, including the 40px tool rail on the right. Extended uses up to 760px/55vw, constrained by available viewport width. Extended Packaging arranges generation beside selected-box dimensions, appearance and playback; minimal stacks these groups with generation first. AI uses two content columns in Extended. Close hides content and leaves the rail/reopen toggle accessible. Each module remembers its last chosen open mode for this browser session. Switching modules preserves inputs, generation drafts, model state and playback. Width changes resize the viewer without changing its engineering model or camera snapshot.
 
+Current behavior: left-side modules use Minimal and Close only. Extended is available to right-side modules; attempts to set Extended on a left-side module are rejected without changing state.
+
 At narrow widths opening a dock closes the opposite dock. Viewport resizing also enforces that rule, and two Extended docks cannot crowd out the viewer. State is session-local, not a new server/account preference. Material editors, CAD dialogs and timeline drawers retain their specialized layouts; this shell standard is for top-level docked modules, not every nested subsection or pop-out window.
 
 ## Ownership and adding modules
@@ -30,4 +32,6 @@ Future modules register their own stable ID and use the generic mode command. Ad
 
 ## Full-viewport extended mode (0.40.0)
 
-ModulePanels moves the active module body and its shared header into one native modal dialog. It fills 100vw × 100dvh and slides from the left, with a reduced-motion alternative. Native modal inertness blocks background buttons, focus and pointers; event containment and SessionEditor shortcut gating prevent scene actions. Minimal/Close restore the original DOM locations and preserve module state. Only one extended module may be active. Nested feature dialogs can still open above it. AI owns its viewer/history/input layout; Packaging owns all of its content and styles.
+ModulePanels moves the active module body and its shared header into one native modal dialog. The shell fills 100vw × 100dvh; the module content slides from the left, with a reduced-motion alternative. Native modal inertness blocks background buttons, focus and pointers; event containment and SessionEditor shortcut gating prevent scene actions. Minimal/Close restore the original DOM locations and preserve module state. Only one extended module may be active. Nested feature dialogs can still open above it. AI owns its viewer/history/input layout; Packaging owns all of its content and styles.
+
+The shared application header and toolbar are temporarily placed at the top of the extended shell, above every module. This keeps its controls, including Undo and Redo, available while the underlying scene remains blocked. The module header and content slide in below the toolbar; minimizing or closing restores the application header and module content to their original locations. New modules inherit this layout by registering with ModulePanels.

@@ -315,7 +315,7 @@ export class ModelLibrary
         });
     }
 
-    async SaveDialog (download = false)
+    async SaveDialog (download = false, custom = null)
     {
         if (this.editor.readOnly) { return; }
         let saveStorage = this.accountStorage;
@@ -324,7 +324,7 @@ export class ModelLibrary
         const form = document.createElement ('form'); form.className = 'workspace_save_form';
         const nameLabel = document.createElement ('label'); nameLabel.textContent = 'Name';
         const name = document.createElement ('input'); name.setAttribute ('aria-label', 'Save name'); name.required = true; name.maxLength = 100;
-        name.value = this.editor.document.name === 'Untitled session' && this.editor.selected ? this.editor.selected.name.replace (/\.[^.]+$/, '') : this.editor.document.name;
+        name.value = custom?.name || (this.editor.document.name === 'Untitled session' && this.editor.selected ? this.editor.selected.name.replace (/\.[^.]+$/, '') : this.editor.document.name);
         nameLabel.appendChild (name);
 
         const categoryLabel = document.createElement ('label'); categoryLabel.textContent = 'Category / project folder';
@@ -355,7 +355,7 @@ export class ModelLibrary
         const kindLabel = document.createElement ('label'); kindLabel.textContent = 'Save';
         const kind = document.createElement ('select'); kind.setAttribute ('aria-label', 'Save contents');
         kind.add (new Option ('Entire session', 'session'));
-        if (!download && this.editor.selected) { kind.add (new Option ('Selected model', 'model')); }
+        if (!custom && !download && this.editor.selected) { kind.add (new Option ('Selected model', 'model')); }
         kindLabel.appendChild (kind);
 
         const destinationLabel = document.createElement ('label'); destinationLabel.textContent = 'Destination';
@@ -378,7 +378,7 @@ export class ModelLibrary
                     ? 'Corporate publishing remains disabled while identity transitions. Save to Device library or a file.'
                     : destination.value === 'account' ? 'Private to your account · Available on your other devices · Up to 32 MB per save.' : 'Choose any category/project folder. Nested folders use paths such as Project A/Concepts.';
             submit.textContent = destination.value === 'file' ? 'Save session file' : destination.value === 'shared' ? 'Publishing unavailable' : 'Save to library';
-            submit.disabled = (!this.editor.document.objects.length && !this.editor.document.packaging?.paths?.length) || destination.value === 'shared';
+            submit.disabled = (!custom && !this.editor.document.objects.length && !this.editor.document.packaging?.paths?.length) || destination.value === 'shared';
         };
         destination.addEventListener ('change', async () => { saveStorage = destination.value === 'device' ? this.deviceStorage : this.accountStorage; updateHint (); if (destination.value === 'file' || destination.value === 'shared') { return; } try { folders = await saveStorage.Folders (); populateFolders (); updateHint (); } catch (error) { status.textContent = error.message + ' You can save to File on disk instead.'; submit.disabled = true; } }); updateHint ();
 
@@ -401,7 +401,9 @@ export class ModelLibrary
                 }
                 const owner = this.editor.website.auth.user?.id;
                 const objects = kind.value === 'model' ? [this.editor.selected] : this.editor.document.objects;
-                const saved = await this.editor.ArchiveAsync (objects, kind.value, name.value.trim ());
+                const prepared = custom ? await custom.prepare (name.value.trim ()) : null;
+                const saved = prepared ? prepared.archive : await this.editor.ArchiveAsync (objects, kind.value, name.value.trim ());
+                if (!owner || this.editor.website.auth.user?.id !== owner) { throw new Error ('Account changed. Sign in before saving.'); }
                 if (destination.value === 'file') {
                     stage = 'saving session file';
                     if (fileHandle) {
@@ -430,18 +432,18 @@ export class ModelLibrary
                     stage = 'preparing Library folder';
                     const folder = await saveStorage.AddFolder (category.value || 'Uncategorized');
                     stage = 'creating preview'; status.textContent = 'Creating Library preview…';
-                    const thumbnail = this.editor.Thumbnail (objects);
+                    const thumbnail = prepared ? prepared.thumbnail : this.editor.Thumbnail (objects);
                     stage = destination.value === 'account' ? 'uploading to account Library' : 'saving to device Library';
                     status.textContent = destination.value === 'account' ? 'Uploading to your account Library…' : 'Saving to device Library…';
                     await saveStorage.Save ({
                         id : crypto.randomUUID (), name : name.value.trim (), category : folder, kind : kind.value,
-                        updatedAt : new Date ().toISOString (), thumbnail, objects : objects.length,
+                        updatedAt : new Date ().toISOString (), thumbnail, objects : prepared ? prepared.objects : objects.length,
                         archive : new Blob ([saved], { type : 'application/octet-stream' })
                     });
                     this.category = folder;
                     status.textContent = 'Saved successfully to ' + folder + '.'; progress.max = 1; progress.value = 1; this.editor.Status ('Saved to ' + folder + ': ' + name.value.trim ());
                 }
-                if (kind.value === 'session') {
+                if (!custom && kind.value === 'session') {
                     stage = 'updating saved session state';
                     this.editor.document.name = name.value.trim ();
                     this.editor.website.parameters.fileNameDiv.textContent = this.editor.document.name;

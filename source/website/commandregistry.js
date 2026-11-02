@@ -1,4 +1,4 @@
-function Validate (value, schema, path = 'arguments')
+export function Validate (value, schema, path = 'arguments')
 {
     if (schema.anyOf) { for (const alternative of schema.anyOf) { try { Validate (value, alternative, path); return; } catch { /* Try the next declared schema. */ } } throw new Error (path + ' does not match an allowed value type.'); }
     if (schema.type === 'null') { if (value !== null) { throw new Error (path + ' must be null.'); } return; }

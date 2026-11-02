@@ -3,7 +3,7 @@ export const BackgroundStops = [0, 0.45, 0.56, 0.59, 1];
 export function GetBackgroundPreset (name, dark)
 {
     const palettes = {
-        dark : ['#000000', '#07090c', '#1b2228', '#171b1f', '#000000'],
+        dark : ['#111820', '#1a2630', '#3c4b56', '#303b44', '#141c23'],
         light : ['#ffffff', '#f8fafc', '#dbe2e8', '#e5e8eb', '#ffffff'],
         sunset : ['#30284d', '#ad697e', '#f6b779', '#9d6c64', '#302b37'],
         outdoor : ['#76afe0', '#c4dfef', '#e9eddd', '#adbda3', '#566b58']

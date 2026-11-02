@@ -1,3 +1,4 @@
+import { BindAgentDialog } from './agentindicator.js';
 import { CaptureSummary } from './agentcapture.js';
 import { WorkspaceDialog } from './modellibrary.js';
 import { CommandGroup, StepSummary } from './macrodesign.js';
@@ -63,7 +64,7 @@ function ArgumentForm (command, values, parent, website, changed = () => {})
 export function OpenCommandPanel (website)
 {
     const registry = website.commands; const commands = registry.Catalog ();
-    const dialog = WorkspaceDialog ('Commands and macros'); dialog.classList.add ('command_dialog');
+    const dialog = WorkspaceDialog ('Commands and macros'); dialog.classList.add ('command_dialog'); BindAgentDialog (dialog, website.agentConnection);
     const account = Section ('Account inspection', dialog);
     Element ('p', 'View your current sign-in status without showing credentials.', account);
     const inspect = Element ('button', 'Refresh account status', account);

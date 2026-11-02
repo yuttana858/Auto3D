@@ -5,6 +5,15 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
+// Recover if pointer capture is lost or release arrives outside the preview.
+export function ReleasePreviewDrag (controls, pointerId)
+{
+    if (!controls?._pointers?.length || (pointerId !== undefined && !controls._pointers.includes (pointerId))) { return; }
+    const element = controls.domElement; for (const id of controls._pointers) { if (element.hasPointerCapture?.(id)) { try { element.releasePointerCapture (id); } catch { /* Capture may already have ended. */ } } }
+    controls._pointers.length = 0; controls._pointerPositions = {}; controls.state = -1;
+    element.ownerDocument.removeEventListener ('pointermove', controls._onPointerMove); element.ownerDocument.removeEventListener ('pointerup', controls._onPointerUp); element.style.cursor = '';
+}
+
 export class AIPreview
 {
     constructor (host)
@@ -14,6 +23,8 @@ export class AIPreview
         this.scene.add (new THREE.HemisphereLight (0xffffff, 0x657080, 2)); const key = new THREE.DirectionalLight (0xffffff, 3); key.position.set (3, 5, 4); this.scene.add (key);
         this.camera = new THREE.PerspectiveCamera (40, 1, .01, 10000); this.camera.position.set (3, 2, 3);
         this.controls = new OrbitControls (this.camera, this.renderer.domElement); this.controls.zoomSpeed = .5; this.controls.addEventListener ('change', () => this.Render ());
+        this.onPointerRelease = event => ReleasePreviewDrag (this.controls, event.pointerId); this.onBlur = () => ReleasePreviewDrag (this.controls);
+        this.renderer.domElement.addEventListener ('lostpointercapture', this.onPointerRelease); window.addEventListener ('pointerup', this.onPointerRelease); window.addEventListener ('blur', this.onBlur);
         this.resize = new ResizeObserver (() => this.Resize ()); this.resize.observe (host); this.Resize ();
     }
     Resize () { const w = Math.max (1, this.host.clientWidth), h = Math.max (1, this.host.clientHeight); this.renderer.setSize (w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix (); this.Render (); }
@@ -40,5 +51,5 @@ export class AIPreview
     }
     Fit () { if (!this.root) { return; } const box = new THREE.Box3 ().setFromObject (this.root); if (box.isEmpty ()) { return; } const sphere = box.getBoundingSphere (new THREE.Sphere ()); const radius = Math.max (.001, sphere.radius); const distance = radius / Math.sin (THREE.MathUtils.degToRad (this.camera.fov / 2)) / Math.min (1, this.camera.aspect) * 1.1; this.controls.target.copy (sphere.center); this.camera.position.copy (sphere.center).add (new THREE.Vector3 (1, .65, 1).normalize ().multiplyScalar (distance)); this.camera.near = radius / 1000; this.camera.far = distance + radius * 100; this.camera.updateProjectionMatrix (); this.controls.update (); this.Render (); }
     Thumbnail () { this.Render (); return this.renderer.domElement.toDataURL ('image/png'); }
-    Dispose () { this.Clear (); this.resize.disconnect (); this.controls.dispose (); ReleaseWebGLRenderer (this.renderer); this.renderer.domElement.remove (); }
+    Dispose () { this.Clear (); this.resize.disconnect (); this.onBlur (); window.removeEventListener ('pointerup', this.onPointerRelease); window.removeEventListener ('blur', this.onBlur); this.renderer.domElement.removeEventListener ('lostpointercapture', this.onPointerRelease); this.controls.dispose (); ReleaseWebGLRenderer (this.renderer); this.renderer.domElement.remove (); }
 }

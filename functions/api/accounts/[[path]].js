@@ -69,7 +69,13 @@ export async function onRequest (context)
         }
         const user = await created.json ();
         if (!user?.id) { throw Object.assign (new Error ('Account service unavailable.'), { status : 503 }); }
+        // Seed shared-table defaults idempotently. If storage is temporarily
+        // unavailable, approval still completes and first sign-in retries the
+        // same upsert; never create a second user to retry provisioning.
+        let preferencesReady = true;
+        try { await DatabaseRequest (context.env, 'auto3d_preferences?on_conflict=user_id', { method : 'POST', headers : { Prefer : 'resolution=ignore-duplicates,return=minimal' }, body : JSON.stringify ({ user_id : user.id }) }); }
+        catch { preferencesReady = false; }
         const updated = await DatabaseRequest (context.env, path + '&status=eq.processing&select=' + columns, { method : 'PATCH', headers : { Prefer : 'return=representation' }, body : JSON.stringify ({ status : 'approved', user_id : user.id }) });
-        return AuthResponse ({ request : updated[0], message : 'Account created. Share the initial password through your secure process.' });
+        return AuthResponse ({ request : updated[0], preferencesReady, message : preferencesReady ? 'Account created. Share the initial password through your secure process.' : 'Account created. Default preferences will be initialized on first sign-in. Share the initial password through your secure process.' });
     } catch (error) { return AuthResponse ({ error : ([400, 401, 403, 413].includes (error.status) || error.code === 'SUPABASE_SERVER_KEY_REQUIRED') ? error.message : 'Account service unavailable. Refresh before retrying; administrators can reconcile processing requests in Supabase.' }, error.status || 503); }
 }
