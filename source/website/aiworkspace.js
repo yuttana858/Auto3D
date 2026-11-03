@@ -1,3 +1,4 @@
+import { OpenMeshyConnection, MeshyCredentialRequest } from './aiconnection.js';
 import { OpenSessionArchive } from './sessionarchive.js';
 import { AIProjectArchive } from './aiproject.js';
 import { AppVersion } from './preferences.js';
@@ -157,6 +158,14 @@ export class AIWorkspace
 
     Open () { return this.website.modulePanels.Open ('ai'); }
     Close () { return this.website.modulePanels.Set ('ai', 'closed'); }
+
+    OpenConnection () { return OpenMeshyConnection (this.website); }
+    InspectConnection () { return MeshyCredentialRequest (this.website); }
+    async RemoveConnection ()
+    {
+        const result = await MeshyCredentialRequest (this.website, 'DELETE');
+        this.lastBalance = null; this.RefreshConnection (); return result;
+    }
 
     Headers (json = false)
     {
