@@ -30,6 +30,7 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         const challenge = Buffer.from (await crypto.subtle.digest ('SHA-256', new TextEncoder ().encode (verifier))).toString ('base64url');
         const params = new URLSearchParams ({ client_id : clientId, response_type : 'code', redirect_uri : 'https://client.example/callback', resource : origin + '/mcp', scope, state : 'test-state', code_challenge : challenge, code_challenge_method : 'S256' });
         const response = await fetch ('/oauth/authorize?' + params, { headers : userHeaders (id) }); assert.equal (response.status, 200);
+        assert.equal (response.headers.get ('Referrer-Policy'), 'same-origin');
         const html = await response.text ();
         assert.ok (!html.includes ('<script>evil</script>')); assert.ok (html.includes ('&#60;script&#62;evil&#60;/script&#62;'));
         const form = new URLSearchParams ({ handle : html.match (/name="handle" value="([^"]+)"/)[1], binding : html.match (/name="binding" value="([^"]+)"/)[1], name : 'My review agent', harness : 'chatgpt', decision : 'approve' });
