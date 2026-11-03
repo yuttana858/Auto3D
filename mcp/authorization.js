@@ -1,0 +1,96 @@
+import { OAuthAuthorizationServer, OAuthError } from '@cloudflare/workers-oauth-provider';
+import { RequireAdmin } from '../functions/_lib/accounts.js';
+import { AgentName, Identifier, Json, PilotConfig, ReadBytes, ReadJson, Scopes, ValidScopes } from './common.js';
+import { ActiveRegistration, BrowserIdentity } from './identity.js';
+
+const Escape = value => String (value).replace (/[&<>"']/g, char => '&#' + char.charCodeAt (0) + ';');
+const Encode = value => new TextEncoder ().encode (value);
+function Page (html, headers = new Headers (), status = 200)
+{
+    headers = new Headers (headers); headers.set ('Content-Type', 'text/html; charset=utf-8'); headers.set ('Cache-Control', 'no-store');
+    headers.set ('Content-Security-Policy', 'default-src \'none\'; form-action \'self\'; frame-ancestors \'none\'; base-uri \'none\'');
+    headers.set ('X-Content-Type-Options', 'nosniff'); headers.set ('Referrer-Policy', 'no-referrer');
+    return new Response ('<!doctype html><html><meta charset="utf-8"><title>Auto3D agent access</title><main>' + html + '</main></html>', { status, headers });
+}
+async function ConsentKey (env)
+{
+    const secret = env.AUTO3D_MCP_CONSENT_SECRET;
+    if (typeof secret !== 'string' || !/^[A-Za-z0-9_-]{43,128}$/.test (secret)) { throw new Error ('Consent key unavailable.'); }
+    return crypto.subtle.importKey ('raw', Encode (secret), { name : 'HMAC', hash : 'SHA-256' }, false, ['sign', 'verify']);
+}
+async function Binding (env, handle, accountId, expiresAt)
+{
+    const signature = new Uint8Array (await crypto.subtle.sign ('HMAC', await ConsentKey (env), Encode (JSON.stringify ([handle, accountId, expiresAt]))));
+    return expiresAt + '.' + [...signature].map (byte => byte.toString (16).padStart (2, '0')).join ('');
+}
+export function AuthorizationProvider (env)
+{
+    const config = PilotConfig (env);
+    return new OAuthAuthorizationServer ({
+        issuer : config.issuer, resources : [config.resource], scopesSupported : [...Scopes],
+        clientIdMetadataDocumentEnabled : true, clientRegistrationEndpoint : config.issuer + '/register',
+        accessTokenTTL : 600, refreshTokenTTL : 86400, refreshTokenIdleTTL : 86400,
+        tokenExchangeCallback : async options => {
+            try { await ActiveRegistration (options.env, options.userId, options.props.registrationId); }
+            catch { throw new OAuthError ('invalid_grant', { description : 'Agent access was revoked or expired.' }); }
+        }
+    });
+}
+export async function Consent (request, env, provider, identity = BrowserIdentity)
+{
+    if (!['GET', 'POST'].includes (request.method)) { return Page ('Method not allowed.', undefined, 405); }
+    const config = PilotConfig (env);
+    if (request.method === 'POST' && request.headers.get ('Origin') !== config.origin) { return Page ('Invalid origin.', undefined, 403); }
+    const user = await identity (request, env);
+    if (!user) { return Page ('<h1>Connect Auto3D</h1><p>Sign in to the staging app in another tab, then retry this connection.</p><a href="/" target="_blank" rel="noopener noreferrer">Open Auto3D staging</a>', undefined, 401); }
+    const oauth = provider.getOAuthApi (env);
+    if (request.method === 'GET') {
+        if (request.url.length > 8192) { return Page ('Request too large.', undefined, 400); }
+        const authRequest = await oauth.parseAuthRequest (request), details = await oauth.describeConsent (authRequest);
+        if (!ValidScopes (authRequest.scope)) { return Page ('Only pilot read and optional screenshot access are supported.', undefined, 400); }
+        const consent = await oauth.beginConsent (authRequest), expiresAt = Date.now () + 600000;
+        const binding = await Binding (env, consent.handle, user.id, expiresAt);
+        return Page ('<h1>Connect an agent</h1><p>Account: ' + Escape (user.email || user.id) + '</p><p>Client: ' + Escape (details.clientName) + '</p><p>' + (details.clientDomain ? 'Client domain: ' + Escape (details.clientDomain) : 'The client name is self-reported.') + '</p><p>Redirect host: ' + Escape (details.redirectHost) + '</p>' + (details.redirectIsLoopback ? '<p>A local application will receive this authorization.</p>' : '') + '<p>Permissions: ' + authRequest.scope.map (Escape).join (', ') + '. Read the session you select' + (authRequest.scope.includes ('auto3d.capture') ? ' and request screenshots' : '') + '. Expires in 24 hours. You can revoke it in Agent access.</p><form method="post"><input type="hidden" name="handle" value="' + Escape (consent.handle) + '"><input type="hidden" name="binding" value="' + binding + '"><label>Registration name <input name="name" required maxlength="80" value="' + Escape (String (details.clientName).slice (0, 80)) + '"></label><label>Harness <select name="harness"><option value="chatgpt">ChatGPT</option><option value="desktop">Desktop OAuth client</option><option value="cli">CLI with OAuth and PKCE</option><option value="other-oauth">Other OAuth client</option></select></label><button name="decision" value="approve">Allow</button><button name="decision" value="deny">Deny</button></form>', consent.headers);
+    }
+    if (!/^application\/x-www-form-urlencoded(?:\s*;|$)/i.test (request.headers.get ('Content-Type') || '')) { return Page ('Invalid form.', undefined, 400); }
+    const form = new URLSearchParams (new TextDecoder ().decode (await ReadBytes (request, 8192)));
+    const keys = ['handle', 'binding', 'name', 'harness', 'decision'];
+    if ([...form.keys ()].some (key => !keys.includes (key)) || keys.some (key => form.getAll (key).length !== 1)) { return Page ('Invalid form.', undefined, 400); }
+    const handle = form.get ('handle'), parts = form.get ('binding').split ('.'), expiresAt = Number (parts[0]);
+    if (handle.length > 512 || !Number.isSafeInteger (expiresAt) || expiresAt <= Date.now () || expiresAt > Date.now () + 600000 || !/^[a-f0-9]{64}$/.test (parts[1] || '') || parts.length !== 2) { return Page ('Consent expired.', undefined, 403); }
+    const signature = Uint8Array.from (parts[1].match (/../g), byte => parseInt (byte, 16));
+    if (!await crypto.subtle.verify ('HMAC', await ConsentKey (env), signature, Encode (JSON.stringify ([handle, user.id, expiresAt])))) { return Page ('Account changed. Start again.', undefined, 403); }
+    if (form.get ('decision') === 'deny') { const denied = await oauth.denyConsent (request, handle); return new Response (null, { status : 302, headers : denied.headers }); }
+    if (form.get ('decision') !== 'approve') { return Page ('Invalid decision.', undefined, 400); }
+    const name = AgentName (form.get ('name')), harness = form.get ('harness');
+    const approved = await oauth.approveConsent (request, handle);
+    if (!ValidScopes (approved.request.scope)) { return Page ('Invalid scopes.', undefined, 403); }
+    const registrationId = crypto.randomUUID (), broker = env.AUTO3D_AGENT_BROKER.getByName (user.id);
+    const record = await broker.Register ({ accountId : user.id, id : registrationId, name, harness, clientId : approved.request.clientId, scopes : approved.request.scope, expiresAt : Date.now () + 86400000 });
+    try {
+        const result = await oauth.completeAuthorization ({ request : approved.request, userId : user.id, scope : approved.request.scope, revokeExistingGrants : false, metadata : { registrationId, name, harness }, props : { registrationId, authorizedAt : record.createdAt } });
+        approved.headers.set ('Location', result.redirectTo); return new Response (null, { status : 302, headers : approved.headers });
+    } catch (error) { await broker.RevokeRegistration ({ accountId : user.id, id : registrationId }); throw error; }
+}
+export async function ManageRegistrations (request, env)
+{
+    const url = new URL (request.url), config = PilotConfig (env);
+    if (!['GET', 'POST'].includes (request.method)) { return Json ({ error : 'Method not allowed.' }, 405); }
+    if (request.method === 'POST' && request.headers.get ('Origin') !== config.origin) { return Json ({ error : 'Invalid origin.' }, 403); }
+    const user = await BrowserIdentity (request, env); if (!user) { return Json ({ error : 'Sign in.' }, 401); }
+    if (request.headers.get ('X-Auto3D-Account') !== user.id) { return Json ({ error : 'Account changed.' }, 409); }
+    const admin = url.pathname === '/api/agent/admin';
+    if (admin) { await RequireAdmin ({ request, env }); }
+    if ([...url.searchParams.keys ()].some (key => !admin || key !== 'accountId') || url.searchParams.getAll ('accountId').length > 1) { return Json ({ error : 'Invalid query.' }, 400); }
+    let body = null;
+    if (request.method === 'POST') { body = await ReadJson (request); }
+    const accountId = admin ? Identifier (body?.accountId || url.searchParams.get ('accountId')) : user.id;
+    if (!config.accounts.includes (accountId)) { return Json ({ error : 'Pilot account unavailable.' }, 403); }
+    const broker = env.AUTO3D_AGENT_BROKER.getByName (accountId);
+    if (request.method === 'GET') { return Json (await broker.Registrations (accountId)); }
+    const allowed = admin ? ['accountId', 'id', 'action', 'disabled'] : ['id', 'action'];
+    if (Object.keys (body).some (key => !allowed.includes (key))) { return Json ({ error : 'Invalid action.' }, 400); }
+    if (body.action === 'revoke' && body.disabled === undefined) { return Json (await broker.RevokeRegistration ({ accountId, id : Identifier (body.id) })); }
+    if (admin && body.action === 'disable' && body.id === undefined && typeof body.disabled === 'boolean') { return Json (await broker.DisableAgents ({ accountId, disabled : body.disabled })); }
+    return Json ({ error : 'Invalid action.' }, 400);
+}

@@ -1,0 +1,27 @@
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { CaptureContent } from './service.js';
+import { ReadBytes } from './common.js';
+
+export async function HandleMcp (request, service, actor)
+{
+    await service.Assert (actor);
+    const server = new Server ({ name : 'Auto3D staging', version : '0.1.0' }, { capabilities : { tools : {} } });
+    server.setRequestHandler (ListToolsRequestSchema, async () => { await service.Assert (actor); return { tools : [
+        { name : 'auto3d.sessions.list', description : 'List this account’s connected browser windows and sessions.', inputSchema : { type : 'object', properties : {}, additionalProperties : false }, annotations : { readOnlyHint : true } },
+        { name : 'auto3d.sessions.select', description : 'Pair with an active session explicitly chosen by the user. Does not edit the scene.', inputSchema : { type : 'object', properties : { connectionId : { type : 'string' }, sessionId : { type : 'string' } }, required : ['connectionId', 'sessionId'], additionalProperties : false }, annotations : { readOnlyHint : false, destructiveHint : false, idempotentHint : false } },
+        ...service.Tools (actor).map (tool => ({ name : tool.id, title : tool.title, description : tool.description, inputSchema : tool.inputSchema, annotations : { readOnlyHint : true } }))
+    ] }; });
+    server.setRequestHandler (CallToolRequestSchema, async ({ params }) => {
+        try {
+            const result = await service.Call (actor, params.name, params.arguments || {});
+            if (params.name === 'capture.image') { return { content : CaptureContent (result) }; }
+            return { content : [{ type : 'text', text : JSON.stringify (result) }], structuredContent : { result } };
+        } catch { return { isError : true, content : [{ type : 'text', text : 'Request unavailable. Check the selected session, connection and permissions. Timed-out requests are not replayed.' }] }; }
+    });
+    const transport = new WebStandardStreamableHTTPServerTransport ({ enableJsonResponse : true, sessionIdGenerator : undefined });
+    if (request.method === 'POST') { request = new Request (request.url, { method : 'POST', headers : request.headers, body : await ReadBytes (request, 65536), signal : request.signal }); }
+    await server.connect (transport);
+    try { return await transport.handleRequest (request); } finally { await server.close (); }
+}

@@ -1,0 +1,60 @@
+import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { chromium } from 'playwright-core';
+
+// Generated staging assets, mocked identity/API/WebSocket. No live client claim.
+const root = path.resolve ('build/mcp-pilot'), origin = 'https://auto3d-mcp-pilot.pages.dev';
+const types = { '.html' : 'text/html', '.js' : 'text/javascript', '.css' : 'text/css', '.json' : 'application/json', '.svg' : 'image/svg+xml', '.ttf' : 'font/ttf', '.woff' : 'font/woff', '.png' : 'image/png', '.wasm' : 'application/wasm' };
+const server = createServer (async (request, response) => {
+    try {
+        const url = new URL (request.url, 'http://localhost'), filename = path.resolve (root, '.' + (url.pathname === '/' ? '/index.html' : url.pathname));
+        if (!filename.startsWith (root + path.sep) || path.basename (filename).startsWith ('_')) { response.writeHead (403).end (); return; }
+        response.setHeader ('Content-Type', types[path.extname (filename)] || 'application/octet-stream'); response.end (await readFile (filename));
+    } catch { response.writeHead (404).end (); }
+});
+await new Promise (resolve => server.listen (0, '127.0.0.1', resolve));
+const browser = await chromium.launch ({ executablePath : process.env.BROWSER_EXECUTABLE || (process.env.CI ? chromium.executablePath () : '/usr/bin/chromium'), args : ['--no-sandbox', '--enable-unsafe-swiftshader'] });
+try {
+    const page = await browser.newPage ({ viewport : { width : 1280, height : 900 } }), errors = [], results = []; let nextResult;
+    page.on ('pageerror', error => errors.push (error.message));
+    await page.route (origin + '/**', async route => {
+        const url = new URL (route.request ().url ());
+        if (url.pathname.startsWith ('/api/')) {
+            let json = [];
+            if (url.pathname.startsWith ('/api/auth/')) { json = { user : { id : 'test-owner', email : 'test@example.test' } }; }
+            if (url.pathname === '/api/preferences') { json = { preferences : {}, folders : [] }; }
+            if (url.pathname.startsWith ('/api/accounts/')) { json = { isAdmin : false }; }
+            if (url.pathname === '/api/agent/config') { json = { pilot : true, mcpUrl : origin + '/mcp' }; }
+            if (url.pathname === '/api/agent/registrations') { json = route.request ().method () === 'POST' ? { revoked : true } : { registrations : [{ id : 'grant-a', name : 'Named review agent', harness : 'chatgpt', expiresAt : Date.now () + 60000, revokedAt : null }] }; }
+            if (url.pathname.startsWith ('/api/agent/admin')) { json = { disabled : false, registrations : [] }; }
+            await route.fulfill ({ json }); return;
+        }
+        const response = await route.fetch ({ url : 'http://127.0.0.1:' + server.address ().port + url.pathname + url.search }); await route.fulfill ({ response });
+    });
+    let wire;
+    await page.routeWebSocket ('wss://auto3d-mcp-pilot.pages.dev/api/agent/connect', ws => {
+        wire = ws; ws.onMessage (text => {
+            const message = JSON.parse (text);
+            if (message.type === 'hello') { ws.send (JSON.stringify ({ type : 'hello_ack', connectionId : 'connection-a', expiresAt : Date.now () + 300000 })); }
+            if (message.type === 'result') { results.push (message); nextResult?.(); }
+        });
+    });
+    await page.goto (origin + '/'); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
+    const call = async (id, args = {}) => { const result = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (result.ok, true, JSON.stringify (result)); return result.result; };
+    await page.getByRole ('button', { name : 'Preferences', exact : true }).click (); await page.getByRole ('button', { name : 'Agent access', exact : true }).click ();
+    const dialog = page.getByRole ('dialog', { name : 'Agent access', exact : true }); await dialog.waitFor (); assert.ok (await dialog.getByText ('Named review agent', { exact : false }).count ());
+    assert.equal (await dialog.locator ('input[type=checkbox]').isChecked (), false);
+    await dialog.getByLabel ('Window name').fill ('Review window'); await dialog.getByRole ('button', { name : 'Connect this window' }).click (); await dialog.getByRole ('status').filter ({ hasText : 'Connected' }).waitFor ();
+    const tab = await call ('session.tabs.inspect');
+    const received = new Promise (resolve => { nextResult = resolve; });
+    wire.send (JSON.stringify ({ type : 'request', requestId : 'inspect-a', command : 'scene.inspect', sessionId : tab.activeId, arguments : {} }));
+    await received; assert.equal (results[0]?.requestId, 'inspect-a'); assert.equal (results[0].result.ok, true);
+    await dialog.getByRole ('button', { name : 'Disconnect', exact : true }).click (); assert.equal ((await call ('agent.access.inspect')).connected, false);
+    await dialog.getByRole ('button', { name : 'Revoke', exact : true }).click ();
+    await page.evaluate (() => document.querySelector ('dialog[aria-label="Agent access"]').close ());
+    await call ('admin.agents.open'); const admin = page.getByRole ('dialog', { name : 'Agent administration', exact : true }); await admin.getByLabel ('Pilot account ID').fill ('test-owner'); await admin.getByRole ('button', { name : 'Inspect account' }).click ();
+    await admin.getByRole ('status').filter ({ hasText : 'Agent access enabled' }).waitFor ();
+    assert.deepEqual (errors, []); console.log ('MCP browser controls, explicit connection, safe remote read, disconnect, revoke and admin UI passed on generated staging assets.');
+} finally { await browser.close (); await new Promise (resolve => server.close (resolve)); }

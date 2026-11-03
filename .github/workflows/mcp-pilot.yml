@@ -1,0 +1,50 @@
+name: Verify isolated MCP pilot
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/mcp-staging-registrations]
+  pull_request:
+    paths:
+      - 'mcp/**'
+      - 'source/website/agent*.js'
+      - 'source/website/commandregistry.js'
+      - 'source/website/preferences.js'
+      - 'source/website/sessiontabs.js'
+      - 'tools/*mcp*.mjs'
+      - 'test/mcp/**'
+      - 'test/browser/mcp-access.mjs'
+      - 'package*.json'
+      - '.github/workflows/mcp-pilot.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint && npm run lint_mcp
+      - run: npm run check_licenses
+      - run: npm test
+      - run: npm run test_mcp
+      - run: npm run build_mcp_pilot
+      - run: node node_modules/playwright-core/cli.js install --with-deps chromium
+      - run: node test/browser/mcp-access.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: auto3d-mcp-staging-candidate
+          path: |
+            build/mcp-pilot
+            build/mcp-workers
+          retention-days: 7
+
+# This workflow deliberately has no deployment job or production credentials.
+# Live staging requires the isolated identity project and pilot allowlist first.

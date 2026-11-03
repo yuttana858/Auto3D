@@ -1,4 +1,5 @@
 import { OpenErrorLog } from './errorlogpanel.js';
+import { AgentAccessFor } from './agentaccess.js';
 import { RGBAColor, RGBColor } from '../engine/model/color.js';
 import { AccountConsole } from './accountpaths.js';
 import { Theme, Settings, CameraSettings } from './settings.js';
@@ -123,8 +124,11 @@ export class Preferences
         about.textContent = 'SW Auto3D v' + AppVersion + ' · Build ' + AppBuildInfo ().build + ' — A browser workspace for inspecting, arranging and reviewing 3D models, materials, lighting and reusable layouts. Dimensions use the units declared by the source model; unspecified units remain model units.';
         const commands = document.createElement ('button'); commands.textContent = 'Commands and macros'; commands.className = 'workspace_primary'; commands.addEventListener ('click', () => { dialog.close (); OpenCommandPanel (this.website); });
         const errorLogs = document.createElement ('button'); errorLogs.textContent = 'Error logs'; errorLogs.addEventListener ('click', () => { dialog.close (); OpenErrorLog (this.website); });
+        const agentAccess = document.createElement ('button'); agentAccess.textContent = 'Agent access'; agentAccess.addEventListener ('click', () => { AgentAccessFor (this.website).Open ().then (() => dialog.close ()).catch (error => { syncStatus.textContent = error.message; }); });
+        const agentAdmin = document.createElement ('button'); agentAdmin.textContent = 'Agent administration'; agentAdmin.addEventListener ('click', () => { AgentAccessFor (this.website).OpenAdmin ().then (() => dialog.close ()).catch (error => { syncStatus.textContent = error.message; }); });
         const recovery = document.createElement ('button'); recovery.textContent = 'Recover unsaved session'; recovery.addEventListener ('click', () => { dialog.close (); this.website.sessionEditor.OfferRecovery (true).catch (error => this.website.sessionEditor.Status (error.message)); });
-        const heading = document.createElement ('strong'); heading.textContent = 'About'; form.append (appearance, unitLabel, qualityLabel, qualityNote, syncStatus, commands, errorLogs, recovery, aiHeading, aiNote, aiActions, aiStatus, heading, about); dialog.appendChild (form);
+        const agentControls = globalThis.location?.hostname === 'auto3d-mcp-pilot.pages.dev' ? [agentAccess, agentAdmin] : [];
+        const heading = document.createElement ('strong'); heading.textContent = 'About'; form.append (appearance, unitLabel, qualityLabel, qualityNote, syncStatus, commands, errorLogs, recovery, ...agentControls, aiHeading, aiNote, aiActions, aiStatus, heading, about); dialog.appendChild (form);
     }
 
     async SetViewportQuality (mode)

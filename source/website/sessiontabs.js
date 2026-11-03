@@ -7,7 +7,7 @@ export class SessionTabs
 {
     constructor (editor, parent)
     {
-        this.editor = editor; this.tabs = [{ id : crypto.randomUUID (), document : editor.document, history : editor.history, dirty : false }]; this.active = this.tabs[0].id; this.clipboard = null;
+        this.editor = editor; this.tabs = [{ id : crypto.randomUUID (), document : editor.document, history : editor.history, dirty : false }]; this.active = this.tabs[0].id; this.clipboard = null; this.revision = 0;
         this.root = document.createElement ('div'); this.root.className = 'session_tabs'; this.root.setAttribute ('aria-label', 'Open sessions'); parent.appendChild (this.root);
         this.editor.website.auth?.Subscribe?.(user => { if (!user || this.owner && this.owner !== user.id) { this.clipboard = null; } if (user) { this.owner = user.id; } }); this.Refresh ();
     }
@@ -47,7 +47,7 @@ export class SessionTabs
     {
         this.AssertEditable (); if (this.switching) { throw new Error ('Wait for the session to finish opening.'); } const target = this.tabs.find (tab => tab.id === id); if (!target) { throw new Error ('Session not found.'); } if (id === this.active) { return this.Inspect (); }
         const owner = this.editor.website.auth.user.id, previous = this.Current (); this.Capture (); this.active = id;
-        this.switching = true;
+        this.revision++; this.switching = true;
         try { await this.Apply (target); if (this.editor.website.auth?.user?.id !== owner || this.editor.website.accountReady === false) { throw new Error ('Account changed while switching sessions.'); } }
         catch (error) { this.active = previous.id; if (this.editor.website.auth?.user?.id === owner) { try { await this.Apply (previous); } catch { /* Preserve the original error. */ } } throw error; }
         finally { this.switching = false; }
