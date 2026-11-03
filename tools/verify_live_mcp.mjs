@@ -12,4 +12,6 @@ for (const endpoint of ['authorization_endpoint', 'token_endpoint', 'registratio
 const challenge = await read ('/mcp', 401);
 if (!challenge.headers.get ('WWW-Authenticate')?.includes ('oauth-protected-resource/mcp')) { throw new Error ('MCP Bearer challenge missing.'); }
 await read ('/api/agent/config', 401); await read ('/api/personal/items', 401);
-console.log ('Live MCP discovery, S256 PKCE advertisement, unauthenticated challenge and existing Library authentication verified. Interactive administrator OAuth and real ChatGPT connection still require testing.');
+const consent = await read ('/oauth/authorize', 401);
+if (consent.headers.get ('Referrer-Policy') !== 'same-origin') { throw new Error ('Consent page does not preserve its form Origin.'); }
+console.log ('Live MCP discovery, S256 PKCE advertisement, unauthenticated challenge, consent referrer policy and existing Library authentication verified. Interactive administrator OAuth and real ChatGPT connection still require testing.');

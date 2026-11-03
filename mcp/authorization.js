@@ -9,7 +9,9 @@ function Page (html, headers = new Headers (), status = 200)
 {
     headers = new Headers (headers); headers.set ('Content-Type', 'text/html; charset=utf-8'); headers.set ('Cache-Control', 'no-store');
     headers.set ('Content-Security-Policy', 'default-src \'none\'; form-action \'self\'; frame-ancestors \'none\'; base-uri \'none\'');
-    headers.set ('X-Content-Type-Options', 'nosniff'); headers.set ('Referrer-Policy', 'no-referrer');
+    // no-referrer makes browser form POSTs serialize their Origin as "null".
+    // Keep the same-origin Origin check working without leaking OAuth URLs cross-site.
+    headers.set ('X-Content-Type-Options', 'nosniff'); headers.set ('Referrer-Policy', 'same-origin');
     return new Response ('<!doctype html><html><meta charset="utf-8"><title>Auto3D agent access</title><main>' + html + '</main></html>', { status, headers });
 }
 async function ConsentKey (env)

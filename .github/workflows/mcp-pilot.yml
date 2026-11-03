@@ -38,6 +38,7 @@ jobs:
       - run: npm run build_mcp_pilot
       - run: node node_modules/playwright-core/cli.js install --with-deps chromium
       - run: node test/browser/mcp-access.mjs
+      - run: node test/browser/mcp-consent.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: auto3d-mcp-staging-candidate
