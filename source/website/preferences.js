@@ -7,7 +7,7 @@ import { WorkspaceDialog } from './modellibrary.js';
 import { Unit } from '../engine/model/unit.js';
 import { OpenCommandPanel } from './commandpanel.js';
 
-export const AppVersion = '0.46.0';
+export const AppVersion = '0.47.0';
 
 export function AppBuildInfo ()
 {
@@ -127,7 +127,7 @@ export class Preferences
         const agentAccess = document.createElement ('button'); agentAccess.textContent = 'Agent access'; agentAccess.addEventListener ('click', () => { AgentAccessFor (this.website).Open ().then (() => dialog.close ()).catch (error => { syncStatus.textContent = error.message; }); });
         const agentAdmin = document.createElement ('button'); agentAdmin.textContent = 'Agent administration'; agentAdmin.addEventListener ('click', () => { AgentAccessFor (this.website).OpenAdmin ().then (() => dialog.close ()).catch (error => { syncStatus.textContent = error.message; }); });
         const recovery = document.createElement ('button'); recovery.textContent = 'Recover unsaved session'; recovery.addEventListener ('click', () => { dialog.close (); this.website.sessionEditor.OfferRecovery (true).catch (error => this.website.sessionEditor.Status (error.message)); });
-        const agentControls = globalThis.location?.hostname === 'auto3d-mcp-pilot.pages.dev' ? [agentAccess, agentAdmin] : [];
+        const agentControls = globalThis.location?.hostname === 'auto3d-mcp-pilot.pages.dev' || globalThis.location?.hostname === 'auto3d-5av.pages.dev' && this.website.accountAdmin?.isAdmin ? [agentAccess, agentAdmin] : [];
         const heading = document.createElement ('strong'); heading.textContent = 'About'; form.append (appearance, unitLabel, qualityLabel, qualityNote, syncStatus, commands, errorLogs, recovery, ...agentControls, aiHeading, aiNote, aiActions, aiStatus, heading, about); dialog.appendChild (form);
     }
 

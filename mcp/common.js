@@ -1,5 +1,9 @@
 export const ReadTools = Object.freeze (['scene.inspect', 'camera.current.inspect', 'packaging.measurements.inspect', 'render.queue.inspect', 'session.tabs.inspect', 'capture.image']);
 export const Scopes = Object.freeze (['auto3d.read', 'auto3d.capture', 'offline_access']);
+export function LiveMcpPath (pathname)
+{
+    return pathname === '/mcp' || pathname.startsWith ('/oauth/') || ['/.well-known/oauth-protected-resource/mcp', '/.well-known/oauth-authorization-server/oauth', '/api/agent/config', '/api/agent/connect', '/api/agent/renew', '/api/agent/registrations', '/api/agent/admin'].includes (pathname);
+}
 export function Identifier (value)
 {
     if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test (value)) { throw new Error ('Invalid identifier.'); }
@@ -44,13 +48,20 @@ export async function ReadJson (request, limit = 4096)
 }
 export function PilotConfig (env)
 {
+    if (env.AUTO3D_MCP_LIVE_ADMIN === '1') {
+        const origin = 'https://auto3d-5av.pages.dev';
+        const accounts = String (env.AUTO3D_MCP_LIVE_ACCOUNTS || '').split (',').map (id => id.trim ()).filter (Boolean);
+        const identity = String (env.SUPABASE_URL || '').trim ().replace (/\/$/, '');
+        if (env.AUTO3D_MCP_PILOT === '1' || env.AUTO3D_MCP_ORIGIN !== origin || !accounts.length || accounts.some (id => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test (id)) || !/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test (identity) || identity !== env.AUTO3D_MCP_PRODUCTION_SUPABASE_URL) { throw new Error ('Live administrator MCP configuration is incomplete.'); }
+        return { mode : 'live-admin', origin, issuer : origin + '/oauth', resource : origin + '/mcp', accounts };
+    }
     const origin = 'https://auto3d-mcp-pilot.pages.dev';
     if (env.AUTO3D_MCP_PILOT !== '1' || env.AUTO3D_MCP_ORIGIN !== origin) { throw new Error ('MCP pilot is disabled.'); }
     const accounts = String (env.AUTO3D_MCP_PILOT_ACCOUNTS || '').split (',').map (id => id.trim ()).filter (Boolean);
     if (!accounts.length || accounts.some (id => !/^[0-9a-f-]{36}$/i.test (id))) { throw new Error ('Pilot accounts are not configured.'); }
     const staging = String (env.AUTO3D_MCP_STAGING_SUPABASE_URL || '').replace (/\/$/, ''), production = String (env.AUTO3D_MCP_PRODUCTION_SUPABASE_URL || '').replace (/\/$/, '');
     if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test (staging) || !/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test (production) || staging === production || String (env.SUPABASE_URL || '').replace (/\/$/, '') !== staging) { throw new Error ('Separate staging identity configuration required.'); }
-    return { origin, issuer : origin + '/oauth', resource : origin + '/mcp', accounts };
+    return { mode : 'staging', origin, issuer : origin + '/oauth', resource : origin + '/mcp', accounts };
 }
 export function PilotAccount (env, accountId)
 {

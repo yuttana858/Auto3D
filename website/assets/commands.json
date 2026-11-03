@@ -5,7 +5,7 @@
       "id": "agent.access.open",
       "title": "Open agent access",
       "category": "Account",
-      "description": "Open the interactive staging OAuth registration and browser-window connection controls. Does not grant access or connect a client by itself.",
+      "description": "Open the interactive OAuth registration and browser-window connection controls. Does not grant access or connect a client by itself.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -33,7 +33,7 @@
       "id": "agent.access.connect",
       "title": "Connect this browser window",
       "category": "Account",
-      "description": "Explicitly share this staging browser window with individually authorized OAuth agents. Screenshots need a separate opt-in and OAuth scope. Does not pair a remote client automatically.",
+      "description": "Explicitly share this browser window with individually authorized OAuth agents. Screenshots need a separate opt-in and OAuth scope. Does not pair a remote client automatically.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -75,7 +75,7 @@
       "id": "agent.registrations.list",
       "title": "List my agent registrations",
       "category": "Account",
-      "description": "Read named staging OAuth registrations, permissions and revocation state without tokens.",
+      "description": "Read named OAuth registrations, permissions and revocation state without tokens.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -114,7 +114,7 @@
       "id": "admin.agents.open",
       "title": "Open agent administration",
       "category": "Administration",
-      "description": "Open interactive staging agent controls. Server administrator authorization is required for every operation.",
+      "description": "Open interactive agent controls. Server administrator authorization is required for every operation.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -128,7 +128,7 @@
       "id": "admin.agents.list",
       "title": "List account agent registrations",
       "category": "Administration",
-      "description": "Inspect a pilot account registrations; verified administrator access required.",
+      "description": "Inspect an enrolled account registrations; verified administrator access required.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -153,7 +153,7 @@
       "id": "admin.agents.revoke",
       "title": "Revoke account agent registration",
       "category": "Administration",
-      "description": "Revoke one pilot account agent registration; verified administrator access required.",
+      "description": "Revoke one enrolled account agent registration; verified administrator access required.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -186,7 +186,7 @@
       "id": "admin.agents.disable",
       "title": "Control account agent access",
       "category": "Administration",
-      "description": "Disable or re-enable pilot account agent access. Disabling revokes existing registrations; re-enabling never restores them. Administrator only.",
+      "description": "Disable or re-enable enrolled account agent access. Disabling revokes existing registrations; re-enabling never restores them. Administrator only.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
