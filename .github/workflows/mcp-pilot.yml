@@ -14,6 +14,8 @@ on:
       - 'tools/*mcp*.mjs'
       - 'test/mcp/**'
       - 'test/browser/mcp-access.mjs'
+      - 'test/browser/mcp-consent.mjs'
+      - 'test/fixtures/mcp-*.mjs'
       - 'package*.json'
       - '.github/workflows/mcp-pilot.yml'
 

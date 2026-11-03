@@ -31,6 +31,7 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         const params = new URLSearchParams ({ client_id : clientId, response_type : 'code', redirect_uri : 'https://client.example/callback', resource : origin + '/mcp', scope, state : 'test-state', code_challenge : challenge, code_challenge_method : 'S256' });
         const response = await fetch ('/oauth/authorize?' + params, { headers : userHeaders (id) }); assert.equal (response.status, 200);
         assert.equal (response.headers.get ('Referrer-Policy'), 'same-origin');
+        assert.match (response.headers.get ('Content-Security-Policy'), /form-action 'self' https:\/\/client\.example;/);
         const html = await response.text ();
         assert.ok (!html.includes ('<script>evil</script>')); assert.ok (html.includes ('&#60;script&#62;evil&#60;/script&#62;'));
         const form = new URLSearchParams ({ handle : html.match (/name="handle" value="([^"]+)"/)[1], binding : html.match (/name="binding" value="([^"]+)"/)[1], name : 'My review agent', harness : 'chatgpt', decision : 'approve' });
@@ -90,7 +91,8 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         assert.equal ((await approve (wrongAccount, userB)).status, 403);
         const noCookie = { ...flow, cookies : cookieFor (userA) };
         assert.notEqual ((await approve (noCookie)).status, 302);
-        const success = await approve (flow); assert.equal (success.status, 302); assert.notEqual ((await approve (flow)).status, 302);
+        const success = await approve (flow); assert.equal (success.status, 302);
+        const reused = await approve (flow); assert.equal (reused.status, 400); assert.equal ((await reused.json ()).code, 'CONSENT_REQUEST_INVALID');
     });
     it ('enforces PKCE and rejects a different token resource', async () => {
         const flow = await begin (), approved = await approve (flow), code = new URL (approved.headers.get ('Location')).searchParams.get ('code');
