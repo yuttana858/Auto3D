@@ -12,7 +12,12 @@ export async function AuthFetch (request, env, ctx)
         if (url.pathname === '/oauth/authorize') { return await Consent (request, env, provider); }
         if (['/api/agent/registrations', '/api/agent/admin'].includes (url.pathname)) { return await ManageRegistrations (request, env); }
         return await provider.fetch (request, env, ctx);
-    } catch (error) { return Json ({ error : 'Agent authorization unavailable. Start again.' }, error instanceof AuthorizationError || error instanceof CimdFetchError ? 400 : [400, 401, 403].includes (error.status) ? error.status : 503); }
+    } catch (error) {
+        if (error instanceof AuthorizationError && request.method === 'POST' && new URL (request.url).pathname === '/oauth/authorize') {
+            return Json ({ error : 'This permission request expired or was already used. Restart the connection from ChatGPT.', code : 'CONSENT_REQUEST_INVALID' }, 400);
+        }
+        return Json ({ error : 'Agent authorization unavailable. Start again.' }, error instanceof AuthorizationError || error instanceof CimdFetchError ? 400 : [400, 401, 403].includes (error.status) ? error.status : 503);
+    }
 }
 export async function ValidateAccessToken (resource, token, env)
 {

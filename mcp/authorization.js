@@ -5,10 +5,18 @@ import { ActiveRegistration, BrowserIdentity } from './identity.js';
 
 const Escape = value => String (value).replace (/[&<>"']/g, char => '&#' + char.charCodeAt (0) + ';');
 const Encode = value => new TextEncoder ().encode (value);
-function Page (html, headers = new Headers (), status = 200)
+function Page (html, headers = new Headers (), status = 200, validatedRedirectUri = null)
 {
     headers = new Headers (headers); headers.set ('Content-Type', 'text/html; charset=utf-8'); headers.set ('Cache-Control', 'no-store');
-    headers.set ('Content-Security-Policy', 'default-src \'none\'; form-action \'self\'; frame-ancestors \'none\'; base-uri \'none\'');
+    let formAction = '\'self\'';
+    if (validatedRedirectUri) {
+        // Chromium applies form-action to the POST's redirect too. Only use the
+        // callback already validated by the OAuth provider, never raw query data.
+        const callback = new URL (validatedRedirectUri);
+        if (!['https:', 'http:'].includes (callback.protocol) || callback.username || callback.password) { throw new Error ('Invalid validated callback.'); }
+        formAction += ' ' + callback.origin;
+    }
+    headers.set ('Content-Security-Policy', 'default-src \'none\'; form-action ' + formAction + '; frame-ancestors \'none\'; base-uri \'none\'');
     // no-referrer makes browser form POSTs serialize their Origin as "null".
     // Keep the same-origin Origin check working without leaking OAuth URLs cross-site.
     headers.set ('X-Content-Type-Options', 'nosniff'); headers.set ('Referrer-Policy', 'same-origin');
@@ -58,7 +66,7 @@ export async function Consent (request, env, provider, identity = BrowserIdentit
         if (!ValidScopes (authRequest.scope)) { return Page ('Only pilot read and optional screenshot access are supported.', undefined, 400); }
         const consent = await oauth.beginConsent (authRequest), expiresAt = Date.now () + 600000;
         const binding = await Binding (env, consent.handle, user.id, expiresAt);
-        return Page ('<h1>Connect an agent</h1><p>Account: ' + Escape (user.email || user.id) + '</p><p>Client: ' + Escape (details.clientName) + '</p><p>' + (details.clientDomain ? 'Client domain: ' + Escape (details.clientDomain) : 'The client name is self-reported.') + '</p><p>Redirect host: ' + Escape (details.redirectHost) + '</p>' + (details.redirectIsLoopback ? '<p>A local application will receive this authorization.</p>' : '') + '<p>Permissions: ' + authRequest.scope.map (Escape).join (', ') + '. Read the session you select' + (authRequest.scope.includes ('auto3d.capture') ? ' and request screenshots' : '') + '. Expires in 24 hours. You can revoke it in Agent access.</p><form method="post"><input type="hidden" name="handle" value="' + Escape (consent.handle) + '"><input type="hidden" name="binding" value="' + binding + '"><label>Registration name <input name="name" required maxlength="80" value="' + Escape (String (details.clientName).slice (0, 80)) + '"></label><label>Harness <select name="harness"><option value="chatgpt">ChatGPT</option><option value="desktop">Desktop OAuth client</option><option value="cli">CLI with OAuth and PKCE</option><option value="other-oauth">Other OAuth client</option></select></label><button name="decision" value="approve">Allow</button><button name="decision" value="deny">Deny</button></form>', consent.headers);
+        return Page ('<h1>Connect an agent</h1><p>Account: ' + Escape (user.email || user.id) + '</p><p>Client: ' + Escape (details.clientName) + '</p><p>' + (details.clientDomain ? 'Client domain: ' + Escape (details.clientDomain) : 'The client name is self-reported.') + '</p><p>Redirect host: ' + Escape (details.redirectHost) + '</p>' + (details.redirectIsLoopback ? '<p>A local application will receive this authorization.</p>' : '') + '<p>Permissions: ' + authRequest.scope.map (Escape).join (', ') + '. Read the session you select' + (authRequest.scope.includes ('auto3d.capture') ? ' and request screenshots' : '') + '. Expires in 24 hours. You can revoke it in Agent access.</p><form method="post"><input type="hidden" name="handle" value="' + Escape (consent.handle) + '"><input type="hidden" name="binding" value="' + binding + '"><label>Registration name <input name="name" required maxlength="80" value="' + Escape (String (details.clientName).slice (0, 80)) + '"></label><label>Harness <select name="harness"><option value="chatgpt">ChatGPT</option><option value="desktop">Desktop OAuth client</option><option value="cli">CLI with OAuth and PKCE</option><option value="other-oauth">Other OAuth client</option></select></label><button name="decision" value="approve">Allow</button><button name="decision" value="deny">Deny</button></form>', consent.headers, 200, details.redirectUri);
     }
     if (!/^application\/x-www-form-urlencoded(?:\s*;|$)/i.test (request.headers.get ('Content-Type') || '')) { return Page ('Invalid form.', undefined, 400); }
     const form = new URLSearchParams (new TextDecoder ().decode (await ReadBytes (request, 8192)));
