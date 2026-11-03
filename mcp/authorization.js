@@ -40,9 +40,15 @@ export async function Consent (request, env, provider, identity = BrowserIdentit
 {
     if (!['GET', 'POST'].includes (request.method)) { return Page ('Method not allowed.', undefined, 405); }
     const config = PilotConfig (env);
+    if (request.url.length > 8192) { return Page ('Request too large.', undefined, 400); }
     if (request.method === 'POST' && request.headers.get ('Origin') !== config.origin) { return Page ('Invalid origin.', undefined, 403); }
     const user = await identity (request, env);
-    if (!user) { return Page ('<h1>Connect Auto3D</h1><p>Sign in to Auto3D in another tab, then retry this connection.</p><a href="/" target="_blank" rel="noopener noreferrer">Open Auto3D</a>', undefined, 401); }
+    if (!user) {
+        const params = [...new URL (request.url).searchParams];
+        if (params.length > 30 || request.method !== 'GET') { return Page ('Sign in and start the connection again.', undefined, 401); }
+        const hidden = params.map (([name, value]) => '<input type="hidden" name="' + Escape (name) + '" value="' + Escape (value) + '">').join ('');
+        return Page ('<h1>Connect Auto3D</h1><p>Sign in to Auto3D in another tab, then continue here. An existing sign-in also needs this same-site continuation.</p><a href="/" target="_blank" rel="noopener noreferrer">Open Auto3D</a><form method="get">' + hidden + '<button type="submit">Continue to permissions</button></form>', undefined, 401);
+    }
     const oauth = provider.getOAuthApi (env);
     if (request.method === 'GET') {
         if (request.url.length > 8192) { return Page ('Request too large.', undefined, 400); }

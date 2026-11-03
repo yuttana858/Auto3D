@@ -82,6 +82,8 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         const response = await fetch ('/mcp'); assert.equal (response.status, 401); assert.match (response.headers.get ('WWW-Authenticate'), /oauth-protected-resource/);
     });
     it ('binds consent to its original browser and account', async () => {
+        const unsigned = await fetch ('/oauth/authorize?client_id=' + encodeURIComponent (clientId));
+        assert.equal (unsigned.status, 401); assert.match (await unsigned.text (), /Continue to permissions/);
         const flow = await begin ();
         const wrongAccount = { ...flow, cookies : flow.cookies.replace (cookieFor (userA), cookieFor (userB)) };
         assert.equal ((await approve (wrongAccount, userB)).status, 403);
