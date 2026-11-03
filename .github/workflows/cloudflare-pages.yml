@@ -78,6 +78,8 @@ jobs:
 
       - name: Verify deployed version and bundle
         run: node tools/verify_deployment.mjs https://auto3d-5av.pages.dev "${GITHUB_SHA}"
+      - name: Verify Meshy UI and credential authentication boundary
+        run: node tools/verify_meshy_deployment.mjs https://auto3d-5av.pages.dev
       - name: Verify live MCP discovery and authentication boundary
         if: steps.mcp_broker.outputs.enabled == 'true'
         run: node tools/verify_live_mcp.mjs

@@ -5914,6 +5914,62 @@
       }
     },
     {
+      "id": "ai.connection.open",
+      "title": "Manage Meshy key",
+      "category": "AI",
+      "description": "Open the private interactive Meshy key dialog. The user enters and saves the key; this command never accepts or returns credentials.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ai.connection.inspect",
+      "title": "Inspect Meshy connection",
+      "category": "AI",
+      "description": "Return whether personal key storage is available and a key is saved, without credentials.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ai.connection.remove",
+      "title": "Remove Meshy key",
+      "category": "AI",
+      "description": "Delete the signed-in account’s saved Meshy key. Does not revoke it at Meshy or cancel submitted tasks.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ai.connection.test",
+      "title": "Test Meshy connection",
+      "category": "AI",
+      "description": "Check the saved or administrator Meshy connection without submitting a paid generation task.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
       "id": "ai.workspace.inspect",
       "title": "Inspect AI project",
       "category": "AI",

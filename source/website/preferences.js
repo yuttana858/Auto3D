@@ -7,7 +7,7 @@ import { WorkspaceDialog } from './modellibrary.js';
 import { Unit } from '../engine/model/unit.js';
 import { OpenCommandPanel } from './commandpanel.js';
 
-export const AppVersion = '0.47.2';
+export const AppVersion = '0.47.3';
 
 export function AppBuildInfo ()
 {
@@ -108,7 +108,7 @@ export class Preferences
             this.SetUnits (units.value).catch ((error) => { syncStatus.textContent = error.message; });
         }); unitLabel.appendChild (units);
         const aiHeading = document.createElement ('strong'); aiHeading.textContent = 'AI connections';
-        const aiNote = document.createElement ('p'); aiNote.className = 'section_hint'; aiNote.textContent = 'Meshy connects through Auto3D using an administrator-configured server credential.';
+        const aiNote = document.createElement ('p'); aiNote.className = 'section_hint'; aiNote.textContent = 'Connect your own Meshy account to use your credits.';
         const aiActions = document.createElement ('div'); aiActions.className = 'mode_buttons';
         const testAI = document.createElement ('button'); testAI.textContent = 'Test connection';
         const aiStatus = document.createElement ('p'); aiStatus.className = 'section_hint'; aiStatus.setAttribute ('role', 'status');
@@ -118,7 +118,9 @@ export class Preferences
             catch (error) { aiStatus.textContent = error.message; }
             finally { testAI.disabled = false; }
         });
-        aiActions.append (testAI);
+        const manageAI = document.createElement ('button'); manageAI.textContent = 'Manage Meshy key';
+        manageAI.addEventListener ('click', () => { dialog.close (); this.website.aiWorkspace.OpenConnection (); });
+        aiActions.append (manageAI, testAI);
         const syncStatus = document.createElement ('p'); syncStatus.setAttribute ('role', 'status'); syncStatus.textContent = 'Theme and units are saved automatically to your account.'; this.syncStatus = syncStatus;
         const about = document.createElement ('p'); about.className = 'preferences_about';
         about.textContent = 'SW Auto3D v' + AppVersion + ' · Build ' + AppBuildInfo ().build + ' — A browser workspace for inspecting, arranging and reviewing 3D models, materials, lighting and reusable layouts. Dimensions use the units declared by the source model; unspecified units remain model units.';

@@ -17,7 +17,11 @@ Meshy also documents multi-image generation, remesh, conversion, UV unwrap and T
 
 ## Connection and requests
 
-Preferences → AI connections → Meshy uses `/api/ai` and a personal key. Remember key on this device is optional and account scoped; leave it disabled on shared computers. Keys travel in `X-Auto3D-AI-Key` to the authenticated proxy and never enter project archives. A deployment key is used only with `AUTO3D_AI_ALLOW_SHARED_KEY=true`; this release changes no secrets or shared-key settings. `MESHY_API_BASE_URL` remains an optional server-side test override.
+Preferences → AI connections → Manage Meshy key opens a private masked entry dialog. Save key encrypts a personal credential on the server for the signed-in account. Test saved connection checks Meshy's balance endpoint without submitting a generation task. Remove key deletes Auto3D's copy; it does not revoke the key at Meshy or cancel existing provider tasks. Saved keys cannot be retrieved or revealed. Entry is interactive only: agents can open the dialog but cannot pass credentials through commands or macros.
+
+The browser sends a key only on the explicit same-origin HTTPS save request. It is never kept in localStorage, sessionStorage, IndexedDB, preferences, recovery archives, AI projects or command arguments/results. Account changes close the dialog and clear entry; the entire dialog is excluded from workspace capture. Auto3D's server necessarily decrypts the credential in memory to call Meshy. A compromised application runtime or same-origin script could access credentials; encryption at rest is not protection from either. See [secure key setup](meshy-api-keys.md) for operational boundaries.
+
+The proxy prefers the account's personal key. If none exists, a deployment key is used only with `AUTO3D_AI_ALLOW_SHARED_KEY=true`. An unreadable personal key or provider rejection does not silently switch to the deployment key. Browser `X-Auto3D-AI-Key` headers remain rejected. `MESHY_API_BASE_URL` is an HTTPS-only server-side override; credentialed requests refuse redirects.
 
 Routes: GET balance; POST/GET text-to-3d, image-to-3d, text-to-image, retexture, rigging and animations; GET each task by ID. Text to 3D maps to Meshy v2, the others to v1. Allow-listed routes do not expose arbitrary upstream URLs. JSON request bodies are bounded to 28 MiB (including base64 references), upstream metadata to 4 MiB; GLB downloads stream through `/model?url=...`, restricted to HTTPS assets.meshy.ai. Private API middleware enforces account identity and same-origin writes.
 
@@ -36,3 +40,5 @@ Open AI project accepts an AI `.auto3d` file. `ai.project.open_library` opens an
 `ui.ai`, `ui.module.mode`, `ai.workspace.inspect`, `ai.creations.refresh`, `ai.creation.preview`, `ai.creation.scale`, `ai.creation.add`, `ai.creation.refine`, `ai.reference.open`, `ai.generate`, `ai.project.save`, `ai.project.open_library`, `ai.project.open_file`. The file command opens an interactive picker; generation and project saving are explicit writes. Generation fields use the same service as the UI; reference upload remains interactive.
 
 Validation uses mocked provider responses and actual textured/animated GLBs. No paid live generation was submitted in development.
+
+Personal key commands: `ai.connection.open` (interactive), `ai.connection.inspect` (status only), `ai.connection.test` (balance), and `ai.connection.remove` (explicit account mutation).
