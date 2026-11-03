@@ -125,6 +125,7 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         if (live) {
             assert.equal ((await fetch ('/api/agent/config', { headers : userHeaders (userB) })).status, 403);
             assert.equal ((await fetch ('/oauth/authorize', { headers : userHeaders (userB) })).status, 403);
+            assert.equal ((await fetch ('/api/agent/connect', { headers : { ...userHeaders (userB), Origin : origin, Upgrade : 'websocket' } })).status, 403);
         }
     });
     it ('keeps separate grants for one harness independently revocable and denies screenshots without scope', async () => {
