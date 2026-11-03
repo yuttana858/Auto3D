@@ -5,7 +5,8 @@ import path from 'node:path';
 import { chromium } from 'playwright-core';
 
 // Generated staging assets, mocked identity/API/WebSocket. No live client claim.
-const root = path.resolve ('build/mcp-pilot'), origin = 'https://auto3d-mcp-pilot.pages.dev';
+const live = process.env.MCP_TEST_LIVE === '1';
+const root = path.resolve (live ? 'build/pages' : 'build/mcp-pilot'), origin = live ? 'https://auto3d-5av.pages.dev' : 'https://auto3d-mcp-pilot.pages.dev';
 const types = { '.html' : 'text/html', '.js' : 'text/javascript', '.css' : 'text/css', '.json' : 'application/json', '.svg' : 'image/svg+xml', '.ttf' : 'font/ttf', '.woff' : 'font/woff', '.png' : 'image/png', '.wasm' : 'application/wasm' };
 const server = createServer (async (request, response) => {
     try {
@@ -25,8 +26,8 @@ try {
             let json = [];
             if (url.pathname.startsWith ('/api/auth/')) { json = { user : { id : 'test-owner', email : 'test@example.test' } }; }
             if (url.pathname === '/api/preferences') { json = { preferences : {}, folders : [] }; }
-            if (url.pathname.startsWith ('/api/accounts/')) { json = { isAdmin : false }; }
-            if (url.pathname === '/api/agent/config') { json = { pilot : true, mcpUrl : origin + '/mcp' }; }
+            if (url.pathname.startsWith ('/api/accounts/')) { json = { isAdmin : live }; }
+            if (url.pathname === '/api/agent/config') { json = { pilot : true, mode : live ? 'live-admin' : 'staging', mcpUrl : origin + '/mcp' }; }
             if (url.pathname === '/api/agent/registrations') { json = route.request ().method () === 'POST' ? { revoked : true } : { registrations : [{ id : 'grant-a', name : 'Named review agent', harness : 'chatgpt', expiresAt : Date.now () + 60000, revokedAt : null }] }; }
             if (url.pathname.startsWith ('/api/agent/admin')) { json = { disabled : false, registrations : [] }; }
             await route.fulfill ({ json }); return;
@@ -34,7 +35,7 @@ try {
         const response = await route.fetch ({ url : 'http://127.0.0.1:' + server.address ().port + url.pathname + url.search }); await route.fulfill ({ response });
     });
     let wire;
-    await page.routeWebSocket ('wss://auto3d-mcp-pilot.pages.dev/api/agent/connect', ws => {
+    await page.routeWebSocket (origin.replace ('https:', 'wss:') + '/api/agent/connect', ws => {
         wire = ws; ws.onMessage (text => {
             const message = JSON.parse (text);
             if (message.type === 'hello') { ws.send (JSON.stringify ({ type : 'hello_ack', connectionId : 'connection-a', expiresAt : Date.now () + 300000 })); }

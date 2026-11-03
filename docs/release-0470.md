@@ -1,0 +1,9 @@
+# Auto3D 0.47.0 / Packaging 1.10.3 — live administrator MCP test
+
+Adds an explicitly enabled, allowlisted administrator MCP test on the canonical live site. OAuth, registration controls and MCP HTTP endpoints run inside the existing Pages Functions and reuse the protected login and server-side identity configuration. A separate private broker Durable Object and OAuth KV namespace store only agent registrations, pairing and OAuth state. Library/R2 data and existing API routes are unchanged.
+
+Both enrollment and current administrator status are required at browser connection/renewal and consent. Token validation rechecks enrollment, account controls, current administrator membership and registration revocation. Remote tools remain restricted to scene/camera/measurement/render/session inspection and separately consented screenshots. File saves, publication, account management and arbitrary JavaScript are excluded from the remote allowlist. Tests should use an empty or disposable scene.
+
+Configuration is off by default. `AUTO3D_MCP_LIVE_ADMIN=1`, `AUTO3D_MCP_LIVE_ACCOUNTS`, canonical `AUTO3D_MCP_ORIGIN` and matching `AUTO3D_MCP_PRODUCTION_SUPABASE_URL` enable the live mode. It cannot be combined with staging mode. Pages retains its existing Supabase secrets, R2 binding and API middleware. A separate `OAUTH_KV`, `AUTO3D_AGENT_BROKER` namespace and server-only consent secret must be configured. No database migration or user credential reset is required.
+
+The user explicitly authorized live testing with the existing administrator, replacing the earlier staging-only release plan. A real ChatGPT connection still requires the administrator's interactive OAuth sign-in/consent and browser connection. Local simulated clients, discovery probes and successful deployment must not be reported as a real ChatGPT test.

@@ -4,13 +4,15 @@ import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 
 // Real workerd/DO/KV and OAuth library; identity is a disposable in-process fixture.
 // These tests make no requests to Supabase, Cloudflare or ChatGPT.
-const origin = 'https://auto3d-mcp-pilot.pages.dev';
 const userA = '11111111-1111-4111-8111-111111111111', userB = '22222222-2222-4222-8222-222222222222';
 const tokenFor = id => 'e30.' + Buffer.from (JSON.stringify ({ sub : id, session_id : id })).toString ('base64url') + '.fixture';
 const cookieFor = id => '__Host-auto3d-access=' + tokenFor (id);
-const bindings = { AUTO3D_MCP_PILOT : '1', AUTO3D_MCP_ORIGIN : origin, AUTO3D_MCP_PILOT_ACCOUNTS : [userA, userB].join (','), AUTO3D_MCP_STAGING_SUPABASE_URL : 'https://stagingtest.supabase.co', AUTO3D_MCP_PRODUCTION_SUPABASE_URL : 'https://productiontest.supabase.co', SUPABASE_URL : 'https://stagingtest.supabase.co', SUPABASE_SECRET_KEY : 'sb_secret_disposable_test_fixture', AUTO3D_MCP_CONSENT_SECRET : 'a'.repeat (43) };
+const baseBindings = { AUTO3D_MCP_PILOT : '1', AUTO3D_MCP_ORIGIN : 'https://auto3d-mcp-pilot.pages.dev', AUTO3D_MCP_PILOT_ACCOUNTS : [userA, userB].join (','), AUTO3D_MCP_STAGING_SUPABASE_URL : 'https://stagingtest.supabase.co', AUTO3D_MCP_PRODUCTION_SUPABASE_URL : 'https://productiontest.supabase.co', SUPABASE_URL : 'https://stagingtest.supabase.co', SUPABASE_SECRET_KEY : 'sb_secret_disposable_test_fixture', AUTO3D_MCP_CONSENT_SECRET : 'a'.repeat (43) };
 
-describe ('MCP pilot on the Workers runtime', function () {
+for (const live of [false, true]) {
+const origin = live ? 'https://auto3d-5av.pages.dev' : 'https://auto3d-mcp-pilot.pages.dev';
+const bindings = live ? { ...baseBindings, AUTO3D_MCP_PILOT : '0', AUTO3D_MCP_LIVE_ADMIN : '1', AUTO3D_MCP_ORIGIN : origin, AUTO3D_MCP_LIVE_ACCOUNTS : [userA, userB].join (','), AUTO3D_MCP_PRODUCTION_SUPABASE_URL : baseBindings.SUPABASE_URL } : baseBindings;
+describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers runtime', function () {
     this.timeout (30000);
     let mf, nextId = 0, clientId, socket;
     const inactive = new Set ();
@@ -49,6 +51,7 @@ describe ('MCP pilot on the Workers runtime', function () {
     before (async () => {
         const outboundService = async request => {
             const url = new URL (request.url); assert.equal (url.hostname, 'stagingtest.supabase.co');
+            if (url.pathname.startsWith ('/auth/v1/admin/users/')) { const id = url.pathname.split ('/').pop (); return Response.json ({ id, email : id + '@example.test', email_confirmed_at : '2026-01-01T00:00:00Z' }); }
             if (url.pathname === '/auth/v1/user') {
                 const token = request.headers.get ('Authorization')?.slice (7), id = token ? JSON.parse (Buffer.from (token.split ('.')[1], 'base64url')).sub : null;
                 return Response.json ({ id, email : id + '@example.test', email_confirmed_at : '2026-01-01T00:00:00Z' });
@@ -61,7 +64,7 @@ describe ('MCP pilot on the Workers runtime', function () {
         const worker = role => ({ name : role, modules : true, scriptPath : path.resolve ('build/mcp-workers/' + role + '.js'), compatibilityDate : '2026-11-03', compatibilityFlags : ['nodejs_compat', 'global_fetch_strictly_public'], bindings, outboundService });
         const durableObjects = { AUTO3D_AGENT_BROKER : { className : 'Auto3DAgentBroker', scriptName : 'broker', storage : 'sqlite' } };
         mf = new Miniflare (convertV4MiniflareOptions ({ workers : [
-            { ...worker ('pages-worker'), serviceBindings : { AUTO3D_MCP_AUTH : 'auth', AUTO3D_MCP_GATEWAY : 'gateway', AUTO3D_MCP_RESOURCE : 'resource', ASSETS : () => Response.json ({ static : true }) } },
+            { ...worker (live ? 'live' : 'pages-worker'), durableObjects, kvNamespaces : live ? ['OAUTH_KV'] : undefined, serviceBindings : { AUTO3D_MCP_AUTH : 'auth', AUTO3D_MCP_GATEWAY : 'gateway', AUTO3D_MCP_RESOURCE : 'resource', ASSETS : () => Response.json ({ static : true }) } },
             { ...worker ('broker'), durableObjects },
             { ...worker ('auth'), durableObjects, kvNamespaces : ['OAUTH_KV'] },
             { ...worker ('gateway'), durableObjects },
@@ -93,14 +96,14 @@ describe ('MCP pilot on the Workers runtime', function () {
         const token = await grant (); const auth = await mf.getWorker ('auth'); assert.equal (await auth.validateToken ('https://other.example/mcp', token.access_token), null);
     });
     it ('keeps accounts, browser windows and selected sessions separate through real MCP calls', async () => {
-        const token = await grant (), other = await grant (userB);
+        const token = await grant (), other = live ? null : await grant (userB);
         const upgrade = await fetch ('/api/agent/connect', { headers : { Cookie : cookieFor (userA), Origin : origin, Upgrade : 'websocket' } }); assert.equal (upgrade.status, 101);
         socket = upgrade.webSocket; socket.accept (); const ack = message (socket);
         socket.send (JSON.stringify ({ type : 'hello', instanceId : 'window-a', windowLabel : 'Review window', sessions : [{ id : 'tab-a', name : 'Test box', active : true }] }));
         const hello = await ack;
         const initialized = await rpc (token.access_token, 'initialize', { protocolVersion : '2025-03-26', capabilities : {}, clientInfo : { name : 'test client', version : '1' } }); assert.equal (initialized.status, 200);
         const tools = await (await rpc (token.access_token, 'tools/list')).json (); assert.ok (!tools.result.tools.some (tool => tool.name === 'capture.image' || tool.name === 'auth.sign_out'));
-        const otherList = await (await rpc (other.access_token, 'tools/call', { name : 'auto3d.sessions.list', arguments : {} })).json (); assert.deepEqual (JSON.parse (otherList.result.content[0].text), []);
+        if (other) { const otherList = await (await rpc (other.access_token, 'tools/call', { name : 'auto3d.sessions.list', arguments : {} })).json (); assert.deepEqual (JSON.parse (otherList.result.content[0].text), []); }
         const selected = await rpc (token.access_token, 'tools/call', { name : 'auto3d.sessions.select', arguments : { connectionId : hello.connectionId, sessionId : 'tab-a' } }); assert.equal (selected.status, 200);
         const waiting = message (socket); // access_changed from pairing is sent before dispatch
         const inspectPromise = rpc (token.access_token, 'tools/call', { name : 'scene.inspect', arguments : {} });
@@ -114,11 +117,15 @@ describe ('MCP pilot on the Workers runtime', function () {
         const refreshed = await fetch ('/oauth/oauth/token', { method : 'POST', headers : { 'Content-Type' : 'application/x-www-form-urlencoded' }, body : new URLSearchParams ({ grant_type : 'refresh_token', refresh_token : token.refresh_token, client_id : clientId, resource : origin + '/mcp' }).toString () }); assert.equal (refreshed.status, 400);
     });
     it ('blocks production data routes, forged origins, account mismatches and non-admin controls', async () => {
-        assert.equal ((await post ('/api/personal/items', {})).status, 403);
+        assert.ok ([403, 404].includes ((await post ('/api/personal/items', {})).status));
         assert.equal ((await fetch ('/api/agent/registrations', { headers : { Cookie : cookieFor (userA), 'X-Auto3D-Account' : userB } })).status, 409);
         assert.equal ((await fetch ('/api/agent/renew', { method : 'POST', headers : { ...userHeaders (userA), Origin : 'https://evil.example', 'Content-Type' : 'application/json' }, body : '{}' })).status, 403);
         assert.equal ((await post ('/api/agent/admin', { accountId : userA, action : 'disable', disabled : true }, userB)).status, 403);
         assert.equal ((await post ('/api/agent/admin', { accountId : userB, action : 'disable', disabled : true })).status, 200);
+        if (live) {
+            assert.equal ((await fetch ('/api/agent/config', { headers : userHeaders (userB) })).status, 403);
+            assert.equal ((await fetch ('/oauth/authorize', { headers : userHeaders (userB) })).status, 403);
+        }
     });
     it ('keeps separate grants for one harness independently revocable and denies screenshots without scope', async () => {
         const first = await grant (), second = await grant ();
@@ -140,3 +147,5 @@ describe ('MCP pilot on the Workers runtime', function () {
         inactive.add (userA); assert.equal ((await rpc (token.access_token, 'tools/list')).status, 401); inactive.delete (userA);
     });
 });
+
+}

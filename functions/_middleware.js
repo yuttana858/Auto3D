@@ -1,7 +1,12 @@
 import { AccessCookie, LoggedOutCookie, AuthCookies, AuthResponse, VerifiedUser } from './_lib/auth.js';
+import { LiveMcpPath } from '../mcp/common.js';
 export async function onRequest (context)
 {
     const path = new URL (context.request.url).pathname;
+    if (LiveMcpPath (path)) {
+        if (context.env.AUTO3D_MCP_LIVE_ADMIN !== '1') { return AuthResponse ({ error : 'Not found.' }, 404); }
+        const { HandleLiveMcp } = await import ('../mcp/live.js'); return HandleLiveMcp (context);
+    }
     const protectedFile = /\.(?:auto3d|glb|gltf|obj|stl|step|stp|iges|igs|3mf|3dm|3ds|dae|fbx|ply|off|bim|brep|fcstd|wrl|amf|zae|zip)$/i.test (path);
     if (!protectedFile && !path.endsWith ('embed.html')) { return context.next (); }
     const cookies = AuthCookies (context.request);

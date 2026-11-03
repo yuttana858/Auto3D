@@ -41,9 +41,11 @@ jobs:
 
       - run: npm ci
       - run: npm run lint
+      - run: npm run lint_mcp
       - run: npm run check_licenses
       - run: npm run audit_prod
       - run: npm test
+      - run: npm run test_mcp
       - name: Verify audience-sharing database permissions and throttling
         shell: bash
         run: |
@@ -54,6 +56,10 @@ jobs:
       - run: npm --prefix backend test
       - run: npm run build_website
       - run: node tools/build_pages.mjs
+      - run: node tools/check_mcp_licenses.mjs build/pages/MCP-LICENSES.txt
+      - name: Check configured private live MCP broker
+        id: mcp_broker
+        run: node tools/deploy_live_mcp_broker.mjs --check
 
       - name: Ensure Cloudflare Pages project exists
         shell: bash
@@ -72,3 +78,6 @@ jobs:
 
       - name: Verify deployed version and bundle
         run: node tools/verify_deployment.mjs https://auto3d-5av.pages.dev "${GITHUB_SHA}"
+      - name: Verify live MCP discovery and authentication boundary
+        if: steps.mcp_broker.outputs.enabled == 'true'
+        run: node tools/verify_live_mcp.mjs

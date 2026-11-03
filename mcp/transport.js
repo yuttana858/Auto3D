@@ -7,7 +7,7 @@ import { ReadBytes } from './common.js';
 export async function HandleMcp (request, service, actor)
 {
     await service.Assert (actor);
-    const server = new Server ({ name : 'Auto3D staging', version : '0.1.0' }, { capabilities : { tools : {} } });
+    const server = new Server ({ name : 'Auto3D', version : '0.1.0' }, { capabilities : { tools : {} } });
     server.setRequestHandler (ListToolsRequestSchema, async () => { await service.Assert (actor); return { tools : [
         { name : 'auto3d.sessions.list', description : 'List this account’s connected browser windows and sessions.', inputSchema : { type : 'object', properties : {}, additionalProperties : false }, annotations : { readOnlyHint : true } },
         { name : 'auto3d.sessions.select', description : 'Pair with an active session explicitly chosen by the user. Does not edit the scene.', inputSchema : { type : 'object', properties : { connectionId : { type : 'string' }, sessionId : { type : 'string' } }, required : ['connectionId', 'sessionId'], additionalProperties : false }, annotations : { readOnlyHint : false, destructiveHint : false, idempotentHint : false } },

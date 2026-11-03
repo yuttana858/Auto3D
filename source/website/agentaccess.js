@@ -35,7 +35,7 @@ export class AgentAccess
     {
         if (typeof windowLabel !== 'string' || !windowLabel.trim () || windowLabel.length > 80 || typeof screenshots !== 'boolean') { throw new Error ('Enter a window name and screenshot preference.'); }
         const owner = this.Account (), config = await this.Request ('config');
-        if (!config.pilot || location.origin !== 'https://auto3d-mcp-pilot.pages.dev') { throw new Error ('The isolated MCP pilot is unavailable here.'); }
+        if (!config.pilot || !['https://auto3d-mcp-pilot.pages.dev', 'https://auto3d-5av.pages.dev'].includes (location.origin) || config.mcpUrl !== location.origin + '/mcp') { throw new Error ('MCP access is unavailable here.'); }
         this.Disconnect (); this.accountId = owner; this.screenshots = screenshots; this.status = 'Connecting'; const generation = this.generation;
         const socket = new WebSocket (location.origin.replace ('https:', 'wss:') + '/api/agent/connect'); this.socket = socket;
         socket.addEventListener ('message', event => { this.Message (event, socket, generation).catch (() => this.Disconnect ()); });
@@ -87,7 +87,7 @@ export class AgentAccess
     {
         const config = await this.Request ('config'), dialog = WorkspaceDialog ('Agent access'); dialog.dataset.capturePrivate = '';
         const form = document.createElement ('div'); form.className = 'workspace_save_form';
-        const note = document.createElement ('p'); note.textContent = 'Staging pilot · Connect your OAuth client to ' + config.mcpUrl + '. Approve each named registration, then select this window and session. Remote tools can inspect; screenshots require permission here and in OAuth.';
+        const note = document.createElement ('p'); note.textContent = (config.mode === 'live-admin' ? 'Administrator live test · ' : 'Staging pilot · ') + 'Connect your OAuth client to ' + config.mcpUrl + '. Approve each named registration, then select this window and session. Remote tools can inspect; screenshots require permission here and in OAuth.';
         const name = document.createElement ('input'); name.placeholder = 'Window name'; name.setAttribute ('aria-label', 'Window name'); name.maxLength = 80;
         const captureLabel = document.createElement ('label'), capture = document.createElement ('input'); capture.type = 'checkbox'; captureLabel.append (capture, 'Allow screenshots from this window');
         const status = document.createElement ('p'); status.setAttribute ('role', 'status'); status.textContent = this.status;

@@ -42,7 +42,7 @@ export async function Consent (request, env, provider, identity = BrowserIdentit
     const config = PilotConfig (env);
     if (request.method === 'POST' && request.headers.get ('Origin') !== config.origin) { return Page ('Invalid origin.', undefined, 403); }
     const user = await identity (request, env);
-    if (!user) { return Page ('<h1>Connect Auto3D</h1><p>Sign in to the staging app in another tab, then retry this connection.</p><a href="/" target="_blank" rel="noopener noreferrer">Open Auto3D staging</a>', undefined, 401); }
+    if (!user) { return Page ('<h1>Connect Auto3D</h1><p>Sign in to Auto3D in another tab, then retry this connection.</p><a href="/" target="_blank" rel="noopener noreferrer">Open Auto3D</a>', undefined, 401); }
     const oauth = provider.getOAuthApi (env);
     if (request.method === 'GET') {
         if (request.url.length > 8192) { return Page ('Request too large.', undefined, 400); }

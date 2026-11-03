@@ -1,5 +1,7 @@
 # Isolated MCP pilot and agent registrations
 
+The user has subsequently authorized a limited live-site test using the existing administrator. See [release-0470.md](release-0470.md). That explicit live-admin mode uses the existing Pages identity configuration, a separate private broker and OAuth KV, and requires enrollment plus current administrator status. The staging plan below remains available; it is not a prerequisite for this separately authorized live-admin test.
+
 This candidate rebuilds the missing MCP source from the available app and the design observed in the private staging Workers. It is not a production release. The application remains 0.46.0 and Packaging remains 1.10.3 until the pilot is validated.
 
 ## Authorization design

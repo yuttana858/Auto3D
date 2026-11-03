@@ -1,4 +1,5 @@
 import { Blob } from 'node:buffer';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { AccountPreferenceState, Preferences, AppBuildInfo } from '../source/website/preferences.js';
 import { Settings, CameraSettings } from '../source/website/settings.js';
@@ -49,6 +50,6 @@ describe ('Account viewport preferences and unsaved recovery', () => {
         assert.equal ((await commands.Execute ('session.recovery.inspect', {})).ok, true);
         assert.equal ((await commands.Execute ('session.recovery.restore', { arbitrary : true })).ok, false);
         const result = await commands.RunMacro ({ version : 1, steps : [{ id : 'restore', command : 'session.recovery.restore', arguments : {} }] }); assert.equal (result.ok, true, JSON.stringify (result));
-        assert.equal (AppBuildInfo ().version, '0.46.0');
+        assert.equal (AppBuildInfo ().version, JSON.parse (readFileSync (new URL ('../package.json', import.meta.url), 'utf8')).version);
     });
 });
