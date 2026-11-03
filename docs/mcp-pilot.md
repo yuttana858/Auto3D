@@ -1,0 +1,67 @@
+# Isolated MCP pilot and agent registrations
+
+This candidate rebuilds the missing MCP source from the available app and the design observed in the private staging Workers. It is not a production release. The application remains 0.46.0 and Packaging remains 1.10.3 until the pilot is validated.
+
+## Authorization design
+
+Use the maintained Cloudflare OAuth provider for discovery, exact redirect validation, PKCE, browser-bound single-use consent, resource-bound tokens and refresh rotation. Each authorization creates a named registration owned by one account. Registrations identify the harness (ChatGPT, desktop, CLI or another OAuth client), client ID, scopes, creation/expiry and revocation. Names are labels supplied by the user, not verified client identities. Consent displays the client's actual domain and redirect host separately.
+
+OAuth-capable clients receive individual revocable grants. Public desktop/CLI clients use authorization code plus S256 PKCE and a loopback callback; confidential hosted clients use the provider's supported client authentication. No shared bearer key, personal API key, client-secret generator or password field is exposed by Auto3D. Harnesses without supported OAuth need a separately reviewed adapter; they cannot bypass consent using an application credential. Dynamic client registration identifies software and does not grant account access.
+
+Per-account Durable Object registrations add strongly consistent revocation to the provider's KV-backed grants. Resource calls and refreshes check registration state. User revoke immediately denies subsequent calls, pairing and result delivery. Administrators can inspect/revoke an account's registrations and disable its agent access. Re-enabling never restores old registrations. Normal account disable/session invalidation is checked in addition to agent revocation. No tokens or secrets appear in registration lists.
+
+## Browser and session boundary
+
+The user explicitly connects a browser window. Same-origin session-cookie authentication creates a short-lived WebSocket lease; renewal verifies the same account and login session. One account has one broker, with independent connections per window. Agents must list and explicitly select a currently active session. Switching tabs, account changes, logout, lease expiry, revocation or disconnect rejects stale requests and results. Reconnect does not replay requests. Browser commands still use the existing CommandRegistry, schemas, account checks and read-only guards.
+
+The initial tool allowlist is read-only: scene, current camera, packaging measurements, render queue and session-tab inspection. Screenshots require both an OAuth capture scope and a browser-window opt-in. No model import, save, publication, arbitrary JavaScript, credentials or administrative mutation is remotely exposed. User/admin registration controls have local stable commands but are excluded from the remote allowlist.
+
+## Staging isolation and release gates
+
+Only `https://auto3d-mcp-pilot.pages.dev` may host the pilot. All Workers have public workers.dev access disabled and communicate through bindings. The pilot app blocks production Library, preferences, sharing, AI and account-management endpoints; no production R2 binding is required. Identity must be configured against a separate staging Supabase project with the existing account/session schema and disposable accounts. Both identity-project isolation and an explicit pilot-account allowlist are deployment prerequisites. Never copy the production service key into a new test fixture.
+
+Before production is proposed: build every Worker and Pages artifact; run OAuth/PKCE/consent/revocation tests, account/window/tab isolation tests and browser checks; deploy staging only; verify discovery and login with two disposable accounts; connect a real ChatGPT client and call list/select/inspect/capture with revocation checks. Record the actual result. A mocked SDK client or passing build is not evidence of a working ChatGPT connection.
+
+The private session log stays at `/workspace/auto3d-private/project-status.md`, outside this repository. Never commit credentials or private progress notes.
+
+## Build and checks
+
+```sh
+npm ci
+npm run lint
+npm run lint_mcp
+npm test
+npm run test_mcp
+npm run build_mcp_pilot
+node test/browser/mcp-access.mjs
+```
+
+The dedicated GitHub workflow runs these checks and uploads the staging artifact; it never deploys. The runtime integration uses actual workerd, Durable Objects, KV, OAuth and MCP libraries, with a disposable identity fixture. The Chromium test uses generated assets with mocked identity and WebSocket endpoints. Neither tests a real ChatGPT connection.
+
+Build output is `build/mcp-pilot` plus four bundles in `build/mcp-workers`. The Pages artifact has its own advanced-mode `_worker.js`; it does not include the production data Functions. MCP library dependencies are pinned build inputs and bundled with license notices in `MCP-LICENSES.txt`. The existing published engine dependencies and MIT-only license policy remain unchanged.
+
+## Required staging setup
+
+1. Supply a separate Supabase test project. The existing pilot Pages configuration was found to have `SUPABASE_URL` pointing to a website rather than a Supabase API. Correct it using the staging project's actual `https://<ref>.supabase.co` URL and staging-only server secret. Prepare the current server-only session RPC, account controls and administrator allowlist; do not replay archived PR16 SQL or copy production users. Create two disposable confirmed accounts and a staging administrator.
+2. Configure the following non-secret environment inputs before running `npm run prepare_mcp_staging`: `AUTO3D_MCP_PILOT_ACCOUNTS` (comma-separated staging account UUIDs), `AUTO3D_MCP_STAGING_SUPABASE_URL`, `AUTO3D_MCP_PRODUCTION_SUPABASE_URL` (used to reject accidental production identity), and `AUTO3D_MCP_OAUTH_KV_ID` (the staging provider KV namespace). The generated files live under ignored `build/mcp-config`. No credentials are written by this command.
+3. Keep `SUPABASE_SECRET_KEY` configured as a secret on the auth, gateway, resource and pilot Pages services, using the staging key. The auth Worker also needs its existing `AUTO3D_MCP_CONSENT_SECRET`. Names and values must never go into source or command arguments. Use Cloudflare secret input or the connector's secure secret workflow. No end-user agent API secret is needed.
+4. For local upload, configure the managed environment's `CLOUDFLARE_API_TOKEN` HTTP credential and allow `api.cloudflare.com`; permit the exact pilot Pages and staging identity hosts for live verification. The Cloudflare connector and the shell HTTP credential are independent. Keep all four Workers private; do not enable workers.dev or preview URLs to bypass staging routing.
+
+After prerequisites are verified, the reviewed staging-only commands are:
+
+```sh
+npm run prepare_mcp_staging
+npx wrangler deploy --config build/mcp-config/broker.json
+npx wrangler deploy --config build/mcp-config/auth.json
+npx wrangler deploy --config build/mcp-config/gateway.json
+npx wrangler deploy --config build/mcp-config/resource.json
+npx wrangler pages deploy build/mcp-pilot --config build/mcp-config/pages.json --project-name=auto3d-mcp-pilot --branch=main
+```
+
+`main` here selects the isolated pilot project's canonical origin; it does not deploy the production `auto3d` project. Existing broker migration `v1` is preserved. Do not use fixture configurations produced by tests for deployment. Check remote bindings before upload, especially the absence of production R2 and the correct staging identity key.
+
+## Live client acceptance
+
+With the pilot deployed, add a custom OAuth MCP connection in ChatGPT using `https://auto3d-mcp-pilot.pages.dev/mcp` (Developer mode/custom app availability depends on the account). Sign in with a disposable staging account and approve a named grant. In Auto3D staging, open Preferences → Agent access, connect a named window and explicitly opt in to screenshots if needed. In ChatGPT, call `auto3d.sessions.list`, have the user identify the intended active session, call `auto3d.sessions.select`, and then `scene.inspect`. Request screenshot scope through OAuth before calling `capture.image`; browser screenshot opt-in is also required.
+
+Repeat with another test account and window; confirm no cross-account sessions or data appear. Switch the selected tab and confirm requests fail until explicitly paired again. Revoke access in the user controls, and then through the staging administrator controls; verify further requests and refresh fail. Disconnect/logout and verify the browser lease ends. Record dates, client, grant scope and actual outcomes in the private log without tokens. Production remains gated on this real-client evidence.

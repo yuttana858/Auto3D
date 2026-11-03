@@ -60,9 +60,15 @@
 		"build_command_catalog": "node tools/generate_command_catalog.mjs",
 		"build_website": "node tools/build_packaging.mjs build/website/packaging && npm run build_command_catalog && esbuild source/website/index.js --bundle --minify --define:import.meta.url=document.currentScript.src --global-name=OV --loader:.ttf=file --loader:.woff=file --loader:.svg=file --outfile=build/website/o3dv.website.min.js && esbuild source/website/sessionrecoveryworker.js --bundle --minify --outfile=build/website/o3dv.recovery.js && esbuild source/website/polygonworker.js --bundle --minify --outfile=build/website/o3dv.optimize.js && node tools/prepare_animation_decoders.mjs build/website && esbuild source/website/miniviewer.js --bundle --minify --define:import.meta.url=document.currentScript.src --outfile=build/website/o3dv.mini.js",
 		"update_engine_exports": "run-python3 tools/update_engine_exports.py",
-		"test_browser_animation": "node test/browser/animation.mjs"
+		"test_browser_animation": "node test/browser/animation.mjs",
+		"test_mcp": "node tools/build_mcp_workers.mjs && mocha test/mcp",
+		"build_mcp_pilot": "npm run build_website && node tools/build_pages.mjs && node tools/build_mcp_pilot.mjs && node tools/check_mcp_licenses.mjs build/mcp-pilot/MCP-LICENSES.txt",
+		"prepare_mcp_staging": "node tools/prepare_mcp_staging.mjs",
+		"lint_mcp": "eslint mcp --env es2021,worker --parser-options '{\"ecmaVersion\":2022,\"sourceType\":\"module\"}'"
 	},
 	"devDependencies": {
+		"@cloudflare/workers-oauth-provider": "1.2.4",
+		"@modelcontextprotocol/sdk": "1.32.2",
 		"@types/node": "^22.20.5",
 		"esbuild": "^0.28.2",
 		"eslint": "^8.57.1",
@@ -70,13 +76,15 @@
 		"fantasticon": "^1.2.2",
 		"http-server": "^14.0.0",
 		"jsdoc": "^4.0.5",
+		"miniflare": "5.20261103.0-beta",
 		"mocha": "^11.8.0",
 		"oslllo-svg-fixer": "^3.0.0",
 		"playwright-core": "1.63.0",
 		"rollup": "^4.64.0",
 		"run-python3": "^0.0.5",
 		"svgo": "^3.3.5",
-		"typescript": "^5.9.3"
+		"typescript": "^5.9.3",
+		"wrangler": "4.157.0"
 	},
 	"dependencies": {
 		"@simonwep/pickr": "1.9.0",

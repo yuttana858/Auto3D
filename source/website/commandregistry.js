@@ -1,4 +1,4 @@
-function Validate (value, schema, path = 'arguments')
+export function Validate (value, schema, path = 'arguments')
 {
     if (schema.anyOf) { for (const alternative of schema.anyOf) { try { Validate (value, alternative, path); return; } catch { /* Try the next declared schema. */ } } throw new Error (path + ' does not match an allowed value type.'); }
     if (schema.type === 'null') { if (value !== null) { throw new Error (path + ' must be null.'); } return; }
@@ -16,6 +16,7 @@ function Validate (value, schema, path = 'arguments')
         if (schema.type === 'integer' ? !Number.isInteger (value) : typeof value !== schema.type || (schema.type === 'number' && !Number.isFinite (value))) { throw new Error (path + ' must be a finite ' + schema.type + '.'); }
         if (schema.minimum !== undefined && value < schema.minimum || schema.maximum !== undefined && value > schema.maximum) { throw new Error (path + ' is out of range.'); }
         if (schema.enum && !schema.enum.includes (value)) { throw new Error (path + ' must be one of: ' + schema.enum.join (', ')); }
+        if (typeof value === 'string' && (schema.minLength !== undefined && value.length < schema.minLength || schema.maxLength !== undefined && value.length > schema.maxLength || schema.pattern && !new RegExp (schema.pattern).test (value))) { throw new Error (path + ' has an invalid format or length.'); }
     }
 }
 

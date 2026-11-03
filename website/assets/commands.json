@@ -2,6 +2,217 @@
   "apiVersion": 1,
   "commands": [
     {
+      "id": "agent.access.open",
+      "title": "Open agent access",
+      "category": "Account",
+      "description": "Open the interactive staging OAuth registration and browser-window connection controls. Does not grant access or connect a client by itself.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "agent.access.inspect",
+      "title": "Inspect browser agent connection",
+      "category": "Account",
+      "description": "Read this browser window connection state without credentials.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "agent.access.connect",
+      "title": "Connect this browser window",
+      "category": "Account",
+      "description": "Explicitly share this staging browser window with individually authorized OAuth agents. Screenshots need a separate opt-in and OAuth scope. Does not pair a remote client automatically.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "windowLabel": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "screenshots": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "windowLabel"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "windowLabel": "Packaging review",
+        "screenshots": false
+      }
+    },
+    {
+      "id": "agent.access.disconnect",
+      "title": "Disconnect this browser window",
+      "category": "Account",
+      "description": "End this browser window agent connection. Does not revoke independent OAuth registrations.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "agent.registrations.list",
+      "title": "List my agent registrations",
+      "category": "Account",
+      "description": "Read named staging OAuth registrations, permissions and revocation state without tokens.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "agent.registrations.revoke",
+      "title": "Revoke an agent registration",
+      "category": "Account",
+      "description": "Immediately revoke this account registration and its session pairing.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "registration-id-from-list"
+      }
+    },
+    {
+      "id": "admin.agents.open",
+      "title": "Open agent administration",
+      "category": "Administration",
+      "description": "Open interactive staging agent controls. Server administrator authorization is required for every operation.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "admin.agents.list",
+      "title": "List account agent registrations",
+      "category": "Administration",
+      "description": "Inspect a pilot account registrations; verified administrator access required.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "accountId"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "accountId": "pilot-account-id"
+      }
+    },
+    {
+      "id": "admin.agents.revoke",
+      "title": "Revoke account agent registration",
+      "category": "Administration",
+      "description": "Revoke one pilot account agent registration; verified administrator access required.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "accountId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "accountId": "pilot-account-id",
+        "id": "registration-id-from-list"
+      }
+    },
+    {
+      "id": "admin.agents.disable",
+      "title": "Control account agent access",
+      "category": "Administration",
+      "description": "Disable or re-enable pilot account agent access. Disabling revokes existing registrations; re-enabling never restores them. Administrator only.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "disabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "accountId",
+          "disabled"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "accountId": "pilot-account-id",
+        "disabled": true
+      }
+    },
+    {
       "id": "capture.image",
       "title": "Capture app screenshot",
       "category": "Capture",
