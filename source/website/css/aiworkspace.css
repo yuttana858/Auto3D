@@ -124,6 +124,31 @@
     line-height: 1.45;
 }
 
+.ai_generate_button
+{
+    width: 100%;
+    margin-top: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--ov_button_color);
+    border-radius: 5px;
+    background: var(--ov_button_color);
+    color: var(--ov_button_text_color);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.ai_generate_button:hover:not(:disabled)
+{
+    filter: brightness(1.08);
+}
+
+.ai_generate_button:disabled
+{
+    opacity: .5;
+    cursor: default;
+}
+
 .ai_image_row
 {
     display: flex;

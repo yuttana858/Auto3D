@@ -51,6 +51,14 @@ describe ('Extended AI workspace services', () => {
    if (action === 'image3d') { assert.equal (body.input_task_id, 'model'); assert.equal (body.target_polycount, 30000); }
   }
  });
+ it ('Chooses text-to-3D by default and image-to-3D for an uploaded or selected image', () => {
+  const { workspace } = Workspace (); Object.assign (workspace, { prompt : { value : 'A red bottle' }, imageFile : null });
+  assert.equal (workspace.PrimaryGenerationAction (), 'text3d');
+  workspace.prompt.value = ''; workspace.recent[0].imageUrl = 'https://assets.meshy.ai/reference.png';
+  assert.equal (workspace.PrimaryGenerationAction (), 'image3d');
+  workspace.recent[0].imageUrl = null; workspace.imageFile = { type : 'image/png' };
+  assert.equal (workspace.PrimaryGenerationAction (), 'image3d');
+ });
  it ('Rejects unavailable references, invalid rigs, read-only work and strict command extras before submission', async () => {
   const { workspace, requests } = Workspace (); for (const options of [{ action : 'image3d' }, { action : 'animations' }, { action : 'text3d' }, { action : 'rigging', height : -1 }, { action : 'texture', prompt : 'x'.repeat (801) }]) { await assert.rejects (() => workspace.Generate (options)); } assert.deepEqual (requests, []);
   workspace.website.sessionEditor.readOnly = true; await assert.rejects (() => workspace.Generate ({ action : 'text3d', prompt : 'x' }), /editable/);

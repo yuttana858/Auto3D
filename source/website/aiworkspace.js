@@ -113,6 +113,12 @@ export class AIWorkspace
         const inputSection = Element ('div', 'ai_workspace_section ai_input_section', undefined, this.aiPane);
         Element ('strong', null, 'Create', inputSection);
         this.prompt = Element ('textarea', 'ai_prompt', undefined, inputSection); this.prompt.rows = 4; this.prompt.maxLength = 800; this.prompt.placeholder = 'Describe the object, image, or texture you want to create…'; this.prompt.setAttribute ('aria-label', 'AI generation prompt'); this.prompt.addEventListener ('input', () => this.RefreshActions ());
+        this.generateButton = Element ('button', 'ai_generate_button', 'Generate', inputSection); this.generateButton.type = 'button'; this.generateButton.setAttribute ('aria-keyshortcuts', 'Enter');
+        this.generateButton.addEventListener ('click', () => this.Run (() => this.Generate (this.UIOptions (this.PrimaryGenerationAction ()))));
+        this.prompt.addEventListener ('keydown', event => {
+            if (event.key !== 'Enter' || event.shiftKey || event.isComposing || event.repeat || this.generateButton.disabled) { return; }
+            event.preventDefault (); this.generateButton.click ();
+        });
 
         const generationOptions = Element ('div', 'ai_generation_options', undefined, inputSection);
         const detailLabel = Element ('label', null, '3D detail', generationOptions);
@@ -214,11 +220,15 @@ export class AIWorkspace
     {
         if (!this.actionButtons) { return; }
         const connected = this.settings.provider === 'meshy';
-        this.actionButtons.get ('text3d').disabled = !connected || !this.prompt?.value.trim ();
-        this.actionButtons.get ('image3d').disabled = !connected || (!this.imageFile && !this.recent.find (item => item.id === this.selectedTask)?.imageUrl);
-        this.actionButtons.get ('textimage').disabled = !connected || !this.prompt?.value.trim ();
         const selected = this.recent.find (item => item.id === this.selectedTask);
-        this.actionButtons.get ('texture').disabled = !connected || (!selected?.modelUrl && !this.assets.has (selected?.id)) || (!this.prompt?.value.trim () && !this.imageFile);
+        const hasPrompt = !!this.prompt?.value.trim ();
+        const hasImage = !!this.imageFile || !!selected?.imageUrl;
+        const busy = !!this.submitting;
+        if (this.generateButton) { this.generateButton.disabled = !connected || busy || (this.PrimaryGenerationAction () === 'text3d' ? !hasPrompt : !hasImage); }
+        this.actionButtons.get ('text3d').disabled = !connected || busy || !hasPrompt;
+        this.actionButtons.get ('image3d').disabled = !connected || busy || !hasImage;
+        this.actionButtons.get ('textimage').disabled = !connected || busy || !hasPrompt;
+        this.actionButtons.get ('texture').disabled = !connected || busy || (!selected?.modelUrl && !this.assets.has (selected?.id)) || (!hasPrompt && !this.imageFile);
         if (this.addButton) { this.addButton.disabled = !this.assets.has (this.selectedTask); }
     }
 
@@ -292,6 +302,11 @@ export class AIWorkspace
     UIOptions (action)
     {
         return { action, prompt : this.prompt.value.trim (), detail : this.detailSelect.value, pbr : this.pbrCheckbox.checked, textureResolution : this.textureResolution.value, imageModel : this.imageModel.value, aspect : this.aspect.value, taskId : this.selectedTask };
+    }
+    PrimaryGenerationAction ()
+    {
+        const selected = this.recent.find (item => item.id === this.selectedTask);
+        return this.imageFile || (!this.prompt.value.trim () && selected?.imageUrl) ? 'image3d' : 'text3d';
     }
     async ReferenceImage ()
     {

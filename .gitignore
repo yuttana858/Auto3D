@@ -3,3 +3,4 @@ plugins/*
 node_modules
 __pycache__
 work/
+/backend/.env

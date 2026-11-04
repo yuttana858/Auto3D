@@ -21,8 +21,7 @@ The full contract is in `openapi.yaml`.
 Use Node.js 22 or later.
 
 ```bash
-cp .env.example .env
-# load the environment values using your preferred local secret mechanism
+# Copy .env.example to .env and set the Supabase values below.
 npm test
 npm start
 ```
@@ -32,6 +31,8 @@ No production secrets should be committed to the repository.
 ## Required runtime configuration
 
 The current adapter requires `SUPABASE_URL` and a server-only `SUPABASE_SECRET_KEY`. Microsoft Entra verification requires `ENTRA_TENANT_ID` and `ENTRA_CLIENT_ID`; issuer and JWKS URLs are derived automatically but can be overridden.
+
+For local development in PowerShell, run `Copy-Item .env.example .env`, then edit `.env` with your Supabase project URL and secret key. `npm start` loads this file; `.env` is excluded from Git. Use the server-only secret key, never a browser publishable/anon key, and do not paste it into chat.
 
 Set `AUTO3D_ALLOWED_ORIGINS` to a comma-separated allowlist of browser origins that may call the API cross-origin.
 

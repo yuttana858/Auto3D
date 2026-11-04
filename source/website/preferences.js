@@ -89,11 +89,21 @@ export class Preferences
     Open ()
     {
         const dialog = WorkspaceDialog ('Preferences');
-        const form = document.createElement ('div'); form.className = 'workspace_save_form';
-        const adminArea = document.createElement ('section'); form.appendChild (adminArea);
+        dialog.classList.add ('preferences_dialog');
+        const form = document.createElement ('div'); form.className = 'workspace_save_form preferences_form';
+        const grid = document.createElement ('div'); grid.className = 'preferences_grid'; form.appendChild (grid);
+        const section = (title) => {
+            const element = document.createElement ('section'); element.className = 'preferences_section';
+            const heading = document.createElement ('h3'); heading.textContent = title; element.appendChild (heading);
+            return element;
+        };
+        const adminArea = section ('Administrator'); adminArea.hidden = true;
         const adminLink = document.createElement ('a'); adminLink.href = '?console=' + AccountConsole; adminLink.textContent = 'Account administration — requests and approvals';
         adminLink.addEventListener ('click', async (event) => { event.preventDefault (); try { await this.website.accountAdmin.Open (); dialog.close (); } catch (error) { adminLink.textContent = error.message; } });
-        this.website.accountAdmin?.Refresh ().then ((data) => { if (data.isAdmin && dialog.isConnected) { const title = document.createElement ('strong'); title.textContent = 'Administrator'; adminArea.append (title, document.createElement ('br'), adminLink); } }).catch ((error) => { if (dialog.isConnected && this.website.auth?.user) { const message = document.createElement ('p'); message.setAttribute ('role', 'status'); message.textContent = error.message; adminArea.replaceChildren (message); } });
+        adminArea.appendChild (adminLink);
+        this.website.accountAdmin?.Refresh ().then ((data) => { if (data.isAdmin && dialog.isConnected) { adminArea.hidden = false; } }).catch ((error) => { if (dialog.isConnected && this.website.auth?.user) { const message = document.createElement ('p'); message.setAttribute ('role', 'status'); message.textContent = error.message; adminArea.appendChild (message); adminArea.hidden = false; } });
+        const display = section ('Display');
+        const displayControls = document.createElement ('div'); displayControls.className = 'preferences_display_controls';
         const appearance = document.createElement ('label'); appearance.textContent = 'Appearance';
         const theme = document.createElement ('select'); theme.setAttribute ('aria-label', 'Appearance'); theme.add (new Option ('Light', String (Theme.Light))); theme.add (new Option ('Dark', String (Theme.Dark))); theme.value = String (this.website.settings.themeId);
         theme.addEventListener ('change', () => { this.website.SwitchTheme (Number (theme.value), true); }); appearance.appendChild (theme);
@@ -107,7 +117,9 @@ export class Preferences
         units.addEventListener ('change', () => {
             this.SetUnits (units.value).catch ((error) => { syncStatus.textContent = error.message; });
         }); unitLabel.appendChild (units);
-        const aiHeading = document.createElement ('strong'); aiHeading.textContent = 'AI connections';
+        displayControls.append (appearance, unitLabel, qualityLabel); display.append (displayControls, qualityNote);
+        const ai = section ('AI connections');
+        const aiContent = document.createElement ('div'); aiContent.className = 'preferences_section_content';
         const aiNote = document.createElement ('p'); aiNote.className = 'section_hint'; aiNote.textContent = 'Connect your own Meshy account to use your credits.';
         const aiActions = document.createElement ('div'); aiActions.className = 'mode_buttons';
         const testAI = document.createElement ('button'); testAI.textContent = 'Test connection';
@@ -119,18 +131,25 @@ export class Preferences
             finally { testAI.disabled = false; }
         });
         const manageAI = document.createElement ('button'); manageAI.textContent = 'Manage Meshy key';
+        manageAI.className = 'workspace_primary';
         manageAI.addEventListener ('click', () => { dialog.close (); this.website.aiWorkspace.OpenConnection (); });
         aiActions.append (manageAI, testAI);
+        aiContent.append (aiNote, aiActions, aiStatus); ai.appendChild (aiContent);
         const syncStatus = document.createElement ('p'); syncStatus.setAttribute ('role', 'status'); syncStatus.textContent = 'Theme and units are saved automatically to your account.'; this.syncStatus = syncStatus;
+        display.appendChild (syncStatus);
         const about = document.createElement ('p'); about.className = 'preferences_about';
         about.textContent = 'SW Auto3D v' + AppVersion + ' · Build ' + AppBuildInfo ().build + ' — A browser workspace for inspecting, arranging and reviewing 3D models, materials, lighting and reusable layouts. Dimensions use the units declared by the source model; unspecified units remain model units.';
+        const tools = section ('Tools');
+        const toolActions = document.createElement ('div'); toolActions.className = 'preferences_actions';
         const commands = document.createElement ('button'); commands.textContent = 'Commands and macros'; commands.className = 'workspace_primary'; commands.addEventListener ('click', () => { dialog.close (); OpenCommandPanel (this.website); });
         const errorLogs = document.createElement ('button'); errorLogs.textContent = 'Error logs'; errorLogs.addEventListener ('click', () => { dialog.close (); OpenErrorLog (this.website); });
         const agentAccess = document.createElement ('button'); agentAccess.textContent = 'Agent access'; agentAccess.addEventListener ('click', () => { AgentAccessFor (this.website).Open ().then (() => dialog.close ()).catch (error => { syncStatus.textContent = error.message; }); });
         const agentAdmin = document.createElement ('button'); agentAdmin.textContent = 'Agent administration'; agentAdmin.addEventListener ('click', () => { AgentAccessFor (this.website).OpenAdmin ().then (() => dialog.close ()).catch (error => { syncStatus.textContent = error.message; }); });
         const recovery = document.createElement ('button'); recovery.textContent = 'Recover unsaved session'; recovery.addEventListener ('click', () => { dialog.close (); this.website.sessionEditor.OfferRecovery (true).catch (error => this.website.sessionEditor.Status (error.message)); });
         const agentControls = globalThis.location?.hostname === 'auto3d-mcp-pilot.pages.dev' || globalThis.location?.hostname === 'auto3d-5av.pages.dev' && this.website.accountAdmin?.isAdmin ? [agentAccess, agentAdmin] : [];
-        const heading = document.createElement ('strong'); heading.textContent = 'About'; form.append (appearance, unitLabel, qualityLabel, qualityNote, syncStatus, commands, errorLogs, recovery, ...agentControls, aiHeading, aiNote, aiActions, aiStatus, heading, about); dialog.appendChild (form);
+        toolActions.append (commands, errorLogs, recovery, ...agentControls); tools.appendChild (toolActions);
+        const aboutSection = section ('About'); aboutSection.appendChild (about);
+        grid.append (display, ai, tools, aboutSection, adminArea); dialog.appendChild (form);
     }
 
     async SetViewportQuality (mode)

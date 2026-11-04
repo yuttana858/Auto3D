@@ -39,6 +39,10 @@ try {
  }
  assert.equal (submitted[1].body.input_task_id, 'generated-1'); assert.equal (submitted[4].body.rig_task_id, 'generated-4');
  await call ('ai.creation.add'); assert.equal ((await call ('scene.inspect')).objects.length, 2);
+ const prompt = page.getByLabel ('AI generation prompt', { exact : true }); await prompt.fill ('Keyboard generated concept');
+ const generationRequest = page.waitForRequest (request => request.url ().endsWith ('/api/ai/text-to-3d') && request.method () === 'POST');
+ await prompt.press ('Enter'); assert.equal ((await generationRequest).postDataJSON ().prompt, 'Keyboard generated concept');
+ await prompt.fill ('First line'); await prompt.press ('Shift+Enter'); await prompt.type ('Second line'); assert.equal (await prompt.inputValue (), 'First line\nSecond line');
  await call ('ui.module.mode', { module : 'ai', mode : 'minimal' }); assert.equal (await modal.isVisible (), false); assert.equal (await page.locator ('#ai_module_panel').isVisible (), true);
  await call ('ui.module.mode', { module : 'data', mode : 'extended' }); assert.equal (await modal.getAttribute ('data-module'), 'data'); await page.keyboard.press ('Escape'); await modal.waitFor ({ state : 'hidden' });
  await call ('ui.module.mode', { module : 'packaging', mode : 'extended' }); assert.equal (await modal.getAttribute ('data-module'), 'packaging'); await page.getByRole ('button', { name : 'Minimal Packaging Gen panel', exact : true }).click ();
