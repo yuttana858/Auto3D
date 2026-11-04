@@ -16,7 +16,7 @@ export async function MeshyCredentialRequest (website, method = 'GET', key)
     });
     Account (website, owner, false);
     // Deliberately ignore response error text: credentials must never appear in logs/UI.
-    if (!response.ok) { throw new Error (response.status === 400 ? 'Enter a valid Meshy API key without spaces.' : response.status === 401 ? 'Sign in again to manage your Meshy key.' : 'Could not update Meshy connection. Retry or contact your administrator.'); }
+    if (!response.ok) { throw new Error (response.status === 400 ? 'Enter a valid Meshy API key without spaces.' : response.status === 401 ? 'Sign in again to manage your Meshy key.' : response.status === 503 ? 'Secure Meshy key storage is unavailable. Contact your administrator.' : 'Could not update Meshy connection. Retry or contact your administrator.'); }
     let result;
     try { result = await response.json (); } catch { throw new Error ('Meshy connection status is unavailable.'); }
     Account (website, owner, false);
@@ -32,12 +32,13 @@ export function OpenMeshyConnection (website)
     const input = document.createElement ('input'); input.type = 'password'; input.autocomplete = 'new-password'; input.spellcheck = false; input.maxLength = 512; input.setAttribute ('aria-label', 'Meshy API key'); input.setAttribute ('autocapitalize', 'none'); label.appendChild (input);
     const actions = document.createElement ('div'); actions.className = 'mode_buttons';
     const save = document.createElement ('button'); save.type = 'submit'; save.textContent = 'Save key';
+    const testEntered = document.createElement ('button'); testEntered.type = 'button'; testEntered.textContent = 'Test entered key';
     const test = document.createElement ('button'); test.type = 'button'; test.textContent = 'Test saved connection';
     const remove = document.createElement ('button'); remove.type = 'button'; remove.textContent = 'Remove key';
     const status = document.createElement ('p'); status.setAttribute ('role', 'status'); status.textContent = 'Loading connection…';
-    actions.append (save, test, remove); form.append (note, label, actions, status); dialog.appendChild (form);
+    actions.append (save, testEntered, test, remove); form.append (note, label, actions, status); dialog.appendChild (form);
     let closed = false, busy = false, available = false, saved = false;
-    const refresh = () => { input.disabled = busy || !available; save.disabled = busy || !available || !input.value; remove.disabled = busy || !saved; test.disabled = busy; };
+    const refresh = () => { input.disabled = busy; save.disabled = busy || !available || !input.value; testEntered.disabled = busy || !input.value; remove.disabled = busy || !saved; test.disabled = busy; };
     const apply = result => { saved = result.saved; if (result.available !== undefined) { available = result.available; } website.aiWorkspace.lastBalance = null; website.aiWorkspace.RefreshConnection (); refresh (); };
     const run = async action => {
         if (busy || closed) { return; } busy = true; refresh ();
@@ -52,10 +53,20 @@ export function OpenMeshyConnection (website)
         run (async () => { const result = await MeshyCredentialRequest (website, 'PUT', key); if (!closed) { apply (result); status.textContent = 'Key saved. Test the saved connection to check it with Meshy.'; } });
     });
     remove.addEventListener ('click', () => { input.value = ''; run (async () => { const result = await MeshyCredentialRequest (website, 'DELETE'); if (!closed) { apply (result); status.textContent = 'Your saved key was removed. An administrator connection may still be available.'; } }); });
+    testEntered.addEventListener ('click', () => { const key = input.value; if (!key) { return; } run (async () => {
+        status.textContent = 'Testing entered key without saving…'; Account (website, owner, true);
+        const response = await fetch ('/api/ai/credential-test', { method : 'POST', credentials : 'same-origin', cache : 'no-store', redirect : 'error', signal : AbortSignal.timeout (20000), headers : { 'Content-Type' : 'application/json', 'X-Auto3D-Account' : owner }, body : JSON.stringify ({ key }) });
+        Account (website, owner, false); if (!response.ok) { throw new Error (response.status === 401 || response.status === 403 ? 'Meshy rejected this key. Check the key and any Meshy IP restrictions.' : response.status === 429 ? 'Meshy is rate limiting requests. Try again later.' : response.status === 400 ? 'Enter a valid Meshy API key without spaces.' : 'Could not test this Meshy key. Try again shortly.'); }
+        let result; try { result = await response.json (); } catch { throw new Error ('Could not verify the Meshy response.'); } Account (website, owner, false); if (result?.valid !== true) { throw new Error ('Could not verify the Meshy response.'); }
+        if (!closed) { status.textContent = 'Meshy accepted the entered key. Save it to use it in Auto3D.'; }
+    }); });
     test.addEventListener ('click', () => run (async () => {
         status.textContent = 'Testing saved connection…';
         try { const result = await website.aiWorkspace.TestConnection (); if (!closed) { status.textContent = Number.isFinite (result.balance) ? 'Connected · ' + result.balance + ' credits available.' : 'Connection succeeded.'; } }
-        catch { throw new Error ('Meshy connection failed. Check your saved key and try again.'); }
+        catch (error) {
+            const messages = { MESHY_KEY_MISSING : 'No Meshy key is configured. Save your key above and test again.', MESHY_KEY_REJECTED : 'Meshy rejected the saved key. Check the key and any Meshy IP restrictions.', MESHY_STORAGE_UNAVAILABLE : 'Secure Meshy key storage is unavailable. Contact your administrator.', MESHY_REQUEST_FAILED : 'Could not reach Meshy. Try again shortly.' };
+            throw new Error (messages[error.code] || 'Meshy connection failed. Check your saved key and try again.');
+        }
     }));
     const unsubscribe = website.auth.Subscribe (() => { if (website.auth?.user?.id !== owner) { input.value = ''; dialog.close (); } });
     dialog.addEventListener ('close', () => { closed = true; input.value = ''; unsubscribe (); }, { once : true });

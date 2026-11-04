@@ -33,13 +33,14 @@ function meshyUrl (context, path)
 async function upstreamJson (context, path, init = {})
 {
     const key = await MeshyKey (context);
-    if (!key) { return json ({ error : 'Meshy API key is not configured.' }, 401); }
+    if (!key) { return json ({ error : 'No Meshy key is configured. Save a key in AI connections.', code : 'MESHY_KEY_MISSING' }, 401); }
     const headers = new Headers (init.headers || {});
     headers.set ('Authorization', 'Bearer ' + key);
     if (init.body !== undefined && !headers.has ('Content-Type')) { headers.set ('Content-Type', 'application/json'); }
     const target = new URL (meshyUrl (context, path));
     if (target.protocol !== 'https:') { return json ({ error : 'Invalid Meshy server configuration.' }, 503); }
     const response = await fetch (target.toString (), { ...init, headers, redirect : 'error', signal : AbortSignal.timeout (30000) });
+    if (response.status === 401 || response.status === 403) { await response.body?.cancel (); return json ({ error : 'Meshy rejected the saved key. Check the key and any Meshy IP restrictions.', code : 'MESHY_KEY_REJECTED' }, response.status); }
     const text = (await boundedText (response, 4 * 1024 * 1024)).replaceAll (key, '[redacted]');
     let body = null;
     if (text) {
@@ -120,7 +121,7 @@ export async function onRequest (context)
     } catch (error) {
         if (error.status === 413) { return json ({ error : 'AI payload exceeds the supported size.' }, 413); }
         if (error.status === 401) { return json ({ error : 'Sign in to use Meshy.' }, 401); }
-        if (error.status === 503) { return json ({ error : 'Secure Meshy key storage is unavailable.' }, 503); }
-        return json ({ error : 'AI provider request failed.' }, 500);
+        if (error.status === 503) { return json ({ error : 'Secure Meshy key storage is unavailable. Contact your administrator.', code : 'MESHY_STORAGE_UNAVAILABLE' }, 503); }
+        return json ({ error : 'AI provider request failed. Check the connection and retry.', code : 'MESHY_REQUEST_FAILED' }, 500);
     }
 }

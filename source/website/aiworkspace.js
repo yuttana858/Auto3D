@@ -192,7 +192,7 @@ export class AIWorkspace
         if (owner !== this.website.auth?.user?.id) { throw new Error ('Account changed. Reopen AI Generative.'); }
         if (!response.ok) {
             const message = result?.error || result?.message || result?.task_error?.message || ('Provider request failed (' + response.status + ').');
-            throw new Error (message);
+            const error = new Error (message); error.code = result?.code; error.status = response.status; throw error;
         }
         return { result, response };
     }
