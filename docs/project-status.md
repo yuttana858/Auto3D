@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Welcome screen — draft Auto3D 0.47.5 / Packaging 1.10.3
+
+Restore the animated startup welcome and wait for an explicit click or keyboard activation before beginning the authentication flow. A remembered login can restore after continuing. The temporary 3D renderer is disposed when the splash closes. See `docs/release-0475.md`.
+
 ## Meshy connection diagnostics — draft Auto3D 0.47.4 / Packaging 1.10.3
 
 The live connection test reported a generic failure, which does not identify whether the key is missing or rejected, encrypted storage is unavailable, or the provider request failed. This draft adds a key test that does not use storage, plus separate sanitized error states for the saved-key path. It does not remove encryption or claim the production failure is resolved. See `docs/release-0474.md`; live verification with the account holder remains required after review and deployment.
