@@ -1,8 +1,16 @@
 import assert from 'node:assert/strict';
 import { SessionTabs } from '../source/website/sessiontabs.js';
 import { SceneDocument, SceneHistory } from '../source/website/scenedocument.js';
+import { SessionEditor } from '../source/website/sessioneditor.js';
 
 describe ('In-app sessions', () => {
+    it ('keeps model copy and paste shortcuts without hijacking text editing', () => {
+        const calls = []; const editor = { website : { auth : { user : {} } }, readOnly : false, busy : false, SelectedObjects : () => [{}], sessions : { clipboard : {}, Copy () { calls.push ('copy'); }, Paste () { calls.push ('paste'); } }, Run (action) { action (); } };
+        const key = (value, target = {}) => ({ key : value, ctrlKey : true, target, preventDefault () { calls.push ('prevent'); } });
+        SessionEditor.prototype.KeyDown.call (editor, key ('c')); SessionEditor.prototype.KeyDown.call (editor, key ('v'));
+        SessionEditor.prototype.KeyDown.call (editor, key ('c', { matches : selector => selector === 'input', type : 'text' }));
+        assert.deepEqual (calls, ['prevent', 'copy', 'prevent', 'paste']);
+    });
     it ('retains separate documents, history and unsaved state while switching', async () => {
         const originalDocument = globalThis.document;
         const node = () => ({ children : [], setAttribute () {}, appendChild (child) { this.children.push (child); }, replaceChildren () { this.children = []; } });
