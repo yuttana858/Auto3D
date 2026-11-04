@@ -1,6 +1,13 @@
 import { WorkspaceDialog } from './modellibrary.js';
 import { ReadTools } from '../../mcp/common.js';
 
+const WindowCodeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function CreateWindowCode ()
+{
+    const bytes = crypto.getRandomValues (new Uint8Array (16));
+    return [...bytes].map (byte => WindowCodeAlphabet[byte & 31]).join ('').match (/.{4}/g).join ('-');
+}
+
 export function AgentAccessFor (website)
 {
     if (!website.agentAccess) { website.agentAccess = new AgentAccess (website); }
@@ -10,7 +17,7 @@ export class AgentAccess
 {
     constructor (website)
     {
-        this.website = website; this.socket = null; this.instanceId = crypto.randomUUID (); this.generation = 0; this.status = 'Disconnected';
+        this.website = website; this.socket = null; this.instanceId = crypto.randomUUID (); this.generation = 0; this.status = 'Disconnected'; this.codeInput = null; this.copyButton = null; this.statusElement = null;
         website.auth.Subscribe (user => { if (!user || this.accountId && user.id !== this.accountId) { this.Disconnect (); } });
     }
     Account ()
@@ -29,14 +36,17 @@ export class AgentAccess
     Sessions () { return this.website.sessionEditor.sessions.Inspect ().tabs.map (tab => ({ id : tab.id, name : tab.name.slice (0, 100), active : tab.active })); }
     Disconnect ()
     {
-        this.generation++; clearInterval (this.poll); clearInterval (this.renew); clearTimeout (this.handshakeTimer); this.socket?.close (); this.socket = null; this.connectionId = null; this.status = 'Disconnected'; return this.Inspect ();
+        this.generation++; clearInterval (this.poll); clearInterval (this.renew); clearTimeout (this.handshakeTimer); this.socket?.close (); this.socket = null; this.connectionId = null; this.windowCode = null;
+        if (this.codeInput) { this.codeInput.value = ''; } if (this.copyButton) { this.copyButton.disabled = true; }
+        this.status = 'Disconnected'; if (this.statusElement) { this.statusElement.textContent = this.status; } return this.Inspect ();
     }
-    async Connect ({ windowLabel, screenshots = false })
+    async Connect ({ screenshots = false })
     {
-        if (typeof windowLabel !== 'string' || !windowLabel.trim () || windowLabel.length > 80 || typeof screenshots !== 'boolean') { throw new Error ('Enter a window name and screenshot preference.'); }
+        if (typeof screenshots !== 'boolean') { throw new Error ('Invalid screenshot preference.'); }
+        const windowCode = CreateWindowCode ();
         const owner = this.Account (), config = await this.Request ('config');
         if (!config.pilot || !['https://auto3d-mcp-pilot.pages.dev', 'https://auto3d-5av.pages.dev'].includes (location.origin) || config.mcpUrl !== location.origin + '/mcp') { throw new Error ('MCP access is unavailable here.'); }
-        this.Disconnect (); this.accountId = owner; this.screenshots = screenshots; this.status = 'Connecting'; const generation = this.generation;
+        this.Disconnect (); this.instanceId = crypto.randomUUID (); this.accountId = owner; this.screenshots = screenshots; this.windowCode = windowCode; this.status = 'Connecting'; const generation = this.generation;
         const socket = new WebSocket (location.origin.replace ('https:', 'wss:') + '/api/agent/connect'); this.socket = socket;
         socket.addEventListener ('message', event => { this.Message (event, socket, generation).catch (() => this.Disconnect ()); });
         socket.addEventListener ('close', () => { if (this.socket === socket) { this.Disconnect (); } });
@@ -46,7 +56,7 @@ export class AgentAccess
             socket.addEventListener ('close', () => { clearTimeout (this.handshakeTimer); reject (new Error ('Connection ended.')); }, { once : true });
             socket.addEventListener ('open', () => {
                 if (this.Account () !== owner || generation !== this.generation) { reject (new Error ('Account changed.')); return; }
-                socket.send (JSON.stringify ({ type : 'hello', instanceId : this.instanceId, windowLabel : windowLabel.trim (), sessions : this.Sessions () }));
+                socket.send (JSON.stringify ({ type : 'hello', instanceId : this.instanceId, windowLabel : 'Auto3D window ' + this.instanceId.slice (0, 8), windowCode, sessions : this.Sessions () }));
             }, { once : true });
             this.onReady = () => { clearTimeout (this.handshakeTimer); resolve (); };
         });
@@ -57,7 +67,7 @@ export class AgentAccess
             } catch { this.Disconnect (); }
         }, 1000);
         this.renew = setInterval (() => { this.Request ('renew', { connectionId : this.connectionId, instanceId : this.instanceId }).catch (() => this.Disconnect ()); }, 60000);
-        return this.Inspect ();
+        return { ...this.Inspect (), windowCode };
     }
     async Message (event, socket, generation)
     {
@@ -87,11 +97,17 @@ export class AgentAccess
     {
         const config = await this.Request ('config'), dialog = WorkspaceDialog ('Agent access'); dialog.dataset.capturePrivate = '';
         const form = document.createElement ('div'); form.className = 'workspace_save_form';
-        const note = document.createElement ('p'); note.textContent = (config.mode === 'live-admin' ? 'Administrator live test · ' : 'Staging pilot · ') + 'Connect your OAuth client to ' + config.mcpUrl + '. Approve each named registration, then select this window and session. Remote tools can inspect; screenshots require permission here and in OAuth.';
-        const name = document.createElement ('input'); name.placeholder = 'Window name'; name.setAttribute ('aria-label', 'Window name'); name.maxLength = 80;
+        const note = document.createElement ('p'); note.textContent = (config.mode === 'live-admin' ? 'Administrator live test · ' : 'Staging pilot · ') + 'Connect your OAuth client to ' + config.mcpUrl + '. Copy this window code into the Auto3D authorization page to pair automatically; without it, select a session from the agent. Remote tools can inspect; screenshots require permission here and in OAuth.';
+        const codeLabel = document.createElement ('label'); codeLabel.textContent = 'App window code ';
+        const code = document.createElement ('input'); code.readOnly = true; code.autocomplete = 'off'; code.placeholder = 'Connect this window to generate a code'; code.value = this.windowCode || ''; code.setAttribute ('aria-label', 'App window code'); codeLabel.appendChild (code); this.codeInput = code;
+        const copy = document.createElement ('button'); copy.type = 'button'; copy.textContent = 'Copy'; copy.disabled = !this.windowCode; this.copyButton = copy;
         const captureLabel = document.createElement ('label'), capture = document.createElement ('input'); capture.type = 'checkbox'; captureLabel.append (capture, 'Allow screenshots from this window');
-        const status = document.createElement ('p'); status.setAttribute ('role', 'status'); status.textContent = this.status;
-        const connect = document.createElement ('button'); connect.textContent = 'Connect this window'; connect.onclick = () => { this.Connect ({ windowLabel : name.value, screenshots : capture.checked }).then (() => { status.textContent = this.status; }).catch (error => { status.textContent = error.message; }); };
+        const status = document.createElement ('p'); status.setAttribute ('role', 'status'); status.textContent = this.status; this.statusElement = status;
+        const connect = document.createElement ('button'); connect.textContent = 'Connect this window'; connect.onclick = () => { this.Connect ({ screenshots : capture.checked }).then (result => { code.value = result.windowCode; copy.disabled = false; status.textContent = 'Connected. Copy this code into the Auto3D authorization page. It expires in 10 minutes and can be used once.'; }).catch (error => { this.Disconnect (); code.value = ''; copy.disabled = true; status.textContent = error.message; }); };
+        copy.onclick = async () => {
+            try { await navigator.clipboard.writeText (code.value); status.textContent = 'Window code copied.'; }
+            catch { code.select (); status.textContent = 'Clipboard unavailable. The code is selected; copy it manually.'; }
+        };
         const disconnect = document.createElement ('button'); disconnect.textContent = 'Disconnect'; disconnect.onclick = () => { this.Disconnect (); status.textContent = this.status; };
         const list = document.createElement ('div');
         const refresh = async () => {
@@ -101,7 +117,7 @@ export class AgentAccess
                 if (record.revokedAt === null && record.expiresAt > Date.now ()) { const revoke = document.createElement ('button'); revoke.textContent = 'Revoke'; revoke.onclick = () => { this.Request ('registrations', { action : 'revoke', id : record.id }).then (refresh).catch (error => { status.textContent = error.message; }); }; row.appendChild (revoke); } list.appendChild (row);
             }
         };
-        form.append (note, name, captureLabel, connect, disconnect, status, list); dialog.appendChild (form); await refresh (); return { opened : true };
+        form.append (note, codeLabel, copy, captureLabel, connect, disconnect, status, list); dialog.appendChild (form); await refresh (); return { opened : true };
     }
     async OpenAdmin ()
     {

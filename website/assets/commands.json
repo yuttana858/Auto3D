@@ -33,27 +33,19 @@
       "id": "agent.access.connect",
       "title": "Connect this browser window",
       "category": "Account",
-      "description": "Explicitly share this browser window with individually authorized OAuth agents. Screenshots need a separate opt-in and OAuth scope. Does not pair a remote client automatically.",
+      "description": "Explicitly share this browser window with individually authorized OAuth agents. Returns a short-lived pairing code; paste it into the Auto3D authorization page to pair automatically. Screenshots need a separate opt-in and OAuth scope.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
         "properties": {
-          "windowLabel": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 80
-          },
           "screenshots": {
             "type": "boolean"
           }
         },
-        "required": [
-          "windowLabel"
-        ],
+        "required": [],
         "additionalProperties": false
       },
       "example": {
-        "windowLabel": "Packaging review",
         "screenshots": false
       }
     },

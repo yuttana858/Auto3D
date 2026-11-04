@@ -16,13 +16,14 @@ export class Auto3DAgentBroker extends DurableObject
     List (accountId) { return this.core.List (accountId); }
     Renew (input) { return this.core.Renew (input); }
     Pair (input) { return this.core.Pair (input); }
+    PairWithCode (input) { return this.core.PairWithCode (input); }
     Dispatch (input) { return this.core.Dispatch (input); }
     Register (input) { return this.core.registrations.Create (input); }
     Registrations (accountId) { return this.core.registrations.List (accountId); }
     AssertRegistration (input) { return this.core.registrations.Assert (input); }
     RevokeRegistration (input) { return this.core.Revoke (input); }
     DisableAgents (input) { return this.core.registrations.Disable (input); }
-    webSocketMessage (socket, message) { this.core.Message (socket, message); }
+    webSocketMessage (socket, message) { return this.core.Message (socket, message); }
     webSocketClose (socket) { this.core.Close (socket); }
     webSocketError (socket) { this.core.Close (socket); }
     async alarm () { await this.core.Cleanup (); if (this.ctx.getWebSockets ().length) { await this.ctx.storage.setAlarm (Date.now () + 300000); } }

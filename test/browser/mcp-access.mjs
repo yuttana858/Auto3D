@@ -47,7 +47,11 @@ try {
     await page.getByRole ('button', { name : 'Preferences', exact : true }).click (); await page.getByRole ('button', { name : 'Agent access', exact : true }).click ();
     const dialog = page.getByRole ('dialog', { name : 'Agent access', exact : true }); await dialog.waitFor (); assert.ok (await dialog.getByText ('Named review agent', { exact : false }).count ());
     assert.equal (await dialog.locator ('input[type=checkbox]').isChecked (), false);
-    await dialog.getByLabel ('Window name').fill ('Review window'); await dialog.getByRole ('button', { name : 'Connect this window' }).click (); await dialog.getByRole ('status').filter ({ hasText : 'Connected' }).waitFor ();
+    await dialog.getByRole ('button', { name : 'Connect this window' }).click (); await dialog.getByRole ('status').filter ({ hasText : 'Connected. Copy this code' }).waitFor ();
+    const windowCode = await dialog.getByLabel ('App window code').inputValue (); assert.match (windowCode, /^[A-HJ-NP-Z2-9]{4}(?:-[A-HJ-NP-Z2-9]{4}){3}$/);
+    await page.context ().grantPermissions (['clipboard-read', 'clipboard-write'], { origin });
+    await dialog.getByRole ('button', { name : 'Copy', exact : true }).click (); await dialog.getByRole ('status').filter ({ hasText : 'Window code copied.' }).waitFor ();
+    assert.equal (await page.evaluate (() => navigator.clipboard.readText ()), windowCode);
     const tab = await call ('session.tabs.inspect');
     const received = new Promise (resolve => { nextResult = resolve; });
     wire.send (JSON.stringify ({ type : 'request', requestId : 'inspect-a', command : 'scene.inspect', sessionId : tab.activeId, arguments : {} }));
