@@ -31,7 +31,7 @@ Use **geometry family** and **use case** as separate fields. Beverage is a categ
 | Clamshell — non-food | Clear hinged retail pack with rectangular/rounded cavity | Closed width/depth/height, base/lid depths, rim, corner radii, flange and hinge location | Base, lid, hinge region; optional hang tab |
 | Clamshell — food | Bakery/produce/deli-style pack | Closed envelope, cavity depths, draft/taper, flange, rib pattern and optional vents | Base, lid, hinge region; food contents are optional imported assets later |
 
-The first milestone should prove bottles and cans with a shared material/artwork system. Build pouches and clamshells after that vertical slice passes. This priority is a recommendation, pending user selection.
+Confirmed first-release priority: **bottles and cans**, selected by the user on 2026-11-04. Start with round non-beverage bottles and beverage/non-beverage cans, proving the shared PBR material and label-artwork workflow end to end. Build pouches and clamshells after that vertical slice passes.
 
 ### Geometry contracts
 
@@ -179,7 +179,7 @@ Validation starts in Phase 0 and continues in every phase; Phase 5 is the final 
 
 ## 10. Decisions to confirm before implementation
 
-1. Confirm the first family priority (recommended: round bottles and cans).
+1. First-family priority is confirmed: bottles and cans. Select the initial bottle/can reference presets and their dimensions.
 2. Supply a small reference set for target silhouettes, closures and label layouts, including dimensions; decide which branded artwork is available for testing.
 3. Confirm whether initial clear-pack quality needs true transmission/refraction or an explicitly labeled lower-cost preview tier. The renderer spike must establish what is deliverable on target devices.
 4. Confirm whether to prioritize parametric closures/shape breadth or advanced artwork finishes after the first working slice.
