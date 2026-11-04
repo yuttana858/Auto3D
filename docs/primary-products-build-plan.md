@@ -1,6 +1,6 @@
 # Primary Products module — build plan
 
-Status: proposed design for review; no implementation or deployment is implied.
+Status: implementation in progress. UI shell is stacked in #63/#62; independent geometry work follows in module 0.2.0. No production deployment is implied. See [geometry progress](primary-products-geometry.md).
 Created: 2026-11-04. Repository baseline: Auto3D 0.47.3, Packaging 1.10.3.
 Proposed package: `@auto3d/primary-products`, initial module version 0.1.0; API version 1.
 
