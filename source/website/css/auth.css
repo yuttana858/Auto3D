@@ -22,7 +22,7 @@
 .account_request_row p { white-space: pre-wrap; overflow-wrap: anywhere; }
 .account_request_list { max-height: 60vh; overflow: auto; }
 
-.auth_locked #main, .auth_locked #header, .auth_locked #toolbar, .auth_locked #material_drawer, .auth_locked #advance_animation_panel, .auth_locked #startup_splash { visibility: hidden; pointer-events: none; }
+.auth_locked #main, .auth_locked #header, .auth_locked #toolbar, .auth_locked #material_drawer, .auth_locked #advance_animation_panel { visibility: hidden; pointer-events: none; }
 #auth_gate { position: fixed; inset: 0; z-index: 200000; overflow: auto; background: #101d2b; color: #eef5fb; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 #auth_gate[hidden] { display: none; }
 

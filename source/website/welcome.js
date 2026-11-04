@@ -60,7 +60,7 @@ function CreateScene (canvas, animated)
     };
 }
 
-function ShowWelcome ()
+export function ShowWelcome ()
 {
     const dialog = WorkspaceDialog ('Welcome to Auto3D'); dialog.classList.add ('welcome_dialog');
     dialog.addEventListener ('click', (event) => {
@@ -140,38 +140,22 @@ function StartTour ()
     document.body.appendChild (dialog); dialog.showModal (); show ();
 }
 
-export function StartWelcomeSequence (authPanel)
+export function StartWelcomeSequence (onContinue, { createScene = CreateScene, fade = FadeOut } = {})
 {
     const splash = document.getElementById ('startup_splash');
-    if (!splash) { return; }
+    if (!splash) { onContinue (); return; }
     splash.querySelector ('.splash_version').textContent = 'v' + AppVersion;
-    const dispose = CreateScene (splash.querySelector ('canvas'), true);
-    const main = document.getElementById ('main'); const header = document.getElementById ('header');
-    main.inert = true; header.inert = true;
+    const dispose = createScene (splash.querySelector ('canvas'), true);
+    const hint = document.createElement ('span'); hint.className = 'splash_continue'; hint.textContent = 'Click anywhere to continue'; splash.querySelector ('.splash_identity').appendChild (hint);
+    splash.setAttribute ('role', 'button'); splash.setAttribute ('aria-label', 'Welcome to Auto3D. Continue to sign in.'); splash.tabIndex = 0;
     let finished = false;
-    let loginPanel = null;
-    const finish = async (tour = false, greetUser = true) => {
+    const finish = async () => {
         if (finished) { return; } finished = true;
         splash.style.pointerEvents = 'none';
-        await FadeOut (splash, 500);
-        loginPanel?.dispose (); dispose (); splash.remove (); main.inert = false; header.inert = false;
-        if (tour) { StartTour (); return; }
-        if (!greetUser) { return; }
-        const greet = () => {
-            if (document.querySelector ('dialog[open], .ov_progress_img')) { window.setTimeout (greet, 300); return; }
-            ShowWelcome ();
-        };
-        greet ();
+        await fade (splash, 500);
+        dispose (); splash.remove (); onContinue ();
     };
-    const tour = document.createElement ('button'); tour.className = 'splash_tour'; tour.textContent = 'Take a tour →';
-    tour.addEventListener ('click', () => finish (true)); splash.appendChild (tour);
-    splash.addEventListener ('click', (event) => { if (event.target === splash || event.target.tagName === 'CANVAS') { finish (false, false); } });
-    window.setTimeout (() => {
-        if (finished) { return; }
-        loginPanel = authPanel.Create (() => finish (false, false));
-        splash.querySelector ('.splash_identity').appendChild (loginPanel);
-        splash.setAttribute ('role', 'region'); splash.setAttribute ('aria-label', 'Welcome to Auto3D');
-        loginPanel.querySelector ('input')?.focus ();
-    }, 3000);
-    authPanel.auth.Restore ().catch (() => { /* Login remains available for retry. */ });
+    splash.addEventListener ('click', finish);
+    splash.addEventListener ('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault (); finish (); } });
+    splash.focus ();
 }
