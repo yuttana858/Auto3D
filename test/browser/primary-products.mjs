@@ -36,6 +36,7 @@ try {
     const panel = page.getByRole ('region', { name : 'Primary Products', exact : true }); await panel.getByRole ('button', { name : 'Choose bottle' }).waitFor ();
     assert.equal ((await call ('primary.inspect')).generationAvailable, false); assert.equal (await panel.getByRole ('button', { name : 'Add to session', exact : true }).isDisabled (), true);
     const height = panel.getByRole ('spinbutton', { name : 'Product height', exact : true }); await height.fill ('220'); await height.press ('Tab'); assert.equal ((await call ('primary.inspect')).heightMm, 220);
+    await panel.getByRole ('slider', { name : 'Product roughness', exact : true }).focus (); await page.keyboard.press ('Delete'); assert.deepEqual (await call ('scene.inspect'), before);
     await panel.getByRole ('button', { name : 'Wrap label', exact : true }).click (); await mkdir ('work/primary-products-review', { recursive : true });
     await panel.evaluate (node => { node.scrollTop = 0; });
     await page.screenshot ({ path : 'work/primary-products-review/minimal.png' });

@@ -13,6 +13,7 @@ export class PrimaryProductsPanel
     constructor (host, parent)
     {
         this.host = host; this.root = Element ('div', 'pp_workspace', undefined, parent);
+        for (const type of ['keydown', 'keyup']) { this.root.addEventListener (type, event => { if (event.target.closest?.('input, select, textarea, button, [contenteditable]')) { event.stopPropagation (); } }); }
         const top = Element ('div', 'pp_intro', undefined, this.root); Element ('span', 'pp_kicker', 'BOTTLES & CANS', top); Element ('span', 'pp_version', 'v' + PrimaryProductsVersion, top);
         this.layout = Element ('div', 'pp_layout', undefined, this.root);
         const catalog = Element ('section', 'pp_catalog', undefined, this.layout); Element ('h3', '', 'Product', catalog);
