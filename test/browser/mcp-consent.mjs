@@ -25,7 +25,7 @@ try {
     const verifier = 'v'.repeat (43), challenge = Buffer.from (await crypto.subtle.digest ('SHA-256', new TextEncoder ().encode (verifier))).toString ('base64url');
     const params = new URLSearchParams ({ client_id : clientId, redirect_uri : callback, response_type : 'code', resource : origin + '/mcp', scope : 'auto3d.read offline_access', state : 'browser-fixture-state', code_challenge : challenge, code_challenge_method : 'S256' });
     await page.goto (origin + '/oauth/authorize?' + params);
-    await Promise.all ([page.waitForURL (url => url.origin === new URL (callback).origin && url.pathname === new URL (callback).pathname), page.getByRole ('button', { name : 'Allow', exact : true }).click ()]);
+    await Promise.all ([page.waitForURL (url => url.origin === new URL (callback).origin && url.pathname === new URL (callback).pathname), page.getByRole ('button', { name : 'Allow without pairing', exact : true }).click ()]);
     assert.equal (posted.origin, origin); assert.match (posted.form.get ('binding'), /^\d+\.[a-f0-9]{64}$/);
     assert.equal (callbackUrl.searchParams.get ('state'), 'browser-fixture-state'); assert.equal (callbackUrl.searchParams.get ('iss'), origin + '/oauth');
     assert.ok (callbackUrl.searchParams.get ('code'));
