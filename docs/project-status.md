@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Primary Products geometry — module 0.2.0 / Auto3D 0.48.0 / Packaging 1.10.3
+
+Independent bottle/can presentation meshes and physical label-zone descriptors extend the panel stack. No scene insertion or actual artwork/glass rendering is enabled. Draft PRs skip costly CI/MCP jobs until ready for review; production checks remain. See [primary-products-geometry.md](primary-products-geometry.md).
+
 ## Primary Products UI shell — Auto3D 0.48.0 / Packaging 1.10.3 / Primary Products 0.1.0 (2026-11-04)
 
 Adds Primary Products directly below Packaging within the same outlined module rail group. Independent module-owned compact/extended UI supplies bottle/can cards, canonical-mm draft dimensions, surface controls and front/wrap label zones with an explicitly illustrative SVG profile. Add to session is disabled until generator work lands. Drafts survive panel changes, reset on account changes and respect account/read-only/busy guards. No scene or camera changes, artwork uploads or paid calls occur.
