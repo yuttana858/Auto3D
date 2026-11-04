@@ -128,3 +128,8 @@ The share-service migration removes browser-role function/table/column grants an
 ## Authoritative Measurement layer (v0.36.0 / Packaging v1.6.0)
 
 `modules/packaging/src/engineering.js` owns pure CAD distance, material-record validation, allowance and tolerance evaluation. Optional `profile.engineering` travels through existing archive/recovery validation. `EngineeringPanel` uses a neutral host; PackagingWorkspace owns atomic scene/CAD replacement, account/read-only guards and history. Independent dimension modes and material database records are separate from legacy fit reserves. `creasevisuals.js` supplies presentation joins via optional `visualMeshes`; hosts update their vertices during folding. These surfaces do not enter collision prisms or manufacturing measurement calculations. See [corrugated-dimensions-and-creases.md](corrugated-dimensions-and-creases.md) for scope and references.
+
+
+## Proposed Primary Products module
+
+[Primary Products build plan](primary-products-build-plan.md) describes an independent module for parametric CPG bottles, cans, beverage containers, pouches and food/non-food clamshells, with component PBR materials and editable label artwork. It is a planning document; generators, UI, archive fields and commands are not implemented by that document.
