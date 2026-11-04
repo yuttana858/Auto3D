@@ -10,7 +10,20 @@ Use the maintained Cloudflare OAuth provider for discovery, exact redirect valid
 
 OAuth-capable clients receive individual revocable grants. Public desktop/CLI clients use authorization code plus S256 PKCE and a loopback callback; confidential hosted clients use the provider's supported client authentication. No shared bearer key, personal API key, client-secret generator or password field is exposed by Auto3D. Harnesses without supported OAuth need a separately reviewed adapter; they cannot bypass consent using an application credential. Dynamic client registration identifies software and does not grant account access.
 
-At consent, a user can optionally enter the short-lived app window code copied from Agent access. A valid code pairs that OAuth registration with the connected window's active session as part of authorization. Codes are random, stored server-side only as SHA-256 digests, expire after 10 minutes, and are single-use. Leaving the field blank retains explicit manual selection through `auto3d.sessions.list` and `auto3d.sessions.select`. The flow is harness-neutral for OAuth-compatible clients; ChatGPT and Claude are named choices, with other OAuth clients still supported.
+At consent, a user enters the short-lived app window code copied from Agent access to pair that OAuth registration with the connected window's active session. Pairing is the default approval path; the consent form requires the code for it and offers a separate explicit approval without pairing. Codes are random, stored server-side only as SHA-256 digests, expire after 10 minutes, and are single-use. Without pairing, users can select a session later through `auto3d.sessions.list` and `auto3d.sessions.select`. The flow is harness-neutral for OAuth-compatible clients; ChatGPT and Claude are named choices, with other OAuth clients still supported.
+
+The generated command catalog is the source of truth for MCP command discovery and execution. A grant with only `auto3d.read` exposes five basic read-only app tools; `capture.image` is added when `auto3d.capture` is granted. A grant that also requests `auto3d.write` exposes catalog operations for all 250 commands, including app mutations and account/administrator operations. The OAuth consent page identifies this full access; account and administrator commands still pass through their existing Auto3D authorization checks. Screenshot capture remains separately gated by the `auto3d.capture` OAuth scope and the connected window's screenshot opt-in. Tool schemas are validated against the generated catalog before dispatch, and the broker independently enforces the write scope.
+
+### Efficient agent tool workflow
+
+The MCP `tools/list` response stays small: it includes the basic tools and session controls, plus three catalog tools for a write-enabled grant. Agents should not request or receive all 250 command definitions at startup:
+
+1. Call `auto3d.commands.categories` to see the available command groups and counts.
+2. Call `auto3d.commands.list` with a category (for example, `Packaging`) or a search string. Results include each matching command's input schema and are limited to 25 per page; follow `nextOffset` when more results are needed.
+3. Call `auto3d.commands.invoke` with the selected command ID and arguments that match its returned schema.
+4. Verify the result with a suitable inspection tool before continuing a multi-step task.
+
+This keeps discovery focused on the current task while making the entire generated catalog available on demand. See [agent-screen-capture.md](./agent-screen-capture.md) for user setup and pairing.
 
 Per-account Durable Object registrations add strongly consistent revocation to the provider's KV-backed grants. Resource calls and refreshes check registration state. User revoke immediately denies subsequent calls, pairing and result delivery. Administrators can inspect/revoke an account's registrations and disable its agent access. Re-enabling never restores old registrations. Normal account disable/session invalidation is checked in addition to agent revocation. No tokens or secrets appear in registration lists.
 
@@ -18,7 +31,7 @@ Per-account Durable Object registrations add strongly consistent revocation to t
 
 The user explicitly connects a browser window. Same-origin session-cookie authentication creates a short-lived WebSocket lease; renewal verifies the same account and login session. One account has one broker, with independent connections per window. A code entered at OAuth consent pairs that registration with the window's current active session; otherwise the agent lists windows and the user explicitly selects an active session. Switching tabs, account changes, logout, lease expiry, revocation or disconnect rejects stale requests and results. Reconnect does not replay requests. Browser commands still use the existing CommandRegistry, schemas, account checks and read-only guards.
 
-The initial tool allowlist is read-only: scene, current camera, packaging measurements, render queue and session-tab inspection. Screenshots require both an OAuth capture scope and a browser-window opt-in. No model import, save, publication, arbitrary JavaScript, credentials or administrative mutation is remotely exposed. User/admin registration controls have local stable commands but are excluded from the remote allowlist.
+The basic tools available to a read-only grant are scene, current-camera, packaging-measurement, render-queue and session-tab inspection. A write-enabled grant can discover and invoke the full generated command catalog, including account and administrator commands; those operations continue to enforce the existing account and administrator checks. Screenshot requests require both an OAuth capture scope and a browser-window opt-in. Arbitrary JavaScript and credential values are not exposed through the catalog.
 
 ## Staging isolation and release gates
 

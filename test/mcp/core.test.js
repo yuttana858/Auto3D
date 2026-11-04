@@ -56,6 +56,7 @@ describe ('MCP registration and isolation boundary', () => {
         socket.onSend = message => { if (message.type === 'request') { queueMicrotask (() => broker.Message (socket, JSON.stringify ({ type : 'result', requestId : message.requestId, sessionId : message.sessionId, result : { ok : true, command : message.command, result : 'box' } }))); } };
         const input = { accountId : owner, grantId : 'grant-a', requestId : 'request-a', command : 'scene.inspect', arguments : {} };
         assert.equal ((await broker.Dispatch (input)).result, 'box'); await assert.rejects (broker.Dispatch (input), /Duplicate/);
+        await assert.rejects (broker.Dispatch ({ ...input, requestId : 'write-denied', command : 'auth.sign_out' }), /Write permission/);
         await assert.rejects (broker.List (other));
         await broker.Message (socket, JSON.stringify ({ type : 'sessions', instanceId : 'window-a', sessions : [{ id : 'tab-a', name : 'Box', active : false }, { id : 'tab-b', name : 'Other', active : true }] }));
         await assert.rejects (broker.Dispatch ({ ...input, requestId : 'request-b' }), /session/);
@@ -93,6 +94,7 @@ describe ('MCP registration and isolation boundary', () => {
         const broker = { AssertRegistration : async () => ({}) }, actor = { userId : owner, props : { registrationId : 'grant-a' }, scope : ['auto3d.read'], expiresAt : Date.now () / 1000 + 60 };
         const service = new PilotService (broker, [{ id : 'auth.sign_out', mutates : true }, { id : 'capture.image', mutates : false }]);
         assert.equal (service.Tools (actor).length, 0); await assert.rejects (service.Call (actor, 'auth.sign_out', {}));
+        assert.deepEqual (service.Tools ({ ...actor, scope : ['auto3d.read', 'auto3d.write'] }).map (tool => tool.id), ['auto3d.commands.categories', 'auto3d.commands.list', 'auto3d.commands.invoke']);
         assert.throws (() => Validate ('abc', { type : 'string', maxLength : 2 })); assert.throws (() => Validate ('bad!', { type : 'string', pattern : '^[a-z]+$' }));
     });
 });

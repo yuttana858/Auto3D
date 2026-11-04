@@ -1,5 +1,5 @@
 export const ReadTools = Object.freeze (['scene.inspect', 'camera.current.inspect', 'packaging.measurements.inspect', 'render.queue.inspect', 'session.tabs.inspect', 'capture.image']);
-export const Scopes = Object.freeze (['auto3d.read', 'auto3d.capture', 'offline_access']);
+export const Scopes = Object.freeze (['auto3d.read', 'auto3d.write', 'auto3d.capture', 'offline_access']);
 export function LiveMcpPath (pathname)
 {
     return pathname === '/mcp' || pathname.startsWith ('/oauth/') || ['/.well-known/oauth-protected-resource/mcp', '/.well-known/oauth-authorization-server/oauth', '/api/agent/config', '/api/agent/connect', '/api/agent/renew', '/api/agent/registrations', '/api/agent/admin'].includes (pathname);

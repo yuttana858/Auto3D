@@ -8,8 +8,9 @@ function Fixture ()
     website.commands = new CommandRegistry ({ website });
     website.commands.Register ({ id : 'scene.inspect', mutates : false, inputSchema : { type : 'object', properties : {} } }, async () => ({ objects : [] }));
     website.commands.Register ({ id : 'capture.image', mutates : false, inputSchema : { type : 'object', properties : {} } }, async () => ({ image : true }));
+    website.commands.Register ({ id : 'objects.delete', mutates : true, inputSchema : { type : 'object', properties : {} } }, async () => ({ deleted : true }));
     const access = new AgentAccess (website); access.accountId = 'owner'; access.socket = { sent : [], send (data) { this.sent.push (JSON.parse (data)); } };
-    const request = command => ({ data : JSON.stringify ({ type : 'request', command, requestId : 'request-a', sessionId : 'tab-a', arguments : {} }) });
+    const request = (command, writeAuthorized = false) => ({ data : JSON.stringify ({ type : 'request', command, requestId : 'request-a', sessionId : 'tab-a', arguments : {}, writeAuthorized }) });
     return { website, access, request };
 }
 describe ('Browser-side MCP guards', () => {
@@ -18,7 +19,9 @@ describe ('Browser-side MCP guards', () => {
         await access.Message (request ('scene.inspect'), access.socket, 0); assert.equal (access.socket.sent[0].result.ok, true);
         await assert.rejects (access.Message (request ('auth.sign_out'), access.socket, 0));
         await assert.rejects (access.Message (request ('capture.image'), access.socket, 0));
-        access.screenshots = true; await access.Message (request ('capture.image'), access.socket, 0); assert.equal (access.socket.sent.length, 2);
+        await assert.rejects (access.Message (request ('objects.delete'), access.socket, 0));
+        await access.Message (request ('objects.delete', true), access.socket, 0); assert.equal (access.socket.sent[1].result.ok, true);
+        access.screenshots = true; await access.Message (request ('capture.image'), access.socket, 0); assert.equal (access.socket.sent.length, 3);
     });
     it ('checks account and tab after the registry queue and discards late results', async () => {
         const { website, access, request } = Fixture (); let release;

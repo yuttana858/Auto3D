@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 
 // Real workerd/DO/KV and OAuth library; identity is a disposable in-process fixture.
 // These tests make no requests to Supabase, Cloudflare or ChatGPT.
+const commandCatalog = JSON.parse (readFileSync (new URL ('../../website/assets/commands.json', import.meta.url)));
 const userA = '11111111-1111-4111-8111-111111111111', userB = '22222222-2222-4222-8222-222222222222';
 const tokenFor = id => 'e30.' + Buffer.from (JSON.stringify ({ sub : id, session_id : id })).toString ('base64url') + '.fixture';
 const cookieFor = id => '__Host-auto3d-access=' + tokenFor (id);
@@ -34,8 +36,10 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         assert.match (response.headers.get ('Content-Security-Policy'), /form-action 'self' https:\/\/client\.example;/);
         const html = await response.text ();
         assert.ok (!html.includes ('<script>evil</script>')); assert.ok (html.includes ('&#60;script&#62;evil&#60;/script&#62;'));
-        assert.ok (html.includes ('App window code (optional)')); assert.ok (html.includes ('value="claude"'));
-        const form = new URLSearchParams ({ handle : html.match (/name="handle" value="([^"]+)"/)[1], binding : html.match (/name="binding" value="([^"]+)"/)[1], name : 'My review agent', harness : 'chatgpt', appWindowCode, decision : 'approve' });
+        assert.ok (html.includes ('<label>App window code <input name="appWindowCode" required')); assert.ok (html.includes ('value="claude"'));
+        if (scope.includes ('auto3d.write')) { assert.match (html, /full 250-command catalog, including tools that change the app and account or administrator controls/); }
+        assert.ok (html.includes ('value="approve-manual" formnovalidate'));
+        const form = new URLSearchParams ({ handle : html.match (/name="handle" value="([^"]+)"/)[1], binding : html.match (/name="binding" value="([^"]+)"/)[1], name : 'My review agent', harness : 'chatgpt', appWindowCode, decision : appWindowCode ? 'approve' : 'approve-manual' });
         const cookies = [cookieFor (id), ...response.headers.getSetCookie ().map (value => value.split (';')[0])].join ('; ');
         return { verifier, form, cookies };
     }
@@ -86,7 +90,8 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
     });
     it ('binds consent to its original browser and account', async () => {
         const unsigned = await fetch ('/oauth/authorize?client_id=' + encodeURIComponent (clientId));
-        assert.equal (unsigned.status, 401); assert.match (await unsigned.text (), /Continue to permissions/);
+        assert.equal (unsigned.status, 401); const signInPage = await unsigned.text ();
+        assert.match (signInPage, /Continue to permissions/); assert.match (signInPage, /enter the app window code on the permissions page/);
         const flow = await begin ();
         const wrongAccount = { ...flow, cookies : flow.cookies.replace (cookieFor (userA), cookieFor (userB)) };
         assert.equal ((await approve (wrongAccount, userB)).status, 403);
@@ -127,16 +132,52 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         assert.equal (upgrade.status, 101); socket = upgrade.webSocket; socket.accept (); const ack = message (socket), pairingNotice = message (socket);
         socket.send (JSON.stringify ({ type : 'hello', instanceId : 'window-auto-pair', windowLabel : 'Auto3D window', windowCode : code, sessions : [{ id : 'tab-a', name : 'Bottle', active : true }] }));
         await ack;
-        const token = await grant (userA, undefined, code); await pairingNotice;
+        const token = await grant (userA, 'auto3d.read auto3d.write offline_access', code); await pairingNotice;
         const pending = rpc (token.access_token, 'tools/call', { name : 'scene.inspect', arguments : {} }), request = await message (socket);
         assert.equal (request.type, 'request'); assert.equal (request.sessionId, 'tab-a');
         socket.send (JSON.stringify ({ type : 'result', requestId : request.requestId, sessionId : request.sessionId, result : { ok : true, command : 'scene.inspect', result : { objects : [{ name : 'Bottle' }] } } }));
         const response = await pending, result = await response.json ();
         assert.equal (response.status, 200); assert.equal (JSON.parse (result.result.content[0].text).objects[0].name, 'Bottle');
+        const commandPending = rpc (token.access_token, 'tools/call', { name : 'auto3d.commands.invoke', arguments : { command : 'diagnostics.list', arguments : { level : 'error' } } });
+        const commandRequest = await message (socket);
+        assert.equal (commandRequest.command, 'diagnostics.list'); assert.equal (commandRequest.writeAuthorized, true);
+        socket.send (JSON.stringify ({ type : 'result', requestId : commandRequest.requestId, sessionId : commandRequest.sessionId, result : { ok : true, command : commandRequest.command, result : [] } }));
+        const commandResponse = await commandPending;
+        assert.equal (commandResponse.status, 200); assert.deepEqual (JSON.parse ((await commandResponse.json ()).result.content[0].text), []);
         const reusedFlow = await begin (userA, undefined, code), reused = await approve (reusedFlow);
         assert.equal (reused.status, 400); assert.match (await reused.text (), /expired, already used, or disconnected/);
         const invalidFlow = await begin (userA, undefined, 'NOT-A-VALID-CODE'), invalid = await approve (invalidFlow);
         assert.equal (invalid.status, 400); assert.match (await invalid.text (), /code is invalid/);
+    });
+    it ('requires a code for paired approval while preserving explicit manual approval', async () => {
+        const flow = await begin (), attempt = new URLSearchParams (flow.form); attempt.set ('decision', 'approve');
+        const response = await fetch ('/oauth/authorize', { method : 'POST', headers : { Cookie : flow.cookies, Origin : origin, 'Content-Type' : 'application/x-www-form-urlencoded' }, body : attempt.toString () });
+        assert.equal (response.status, 400); assert.match (await response.text (), /Enter the current app window code/);
+        assert.equal ((await approve (flow)).status, 302);
+    });
+    it ('exposes the generated full command catalog only with write consent', async () => {
+        const reader = await grant (), readerList = await (await rpc (reader.access_token, 'tools/list')).json ();
+        assert.ok (!readerList.result.tools.some (tool => tool.name.startsWith ('auto3d.commands.')));
+        const writer = await grant (userA, 'auto3d.read auto3d.write auto3d.capture offline_access'), response = await rpc (writer.access_token, 'tools/list');
+        assert.equal (response.status, 200);
+        const tools = (await response.json ()).result.tools;
+        assert.ok (tools.length < 15);
+        assert.ok (tools.some (tool => tool.name === 'auto3d.commands.categories'));
+        assert.ok (tools.some (tool => tool.name === 'auto3d.commands.list'));
+        assert.ok (tools.some (tool => tool.name === 'auto3d.commands.invoke' && tool.annotations.readOnlyHint === false && tool.annotations.destructiveHint));
+        const categories = await rpc (writer.access_token, 'tools/call', { name : 'auto3d.commands.categories', arguments : {} });
+        const categoryList = JSON.parse ((await categories.json ()).result.content[0].text);
+        assert.equal (categoryList.length, 22); assert.equal (categoryList.reduce ((sum, category) => sum + category.total, 0), commandCatalog.commands.length);
+        const ids = [];
+        for (let offset = 0; offset < commandCatalog.commands.length; offset += 25) {
+            const page = await rpc (writer.access_token, 'tools/call', { name : 'auto3d.commands.list', arguments : { offset, limit : 25 } });
+            const catalogPage = JSON.parse ((await page.json ()).result.content[0].text);
+            assert.equal (catalogPage.commands.length, Math.min (25, commandCatalog.commands.length - offset)); ids.push (...catalogPage.commands.map (tool => tool.id));
+        }
+        assert.deepEqual (ids.sort (), commandCatalog.commands.map (tool => tool.id).sort ());
+        const packaging = await rpc (writer.access_token, 'tools/call', { name : 'auto3d.commands.list', arguments : { category : 'packaging', limit : 5 } });
+        const packagingPage = JSON.parse ((await packaging.json ()).result.content[0].text);
+        assert.equal (packagingPage.total, 59); assert.equal (packagingPage.commands.length, 5); assert.equal (packagingPage.commands[0].category, 'Packaging');
     });
     it ('blocks production data routes, forged origins, account mismatches and non-admin controls', async () => {
         assert.ok ([403, 404].includes ((await post ('/api/personal/items', {})).status));
