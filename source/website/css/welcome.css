@@ -4,6 +4,9 @@
 .splash_logo { width: min(380px, 75vw); --ov_logo_text_color: #f6f8fb; }
 .splash_identity p { font-size: 12.33px; letter-spacing: .03em; color: #aebaca; margin: 22px 0; }
 .splash_version { display: block; font-size: 8.33px; letter-spacing: .18em; color: #5b93b7; }
+.splash_continue { display: block; margin-top: 26px; color: #d4e7f5; font-size: 13px; }
+.startup_splash[role="button"] { cursor: pointer; }
+.startup_splash:focus-visible { outline: 3px solid #65c4ee; outline-offset: -5px; }
 .splash_exit { opacity: 0; pointer-events: none; }
 .splash_tour { position: absolute; left: 32px; bottom: 32px; padding: 12px 20px; border: 1px solid #3d7b9c; border-radius: 6px; background: #0a1825; color: #a8ddf5; cursor: pointer; font: inherit; }
 .welcome_tour { margin-right: auto; }
