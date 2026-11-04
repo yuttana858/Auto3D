@@ -10,13 +10,25 @@ describe ('Selected-object orbit', () => {
     it ('Fits the selected visible object at the viewport center without including other or hidden objects', () => {
         const root = new THREE.Group (); root.position.set (100, 20, -30); root.add (new THREE.Mesh (new THREE.BoxGeometry (10, 20, 30), new THREE.MeshBasicMaterial ()));
         const hidden = new THREE.Mesh (new THREE.BoxGeometry (100, 100, 100), new THREE.MeshBasicMaterial ()); hidden.position.x = 1000; hidden.visible = false; root.add (hidden);
-        let sphere; const editor = { selected : { id : 'box', visible : true, threeObject : root }, website : { viewer : { FitSphereToWindow : value => { sphere = value; } } } };
+        let sphere; const editor = { selected : { id : 'box', visible : true, threeObject : root }, SelectedViewBounds : SessionEditor.prototype.SelectedViewBounds, SelectedObjects () { return [this.selected]; }, website : { viewer : { navigation : {}, FitSphereToWindow : value => { sphere = value; } } } };
         SessionEditor.prototype.Focus.call (editor); assert.deepEqual (sphere.center.toArray (), [100, 20, -30]); assert.ok (sphere.radius < 20);
     });
-    it ('Uses transformed visible bounds and preserves eye/target/FOV when assigning the pivot', async () => {
+    it ('Targets transformed visible bounds while preserving eye and FOV', async () => {
         const root = new THREE.Group (); root.position.set (100, 20, -30); const box = new THREE.Mesh (new THREE.BoxGeometry (10, 20, 30), new THREE.MeshBasicMaterial ()); root.add (box); const hidden = box.clone (); hidden.position.x = 1000; hidden.visible = false; root.add (hidden);
-        const navigation = { camera : { eye : new Coord3D (0, 0, 500), center : new Coord3D (0, 0, 0), fov : 45 }, StopCameraMovement () {} }; const editor = { selected : { id : 'box', visible : true, threeObject : root }, website : { viewer : { navigation } }, OrbitSelected : SessionEditor.prototype.OrbitSelected }; editor.website.sessionEditor = editor;
-        const before = JSON.stringify (navigation.camera); const result = await CreateAgentCommands (editor.website).Execute ('camera.orbit.focus_selected'); assert.equal (result.ok, true); assert.deepEqual (result.result.pivot, [100, 20, -30]); assert.equal (JSON.stringify (navigation.camera), before); editor.selected.visible = false; assert.equal (editor.OrbitSelected ().focused, false); assert.equal (navigation.orbitCenter, null);
+        const navigation = { camera : { eye : new Coord3D (0, 0, 500), center : new Coord3D (0, 0, 0), fov : 45 }, StopCameraMovement () {} }; const editor = { selected : { id : 'box', visible : true, threeObject : root }, SelectedViewBounds : SessionEditor.prototype.SelectedViewBounds, SelectedObjects () { return [this.selected]; }, website : { viewer : { navigation } }, OrbitSelected : SessionEditor.prototype.OrbitSelected }; editor.website.sessionEditor = editor;
+        const before = navigation.camera.eye.Clone (); const result = await CreateAgentCommands (editor.website).Execute ('camera.orbit.focus_selected'); assert.equal (result.ok, true); assert.deepEqual (result.result.pivot, [100, 20, -30]); assert.deepEqual (navigation.camera.eye, before); assert.deepEqual ([navigation.camera.center.x, navigation.camera.center.y, navigation.camera.center.z], [100, 20, -30]); editor.selected.visible = false; assert.equal (editor.OrbitSelected ().focused, false); assert.equal (navigation.orbitCenter, null);
+    });
+    it ('Frames and targets the union of selected objects, excluding hidden objects', () => {
+        const make = (id, x, visible = true) => { const mesh = new THREE.Mesh (new THREE.BoxGeometry (2, 2, 2)); mesh.position.x = x; return { id, visible, threeObject : mesh }; };
+        const objects = [make ('left', -10), make ('right', 20), make ('hidden', 1000, false)]; let sphere;
+        const editor = { selected : objects[0], SelectedObjects : () => objects, SelectedViewBounds : SessionEditor.prototype.SelectedViewBounds, website : { viewer : { navigation : { StopCameraMovement () {}, camera : { center : new Coord3D (0, 0, 0) } }, FitSphereToWindow : value => { sphere = value; } } } };
+        const result = SessionEditor.prototype.Focus.call (editor); assert.deepEqual (result.objectIds, ['left', 'right']); assert.deepEqual (sphere.center.toArray (), [5, 0, 0]); assert.ok (sphere.radius < 17);
+        const orbit = SessionEditor.prototype.OrbitSelected.call (editor); assert.deepEqual (orbit.pivot, [5, 0, 0]);
+    });
+    it ('Focus command preserves a multi-selection when no object ID is supplied', async () => {
+        const objects = ['a', 'b'].map ((id, index) => { const threeObject = new THREE.Mesh (new THREE.BoxGeometry (2, 2, 2)); threeObject.position.x = index * 10; return { id, visible : true, threeObject }; });
+        const editor = { selected : objects[0], SelectedObjects : () => objects, SelectedViewBounds : SessionEditor.prototype.SelectedViewBounds, Focus : SessionEditor.prototype.Focus, Select () { throw new Error ('Focus must retain the current selection'); }, website : { viewer : { navigation : {}, FitSphereToWindow () {} } } }; editor.website.sessionEditor = editor;
+        const result = await CreateAgentCommands (editor.website).Execute ('view.focus', {}); assert.equal (result.ok, true); assert.deepEqual (result.result.objectIds, ['a', 'b']);
     });
     it ('Rotates eye and target around the selected pivot as a rigid camera movement', () => {
         for (const navigationMode of [NavigationMode.FixedUpVector, NavigationMode.FreeOrbit]) {

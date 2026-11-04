@@ -1261,15 +1261,30 @@ export class SessionEditor
     }
     OrbitSelected ()
     {
-        const navigation = this.website.viewer.navigation; navigation.StopCameraMovement (); const bounds = this.selected?.visible !== false ? VisibleSceneBounds (this.selected?.threeObject) : null;
+        const navigation = this.website.viewer.navigation; navigation.StopCameraMovement (); const bounds = this.SelectedViewBounds ();
         const center = bounds?.getCenter (new THREE.Vector3 ()); navigation.orbitCenter = center ? new Coord3D (center.x, center.y, center.z) : null;
-        return { focused : Boolean (center), objectId : center ? this.selected.id : null, pivot : center ? center.toArray () : null };
+        if (center) { navigation.camera.center = new Coord3D (center.x, center.y, center.z); }
+        return { focused : Boolean (center), objectId : center ? this.selected?.id || null : null, pivot : center ? center.toArray () : null };
+    }
+    SelectedViewBounds ()
+    {
+        const objects = this.SelectedObjects (); const selection = objects.length ? objects : [this.selected].filter (Boolean);
+        const bounds = new THREE.Box3 (); let found = false;
+        for (const object of selection) {
+            if (object.visible === false || !object.threeObject) { continue; }
+            const item = VisibleSceneBounds (object.threeObject);
+            if (item && !item.isEmpty ()) { bounds.union (item); found = true; }
+        }
+        return found ? bounds : null;
     }
     Focus ()
     {
-        const object = this.selected; if (!object?.visible || !object.threeObject) { return; }
-        const bounds = VisibleSceneBounds (object.threeObject);
-        if (bounds) { this.website.viewer.FitSphereToWindow (bounds.getBoundingSphere (new THREE.Sphere ()), true); }
+        const bounds = this.SelectedViewBounds ();
+        if (!bounds) { return { focused : false, objectIds : [] }; }
+        const center = bounds.getCenter (new THREE.Vector3 ());
+        this.website.viewer.navigation.orbitCenter = new Coord3D (center.x, center.y, center.z);
+        this.website.viewer.FitSphereToWindow (bounds.getBoundingSphere (new THREE.Sphere ()), true);
+        return { focused : true, objectIds : this.SelectedObjects ().filter (object => object.visible !== false && VisibleSceneBounds (object.threeObject)).map (object => object.id) };
     }
     async Undo () { await this.history.Undo (); this.RefreshUI (); }
     async Redo () { await this.history.Redo (); this.RefreshUI (); }
