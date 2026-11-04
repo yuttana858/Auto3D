@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { StoreMeshyKey, ReadMeshyKey, CredentialPath } from '../functions/_lib/aicredentials.js';
 import { onRequest } from '../functions/api/ai/credentials.js';
 import { onRequest as proxy } from '../functions/api/ai/[[path]].js';
+import { onRequest as testEnteredKey } from '../functions/api/ai/credential-test.js';
 import { MeshyCredentialRequest } from '../source/website/aiconnection.js';
 import { CreateAgentCommands } from '../source/website/agentcommands.js';
 
@@ -78,6 +79,27 @@ describe ('Private account Meshy credentials', () => {
             const c = Context ({ MESHY_API_KEY : 'shared' }); c.params = { path : ['balance'] };
             assert.equal ((await proxy (c)).status, 401); c.env.AUTO3D_AI_ALLOW_SHARED_KEY = 'true'; assert.equal ((await proxy (c)).status, 200);
             c.env.MESHY_API_BASE_URL = 'http://insecure.test'; assert.equal ((await proxy (c)).status, 503); assert.equal (calls, 1);
+        } finally { globalThis.fetch = original; }
+    });
+    it ('distinguishes a missing key, unavailable secure storage, and provider rejection without returning the key', async () => {
+        const original = globalThis.fetch; const env = Environment (); const c = Context (env); c.params = { path : ['balance'] };
+        try {
+            let response = await proxy (c); assert.equal ((await response.json ()).code, 'MESHY_KEY_MISSING');
+            await StoreMeshyKey (env, 'owner', key); env.AUTO3D_AI_KEY_ENCRYPTION_SECRET = 'b2'.repeat (32);
+            response = await proxy (c); assert.equal ((await response.json ()).code, 'MESHY_STORAGE_UNAVAILABLE');
+            env.AUTO3D_AI_KEY_ENCRYPTION_SECRET = 'a1'.repeat (32); globalThis.fetch = async () => new Response ('provider echoed ' + key, { status : 401 });
+            response = await proxy (c); const body = await response.text (); assert.match (body, /MESHY_KEY_REJECTED/); assert.equal (body.includes (key), false);
+        } finally { globalThis.fetch = original; }
+    });
+    it ('tests an entered key without storage and does not return a provider response or secret', async () => {
+        const original = globalThis.fetch; let calls = 0; let providerStatus = 200;
+        globalThis.fetch = async (url, init) => { calls++; assert.equal (url, 'https://api.meshy.ai/openapi/v1/balance'); assert.equal (init.headers.Authorization, 'Bearer ' + key); assert.equal (init.redirect, 'error'); return new Response ('provider echoes ' + key, { status : providerStatus }); };
+        try {
+            const c = Context ({}, 'POST', { key }); let response = await testEnteredKey (c); assert.deepEqual (await response.json (), { valid : true });
+            providerStatus = 401; response = await testEnteredKey (Context ({}, 'POST', { key })); const body = await response.text (); assert.equal (response.status, 401); assert.equal (body.includes (key), false);
+            const foreign = Context ({}, 'POST', { key }); foreign.request.headers.set ('Origin', 'https://attacker.test'); assert.equal ((await testEnteredKey (foreign)).status, 403);
+            const mismatch = Context ({}, 'POST', { key }); mismatch.request.headers.set ('X-Auto3D-Account', 'other'); assert.equal ((await testEnteredKey (mismatch)).status, 409);
+            assert.equal ((await testEnteredKey (Context ({}, 'POST', { key, extra : true }))).status, 400); assert.equal (calls, 2);
         } finally { globalThis.fetch = original; }
     });
     it ('checks account changes and read-only state on the client without trusting response fields', async () => {
