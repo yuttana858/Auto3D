@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { Blob as NodeBlob } from 'node:buffer';
 import { SceneDocument, SceneHistory } from '../../source/website/scenedocument.js';
 import { PackSession, ReadSession, CreateSessionArchive, OpenSessionArchive, MigrateSessionData, SessionVersion } from '../../source/website/sessionarchive.js';
+import { RecoverySnapshot } from '../../source/website/sessionrecovery.js';
+import { PackRecoverySnapshot } from '../../source/website/sessionrecoverypack.js';
 import { Model } from '../../source/engine/model/model.js';
 import { Node } from '../../source/engine/model/node.js';
 import { Mesh } from '../../source/engine/model/mesh.js';
@@ -51,6 +53,24 @@ export default function suite ()
             assert.deepEqual (new Uint8Array (reopened.document.objects[0].animationAsset.files[0].buffer), new Uint8Array ([1, 2, 255])); assert.deepEqual (new Uint8Array (reopened.document.model.materials[0].diffuseMap.buffer), new Uint8Array ([0, 128, 255])); assert.equal (reopened.document.model.materials[0].gltfMaterialIndex, 3); assert.equal (reopened.document.model.materials[0].bumpScale, 0.7); assert.equal (reopened.document.model.materials[0].roughness, 0.24); assert.equal (reopened.document.model.materials[0].metalness, 0.61); assert.equal (reopened.document.model.materials[0].specularIntensity, 0.73);
             const view = { backgroundPreset : 'outdoor', horizonGradient : true, showGroundGrid : false, lighting : { mode : 'hdri', environment : 'studio_small_09', background : true, brightness : 1.25, rotation : 35, elevation : -10, effects : { environmentIntensity : 0.8, modelReflections : true, modelReflectionIntensity : 0.6 } } }; const packedView = PackSession (scene, view); assert.deepEqual (packedView.view, view); assert.equal (packedView.model.materials[0].specularIntensity, surface.specularIntensity);
             let importedIndex; reopened.document.model.root.Enumerate ((node) => { if (node.gltfNodeIndex !== undefined) { importedIndex = node.gltfNodeIndex; } }); assert.equal (importedIndex, 7);
+        });
+        it ('rejects malformed texture coordinates', () => {
+            const surface = new PhysicalMaterial (); surface.diffuseMap = new TextureMap ();
+            surface.diffuseMap.name = 'pixel.png'; surface.diffuseMap.buffer = new Uint8Array ([1]).buffer;
+            const scene = new SceneDocument (); scene.AddImported (Asset (surface), 'textured');
+            const data = PackSession (scene); const map = data.model.materials[0].diffuseMap;
+            delete map.offset; assert.throws (() => ReadSession (data), /Invalid texture transform/);
+            map.offset = { x : 1 }; assert.throws (() => ReadSession (data), /Invalid texture transform/);
+            map.offset = null; assert.throws (() => ReadSession (data), /Invalid texture transform/);
+        });
+        it ('saves the diffuse color flag as a boolean and repairs previously saved flags', () => {
+            const surface = new PhysicalMaterial (); surface.multiplyDiffuseMap = true;
+            const scene = new SceneDocument (); scene.AddImported (Asset (surface), 'shared');
+            const data = PackRecoverySnapshot (structuredClone (RecoverySnapshot (scene, {})));
+            assert.equal (data.model.materials[0].multiplyDiffuseMap, true);
+            assert.equal (OpenSessionArchive (CreateSessionArchive (data)).document.model.materials[0].multiplyDiffuseMap, true);
+            data.model.materials[0].multiplyDiffuseMap = { buffer : null };
+            assert.equal (OpenSessionArchive (CreateSessionArchive (data)).document.model.materials[0].multiplyDiffuseMap, true);
         });
         it ('Round-trips object user data, shadow flags and keyframes in session schema v5', () => {
             const scene = new SceneDocument (); const object = scene.AddImported (Asset (), 'one');

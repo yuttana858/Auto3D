@@ -1,5 +1,6 @@
 import { ErrorLogs } from './errorlogs.js';
 import { InstallAuthGate } from './authgate.js';
+import { StartWelcomeSequence } from './welcome.js';
 import { AccountAdmin } from './accountadmin.js';
 import { Loc } from '../engine/core/localization.js';
 import { AddDiv, AddDomElement } from '../engine/viewer/domutils.js';
@@ -104,12 +105,13 @@ export function StartWebsite ()
         website.sceneEffects.onDiagnostics = (diagnosis) => errorLogs.RecordShadow (diagnosis, 'Shadow controls updated');
         website.accountAdmin = new AccountAdmin (website.auth);
         website.authPanel = new AuthPanel (website.auth, website.accountAdmin); website.authPanel.recovery = recovery;
-        const refreshAccount = () => { if (document.visibilityState === 'visible') { website.auth.Restore ().catch (() => {}); } };
+        let welcomeComplete = false;
+        const refreshAccount = () => { if (welcomeComplete && document.visibilityState === 'visible') { website.auth.Restore ().catch (() => {}); } };
         document.addEventListener ('visibilitychange', refreshAccount);
         window.setInterval (refreshAccount, 240000);
         website.commands = CreateAgentCommands (website);
         window.Auto3D = Object.freeze ({ apiVersion : 1, catalog : (query) => website.commands.Catalog (query), execute : (id, args) => website.commands.Execute (id, args), runMacro : (macro) => website.commands.RunMacro (macro), cancelMacro : () => website.commands.Cancel () });
-        InstallAuthGate (website);
+        StartWelcomeSequence (() => { welcomeComplete = true; InstallAuthGate (website); });
     });
 }
 

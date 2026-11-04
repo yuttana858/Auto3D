@@ -9,6 +9,10 @@ The shared shell offers opt-in animated entry/exit with latest-action cancellati
 Validation: 718 app/module tests, 26 MCP tests, 11 backend tests, lint, independent/module/website/Pages builds and production audit (zero vulnerabilities) pass; desktop/mobile Chromium verifies rail order/outline, lazy loading, draft edits, compact/extended/close motion, rapid transitions, reduced motion, unit conversion and unchanged imported-model/camera state. The initial browser fixture captured the baseline before asynchronous model import finished; a bounded import-completion poll corrected the fixture without changing application behavior or increasing timeouts.
 
 
+## Welcome screen — draft Auto3D 0.47.5 / Packaging 1.10.3
+
+Restore the animated startup welcome and wait for an explicit click or keyboard activation before beginning the authentication flow. A remembered login can restore after continuing. The temporary 3D renderer is disposed when the splash closes. See `docs/release-0475.md`.
+
 ## Meshy connection diagnostics — draft Auto3D 0.47.4 / Packaging 1.10.3
 
 The live connection test reported a generic failure, which does not identify whether the key is missing or rejected, encrypted storage is unavailable, or the provider request failed. This draft adds a key test that does not use storage, plus separate sanitized error states for the saved-key path. It does not remove encryption or claim the production failure is resolved. See `docs/release-0474.md`; live verification with the account holder remains required after review and deployment.
