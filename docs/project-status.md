@@ -4,6 +4,8 @@
 
 The live connection test reported a generic failure, which does not identify whether the key is missing or rejected, encrypted storage is unavailable, or the provider request failed. This draft adds a key test that does not use storage, plus separate sanitized error states for the saved-key path. It does not remove encryption or claim the production failure is resolved. See `docs/release-0474.md`; live verification with the account holder remains required after review and deployment.
 
+The startup flow also restores the animated welcome screen. It remains visible until click or keyboard activation, then starts the existing authentication flow and disposes the temporary 3D renderer. A remembered login can be restored after the user continues.
+
 ## Personal Meshy keys — Auto3D 0.47.3 / Packaging 1.10.3 (2026-11-03)
 
 Release candidate based on deployed 0.47.2 (`075f74d`), preserving current OAuth/MCP integrations. Adds masked interactive personal key save/replace/test/remove, account-bound AES-256-GCM storage in dedicated private R2 buckets, credential-free status commands and explicit proxy preference/failure behavior. Production/preview bindings and separate encryption secrets are configured; no database migration is needed. Validation: 710 app/module tests, 23 OAuth/MCP tests, 11 backend tests, lint, production dependency audit (zero vulnerabilities), dependency licenses, website/Pages build and desktop/mobile credential UI checks pass. Deployment now also checks the served Meshy UI/commands and unauthenticated credential-route denial. See [release-0473.md](release-0473.md) and [meshy-api-keys.md](meshy-api-keys.md).
