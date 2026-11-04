@@ -22,7 +22,7 @@ export class ModulePanels
 {
     constructor (website)
     {
-        this.website = website; this.extended = null; this.lastSide = 'left'; this.state = new ModulePanelState (); this.entries = new Map (); this.headers = new Map ();
+        this.website = website; this.extended = null; this.lastSide = 'left'; this.state = new ModulePanelState (); this.entries = new Map (); this.headers = new Map (); this.transitionGeneration = 0; this.motion = [];
         for (const [side, toggleId] of [['left', 'upload_panel_toggle'], ['right', 'data_panel_toggle']]) {
             const toggle = document.getElementById (toggleId); const header = toggle.parentElement; header.classList.add ('module_panel_header');
             const controls = document.createElement ('div'); controls.className = 'module_panel_controls'; header.appendChild (controls); const buttons = new Map ();
@@ -47,18 +47,38 @@ export class ModulePanels
             this.Render ();
         });
     }
-    Register (id, { side = 'right', title, body, mode = 'closed', onOpen, onMode })
+    Register (id, { side = 'right', title, body, mode = 'closed', onOpen, onMode, animated = false })
     {
-        this.state.Register (id, side, title, mode); body.id ||= 'module_panel_' + id; body.hidden = mode === 'closed'; body.dataset.module = id; body.classList.add ('module_panel_body'); this.entries.set (id, { body, onOpen, onMode });
+        this.state.Register (id, side, title, mode); body.id ||= 'module_panel_' + id; body.hidden = mode === 'closed'; body.dataset.module = id; body.classList.add ('module_panel_body'); this.entries.set (id, { body, onOpen, onMode, animated });
     }
     Inspect () { return [...this.state.modules.keys ()].map (id => this.state.Inspect (id)); }
     async Open (id) { const panel = this.state.modules.get (id); if (!panel) { throw new Error ('Unknown module panel.'); } return this.Set (id, panel.mode === 'closed' ? panel.preferred : panel.mode); }
+    async Animate (id, entering, extended)
+    {
+        const entry = this.entries.get (id);
+        if (!entry?.animated || window.matchMedia ('(prefers-reduced-motion: reduce)').matches) { return; }
+        const elements = [entry.body]; if (extended) { elements.push (this.headers.get (this.state.modules.get (id).side).toggle.parentElement); }
+        const offset = extended ? -40 : 22;
+        const start = { opacity : 0, transform : 'translateX(' + offset + 'px)' }, end = { opacity : 1, transform : 'translateX(0)' };
+        const animations = elements.filter (element => element.animate).map (element => element.animate (entering ? [start, end] : [end, start], { duration : entering ? 220 : 160, easing : entering ? 'cubic-bezier(.2,.8,.2,1)' : 'ease-in' }));
+        this.motion = animations; await Promise.allSettled (animations.map (animation => animation.finished));
+        if (this.motion === animations) { this.motion = []; }
+    }
     async Set (id, mode)
     {
-        const result = this.state.Set (id, mode); const panel = this.state.modules.get (id); if (mode !== 'closed') { this.lastSide = panel.side; }
+        const panel = this.state.modules.get (id);
+        if (!panel || !['minimal', 'extended', 'closed'].includes (mode) || panel.side === 'left' && mode === 'extended') { throw new Error ('Choose a supported mode for an existing module panel.'); }
+        const generation = ++this.transitionGeneration; this.motion.forEach (animation => animation.cancel ()); this.motion = [];
+        const outgoing = this.Inspect ().find (entry => entry.visible && entry.side === panel.side);
+        if (outgoing && (outgoing.id !== id || outgoing.mode !== mode)) { await this.Animate (outgoing.id, false, outgoing.mode === 'extended'); }
+        const result = () => { const state = this.state.Inspect (id); return { ...state, opened : state.visible }; };
+        if (generation !== this.transitionGeneration) { return result (); }
+        this.state.Set (id, mode); if (mode !== 'closed') { this.lastSide = panel.side; }
         const other = this.state.active[panel.side === 'left' ? 'right' : 'left'];
         if (mode !== 'closed' && (window.innerWidth < 800 || mode === 'extended' || this.state.modules.get (other).mode === 'extended')) { this.state.Set (other, 'closed'); }
-        this.Render (); if (mode !== 'closed') { await this.entries.get (id).onOpen?.(); } return { ...this.state.Inspect (id), opened : this.state.Inspect (id).visible, side : result.side };
+        this.Render (); if (mode !== 'closed') { await this.entries.get (id).onOpen?.(); }
+        if (generation === this.transitionGeneration && this.state.Inspect (id).visible && (outgoing?.id !== id || outgoing?.mode !== mode)) { await this.Animate (id, true, mode === 'extended'); }
+        return result ();
     }
     SyncExtended ()
     {

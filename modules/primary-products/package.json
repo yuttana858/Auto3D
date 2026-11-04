@@ -1,0 +1,19 @@
+{
+  "name": "@auto3d/primary-products",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "exports": "./src/index.js",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "test": "mocha test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "mocha": "11.8.0"
+  }
+}

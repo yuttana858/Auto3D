@@ -128,3 +128,5 @@ export function StartEmbed ()
         window.setInterval (() => auth.Restore ().catch (lockEmbed), 240000);
     });
 }
+
+import './css/primaryproducts.css';

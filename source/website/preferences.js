@@ -7,7 +7,7 @@ import { WorkspaceDialog } from './modellibrary.js';
 import { Unit } from '../engine/model/unit.js';
 import { OpenCommandPanel } from './commandpanel.js';
 
-export const AppVersion = '0.47.4';
+export const AppVersion = '0.48.0';
 
 export function AppBuildInfo ()
 {
@@ -166,7 +166,7 @@ export class Preferences
             this.website.sidebar.AddObject3DProperties (this.website.model, this.website.model);
             this.website.sessionEditor.UnitsChanged ();
         }
-        this.website.measureTool?.UpdatePanel (); this.website.sessionEditor?.packaging?.Refresh ();
+        this.website.primaryProductsPanel?.Refresh (); this.website.measureTool?.UpdatePanel (); this.website.sessionEditor?.packaging?.Refresh ();
         return this.SaveAccount ();
     }
     LockAccount ()

@@ -1,5 +1,14 @@
 # Auto3D development log and handoff
 
+## Primary Products UI shell — Auto3D 0.48.0 / Packaging 1.10.3 / Primary Products 0.1.0 (2026-11-04)
+
+Adds Primary Products directly below Packaging within the same outlined module rail group. Independent module-owned compact/extended UI supplies bottle/can cards, canonical-mm draft dimensions, surface controls and front/wrap label zones with an explicitly illustrative SVG profile. Add to session is disabled until generator work lands. Drafts survive panel changes, reset on account changes and respect account/read-only/busy guards. No scene or camera changes, artwork uploads or paid calls occur.
+
+The shared shell offers opt-in animated entry/exit with latest-action cancellation and reduced-motion fallback; Primary Products uses it while existing modules retain their behavior. Separate JS/CSS assets load on demand and are included in release hash verification. Stable commands are `ui.primary_products`, `primary.inspect/configure/reset` and existing `ui.module.mode`. Website/dev builds include independent module assets. See [primary-products-ui.md](primary-products-ui.md) and [release-0480.md](release-0480.md).
+
+Validation: 718 app/module tests, 26 MCP tests, 11 backend tests, lint, independent/module/website/Pages builds and production audit (zero vulnerabilities) pass; desktop/mobile Chromium verifies rail order/outline, lazy loading, draft edits, compact/extended/close motion, rapid transitions, reduced motion, unit conversion and unchanged imported-model/camera state. The initial browser fixture captured the baseline before asynchronous model import finished; a bounded import-completion poll corrected the fixture without changing application behavior or increasing timeouts.
+
+
 ## Meshy connection diagnostics — draft Auto3D 0.47.4 / Packaging 1.10.3
 
 The live connection test reported a generic failure, which does not identify whether the key is missing or rejected, encrypted storage is unavailable, or the provider request failed. This draft adds a key test that does not use storage, plus separate sanitized error states for the saved-key path. It does not remove encryption or claim the production failure is resolved. See `docs/release-0474.md`; live verification with the account holder remains required after review and deployment.
