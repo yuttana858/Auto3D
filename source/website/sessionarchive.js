@@ -54,10 +54,17 @@ function ReadMaterial (data)
     for (const key of Object.keys (material)) {
         const value = data[key];
         if (value === undefined) { continue; }
+        // Older asynchronous saves mistakenly serialized this boolean as a
+        // texture map, turning true into { buffer: null }.
+        if (key === 'multiplyDiffuseMap' && value && typeof value === 'object' && !Array.isArray (value) && Object.keys (value).length === 1 && value.buffer === null) {
+            material[key] = true;
+            continue;
+        }
         if (key.endsWith ('Map') && value && typeof value === 'object') {
             const map = new TextureMap ();
             map.name = String (value.name || 'texture.png'); map.mimeType = value.mimeType || null;
             map.buffer = value.buffer ? DecodeBuffer (value.buffer) : null;
+            if (!value.offset || !value.scale) { throw new Error ('Invalid texture transform.'); }
             map.offset = new Coord2D (value.offset.x, value.offset.y); map.scale = new Coord2D (value.scale.x, value.scale.y);
             map.rotation = value.rotation;
             if (![map.offset.x, map.offset.y, map.scale.x, map.scale.y, map.rotation].every (Number.isFinite)) { throw new Error ('Invalid texture transform.'); }
