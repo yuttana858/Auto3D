@@ -1,6 +1,17 @@
 import { AgentName, Identifier, ReadTools } from './common.js';
 import { Registrations } from './registrations.js';
 
+function NormalizeWindowCode (code)
+{
+    const normalized = typeof code === 'string' ? code.trim ().toUpperCase ().replace (/-/g, '') : '';
+    if (!/^[A-HJ-NP-Z2-9]{16}$/.test (normalized)) { throw new Error ('Invalid app window code.'); }
+    return normalized;
+}
+async function WindowCodeHash (code)
+{
+    const digest = new Uint8Array (await crypto.subtle.digest ('SHA-256', new TextEncoder ().encode (NormalizeWindowCode (code))));
+    return [...digest].map (byte => byte.toString (16).padStart (2, '0')).join ('');
+}
 function Sessions (sessions)
 {
     if (!Array.isArray (sessions) || sessions.length > 20 || sessions.filter (item => item.active).length > 1) { throw new Error ('Invalid sessions.'); }
@@ -52,6 +63,23 @@ export class BrokerCore
         await this.registrations.Assert ({ accountId, id : grantId });
         this.Notify (accountId);
     }
+    async PairWithCode ({ accountId, grantId, code, expiresAt })
+    {
+        Identifier (grantId);
+        const codeHash = await WindowCodeHash (code), registration = await this.registrations.Assert ({ accountId, id : grantId });
+        const target = this.Connections (accountId).find (({ data }) => data.windowCodeHash === codeHash && data.windowCodeExpiresAt > this.now () && data.sessions.some (session => session.active));
+        if (!target || !Number.isSafeInteger (expiresAt) || expiresAt <= this.now ()) { throw new Error ('App window code unavailable.'); }
+        await this.state.storage.transaction (async storage => {
+            const key = 'used-window-code:' + codeHash, used = await storage.get (key);
+            if (used?.expiresAt > this.now ()) { throw new Error ('App window code already used.'); }
+            if (used) { await storage.delete (key); }
+            await storage.put ('pair:' + grantId, { connectionId : target.data.connectionId, sessionId : target.data.sessions.find (session => session.active).id, expiresAt : Math.min (expiresAt, registration.expiresAt), revision : crypto.randomUUID () });
+            await storage.put (key, { expiresAt : target.data.windowCodeExpiresAt });
+        });
+        await this.registrations.Assert ({ accountId, id : grantId });
+        this.Notify (accountId);
+        return { paired : true };
+    }
     Notify (accountId)
     {
         // Names are fetched separately by the account UI; sockets carry no credentials.
@@ -100,7 +128,7 @@ export class BrokerCore
         }
         this.Notify (accountId); return { revoked : true };
     }
-    Message (socket, text)
+    async Message (socket, text)
     {
         const data = socket.deserializeAttachment ();
         try {
@@ -109,7 +137,11 @@ export class BrokerCore
             if (message.type === 'hello' && !data.ready && text.length <= 65536) {
                 Identifier (message.instanceId); const windowLabel = AgentName (message.windowLabel);
                 if (this.Connections (data.accountId).some (item => item.data.instanceId === message.instanceId)) { throw new Error ('Duplicate window.'); }
-                socket.serializeAttachment ({ ...data, instanceId : message.instanceId, windowLabel, sessions : Sessions (message.sessions), ready : true });
+                let windowCodeHash = null, windowCodeExpiresAt = null;
+                if (message.windowCode !== undefined) {
+                    windowCodeHash = await WindowCodeHash (message.windowCode); windowCodeExpiresAt = this.now () + 600000;
+                }
+                socket.serializeAttachment ({ ...data, instanceId : message.instanceId, windowLabel, windowCodeHash, windowCodeExpiresAt, sessions : Sessions (message.sessions), ready : true });
                 socket.send (JSON.stringify ({ type : 'hello_ack', connectionId : data.connectionId, expiresAt : data.expiresAt })); return;
             }
             if (message.type === 'sessions' && data.ready && text.length <= 65536 && message.instanceId === data.instanceId) {
@@ -134,8 +166,10 @@ export class BrokerCore
     }
     async Cleanup ()
     {
-        const records = await this.state.storage.list ({ prefix : 'request:', limit : 1000 });
-        for (const [key, record] of records) { if (record.expiresAt <= this.now ()) { await this.state.storage.delete (key); } }
+        for (const prefix of ['request:', 'used-window-code:']) {
+            const records = await this.state.storage.list ({ prefix, limit : 1000 });
+            for (const [key, record] of records) { if (record.expiresAt <= this.now ()) { await this.state.storage.delete (key); } }
+        }
         for (const socket of this.state.getWebSockets ()) { if (socket.deserializeAttachment ()?.expiresAt <= this.now ()) { socket.close (1008, 'Connection expired'); this.Close (socket); } }
     }
 }

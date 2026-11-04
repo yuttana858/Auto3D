@@ -2,8 +2,9 @@ import { build } from 'esbuild';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = path.resolve (new URL ('..', import.meta.url).pathname);
+const root = path.resolve (fileURLToPath (new URL ('..', import.meta.url)));
 process.chdir (root);
 const output = 'build/mcp-pilot';
 await rm (output, { recursive : true, force : true });

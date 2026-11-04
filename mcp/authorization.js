@@ -5,6 +5,8 @@ import { ActiveRegistration, BrowserIdentity } from './identity.js';
 
 const Escape = value => String (value).replace (/[&<>"']/g, char => '&#' + char.charCodeAt (0) + ';');
 const Encode = value => new TextEncoder ().encode (value);
+const NormalizeWindowCode = value => typeof value === 'string' ? value.trim ().toUpperCase ().replace (/-/g, '') : '';
+const ValidWindowCode = value => /^[A-HJ-NP-Z2-9]{16}$/.test (NormalizeWindowCode (value));
 function Page (html, headers = new Headers (), status = 200, validatedRedirectUri = null)
 {
     headers = new Headers (headers); headers.set ('Content-Type', 'text/html; charset=utf-8'); headers.set ('Cache-Control', 'no-store');
@@ -66,11 +68,11 @@ export async function Consent (request, env, provider, identity = BrowserIdentit
         if (!ValidScopes (authRequest.scope)) { return Page ('Only pilot read and optional screenshot access are supported.', undefined, 400); }
         const consent = await oauth.beginConsent (authRequest), expiresAt = Date.now () + 600000;
         const binding = await Binding (env, consent.handle, user.id, expiresAt);
-        return Page ('<h1>Connect an agent</h1><p>Account: ' + Escape (user.email || user.id) + '</p><p>Client: ' + Escape (details.clientName) + '</p><p>' + (details.clientDomain ? 'Client domain: ' + Escape (details.clientDomain) : 'The client name is self-reported.') + '</p><p>Redirect host: ' + Escape (details.redirectHost) + '</p>' + (details.redirectIsLoopback ? '<p>A local application will receive this authorization.</p>' : '') + '<p>Permissions: ' + authRequest.scope.map (Escape).join (', ') + '. Read the session you select' + (authRequest.scope.includes ('auto3d.capture') ? ' and request screenshots' : '') + '. Expires in 24 hours. You can revoke it in Agent access.</p><form method="post"><input type="hidden" name="handle" value="' + Escape (consent.handle) + '"><input type="hidden" name="binding" value="' + binding + '"><label>Registration name <input name="name" required maxlength="80" value="' + Escape (String (details.clientName).slice (0, 80)) + '"></label><label>Harness <select name="harness"><option value="chatgpt">ChatGPT</option><option value="desktop">Desktop OAuth client</option><option value="cli">CLI with OAuth and PKCE</option><option value="other-oauth">Other OAuth client</option></select></label><button name="decision" value="approve">Allow</button><button name="decision" value="deny">Deny</button></form>', consent.headers, 200, details.redirectUri);
+        return Page ('<h1>Connect an agent</h1><p>Account: ' + Escape (user.email || user.id) + '</p><p>Client: ' + Escape (details.clientName) + '</p><p>' + (details.clientDomain ? 'Client domain: ' + Escape (details.clientDomain) : 'The client name is self-reported.') + '</p><p>Redirect host: ' + Escape (details.redirectHost) + '</p>' + (details.redirectIsLoopback ? '<p>A local application will receive this authorization.</p>' : '') + '<p>Permissions: ' + authRequest.scope.map (Escape).join (', ') + '. Read the session you select' + (authRequest.scope.includes ('auto3d.capture') ? ' and request screenshots' : '') + '. Expires in 24 hours. You can revoke it in Agent access.</p><form method="post"><input type="hidden" name="handle" value="' + Escape (consent.handle) + '"><input type="hidden" name="binding" value="' + binding + '"><label>Registration name <input name="name" required maxlength="80" value="' + Escape (String (details.clientName).slice (0, 80)) + '"></label><label>Harness <select name="harness"><option value="chatgpt">ChatGPT</option><option value="claude">Claude</option><option value="desktop">Desktop OAuth client</option><option value="cli">CLI with OAuth and PKCE</option><option value="other-oauth">Other OAuth client</option></select></label><label>App window code (optional) <input name="appWindowCode" maxlength="19" autocomplete="off" placeholder="ABCD-EFGH-JKLM-NPQR"></label><p>Enter the code copied from Agent access to pair this agent with that open app window after approval. Leave blank to select the window and session later.</p><button name="decision" value="approve">Allow</button><button name="decision" value="deny">Deny</button></form>', consent.headers, 200, details.redirectUri);
     }
     if (!/^application\/x-www-form-urlencoded(?:\s*;|$)/i.test (request.headers.get ('Content-Type') || '')) { return Page ('Invalid form.', undefined, 400); }
     const form = new URLSearchParams (new TextDecoder ().decode (await ReadBytes (request, 8192)));
-    const keys = ['handle', 'binding', 'name', 'harness', 'decision'];
+    const keys = ['handle', 'binding', 'name', 'harness', 'appWindowCode', 'decision'];
     if ([...form.keys ()].some (key => !keys.includes (key)) || keys.some (key => form.getAll (key).length !== 1)) { return Page ('Invalid form.', undefined, 400); }
     const handle = form.get ('handle'), parts = form.get ('binding').split ('.'), expiresAt = Number (parts[0]);
     if (handle.length > 512 || !Number.isSafeInteger (expiresAt) || expiresAt <= Date.now () || expiresAt > Date.now () + 600000 || !/^[a-f0-9]{64}$/.test (parts[1] || '') || parts.length !== 2) { return Page ('Consent expired.', undefined, 403); }
@@ -78,15 +80,21 @@ export async function Consent (request, env, provider, identity = BrowserIdentit
     if (!await crypto.subtle.verify ('HMAC', await ConsentKey (env), signature, Encode (JSON.stringify ([handle, user.id, expiresAt])))) { return Page ('Account changed. Start again.', undefined, 403); }
     if (form.get ('decision') === 'deny') { const denied = await oauth.denyConsent (request, handle); return new Response (null, { status : 302, headers : denied.headers }); }
     if (form.get ('decision') !== 'approve') { return Page ('Invalid decision.', undefined, 400); }
-    const name = AgentName (form.get ('name')), harness = form.get ('harness');
+    const name = AgentName (form.get ('name')), harness = form.get ('harness'), appWindowCode = form.get ('appWindowCode');
+    if (appWindowCode && !ValidWindowCode (appWindowCode)) { return Page ('The app window code is invalid. Copy the complete current code from Agent access, or leave it blank to pair manually.', undefined, 400); }
     const approved = await oauth.approveConsent (request, handle);
     if (!ValidScopes (approved.request.scope)) { return Page ('Invalid scopes.', undefined, 403); }
     const registrationId = crypto.randomUUID (), broker = env.AUTO3D_AGENT_BROKER.getByName (user.id);
     const record = await broker.Register ({ accountId : user.id, id : registrationId, name, harness, clientId : approved.request.clientId, scopes : approved.request.scope, expiresAt : Date.now () + 86400000 });
     try {
+        if (appWindowCode) { await broker.PairWithCode ({ accountId : user.id, grantId : registrationId, code : appWindowCode, expiresAt : Date.now () + 600000 }); }
         const result = await oauth.completeAuthorization ({ request : approved.request, userId : user.id, scope : approved.request.scope, revokeExistingGrants : false, metadata : { registrationId, name, harness }, props : { registrationId, authorizedAt : record.createdAt } });
         approved.headers.set ('Location', result.redirectTo); return new Response (null, { status : 302, headers : approved.headers });
-    } catch (error) { await broker.RevokeRegistration ({ accountId : user.id, id : registrationId }); throw error; }
+    } catch (error) {
+        await broker.RevokeRegistration ({ accountId : user.id, id : registrationId });
+        if (appWindowCode) { return Page ('Could not pair with that app window. The code may be expired, already used, or disconnected. Reconnect the app window to generate a new code, then restart authorization.', undefined, 400); }
+        throw error;
+    }
 }
 export async function ManageRegistrations (request, env)
 {

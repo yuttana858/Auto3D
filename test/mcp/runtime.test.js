@@ -24,7 +24,7 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         const timer = setTimeout (() => reject (new Error ('Browser fixture timed out.')), 5000);
         ws.addEventListener ('message', event => { clearTimeout (timer); resolve (JSON.parse (event.data)); }, { once : true });
     });
-    async function begin (id = userA, scope = 'auto3d.read offline_access')
+    async function begin (id = userA, scope = 'auto3d.read offline_access', appWindowCode = '')
     {
         const verifier = Buffer.from (crypto.getRandomValues (new Uint8Array (32))).toString ('base64url');
         const challenge = Buffer.from (await crypto.subtle.digest ('SHA-256', new TextEncoder ().encode (verifier))).toString ('base64url');
@@ -34,15 +34,16 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         assert.match (response.headers.get ('Content-Security-Policy'), /form-action 'self' https:\/\/client\.example;/);
         const html = await response.text ();
         assert.ok (!html.includes ('<script>evil</script>')); assert.ok (html.includes ('&#60;script&#62;evil&#60;/script&#62;'));
-        const form = new URLSearchParams ({ handle : html.match (/name="handle" value="([^"]+)"/)[1], binding : html.match (/name="binding" value="([^"]+)"/)[1], name : 'My review agent', harness : 'chatgpt', decision : 'approve' });
+        assert.ok (html.includes ('App window code (optional)')); assert.ok (html.includes ('value="claude"'));
+        const form = new URLSearchParams ({ handle : html.match (/name="handle" value="([^"]+)"/)[1], binding : html.match (/name="binding" value="([^"]+)"/)[1], name : 'My review agent', harness : 'chatgpt', appWindowCode, decision : 'approve' });
         const cookies = [cookieFor (id), ...response.headers.getSetCookie ().map (value => value.split (';')[0])].join ('; ');
         return { verifier, form, cookies };
     }
     const approve = (flow, id = userA) => fetch ('/oauth/authorize', { method : 'POST', headers : { Cookie : flow.cookies, Origin : origin, 'Content-Type' : 'application/x-www-form-urlencoded' }, body : flow.form.toString (), redirect : 'manual' });
-    async function grant (id = userA, scope)
+    async function grant (id = userA, scope, appWindowCode = '')
     {
         const before = await (await fetch ('/api/agent/registrations', { headers : userHeaders (id) })).json ();
-        const flow = await begin (id, scope), approval = await approve (flow, id); assert.equal (approval.status, 302);
+        const flow = await begin (id, scope, appWindowCode), approval = await approve (flow, id); assert.equal (approval.status, 302);
         const redirect = new URL (approval.headers.get ('Location')); assert.equal (redirect.searchParams.get ('state'), 'test-state'); assert.equal (redirect.searchParams.get ('iss'), origin + '/oauth');
         const response = await fetch ('/oauth/oauth/token', { method : 'POST', headers : { 'Content-Type' : 'application/x-www-form-urlencoded' }, body : new URLSearchParams ({ grant_type : 'authorization_code', client_id : clientId, code : redirect.searchParams.get ('code'), code_verifier : flow.verifier, redirect_uri : 'https://client.example/callback', resource : origin + '/mcp' }).toString () });
         assert.equal (response.status, 200);
@@ -120,6 +121,22 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         assert.equal ((await post ('/api/agent/registrations', { action : 'revoke', id : active.id })).status, 200);
         assert.equal ((await rpc (token.access_token, 'tools/list')).status, 401);
         const refreshed = await fetch ('/oauth/oauth/token', { method : 'POST', headers : { 'Content-Type' : 'application/x-www-form-urlencoded' }, body : new URLSearchParams ({ grant_type : 'refresh_token', refresh_token : token.refresh_token, client_id : clientId, resource : origin + '/mcp' }).toString () }); assert.equal (refreshed.status, 400);
+    });
+    it ('pairs the OAuth harness automatically from the open app window code', async () => {
+        const code = 'ABCD-EFGH-JKLM-NPQR', upgrade = await fetch ('/api/agent/connect', { headers : { Cookie : cookieFor (userA), Origin : origin, Upgrade : 'websocket' } });
+        assert.equal (upgrade.status, 101); socket = upgrade.webSocket; socket.accept (); const ack = message (socket), pairingNotice = message (socket);
+        socket.send (JSON.stringify ({ type : 'hello', instanceId : 'window-auto-pair', windowLabel : 'Auto3D window', windowCode : code, sessions : [{ id : 'tab-a', name : 'Bottle', active : true }] }));
+        await ack;
+        const token = await grant (userA, undefined, code); await pairingNotice;
+        const pending = rpc (token.access_token, 'tools/call', { name : 'scene.inspect', arguments : {} }), request = await message (socket);
+        assert.equal (request.type, 'request'); assert.equal (request.sessionId, 'tab-a');
+        socket.send (JSON.stringify ({ type : 'result', requestId : request.requestId, sessionId : request.sessionId, result : { ok : true, command : 'scene.inspect', result : { objects : [{ name : 'Bottle' }] } } }));
+        const response = await pending, result = await response.json ();
+        assert.equal (response.status, 200); assert.equal (JSON.parse (result.result.content[0].text).objects[0].name, 'Bottle');
+        const reusedFlow = await begin (userA, undefined, code), reused = await approve (reusedFlow);
+        assert.equal (reused.status, 400); assert.match (await reused.text (), /expired, already used, or disconnected/);
+        const invalidFlow = await begin (userA, undefined, 'NOT-A-VALID-CODE'), invalid = await approve (invalidFlow);
+        assert.equal (invalid.status, 400); assert.match (await invalid.text (), /code is invalid/);
     });
     it ('blocks production data routes, forged origins, account mismatches and non-admin controls', async () => {
         assert.ok ([403, 404].includes ((await post ('/api/personal/items', {})).status));
