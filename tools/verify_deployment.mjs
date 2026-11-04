@@ -29,6 +29,14 @@ export async function VerifyDeployment (origin, expectedBuild, fetchImpl = fetch
             if (createHash ('sha256').update (Buffer.from (bytes)).digest ('hex') !== module[hash]) { throw new Error ('Served Packaging module ' + key + ' does not match the release.'); }
         }
     }
+    if (release.modules?.primaryProducts) {
+        const module = release.modules.primaryProducts;
+        for (const [key, hash] of [['script', 'scriptHash'], ['stylesheet', 'stylesheetHash']]) {
+            if (!new RegExp ('^/o3dv/primary-products/primary-products\\.module\\.' + (key === 'script' ? 'js' : 'css') + '\\?v=[a-f0-9]{12}$').test (module[key])) { throw new Error ('Invalid Primary Products module location.'); }
+            const bytes = await (await read (module[key])).arrayBuffer ();
+            if (createHash ('sha256').update (Buffer.from (bytes)).digest ('hex') !== module[hash]) { throw new Error ('Served Primary Products module does not match the release.'); }
+        }
+    }
     return { version : release.version, build : release.build, verified : true };
 }
 if (process.argv[1] && import.meta.url === pathToFileURL (process.argv[1]).href) {

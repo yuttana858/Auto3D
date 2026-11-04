@@ -35,3 +35,10 @@ Future modules register their own stable ID and use the generic mode command. Ad
 ModulePanels moves the active module body and its shared header into one native modal dialog. The shell fills 100vw × 100dvh; the module content slides from the left, with a reduced-motion alternative. Native modal inertness blocks background buttons, focus and pointers; event containment and SessionEditor shortcut gating prevent scene actions. Minimal/Close restore the original DOM locations and preserve module state. Only one extended module may be active. Nested feature dialogs can still open above it. AI owns its viewer/history/input layout; Packaging owns all of its content and styles.
 
 The shared application header and toolbar are temporarily placed at the top of the extended shell, above every module. This keeps its controls, including Undo and Redo, available while the underlying scene remains blocked. The module header and content slide in below the toolbar; minimizing or closing restores the application header and module content to their original locations. New modules inherit this layout by registering with ModulePanels.
+
+
+## Primary Products (0.48.0)
+
+The right-side `primary-products` module sits below Packaging in the same outlined Generation modules group. Its independently built content lives in `modules/primary-products`; `primaryproductspanel.js` owns only lazy loading, account-scoped draft state and host callbacks. `ui.primary_products` opens it and the existing `ui.module.mode` command controls Minimal/Extended/Close.
+
+Registrations can set `animated: true` to opt into shared entry/exit motion. Primary Products does so: exit completes before hiding/restoring the DOM, superseded transitions are cancelled, and reduced-motion preference skips motion. Draft state remains owned by the module host and is not reset by layout transitions. Existing registrations retain their prior behavior.

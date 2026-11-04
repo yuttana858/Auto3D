@@ -39,6 +39,7 @@ import { GetBackgroundPreset, GetBackgroundGradientCSS } from '../engine/viewer/
 import { SessionEditor } from './sessioneditor.js';
 import { Preferences } from './preferences.js';
 import { ModulePanels } from './modulepanels.js';
+import { PrimaryProductsPanel } from './primaryproductspanel.js';
 import { PackagingPanel } from './packagingpanel.js';
 import { AIWorkspace } from './aiworkspace.js';
 import { SceneEffects } from '../engine/viewer/sceneeffects.js';
@@ -255,7 +256,7 @@ export class Website
         this.cameraPanel = new CameraPanel (this);
         this.viewModes = new ViewModes (this); this.rendering = new RenderQueue (this); this.renderingPanel = new RenderingPanel (this);
         this.preferences = new Preferences (this);
-        this.aiWorkspace = new AIWorkspace (this); this.packagingPanel = new PackagingPanel (this);
+        this.aiWorkspace = new AIWorkspace (this); this.packagingPanel = new PackagingPanel (this); this.primaryProductsPanel = new PrimaryProductsPanel (this);
         for (const [id, setting] of [['horizon_gradient', 'horizonGradient'], ['ground_grid', 'showGroundGrid']]) {
             const checkbox = document.getElementById (id);
             checkbox.addEventListener ('change', () => {
