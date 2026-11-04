@@ -12,7 +12,7 @@ export function PackRecoverySnapshot (snapshot)
         if (!materialMap.has (index)) {
             const source = snapshot.materials[index]; const material = {};
             for (const [key, value] of Object.entries (source)) {
-                material[key] = key.endsWith ('Map') && value ? { ...value, buffer : value.buffer ? EncodeBuffer (value.buffer) : null } : value;
+                material[key] = key.endsWith ('Map') && value && typeof value === 'object' ? { ...value, buffer : value.buffer ? EncodeBuffer (value.buffer) : null } : value;
             }
             materialMap.set (index, materials.length); materials.push (material);
         }
