@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Selected-object focus — Auto3D 0.47.6 / Packaging 1.10.3
+
+Focus frames the combined visible selection and right-drag targets that selection’s center, including groups. See `docs/release-0476.md`.
+
 ## Welcome screen — draft Auto3D 0.47.5 / Packaging 1.10.3
 
 Restore the animated startup welcome and wait for an explicit click or keyboard activation before beginning the authentication flow. A remembered login can restore after continuing. The temporary 3D renderer is disposed when the splash closes. See `docs/release-0475.md`.
