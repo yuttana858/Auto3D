@@ -1,5 +1,8 @@
+import { CommandIds } from './command-catalog.js';
 import { AgentName, Identifier, ReadTools } from './common.js';
 import { Registrations } from './registrations.js';
+
+const ToolIds = new Set (CommandIds);
 
 function NormalizeWindowCode (code)
 {
@@ -96,11 +99,12 @@ export class BrokerCore
     async Dispatch ({ accountId, grantId, requestId, command, arguments : args })
     {
         Identifier (requestId);
-        if (!ReadTools.includes (command) || !args || typeof args !== 'object' || Array.isArray (args)) { throw new Error ('Tool unavailable.'); }
+        if (!ToolIds.has (command) || !args || typeof args !== 'object' || Array.isArray (args)) { throw new Error ('Tool unavailable.'); }
         const registration = await this.registrations.Assert ({ accountId, id : grantId });
+        if (!ReadTools.includes (command) && !registration.scopes.includes ('auto3d.write')) { throw new Error ('Write permission required.'); }
         if (command === 'capture.image' && !registration.scopes.includes ('auto3d.capture')) { throw new Error ('Screenshot permission required.'); }
         const { pair, target } = await this.Resolve ({ accountId, grantId });
-        const message = JSON.stringify ({ type : 'request', requestId, command, arguments : args, sessionId : pair.sessionId });
+        const message = JSON.stringify ({ type : 'request', requestId, command, arguments : args, sessionId : pair.sessionId, ...(!ReadTools.includes (command) ? { writeAuthorized : true } : {}) });
         if (message.length > 65536 || this.pending.size >= 20) { throw new Error ('Request limit reached.'); }
         await this.state.storage.transaction (async storage => {
             const key = 'request:' + grantId + ':' + requestId;

@@ -11,12 +11,12 @@ export async function HandleMcp (request, service, actor)
     server.setRequestHandler (ListToolsRequestSchema, async () => { await service.Assert (actor); return { tools : [
         { name : 'auto3d.sessions.list', description : 'List this account’s connected browser windows and sessions.', inputSchema : { type : 'object', properties : {}, additionalProperties : false }, annotations : { readOnlyHint : true } },
         { name : 'auto3d.sessions.select', description : 'Pair with an active session explicitly chosen by the user. Does not edit the scene.', inputSchema : { type : 'object', properties : { connectionId : { type : 'string' }, sessionId : { type : 'string' } }, required : ['connectionId', 'sessionId'], additionalProperties : false }, annotations : { readOnlyHint : false, destructiveHint : false, idempotentHint : false } },
-        ...service.Tools (actor).map (tool => ({ name : tool.id, title : tool.title, description : tool.description, inputSchema : tool.inputSchema, annotations : { readOnlyHint : true } }))
+        ...service.Tools (actor).map (tool => ({ name : tool.id, title : tool.title, description : tool.description, inputSchema : tool.inputSchema, annotations : { readOnlyHint : !tool.mutates, ...(tool.id === 'auto3d.commands.invoke' ? { destructiveHint : true, idempotentHint : false } : {}) } }))
     ] }; });
     server.setRequestHandler (CallToolRequestSchema, async ({ params }) => {
         try {
             const result = await service.Call (actor, params.name, params.arguments || {});
-            if (params.name === 'capture.image') { return { content : CaptureContent (result) }; }
+            if (params.name === 'capture.image' || params.name === 'auto3d.commands.invoke' && params.arguments?.command === 'capture.image') { return { content : CaptureContent (result) }; }
             return { content : [{ type : 'text', text : JSON.stringify (result) }], structuredContent : { result } };
         } catch { return { isError : true, content : [{ type : 'text', text : 'Request unavailable. Check the selected session, connection and permissions. Timed-out requests are not replayed.' }] }; }
     });

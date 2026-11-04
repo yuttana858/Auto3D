@@ -78,9 +78,9 @@ export class AgentAccess
         const current = this.website.sessionEditor.sessions.active;
         const revision = this.website.sessionEditor.sessions.revision;
         const allowed = () => generation === this.generation && socket === this.socket && this.Account () === this.accountId && this.website.sessionEditor.sessions.active === current && this.website.sessionEditor.sessions.revision === revision && !this.website.sessionEditor.sessions.switching;
-        if (message.type !== 'request' || message.sessionId !== current || !ReadTools.includes (message.command) || message.command === 'capture.image' && !this.screenshots) { throw new Error ('Request not allowed.'); }
+        if (message.type !== 'request' || message.sessionId !== current || (!ReadTools.includes (message.command) && message.writeAuthorized !== true) || (message.command === 'capture.image' && !this.screenshots)) { throw new Error ('Request not allowed.'); }
         const metadata = this.website.commands.Catalog ().find (tool => tool.id === message.command);
-        if (!metadata || metadata.mutates) { throw new Error ('Tool unavailable.'); }
+        if (!metadata) { throw new Error ('Tool unavailable.'); }
         // Guard inside the registry queue, immediately before execution, and after it.
         const result = await this.website.commands.Queue (async () => {
             if (!allowed ()) { throw new Error ('Session changed.'); }
@@ -97,7 +97,7 @@ export class AgentAccess
     {
         const config = await this.Request ('config'), dialog = WorkspaceDialog ('Agent access'); dialog.dataset.capturePrivate = '';
         const form = document.createElement ('div'); form.className = 'workspace_save_form';
-        const note = document.createElement ('p'); note.textContent = (config.mode === 'live-admin' ? 'Administrator live test · ' : 'Staging pilot · ') + 'Connect your OAuth client to ' + config.mcpUrl + '. Copy this window code into the Auto3D authorization page to pair automatically; without it, select a session from the agent. Remote tools can inspect; screenshots require permission here and in OAuth.';
+        const note = document.createElement ('p'); note.textContent = (config.mode === 'live-admin' ? 'Administrator live test · ' : 'Staging pilot · ') + 'Connect your OAuth client to ' + config.mcpUrl + '. Copy this window code into the Auto3D authorization page to pair automatically; without it, select a session from the agent. The separate auto3d.write scope enables the full command catalog; account/admin operations keep their Auto3D permission checks. Screenshots require permission here and in OAuth.';
         const codeLabel = document.createElement ('label'); codeLabel.textContent = 'App window code ';
         const code = document.createElement ('input'); code.readOnly = true; code.autocomplete = 'off'; code.placeholder = 'Connect this window to generate a code'; code.value = this.windowCode || ''; code.setAttribute ('aria-label', 'App window code'); codeLabel.appendChild (code); this.codeInput = code;
         const copy = document.createElement ('button'); copy.type = 'button'; copy.textContent = 'Copy'; copy.disabled = !this.windowCode; this.copyButton = copy;

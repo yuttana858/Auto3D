@@ -79,7 +79,7 @@ Paths without a directory in this table are under `source/website/` unless ident
 
 ## Agent development and release checks
 
-Read root `AGENTS.md`. Every new user action must have a strict command using shared application services, category/description/example, mutation flag and structured result. Commands opening a dialog report that interaction, not a completed save/upload. Respect account and read-only gates, await completion and validate before mutation. Keep `website/assets/commands.json` synchronized. `window.Auto3D` exposes catalog/execute/runMacro/cancelMacro; it is an in-page API, not a deployed MCP server.
+Read root `AGENTS.md`. Every new user action must have a strict command using shared application services, category/description/example, mutation flag and structured result. Commands opening a dialog report that interaction, not a completed save/upload. Respect account and read-only gates, await completion and validate before mutation. Keep `website/assets/commands.json` and the generated MCP command-ID module synchronized with the catalog. `window.Auto3D` exposes catalog/execute/runMacro/cancelMacro in-page; the separately authorized MCP bridge relays catalog commands to a paired live viewer.
 
 ```bash
 npm ci
