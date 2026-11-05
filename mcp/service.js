@@ -78,13 +78,17 @@ export class PilotService
     }
     async Call (actor, name, args, requestId = crypto.randomUUID ())
     {
-        await this.Assert (actor);
+        const registration = await this.Assert (actor);
         let result;
         if (name === 'auto3d.sessions.list') {
             Validate (args, { type : 'object', properties : {} }); result = await this.broker.List (actor.userId);
         } else if (name === 'auto3d.sessions.select') {
             Validate (args, { type : 'object', properties : { connectionId : { type : 'string', pattern : '^[A-Za-z0-9_-]{1,128}$' }, sessionId : { type : 'string', pattern : '^[A-Za-z0-9_-]{1,128}$' } }, required : ['connectionId', 'sessionId'] });
-            await this.broker.Pair ({ accountId : actor.userId, grantId : actor.props.registrationId, ...args, expiresAt : actor.expiresAt * 1000 }); result = args;
+            await this.broker.Pair ({ accountId : actor.userId, grantId : actor.props.registrationId, ...args, expiresAt : registration.expiresAt }); result = args;
+        } else if (name === 'auto3d.sessions.pair_code') {
+            Validate (args, { type : 'object', properties : { code : { type : 'string', pattern : '^(?:[A-HJ-NP-Za-hj-np-z2-9]{4}-){3}[A-HJ-NP-Za-hj-np-z2-9]{4}$' } }, required : ['code'] });
+            await this.broker.PairWithCode ({ accountId : actor.userId, grantId : actor.props.registrationId, code : args.code, expiresAt : registration.expiresAt });
+            result = { paired : true };
         } else if (FamilyTools.some (tool => tool.id === name)) {
             result = this.BrowseFamily (name.slice ('auto3d.'.length), args);
             if (name === 'auto3d.modules' && !args.category && !args.search && actor.scope.includes ('auto3d.write')) {
