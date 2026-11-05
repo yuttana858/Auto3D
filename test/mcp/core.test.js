@@ -102,7 +102,7 @@ describe ('MCP registration and isolation boundary', () => {
     it ('enforces remote allowlists and strict string argument constraints', async () => {
         const broker = { AssertRegistration : async () => ({}) }, actor = { userId : owner, props : { registrationId : 'grant-a' }, scope : ['auto3d.read'], expiresAt : Date.now () / 1000 + 60 };
         const service = new PilotService (broker, [{ id : 'auth.sign_out', mutates : true }, { id : 'capture.image', mutates : false }]);
-        assert.equal (service.Tools (actor).length, 8); await assert.rejects (service.Call (actor, 'auth.sign_out', {}));
+        assert.equal (service.Tools (actor).length, 9); await assert.rejects (service.Call (actor, 'auth.sign_out', {}));
         const tools = service.Tools ({ ...actor, scope : ['auto3d.read', 'auto3d.write'] }).map (tool => tool.id);
         for (const id of ['auto3d.design', 'auto3d.commands', 'auto3d.capture', 'auto3d.modules', 'auto3d.sessions', 'auto3d.settings', 'auto3d.commands.invoke']) { assert.ok (tools.includes (id)); }
         assert.throws (() => Validate ('abc', { type : 'string', maxLength : 2 })); assert.throws (() => Validate ('bad!', { type : 'string', pattern : '^[a-z]+$' }));
@@ -118,6 +118,19 @@ describe ('MCP registration and isolation boundary', () => {
         await assert.rejects (broker.HeadlessInspect ({ accountId : other, grantId : 'grant-a' }));
         await broker.Revoke ({ accountId : owner, id : 'grant-a' }); await assert.rejects (broker.HeadlessInspect ({ accountId : owner, grantId : 'grant-a' }));
         assert.equal (await broker.state.storage.get ('headless:grant-a'), undefined);
+    });
+    it ('saves account-owned projects with revision checks, preserving them when a grant is revoked', async () => {
+        const broker = new BrokerCore (State ()), params = { code : '0201', length : 304.8, width : 304.8, height : 304.8, thickness : 3 };
+        for (const id of ['grant-a', 'grant-b']) { await broker.registrations.Create ({ ...registration (id), scopes : ['auto3d.read', 'auto3d.write'] }); await broker.HeadlessGenerate ({ accountId : owner, grantId : id, parameters : params }); }
+        const { project } = await broker.HeadlessProjectSave ({ accountId : owner, grantId : 'grant-a', name : 'Box' }); assert.equal (project.revision, 1);
+        const updates = await Promise.allSettled (['grant-a', 'grant-b'].map (grantId => broker.HeadlessProjectSave ({ accountId : owner, grantId, name : 'Updated', projectId : project.id, expectedRevision : 1 })));
+        assert.equal (updates.filter (item => item.status === 'fulfilled').length, 1); assert.equal (updates.filter (item => item.status === 'rejected').length, 1);
+        await broker.Revoke ({ accountId : owner, id : 'grant-a' });
+        assert.equal ((await broker.HeadlessProjectGet ({ accountId : owner, grantId : 'grant-b', projectId : project.id })).project.revision, 2);
+        const restarted = new BrokerCore (broker.state); assert.equal ((await restarted.HeadlessProjectGet ({ accountId : owner, grantId : 'grant-b', projectId : project.id })).project.name, 'Updated');
+        await assert.rejects (broker.HeadlessProjectGet ({ accountId : other, grantId : 'grant-b', projectId : project.id }));
+        await assert.rejects (broker.HeadlessProjectDelete ({ accountId : owner, grantId : 'grant-b', projectId : project.id, expectedRevision : 1 }), /changed/);
+        await broker.HeadlessProjectDelete ({ accountId : owner, grantId : 'grant-b', projectId : project.id, expectedRevision : 2 }); assert.deepEqual ((await broker.HeadlessProjects ({ accountId : owner, grantId : 'grant-b' })).projects, []);
     });
     it ('browses grouped command schemas with pagination without exposing every tool', async () => {
         const broker = { AssertRegistration : async () => ({}) }, actor = { userId : owner, props : { registrationId : 'grant-a' }, scope : ['auto3d.read', 'auto3d.write'], expiresAt : Date.now () / 1000 + 60 };
