@@ -180,6 +180,22 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         assert.equal (response.status, 400); assert.match (await response.text (), /Enter the current app window code/);
         assert.equal ((await approve (flow)).status, 302);
     });
+    it ('creates a long-lived revocable registration with a renewable refresh credential', async () => {
+        const token = await grant (); const records = await (await fetch ('/api/agent/registrations', { headers : userHeaders (userA) })).json ();
+        const record = records.registrations.find (item => item.id === token.registrationId); assert.ok (record.expiresAt > Date.now () + 365 * 86400000); assert.ok (token.refresh_token);
+        const response = await fetch ('/oauth/oauth/token', { method : 'POST', headers : { 'Content-Type' : 'application/x-www-form-urlencoded' }, body : new URLSearchParams ({ grant_type : 'refresh_token', client_id : clientId, refresh_token : token.refresh_token, resource : origin + '/mcp' }).toString () });
+        assert.equal (response.status, 200); assert.ok ((await response.json ()).refresh_token);
+        await post ('/api/agent/registrations', { action : 'revoke', id : token.registrationId });
+    });
+    it ('creates and reads an isolated headless CAD draft without a browser connection', async () => {
+        const writer = await grant (userA, 'auto3d.read auto3d.write offline_access');
+        const parameters = { code : '0201', length : 304.8, width : 304.8, height : 304.8, thickness : 3 };
+        const generated = await (await rpc (writer.access_token, 'tools/call', { name : 'auto3d.headless.fefco', arguments : parameters })).json ();
+        assert.equal (generated.result.structuredContent.result.draft.parameters.length, 304.8);
+        const inspected = await (await rpc (writer.access_token, 'tools/call', { name : 'auto3d.headless.inspect', arguments : {} })).json ();
+        assert.equal (inspected.result.structuredContent.result.draft.basis, 'score-to-score');
+        const reader = await grant (); const denied = await (await rpc (reader.access_token, 'tools/call', { name : 'auto3d.headless.fefco', arguments : parameters })).json (); assert.equal (denied.result.isError, true);
+    });
     it ('exposes the generated full command catalog only with write consent', async () => {
         const reader = await grant (), readerList = await (await rpc (reader.access_token, 'tools/list')).json ();
         assert.ok (!readerList.result.tools.some (tool => tool.name.startsWith ('auto3d.commands.')));

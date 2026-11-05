@@ -17,7 +17,7 @@ export class AgentAccess
 {
     constructor (website)
     {
-        this.website = website; this.socket = null; this.instanceId = crypto.randomUUID (); this.generation = 0; this.status = 'Disconnected'; this.codeInput = null; this.copyButton = null; this.statusElement = null;
+        this.website = website; this.socket = null; this.instanceId = crypto.randomUUID (); this.generation = 0; this.status = 'Disconnected'; this.codeInput = null; this.copyButton = null; this.statusElement = null; this.reconnectEnabled = false; this.reconnectAttempts = 0;
         website.auth.Subscribe (user => { if (!user || this.accountId && user.id !== this.accountId) { this.Disconnect (); } });
     }
     Account ()
@@ -34,22 +34,45 @@ export class AgentAccess
     }
     Inspect () { return { status : this.status, connected : this.socket?.readyState === 1, screenshots : this.screenshots === true, connectionId : this.connectionId || null }; }
     Sessions () { return this.website.sessionEditor.sessions.Inspect ().tabs.map (tab => ({ id : tab.id, name : tab.name.slice (0, 100), active : tab.active })); }
-    Disconnect ()
+    Disconnect ({ preserveRetry = false } = {})
     {
+        if (!preserveRetry) { this.reconnectEnabled = false; this.reconnectAttempts = 0; }
+        clearTimeout (this.reconnectTimer); this.reconnectTimer = null;
         this.generation++; clearInterval (this.poll); clearInterval (this.renew); clearTimeout (this.handshakeTimer); this.socket?.close (); this.socket = null; this.connectionId = null; this.windowCode = null;
         if (this.codeInput) { this.codeInput.value = ''; } if (this.copyButton) { this.copyButton.disabled = true; }
         this.status = 'Disconnected'; if (this.statusElement) { this.statusElement.textContent = this.status; } return this.Inspect ();
     }
-    async Connect ({ screenshots = false })
+    ConnectionLost ()
+    {
+        const retry = this.reconnectEnabled, owner = this.accountId, screenshots = this.screenshots, attempts = this.reconnectAttempts;
+        this.Disconnect ();
+        if (!retry || !owner || this.website.auth?.user?.id !== owner) { return; }
+        this.reconnectEnabled = true; this.reconnectAttempts = attempts; this.ScheduleReconnect (owner, screenshots);
+    }
+    ScheduleReconnect (owner, screenshots)
+    {
+        if (!this.reconnectEnabled || this.reconnectTimer) { return; }
+        const delay = Math.min (30000, 1000 * 2 ** Math.min (this.reconnectAttempts++, 5));
+        this.status = 'Reconnecting'; if (this.statusElement) { this.statusElement.textContent = this.status; }
+        this.reconnectTimer = setTimeout (async () => {
+            this.reconnectTimer = null;
+            if (!this.reconnectEnabled || this.website.auth?.user?.id !== owner) { this.Disconnect (); return; }
+            try { await this.Connect ({ screenshots, retry : true }); }
+            catch { if (this.reconnectEnabled && this.website.auth?.user?.id === owner) { this.ScheduleReconnect (owner, screenshots); } }
+        }, delay);
+    }
+    async Connect ({ screenshots = false, retry = false } = {})
     {
         if (typeof screenshots !== 'boolean') { throw new Error ('Invalid screenshot preference.'); }
+        const initialGeneration = this.generation;
         const windowCode = CreateWindowCode ();
         const owner = this.Account (), config = await this.Request ('config');
+        if (retry && (!this.reconnectEnabled || this.generation !== initialGeneration)) { throw new Error ('Reconnect cancelled.'); }
         if (!config.pilot || !['https://auto3d-mcp-pilot.pages.dev', 'https://auto3d-5av.pages.dev'].includes (location.origin) || config.mcpUrl !== location.origin + '/mcp') { throw new Error ('MCP access is unavailable here.'); }
-        this.Disconnect (); this.instanceId = crypto.randomUUID (); this.accountId = owner; this.screenshots = screenshots; this.windowCode = windowCode; this.status = 'Connecting'; const generation = this.generation;
+        this.Disconnect ({ preserveRetry : retry }); this.instanceId = crypto.randomUUID (); this.accountId = owner; this.screenshots = screenshots; this.windowCode = windowCode; this.status = 'Connecting'; const generation = this.generation;
         const socket = new WebSocket (location.origin.replace ('https:', 'wss:') + '/api/agent/connect'); this.socket = socket;
         socket.addEventListener ('message', event => { this.Message (event, socket, generation).catch (() => this.Disconnect ()); });
-        socket.addEventListener ('close', () => { if (this.socket === socket) { this.Disconnect (); } });
+        socket.addEventListener ('close', () => { if (this.socket === socket) { this.ConnectionLost (); } });
         await new Promise ((resolve, reject) => {
             this.handshakeTimer = setTimeout (() => { this.Disconnect (); reject (new Error ('Connection timed out.')); }, 15000);
             socket.addEventListener ('error', () => { clearTimeout (this.handshakeTimer); reject (new Error ('Connection failed.')); }, { once : true });
@@ -64,9 +87,12 @@ export class AgentAccess
             try {
                 if (this.Account () !== owner || generation !== this.generation) { this.Disconnect (); return; }
                 socket.send (JSON.stringify ({ type : 'sessions', instanceId : this.instanceId, sessions : this.Sessions () }));
-            } catch { this.Disconnect (); }
+            } catch { this.ConnectionLost (); }
         }, 1000);
-        this.renew = setInterval (() => { this.Request ('renew', { connectionId : this.connectionId, instanceId : this.instanceId }).catch (() => this.Disconnect ()); }, 60000);
+        this.renew = setInterval (() => { this.Request ('renew', { connectionId : this.connectionId, instanceId : this.instanceId }).catch (() => this.ConnectionLost ()); }, 60000);
+        this.reconnectEnabled = true; this.reconnectAttempts = 0;
+        if (this.codeInput) { this.codeInput.value = windowCode; } if (this.copyButton) { this.copyButton.disabled = false; }
+        if (this.statusElement) { this.statusElement.textContent = retry ? 'Reconnected. Copy the new window code to pair again.' : 'Connected'; }
         return { ...this.Inspect (), windowCode };
     }
     async Message (event, socket, generation)

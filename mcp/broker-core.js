@@ -1,6 +1,7 @@
 import { CommandIds } from './command-catalog.js';
 import { AgentName, Identifier, ReadTools } from './common.js';
 import { Registrations } from './registrations.js';
+import { FefcoProfile, ValidateFefco } from '../modules/packaging/src/fefco.js';
 
 const ToolIds = new Set (CommandIds);
 
@@ -62,7 +63,7 @@ export class BrokerCore
         const registration = await this.registrations.Assert ({ accountId, id : grantId });
         const target = this.Connections (accountId).find (({ data }) => data.connectionId === connectionId && data.sessions.some (session => session.id === sessionId && session.active));
         if (!target || !Number.isFinite (expiresAt) || expiresAt <= this.now ()) { throw new Error ('Session unavailable.'); }
-        await this.state.storage.put ('pair:' + grantId, { connectionId, sessionId, expiresAt : Math.min (expiresAt, registration.expiresAt), revision : crypto.randomUUID () });
+        await this.state.storage.put ('pair:' + grantId, { connectionId, sessionId, expiresAt : Math.min (expiresAt, registration.expiresAt), lastActivity : this.now (), revision : crypto.randomUUID () });
         await this.registrations.Assert ({ accountId, id : grantId });
         this.Notify (accountId);
     }
@@ -76,7 +77,7 @@ export class BrokerCore
             const key = 'used-window-code:' + codeHash, used = await storage.get (key);
             if (used?.expiresAt > this.now ()) { throw new Error ('App window code already used.'); }
             if (used) { await storage.delete (key); }
-            await storage.put ('pair:' + grantId, { connectionId : target.data.connectionId, sessionId : target.data.sessions.find (session => session.active).id, expiresAt : Math.min (expiresAt, registration.expiresAt), revision : crypto.randomUUID () });
+            await storage.put ('pair:' + grantId, { connectionId : target.data.connectionId, sessionId : target.data.sessions.find (session => session.active).id, expiresAt : Math.min (expiresAt, registration.expiresAt), lastActivity : this.now (), revision : crypto.randomUUID () });
             await storage.put (key, { expiresAt : target.data.windowCodeExpiresAt });
         });
         await this.registrations.Assert ({ accountId, id : grantId });
@@ -100,6 +101,10 @@ export class BrokerCore
     {
         await this.registrations.Assert ({ accountId, id : grantId });
         const pair = await this.state.storage.get ('pair:' + grantId);
+        if (pair && Number.isFinite (pair.lastActivity) && this.now () - pair.lastActivity >= 3600000) {
+            await this.state.storage.transaction (async storage => { const current = await storage.get ('pair:' + grantId); if (current?.revision === pair.revision && current.lastActivity === pair.lastActivity) { await storage.delete ('pair:' + grantId); } });
+            throw new Error ('Agent session disconnected after inactivity. Pair again.');
+        }
         const target = this.Connections (accountId).find (({ data }) => data.connectionId === pair?.connectionId && data.sessions.some (session => session.id === pair.sessionId && session.active));
         if (!pair || pair.expiresAt <= this.now () || !target) { throw new Error ('Paired session unavailable.'); }
         return { pair, target };
@@ -122,6 +127,11 @@ export class BrokerCore
         });
         const fresh = await this.Resolve ({ accountId, grantId });
         if (fresh.pair.revision !== pair.revision || fresh.target.socket !== target.socket) { throw new Error ('Pairing changed.'); }
+        await this.state.storage.transaction (async storage => {
+            const current = await storage.get ('pair:' + grantId);
+            if (!current || current.revision !== pair.revision) { throw new Error ('Pairing changed.'); }
+            await storage.put ('pair:' + grantId, { ...current, lastActivity : this.now () });
+        });
         const key = target.data.connectionId + ':' + requestId;
         const result = await new Promise ((resolve, reject) => {
             const timer = setTimeout (() => { this.pending.delete (key); reject (new Error ('Timed out. Do not automatically replay.')); }, this.timeoutMs);
@@ -131,6 +141,24 @@ export class BrokerCore
         const current = await this.Resolve ({ accountId, grantId });
         if (current.pair.revision !== pair.revision || current.target.socket !== target.socket) { throw new Error ('Pairing changed. Result discarded.'); }
         return result;
+    }
+    async HeadlessInspect ({ accountId, grantId })
+    {
+        await this.registrations.Assert ({ accountId, id : grantId });
+        return { mode : 'headless', draft : await this.state.storage.get ('headless:' + grantId) || null };
+    }
+    async HeadlessGenerate ({ accountId, grantId, parameters })
+    {
+        const registration = await this.registrations.Assert ({ accountId, id : grantId });
+        if (!registration.scopes.includes ('auto3d.write')) { throw new Error ('Write permission required.'); }
+        const p = ValidateFefco (parameters); const profile = FefcoProfile (p);
+        const draft = { kind : 'fefco-cad', basis : 'score-to-score', units : 'mm', parameters : p, profile, updatedAt : this.now () };
+        await this.state.storage.transaction (async storage => {
+            const current = await storage.get ('registration:' + grantId);
+            if (!current || current.revokedAt !== null || current.expiresAt <= this.now () || await storage.get ('disabled')) { throw new Error ('Agent access revoked.'); }
+            await storage.put ('headless:' + grantId, draft);
+        });
+        return { mode : 'headless', draft };
     }
     async Revoke ({ accountId, id })
     {
@@ -183,5 +211,12 @@ export class BrokerCore
             for (const [key, record] of records) { if (record.expiresAt <= this.now ()) { await this.state.storage.delete (key); } }
         }
         for (const socket of this.state.getWebSockets ()) { if (socket.deserializeAttachment ()?.expiresAt <= this.now ()) { socket.close (1008, 'Connection expired'); this.Close (socket); } }
+        const pairs = await this.state.storage.list ({ prefix : 'pair:', limit : 1000 }); let remaining = false;
+        for (const [key, pair] of pairs) {
+            if (pair.expiresAt <= this.now () || Number.isFinite (pair.lastActivity) && this.now () - pair.lastActivity >= 3600000) {
+                await this.state.storage.transaction (async storage => { const current = await storage.get (key); if (current?.revision === pair.revision && current.lastActivity === pair.lastActivity) { await storage.delete (key); } });
+            } else { remaining = true; }
+        }
+        return remaining;
     }
 }

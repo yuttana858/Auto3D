@@ -16,7 +16,7 @@ export class Registrations
     async Create ({ accountId, id, name, harness, clientId, scopes, expiresAt })
     {
         await this.Account (accountId); Identifier (id); name = AgentName (name);
-        if (!['chatgpt', 'claude', 'desktop', 'cli', 'other-oauth'].includes (harness) || typeof clientId !== 'string' || !clientId || clientId.length > 2048 || !ValidScopes (scopes) || !Number.isSafeInteger (expiresAt) || expiresAt <= this.now () || expiresAt > this.now () + 30 * 86400000) { throw new Error ('Invalid registration.'); }
+        if (!['chatgpt', 'claude', 'desktop', 'cli', 'other-oauth'].includes (harness) || typeof clientId !== 'string' || !clientId || clientId.length > 2048 || !ValidScopes (scopes) || !Number.isSafeInteger (expiresAt) || expiresAt <= this.now () || expiresAt > this.now () + 36526 * 86400000) { throw new Error ('Invalid registration.'); }
         return this.storage.transaction (async storage => {
             if (await storage.get ('disabled') || await storage.get ('registration:' + id)) { throw new Error ('Registration unavailable.'); }
             const records = await storage.list ({ prefix : 'registration:', limit : 101 });
@@ -44,6 +44,7 @@ export class Registrations
             const record = await storage.get ('registration:' + id);
             if (record) { await storage.put ('registration:' + id, { ...record, revokedAt : this.now () }); }
             await storage.delete ('pair:' + id);
+            await storage.delete ('headless:' + id);
         });
         return { revoked : true };
     }
@@ -56,7 +57,7 @@ export class Registrations
             // Re-enabling the account must never resurrect old authorizations.
             if (disabled) {
                 const records = await storage.list ({ prefix : 'registration:', limit : 100 });
-                for (const [key, record] of records) { await storage.put (key, { ...record, revokedAt : record.revokedAt ?? this.now () }); }
+                for (const [key, record] of records) { await storage.put (key, { ...record, revokedAt : record.revokedAt ?? this.now () }); await storage.delete ('headless:' + record.id); }
             }
         });
         return { disabled };

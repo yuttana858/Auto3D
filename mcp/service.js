@@ -19,6 +19,11 @@ const Families = Object.freeze ({
 });
 const FamilySchema = { type : 'object', properties : { category : { type : 'string', maxLength : 80 }, search : { type : 'string', maxLength : 120 }, offset : { type : 'integer', minimum : 0, maximum : 10000 }, limit : { type : 'integer', minimum : 1, maximum : 25 } }, additionalProperties : false };
 const FamilyTools = Object.entries (Families).map (([id, family]) => ({ id : 'auto3d.' + id, title : family.title, description : 'Browse ' + family.title + ' categories, then request a category to see paginated command schemas. Run a selected command using auto3d.commands.invoke with auto3d.write. Modules shows connected panels when permission permits.', mutates : false, inputSchema : FamilySchema }));
+const HeadlessTools = [
+    { id : 'auto3d.headless', title : 'Headless workspace capabilities', description : 'List server-side operations that do not require a connected app window. The headless draft is separate from live sessions.', mutates : false, inputSchema : { type : 'object', properties : {}, additionalProperties : false } },
+    { id : 'auto3d.headless.inspect', title : 'Inspect headless CAD draft', description : 'Read this agent registration’s separate temporary server-side CAD draft. No browser or window code required.', mutates : false, inputSchema : { type : 'object', properties : {}, additionalProperties : false } },
+    { id : 'auto3d.headless.fefco', title : 'Generate a headless FEFCO CAD draft', description : 'Replace this agent registration’s separate temporary server-side FEFCO cut/score draft. Dimensions are score-to-score in mm, not certified inside/outside allowances. Requires auto3d.write. Does not modify an open app or save to Library.', mutates : true, inputSchema : { type : 'object', properties : { code : { type : 'string', enum : ['0200', '0201', '0202', '0203'] }, length : { type : 'number', minimum : 20, maximum : 10000 }, width : { type : 'number', minimum : 20, maximum : 10000 }, height : { type : 'number', minimum : 20, maximum : 10000 }, thickness : { type : 'number', minimum : 0.5, maximum : 15 }, overlap : { type : 'number', minimum : 0, maximum : 10000 }, closure : { type : 'string', enum : ['open', 'closed'] } }, required : ['code', 'length', 'width', 'height', 'thickness'], additionalProperties : false } }
+];
 
 function ValidateInvocation (value)
 {
@@ -35,7 +40,7 @@ export class PilotService
     Tools (actor)
     {
         const basic = this.tools.filter (tool => ReadTools.includes (tool.id) && (tool.id !== 'capture.image' || actor.scope.includes ('auto3d.capture')));
-        return actor.scope.includes ('auto3d.write') ? [...basic, ...FamilyTools, ...CatalogTools] : [...basic, ...FamilyTools];
+        return actor.scope.includes ('auto3d.write') ? [...basic, ...FamilyTools, ...HeadlessTools, ...CatalogTools] : [...basic, ...FamilyTools, ...HeadlessTools.slice (0, 2)];
     }
     Categories ()
     {
@@ -89,6 +94,13 @@ export class PilotService
             Validate (args, { type : 'object', properties : { code : { type : 'string', pattern : '^(?:[A-HJ-NP-Za-hj-np-z2-9]{4}-){3}[A-HJ-NP-Za-hj-np-z2-9]{4}$' } }, required : ['code'] });
             await this.broker.PairWithCode ({ accountId : actor.userId, grantId : actor.props.registrationId, code : args.code, expiresAt : registration.expiresAt });
             result = { paired : true };
+        } else if (name === 'auto3d.headless') {
+            Validate (args, HeadlessTools[0].inputSchema); result = { mode : 'headless', description : 'Separate temporary CAD draft; live viewer, Library, rendering and UI operations require a connected window.', tools : HeadlessTools.slice (1).map (tool => ({ ...tool, available : !tool.mutates || actor.scope.includes ('auto3d.write') })) };
+        } else if (name === 'auto3d.headless.inspect') {
+            Validate (args, HeadlessTools[1].inputSchema); result = await this.broker.HeadlessInspect ({ accountId : actor.userId, grantId : actor.props.registrationId });
+        } else if (name === 'auto3d.headless.fefco') {
+            if (!actor.scope.includes ('auto3d.write')) { throw new Error ('Write permission required.'); }
+            Validate (args, HeadlessTools[2].inputSchema); result = await this.broker.HeadlessGenerate ({ accountId : actor.userId, grantId : actor.props.registrationId, parameters : args });
         } else if (FamilyTools.some (tool => tool.id === name)) {
             result = this.BrowseFamily (name.slice ('auto3d.'.length), args);
             if (name === 'auto3d.modules' && !args.category && !args.search && actor.scope.includes ('auto3d.write')) {

@@ -90,13 +90,34 @@ describe ('MCP registration and isolation boundary', () => {
         now += 600001; await broker.Cleanup ();
         assert.equal ((await state.storage.list ({ prefix : 'used-window-code:' })).size, 0);
     });
+    it ('disconnects an idle pairing after one hour without revoking the agent registration', async () => {
+        let now = Date.now (); const state = State (), broker = new BrokerCore (state, { now : () => now }), socket = Socket ();
+        await broker.registrations.Create ({ ...registration (), expiresAt : now + 7200000 });
+        await broker.Attach ({ accountId : owner, sessionFingerprint : 'a'.repeat (64), expiresAt : now + 60000 }, socket);
+        await broker.Message (socket, JSON.stringify ({ type : 'hello', instanceId : 'idle-window', windowLabel : 'Review', sessions : [{ id : 'tab-a', name : 'Box', active : true }] }));
+        await broker.Pair ({ accountId : owner, grantId : 'grant-a', connectionId : socket.data.connectionId, sessionId : 'tab-a', expiresAt : now + 7200000 });
+        now += 3600000; await broker.Cleanup (); assert.equal (await state.storage.get ('pair:grant-a'), undefined);
+        assert.ok (await broker.registrations.Assert ({ accountId : owner, id : 'grant-a' }));
+    });
     it ('enforces remote allowlists and strict string argument constraints', async () => {
         const broker = { AssertRegistration : async () => ({}) }, actor = { userId : owner, props : { registrationId : 'grant-a' }, scope : ['auto3d.read'], expiresAt : Date.now () / 1000 + 60 };
         const service = new PilotService (broker, [{ id : 'auth.sign_out', mutates : true }, { id : 'capture.image', mutates : false }]);
-        assert.equal (service.Tools (actor).length, 6); await assert.rejects (service.Call (actor, 'auth.sign_out', {}));
+        assert.equal (service.Tools (actor).length, 8); await assert.rejects (service.Call (actor, 'auth.sign_out', {}));
         const tools = service.Tools ({ ...actor, scope : ['auto3d.read', 'auto3d.write'] }).map (tool => tool.id);
         for (const id of ['auto3d.design', 'auto3d.commands', 'auto3d.capture', 'auto3d.modules', 'auto3d.sessions', 'auto3d.settings', 'auto3d.commands.invoke']) { assert.ok (tools.includes (id)); }
         assert.throws (() => Validate ('abc', { type : 'string', maxLength : 2 })); assert.throws (() => Validate ('bad!', { type : 'string', pattern : '^[a-z]+$' }));
+    });
+    it ('keeps headless CAD drafts isolated by grant, gated and independent of browser windows', async () => {
+        const broker = new BrokerCore (State ());
+        await broker.registrations.Create ({ ...registration (), scopes : ['auto3d.read', 'auto3d.write'] }); await broker.registrations.Create (registration ('grant-b'));
+        const params = { code : '0201', length : 304.8, width : 304.8, height : 304.8, thickness : 3 };
+        const generated = await broker.HeadlessGenerate ({ accountId : owner, grantId : 'grant-a', parameters : params });
+        assert.equal (generated.mode, 'headless'); assert.equal (generated.draft.parameters.length, 304.8); assert.equal (generated.draft.basis, 'score-to-score'); assert.ok (generated.draft.profile.paths.length > 0);
+        assert.equal ((await broker.HeadlessInspect ({ accountId : owner, grantId : 'grant-b' })).draft, null);
+        await assert.rejects (broker.HeadlessGenerate ({ accountId : owner, grantId : 'grant-b', parameters : params }), /Write permission/);
+        await assert.rejects (broker.HeadlessInspect ({ accountId : other, grantId : 'grant-a' }));
+        await broker.Revoke ({ accountId : owner, id : 'grant-a' }); await assert.rejects (broker.HeadlessInspect ({ accountId : owner, grantId : 'grant-a' }));
+        assert.equal (await broker.state.storage.get ('headless:grant-a'), undefined);
     });
     it ('browses grouped command schemas with pagination without exposing every tool', async () => {
         const broker = { AssertRegistration : async () => ({}) }, actor = { userId : owner, props : { registrationId : 'grant-a' }, scope : ['auto3d.read', 'auto3d.write'], expiresAt : Date.now () / 1000 + 60 };
