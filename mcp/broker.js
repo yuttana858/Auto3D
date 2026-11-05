@@ -19,6 +19,8 @@ export class Auto3DAgentBroker extends DurableObject
     PairWithCode (input) { return this.core.PairWithCode (input); }
     CheckWindowCode (input) { return this.core.CheckWindowCode (input); }
     Dispatch (input) { return this.core.Dispatch (input); }
+    HeadlessInspect (input) { return this.core.HeadlessInspect (input); }
+    HeadlessGenerate (input) { return this.core.HeadlessGenerate (input); }
     Register (input) { return this.core.registrations.Create (input); }
     Registrations (accountId) { return this.core.registrations.List (accountId); }
     AssertRegistration (input) { return this.core.registrations.Assert (input); }

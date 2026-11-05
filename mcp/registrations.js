@@ -44,6 +44,7 @@ export class Registrations
             const record = await storage.get ('registration:' + id);
             if (record) { await storage.put ('registration:' + id, { ...record, revokedAt : this.now () }); }
             await storage.delete ('pair:' + id);
+            await storage.delete ('headless:' + id);
         });
         return { revoked : true };
     }
@@ -56,7 +57,7 @@ export class Registrations
             // Re-enabling the account must never resurrect old authorizations.
             if (disabled) {
                 const records = await storage.list ({ prefix : 'registration:', limit : 100 });
-                for (const [key, record] of records) { await storage.put (key, { ...record, revokedAt : record.revokedAt ?? this.now () }); }
+                for (const [key, record] of records) { await storage.put (key, { ...record, revokedAt : record.revokedAt ?? this.now () }); await storage.delete ('headless:' + record.id); }
             }
         });
         return { disabled };

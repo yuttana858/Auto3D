@@ -187,6 +187,15 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         assert.equal (response.status, 200); assert.ok ((await response.json ()).refresh_token);
         await post ('/api/agent/registrations', { action : 'revoke', id : token.registrationId });
     });
+    it ('creates and reads an isolated headless CAD draft without a browser connection', async () => {
+        const writer = await grant (userA, 'auto3d.read auto3d.write offline_access');
+        const parameters = { code : '0201', length : 304.8, width : 304.8, height : 304.8, thickness : 3 };
+        const generated = await (await rpc (writer.access_token, 'tools/call', { name : 'auto3d.headless.fefco', arguments : parameters })).json ();
+        assert.equal (generated.result.structuredContent.result.draft.parameters.length, 304.8);
+        const inspected = await (await rpc (writer.access_token, 'tools/call', { name : 'auto3d.headless.inspect', arguments : {} })).json ();
+        assert.equal (inspected.result.structuredContent.result.draft.basis, 'score-to-score');
+        const reader = await grant (); const denied = await (await rpc (reader.access_token, 'tools/call', { name : 'auto3d.headless.fefco', arguments : parameters })).json (); assert.equal (denied.result.isError, true);
+    });
     it ('exposes the generated full command catalog only with write consent', async () => {
         const reader = await grant (), readerList = await (await rpc (reader.access_token, 'tools/list')).json ();
         assert.ok (!readerList.result.tools.some (tool => tool.name.startsWith ('auto3d.commands.')));

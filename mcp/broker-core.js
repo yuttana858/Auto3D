@@ -1,6 +1,7 @@
 import { CommandIds } from './command-catalog.js';
 import { AgentName, Identifier, ReadTools } from './common.js';
 import { Registrations } from './registrations.js';
+import { FefcoProfile, ValidateFefco } from '../modules/packaging/src/fefco.js';
 
 const ToolIds = new Set (CommandIds);
 
@@ -140,6 +141,24 @@ export class BrokerCore
         const current = await this.Resolve ({ accountId, grantId });
         if (current.pair.revision !== pair.revision || current.target.socket !== target.socket) { throw new Error ('Pairing changed. Result discarded.'); }
         return result;
+    }
+    async HeadlessInspect ({ accountId, grantId })
+    {
+        await this.registrations.Assert ({ accountId, id : grantId });
+        return { mode : 'headless', draft : await this.state.storage.get ('headless:' + grantId) || null };
+    }
+    async HeadlessGenerate ({ accountId, grantId, parameters })
+    {
+        const registration = await this.registrations.Assert ({ accountId, id : grantId });
+        if (!registration.scopes.includes ('auto3d.write')) { throw new Error ('Write permission required.'); }
+        const p = ValidateFefco (parameters); const profile = FefcoProfile (p);
+        const draft = { kind : 'fefco-cad', basis : 'score-to-score', units : 'mm', parameters : p, profile, updatedAt : this.now () };
+        await this.state.storage.transaction (async storage => {
+            const current = await storage.get ('registration:' + grantId);
+            if (!current || current.revokedAt !== null || current.expiresAt <= this.now () || await storage.get ('disabled')) { throw new Error ('Agent access revoked.'); }
+            await storage.put ('headless:' + grantId, draft);
+        });
+        return { mode : 'headless', draft };
     }
     async Revoke ({ accountId, id })
     {
