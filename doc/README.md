@@ -1,22 +1,24 @@
 # Auto3D rebuild handoff bundle
 
-Download [Auto3D-Rebuild-Handoff.zip](Auto3D-Rebuild-Handoff.zip) using GitHub's **Download raw file** control. This repository is private; sign in with an authorized account.
+Download [Auto3D-Rebuild-Handoff.zip](Auto3D-Rebuild-Handoff.zip) using GitHub's **Download raw file** control. Sign in with authorized private-repository access.
 
-The archive contains 161 files: consolidated architecture/product/migration handoff, repository documentation and schema references, the full 250-command catalog, assessment metadata, validation logs, and the requested previous-response appendix. Start with `Auto3D-Rebuild-Handoff/README.md` after extraction.
+Start with `Auto3D-Rebuild-Handoff/README.md` after extraction. The 162-file archive includes the consolidated handoff, source index, documentation/schema references, 250-command catalog, assessment evidence/logs, previous-response appendix and ten-screen UI/UX catalog.
+
+## User-supplied visual evidence
+
+Read [UI-UX-Screenshot-Catalog.md](UI-UX-Screenshot-Catalog.md) directly on GitHub. Ten screenshots were subsequently provided in chat: empty workspace, collapsed docks, Packaging setup, generated selected box, Account Library, Share/QR dialog, AI workspace, HDRI lighting, Welcome and Preferences. Each entry distinguishes visible Verified state, Inferred interpretation, Proposed migration acceptance and Unknown behavior.
+
+Original image binaries are not exposed to workspace tools, so this ZIP contains the textual visual catalog, not PNG/JPEG copies. Sources are identified by stable screenshot IDs and chat message/image order; originals remain in the conversation. No screenshot was recreated or claimed as automated browser capture. Share code/link/QR payload, account display identity and user asset names are omitted from the catalog. Any future embedded originals need clearly labeled redaction of access-bearing regions.
+
+The initial no-screenshots statements in historical evidence describe the original assessment and are superseded for evidence availability by this addendum. SC-10 visibly reports Auto3D 0.47.6/build `0ffd76defb75157f3c701b2360e8939d14ebdf6e`, Standard (in) and Auto viewport quality; this is user-supplied UI evidence, not independent deployment or runtime acceptance. User reports MCP authorization unavailable; root cause remains unconfirmed.
+
+## Baselines and integrity
 
 - Assessment source: `716ed51b48f88caeb5b147e1d4b6cc206c35358e`.
 - Remote main observed during assessment: `8697574620d7d11a1e3532dfdacd0d20e42b293b`.
-- Upload branch base: `0ffd76defb75157f3c701b2360e8939d14ebdf6e`. PR #70 has since merged; its draft status in the archive is historical assessment evidence, not current status.
-- Application: Auto3D 0.47.6. Packaging: 1.10.3. Documentation upload only; no release bump.
-- ZIP size: 624,691 bytes.
-- SHA-256: `c9ed86c0f8f61e9440589c7584b5eb84e78b241987b60d66e0806410ce27bec1`.
+- Original upload base: `0ffd76defb75157f3c701b2360e8939d14ebdf6e`. PR #70 merged after assessment; draft references in historical evidence remain historical.
+- Auto3D 0.47.6 / Packaging 1.10.3 unchanged. Documentation only.
+- ZIP: 634,196 bytes; 162 files.
+- SHA-256: `c307ed605f03dd2237a418a80c375d85fce4d9fae37e75a67c22204b7b712ce4`.
 
-## Screenshot evidence
-
-No actual interface screenshot was supplied or captured in the assessment, and no captured interface images are included in the ZIP. The supplied Companion Page snapshot contained `page_id: null` and `document_view: null`. Screenshot references and browser-test descriptions were reviewed; they do not establish direct visual verification.
-
-## Interpretation and validation
-
-Evidence labels distinguish Verified, Inferred, Proposed, and Unknown conclusions. Historical documentation can conflict with current implementation. SQL is reference evidence, not an executable bootstrap; historical PR16 SQL must not be replayed. The archive includes no credential values or production model contents.
-
-ZIP CRC and every manifest SHA-256 passed. Assessment application tests: 720 passing; focused tests: 22 passing; lint passed. Backend HTTP and MCP runtime checks were blocked by localhost socket restrictions. No production deployment, real-client MCP, paid-generation, or physical-device acceptance is claimed.
+ZIP CRC and all manifest checks passed; uploaded blob matches local bytes. Assessment: 720 application tests, 22 focused tests and lint passed. Backend HTTP/MCP runtime checks were environment-blocked. Screenshots add visual evidence only; no live browser, paid provider, physical-device or permission-enforcement tests were performed. Historical SQL is reference evidence, not an executable bootstrap; PR16 SQL must not replay.
