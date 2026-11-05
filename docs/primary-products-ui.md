@@ -1,3 +1,5 @@
+> Historical UI-shell increment. Opaque generation/update is now implemented in the stacked [0.49.0 increment](release-0490.md); glass and artwork remain pending.
+
 # Primary Products panel — Auto3D 0.48.0 / Primary Products 0.1.0
 
 Primary Products is directly below Packaging in the outlined Generation modules tool-rail group. It opens a compact right panel; the shared Extended, Minimal and Close controls manage its presentation. Extended mode keeps the app header/toolbar and arranges the product catalog, profile reference and controls in columns. Mobile extended mode stacks those areas without horizontal scrolling.

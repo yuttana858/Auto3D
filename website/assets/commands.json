@@ -5861,7 +5861,7 @@
       "id": "primary.inspect",
       "title": "Inspect product draft",
       "category": "Primary Products",
-      "description": "Read canonical-mm draft dimensions, surface and label-zone settings. generationAvailable=false until generators are implemented.",
+      "description": "Read canonical-mm draft dimensions and whether opaque generation is available. Label zones are preparatory; no artwork is applied.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -5931,6 +5931,48 @@
         "heightMm": 122,
         "diameterMm": 66
       }
+    },
+    {
+      "id": "primary.generate",
+      "title": "Add product to session",
+      "category": "Primary Products",
+      "description": "Generate the current opaque bottle/can draft as one undoable session object. Glass and artwork are unavailable.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "primary.selected.load",
+      "title": "Load selected product",
+      "category": "Primary Products",
+      "description": "Load a selected generated product definition into the draft without changing scene geometry.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "primary.update",
+      "title": "Apply draft to selected product",
+      "category": "Primary Products",
+      "description": "Rebuild the selected generated product in one Undo step, preserving identity and placement. Replaces component surfaces with the draft settings; hidden parts and animations must be removed first.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
     },
     {
       "id": "primary.reset",

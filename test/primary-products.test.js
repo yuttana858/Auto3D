@@ -12,7 +12,7 @@ describe ('Primary Products panel services', () => {
         assert.equal ((await commands.Execute ('primary.configure', { heightMm : 254 })).result.heightMm, 254);
         assert.equal ((await commands.Execute ('primary.configure', { heightMm : 0 })).ok, false);
         assert.equal ((await commands.Execute ('primary.configure', { material : 'aluminum' })).ok, false);
-        const inspected = (await commands.Execute ('primary.inspect')).result; assert.equal (inspected.generationAvailable, false); assert.equal (inspected.heightMm, 254);
+        const inspected = (await commands.Execute ('primary.inspect')).result; assert.equal (inspected.generationAvailable, true); assert.equal (inspected.heightMm, 254);
         panel.website.sessionEditor.readOnly = true; assert.equal ((await commands.Execute ('primary.reset')).ok, false); assert.equal (panel.Inspect ().heightMm, 254);
     });
     it ('keeps module source independent of the application and its assets lazy', () => {
