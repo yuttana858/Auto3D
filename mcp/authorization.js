@@ -2,6 +2,7 @@ import { OAuthAuthorizationServer, OAuthError } from '@cloudflare/workers-oauth-
 import { RequireAdmin } from '../functions/_lib/accounts.js';
 import { AgentName, Identifier, Json, PilotConfig, ReadBytes, ReadJson, Scopes, ValidScopes } from './common.js';
 import { ActiveRegistration, BrowserIdentity } from './identity.js';
+import { CompleteAgentConsent } from './consent-completion.js';
 
 const Escape = value => String (value).replace (/[&<>"']/g, char => '&#' + char.charCodeAt (0) + ';');
 const Encode = value => new TextEncoder ().encode (value);
@@ -90,15 +91,10 @@ export async function Consent (request, env, provider, identity = BrowserIdentit
     if (!ValidScopes (approved.request.scope)) { return Page ('Invalid scopes.', undefined, 403); }
     const registrationId = crypto.randomUUID (), broker = env.AUTO3D_AGENT_BROKER.getByName (user.id);
     const record = await broker.Register ({ accountId : user.id, id : registrationId, name, harness, clientId : approved.request.clientId, scopes : approved.request.scope, expiresAt : Date.now () + 86400000 });
-    try {
-        if (decision === 'approve') { await broker.PairWithCode ({ accountId : user.id, grantId : registrationId, code : appWindowCode, expiresAt : Date.now () + 600000 }); }
-        const result = await oauth.completeAuthorization ({ request : approved.request, userId : user.id, scope : approved.request.scope, revokeExistingGrants : false, metadata : { registrationId, name, harness }, props : { registrationId, authorizedAt : record.createdAt } });
-        approved.headers.set ('Location', result.redirectTo); return new Response (null, { status : 302, headers : approved.headers });
-    } catch (error) {
-        await broker.RevokeRegistration ({ accountId : user.id, id : registrationId });
-        if (decision === 'approve') { return Page ('Could not pair with that app window. The code may be expired, already used, or disconnected. Reconnect the app window to generate a new code, then restart authorization.', undefined, 400); }
-        throw error;
-    }
+    const result = await CompleteAgentConsent ({ broker, oauth, accountId : user.id, registrationId, record, approved, name, harness, decision, appWindowCode });
+    if (result.error === 'pair') { return Page ('Could not pair with that app window. The code may be expired, already used, or disconnected. Reconnect the app window to generate a new code, then restart authorization.', undefined, 400); }
+    if (result.error === 'completion') { return Page ('Agent authorization could not be completed. Reconnect the app window to generate a new code, then restart authorization.', undefined, 503); }
+    approved.headers.set ('Location', result.redirectTo); return new Response (null, { status : 302, headers : approved.headers });
 }
 export async function ManageRegistrations (request, env)
 {
