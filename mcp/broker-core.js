@@ -83,6 +83,14 @@ export class BrokerCore
         this.Notify (accountId);
         return { paired : true };
     }
+    async CheckWindowCode ({ accountId, code })
+    {
+        await this.registrations.Account (accountId);
+        const codeHash = await WindowCodeHash (code);
+        const target = this.Connections (accountId).find (({ data }) => data.windowCodeHash === codeHash && data.windowCodeExpiresAt > this.now () && data.sessions.some (session => session.active));
+        const used = await this.state.storage.get ('used-window-code:' + codeHash);
+        return Boolean (target && (!used || used.expiresAt <= this.now ()));
+    }
     Notify (accountId)
     {
         // Names are fetched separately by the account UI; sockets carry no credentials.

@@ -150,9 +150,18 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         socket.send (JSON.stringify ({ type : 'result', requestId : boxRequest.requestId, sessionId : boxRequest.sessionId, result : { ok : true, command : boxRequest.command, result : { generated : true } } }));
         assert.equal (JSON.parse ((await (await boxPending).json ()).result.content[0].text).generated, true);
         const reusedFlow = await begin (userA, undefined, code), reused = await approve (reusedFlow);
-        assert.equal (reused.status, 400); assert.match (await reused.text (), /expired, already used, or disconnected/);
+        assert.equal (reused.status, 400); assert.match (await reused.text (), /window code is unavailable/);
         const invalidFlow = await begin (userA, undefined, 'NOT-A-VALID-CODE'), invalid = await approve (invalidFlow);
         assert.equal (invalid.status, 400); assert.match (await invalid.text (), /code is invalid/);
+    });
+    it ('allows a corrected window code without consuming the permission request', async () => {
+        const wrong = 'ABCD-EFGH-JKLM-NPQR', correct = 'QRST-UVWX-YZ23-4567';
+        const flow = await begin (userA, 'auto3d.read offline_access', wrong);
+        const failed = await approve (flow); assert.equal (failed.status, 400); assert.match (await failed.text (), /window code is unavailable/);
+        const upgrade = await fetch ('/api/agent/connect', { headers : { Cookie : cookieFor (userA), Origin : origin, Upgrade : 'websocket' } }); assert.equal (upgrade.status, 101);
+        socket = upgrade.webSocket; socket.accept (); const ack = message (socket);
+        socket.send (JSON.stringify ({ type : 'hello', instanceId : 'retry-window', windowLabel : 'Retry window', windowCode : correct, sessions : [{ id : 'tab-a', name : 'Box', active : true }] })); await ack;
+        flow.form.set ('appWindowCode', correct); const approved = await approve (flow); assert.equal (approved.status, 302);
     });
     it ('requires a code for paired approval while preserving explicit manual approval', async () => {
         const flow = await begin (), attempt = new URLSearchParams (flow.form); attempt.set ('decision', 'approve');

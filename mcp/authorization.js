@@ -87,9 +87,13 @@ export async function Consent (request, env, provider, identity = BrowserIdentit
     const name = AgentName (form.get ('name')), harness = form.get ('harness'), appWindowCode = form.get ('appWindowCode');
     if (decision === 'approve' && !appWindowCode) { return Page ('Enter the current app window code to pair automatically, or choose Allow without pairing.', undefined, 400); }
     if (decision === 'approve' && !ValidWindowCode (appWindowCode)) { return Page ('The app window code is invalid. Copy the complete current code from Agent access, or choose Allow without pairing.', undefined, 400); }
+    const broker = env.AUTO3D_AGENT_BROKER.getByName (user.id);
+    if (decision === 'approve' && !await broker.CheckWindowCode ({ accountId : user.id, code : appWindowCode })) {
+        return Page ('That window code is unavailable. In Auto3D, reconnect the app window and copy its new code. Use your browser Back button to return to the permission form and enter it, or choose Allow without pairing.', undefined, 400);
+    }
     const approved = await oauth.approveConsent (request, handle);
     if (!ValidScopes (approved.request.scope)) { return Page ('Invalid scopes.', undefined, 403); }
-    const registrationId = crypto.randomUUID (), broker = env.AUTO3D_AGENT_BROKER.getByName (user.id);
+    const registrationId = crypto.randomUUID ();
     const record = await broker.Register ({ accountId : user.id, id : registrationId, name, harness, clientId : approved.request.clientId, scopes : approved.request.scope, expiresAt : Date.now () + 86400000 });
     const result = await CompleteAgentConsent ({ broker, oauth, accountId : user.id, registrationId, record, approved, name, harness, decision, appWindowCode });
     if (result.error === 'pair') { return Page ('Could not pair with that app window. The code may be expired, already used, or disconnected. Reconnect the app window to generate a new code, then restart authorization.', undefined, 400); }
