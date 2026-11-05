@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## MCP reconnect and grant lifecycle — proposed
+
+New agent registrations use renewable refresh credentials; the window bridge retries transient disconnects and idle pairings expire after one hour. See [MCP pilot](mcp-pilot.md) for reauthorization, timing, browser and harness limitations. Deployment updates the private broker before the Pages app. Live client verification is still required.
+
 ## Build list: Library sharing optimization
 
 Pending: implement reviewed mobile/desktop share variants and an explicit optimization choice; preserve saved presentation, quota accounting and revocation. See [share optimization review](share-optimization-review.md). Current size warning shares the original only.

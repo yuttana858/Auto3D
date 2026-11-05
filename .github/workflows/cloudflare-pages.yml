@@ -57,9 +57,9 @@ jobs:
       - run: npm run build_website
       - run: node tools/build_pages.mjs
       - run: node tools/check_mcp_licenses.mjs build/pages/MCP-LICENSES.txt
-      - name: Check configured private live MCP broker
+      - name: Deploy configured private live MCP broker
         id: mcp_broker
-        run: node tools/deploy_live_mcp_broker.mjs --check
+        run: node tools/deploy_live_mcp_broker.mjs
 
       - name: Ensure Cloudflare Pages project exists
         shell: bash

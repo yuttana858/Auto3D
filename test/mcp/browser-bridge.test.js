@@ -14,6 +14,26 @@ function Fixture ()
     return { website, access, request };
 }
 describe ('Browser-side MCP guards', () => {
+    it ('retries an unexpected connection loss and stops after explicit disconnect or account change', () => {
+        const { access, website } = Fixture (); const scheduled = []; access.socket.close = () => {}; access.reconnectEnabled = true; access.screenshots = true;
+        access.ScheduleReconnect = (owner, screenshots) => scheduled.push ({ owner, screenshots });
+        access.ConnectionLost (); assert.deepEqual (scheduled, [{ owner : 'owner', screenshots : true }]); assert.equal (access.reconnectEnabled, true);
+        access.Disconnect (); access.ConnectionLost (); assert.equal (scheduled.length, 1);
+        access.reconnectEnabled = true; access.accountId = 'owner'; website.auth.user = { id : 'other' }; access.ConnectionLost (); assert.equal (scheduled.length, 1); assert.equal (access.reconnectEnabled, false);
+    });
+    it ('backs off retries and cancels pending retries on explicit disconnect', async () => {
+        const { access } = Fixture (); const oldSet = globalThis.setTimeout, oldClear = globalThis.clearTimeout; const timers = new Map (); let next = 0;
+        globalThis.setTimeout = (callback, delay) => { const id = ++next; timers.set (id, { callback, delay }); return id; };
+        globalThis.clearTimeout = id => timers.delete (id);
+        try {
+            access.socket.close = () => {}; access.reconnectEnabled = true; access.screenshots = false;
+            let attempts = 0; access.Connect = async () => { attempts++; throw new Error ('offline'); };
+            access.ConnectionLost (); let timer = [...timers.values ()][0]; assert.equal (timer.delay, 1000); await timer.callback ();
+            timer = [...timers.values ()].at (-1); assert.equal (timer.delay, 2000); assert.equal (attempts, 1);
+            access.Disconnect (); assert.equal (timers.size, 1); // first fired timer is retained by this minimal fake
+            await timer.callback (); assert.equal (attempts, 1);
+        } finally { globalThis.setTimeout = oldSet; globalThis.clearTimeout = oldClear; }
+    });
     it ('executes only the read allowlist and requires a separate screenshot opt-in', async () => {
         const { access, request } = Fixture ();
         await access.Message (request ('scene.inspect'), access.socket, 0); assert.equal (access.socket.sent[0].result.ok, true);

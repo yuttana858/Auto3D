@@ -90,6 +90,15 @@ describe ('MCP registration and isolation boundary', () => {
         now += 600001; await broker.Cleanup ();
         assert.equal ((await state.storage.list ({ prefix : 'used-window-code:' })).size, 0);
     });
+    it ('disconnects an idle pairing after one hour without revoking the agent registration', async () => {
+        let now = Date.now (); const state = State (), broker = new BrokerCore (state, { now : () => now }), socket = Socket ();
+        await broker.registrations.Create ({ ...registration (), expiresAt : now + 7200000 });
+        await broker.Attach ({ accountId : owner, sessionFingerprint : 'a'.repeat (64), expiresAt : now + 60000 }, socket);
+        await broker.Message (socket, JSON.stringify ({ type : 'hello', instanceId : 'idle-window', windowLabel : 'Review', sessions : [{ id : 'tab-a', name : 'Box', active : true }] }));
+        await broker.Pair ({ accountId : owner, grantId : 'grant-a', connectionId : socket.data.connectionId, sessionId : 'tab-a', expiresAt : now + 7200000 });
+        now += 3600000; await broker.Cleanup (); assert.equal (await state.storage.get ('pair:grant-a'), undefined);
+        assert.ok (await broker.registrations.Assert ({ accountId : owner, id : 'grant-a' }));
+    });
     it ('enforces remote allowlists and strict string argument constraints', async () => {
         const broker = { AssertRegistration : async () => ({}) }, actor = { userId : owner, props : { registrationId : 'grant-a' }, scope : ['auto3d.read'], expiresAt : Date.now () / 1000 + 60 };
         const service = new PilotService (broker, [{ id : 'auth.sign_out', mutates : true }, { id : 'capture.image', mutates : false }]);

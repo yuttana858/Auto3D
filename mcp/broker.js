@@ -27,6 +27,6 @@ export class Auto3DAgentBroker extends DurableObject
     webSocketMessage (socket, message) { return this.core.Message (socket, message); }
     webSocketClose (socket) { this.core.Close (socket); }
     webSocketError (socket) { this.core.Close (socket); }
-    async alarm () { await this.core.Cleanup (); if (this.ctx.getWebSockets ().length) { await this.ctx.storage.setAlarm (Date.now () + 300000); } }
+    async alarm () { const paired = await this.core.Cleanup (); if (paired || this.ctx.getWebSockets ().length) { await this.ctx.storage.setAlarm (Date.now () + 300000); } }
 }
 export default { fetch () { return new Response ('Not found.', { status : 404 }); } };
