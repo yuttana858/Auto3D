@@ -2,13 +2,13 @@
 
 ## Provenance and scope
 
-**Verified:** the user supplied ten desktop interface images in this conversation after the initial assessment. SC-01 through SC-08 identify the eight images in the message asking to catalog screenshots; SC-09 and SC-10 identify the Welcome and Preferences images in the following message. These IDs are stable source citations for this catalog. Capture time, browser/OS, exact viewport/device-pixel ratio, and original file hashes are **Unknown and requiring confirmation**.
+**Verified:** the user supplied ten desktop interface images in this conversation after the initial assessment. SC-01 through SC-08 identify the eight images in the message asking to catalog screenshots; SC-09 and SC-10 identify the Welcome and Preferences images in the following message. These IDs are stable source citations for this catalog. Capture time, browser/OS and exact viewport/device-pixel ratio remain **Unknown and requiring confirmation**. Uploaded-file dimensions and hashes for SC-01–SC-08 are now recorded in screenshots/index.json.
 
-The images were visually inspected in chat. Their original binary attachments were not exposed as workspace files, so this package contains a textual catalog, not copied PNG/JPEG images. No screenshots were generated, recreated, or claimed as automated captures. Original visual sources remain in the conversation. Image embedding is pending access to the original files; no invented asset links or hashes are supplied.
+The images were initially inspected in chat. The subsequent uploaded screenshot.zip supplies eight original PNGs matching SC-01–SC-08, represented by seven unchanged originals and one labeled AI-assisted redacted Share reference under screenshots/. SC-09 Welcome and SC-10 Preferences remain chat-only because their files were not in that upload. No live automated screenshots were captured. SC-06 is an AI-assisted redacted derivative: its layout/text may differ from the original and must not be treated as pixel-exact evidence. See [included files](screenshots/README.md), [gallery](screenshots/gallery.html) and [image metadata/hashes](screenshots/index.json); these links resolve after extracting this handoff ZIP.
 
 **Verified historical correction:** no interface screenshots were available during the initial source assessment. User-supplied visual evidence is now available. Historical statements in copied repository documents and the previous-response appendix describe the earlier evidence state. No live browser, paid-provider, permission-enforcement, or end-to-end operation testing was added by this review.
 
-**Privacy:** do not transcribe account display names, share URLs/tokens, access codes, QR payloads, or customer asset names unnecessarily. SC-06 contains access-bearing information. This catalog deliberately omits it. If original image files are later embedded, produce clearly labeled redacted copies of the share code, URL and entire QR region; consider masking account identity/library item names. Keep restricted originals separately. Do not reconstruct QR data or open the depicted share link.
+**Privacy/provenance:** the user requested inclusion of the uploaded original screenshots in this private-repository handoff. Seven are included byte-for-byte. SC-06 is replaced by a labeled AI-assisted redacted reference with code, URL and entire QR hidden; the unredacted Share original is excluded. Account identities and library labels remain visible in other originals. The textual analysis does not transcribe those values. No QR was decoded or depicted share opened. Avoid treating these originals as sanitized public examples.
 
 ## Screen register
 
@@ -89,11 +89,11 @@ The images were visually inspected in chat. Their original binary attachments we
 
 ## SC-06 — audience sharing with generated QR
 
-**Source:** sixth screenshot in the eight-image message. **Access-bearing source: do not publish unredacted.**
+**Source:** sixth screenshot in the eight-image message, now included as screenshots/SC-06-share-dialog-redacted.png. **Labeled AI-assisted redacted reference included; unredacted original excluded.**
 
 **Verified:** Share model modal overlays Model library and the scene. Explanatory copy says code-protected/read-only audience snapshot, 30-day validity, private original and revoke-to-end-access. Allow .auto3d download is checked in this capture. Require 4-digit access code is checked; a code field is present. Share original action, Download enabled status, link field, Copy link, Open mini viewer, Show QR code, QR image, Save QR as PNG and partially visible revoke control appear. Lower content scrolls.
 
-**Important distinction:** checked download permission is a captured choice, not proof that downloads default to enabled. Link/QR appearance does not prove that anonymous access, code enforcement, download control, expiry or revocation actually works. Snapshot independence is explanatory UI copy corroborated by code documentation, not independently tested here. Access code/link/QR contents are deliberately omitted.
+**Important distinction:** checked download permission is a captured choice, not proof that downloads default to enabled. Link/QR appearance does not prove that anonymous access, code enforcement, download control, expiry or revocation actually works. Snapshot independence is explanatory UI copy corroborated by code documentation, not independently tested here. Access code/link/QR values are omitted from this textual analysis; the archived redacted reference hides them; unredacted original is excluded.
 
 **Proposed acceptance:** preserve explicit publication, separate snapshot/original messaging, separate code communication, URL-only QR semantics, expiry/revoke and permission choices. Test nested-modal focus/escape behavior and scrolling; verify no background shortcuts leak. Source-to-code mapping: audiencesharing.js, modellibrary.js, functions/_lib/audienceshares.js; F18.
 
@@ -170,4 +170,20 @@ Each item below is **Proposed**, supported by the cited visual sources and exist
 
 ## Asset register
 
-All ten sources: visual reviewed=true; source=user-supplied chat image; binary archived=false; redacted export=false/not applicable yet; capture timestamp unknown. SC-06 requires access-field/QR redaction before binary embedding. Human-readable labels are enough for current catalog citations; filename/hash/embedded-image references will be added only when real files are available.
+All ten sources are visually reviewed. SC-01–SC-08: seven original PNGs included unchanged; SC-06 included as a labeled AI-assisted redacted derivative; filename/dimensions/byte size/SHA-256 are in screenshots/index.json. SC-09 Welcome and SC-10 Preferences: binary included=false, still cataloged from inline chat. Capture timestamp is unknown; upload filenames are not proof of original capture time. The eight source images have been visually matched to their catalog states. Open screenshots/gallery.html after extraction to browse them.
+
+
+### Uploaded image links
+
+Links resolve inside the extracted handoff archive. The repository catalog itself is a textual index; actual image files are packaged inside the ZIP.
+
+- [SC-01: SC-01-empty-workspace.png](screenshots/SC-01-empty-workspace.png)
+- [SC-02: SC-02-collapsed-docks.png](screenshots/SC-02-collapsed-docks.png)
+- [SC-03: SC-03-packaging-setup.png](screenshots/SC-03-packaging-setup.png)
+- [SC-04: SC-04-generated-box.png](screenshots/SC-04-generated-box.png)
+- [SC-05: SC-05-account-library.png](screenshots/SC-05-account-library.png)
+- [SC-06: SC-06-share-dialog-redacted.png](screenshots/SC-06-share-dialog-redacted.png)
+- [SC-07: SC-07-ai-workspace.png](screenshots/SC-07-ai-workspace.png)
+- [SC-08: SC-08-hdri-lighting.png](screenshots/SC-08-hdri-lighting.png)
+- SC-09 Welcome: image file not in uploaded screenshot.zip.
+- SC-10 Preferences: image file not in uploaded screenshot.zip.
