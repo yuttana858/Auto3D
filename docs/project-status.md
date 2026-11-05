@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Build list: Library sharing optimization
+
+Pending: implement reviewed mobile/desktop share variants and an explicit optimization choice; preserve saved presentation, quota accounting and revocation. See [share optimization review](share-optimization-review.md). Current size warning shares the original only.
+
 ## Selected-object focus — Auto3D 0.47.6 / Packaging 1.10.3
 
 Focus frames the combined visible selection and right-drag targets that selection’s center, including groups. See `docs/release-0476.md`.

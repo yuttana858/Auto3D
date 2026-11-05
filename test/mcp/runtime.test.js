@@ -144,6 +144,11 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         socket.send (JSON.stringify ({ type : 'result', requestId : commandRequest.requestId, sessionId : commandRequest.sessionId, result : { ok : true, command : commandRequest.command, result : [] } }));
         const commandResponse = await commandPending;
         assert.equal (commandResponse.status, 200); assert.deepEqual (JSON.parse ((await commandResponse.json ()).result.content[0].text), []);
+        const boxArgs = { code : '0201', length : 304.8, width : 304.8, height : 304.8 };
+        const boxPending = rpc (token.access_token, 'tools/call', { name : 'auto3d.commands.invoke', arguments : { command : 'packaging.fefco.generate', arguments : boxArgs } });
+        const boxRequest = await message (socket); assert.equal (boxRequest.command, 'packaging.fefco.generate'); assert.deepEqual (boxRequest.arguments, boxArgs); assert.equal (boxRequest.writeAuthorized, true);
+        socket.send (JSON.stringify ({ type : 'result', requestId : boxRequest.requestId, sessionId : boxRequest.sessionId, result : { ok : true, command : boxRequest.command, result : { generated : true } } }));
+        assert.equal (JSON.parse ((await (await boxPending).json ()).result.content[0].text).generated, true);
         const reusedFlow = await begin (userA, undefined, code), reused = await approve (reusedFlow);
         assert.equal (reused.status, 400); assert.match (await reused.text (), /expired, already used, or disconnected/);
         const invalidFlow = await begin (userA, undefined, 'NOT-A-VALID-CODE'), invalid = await approve (invalidFlow);
@@ -161,7 +166,10 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         const writer = await grant (userA, 'auto3d.read auto3d.write auto3d.capture offline_access'), response = await rpc (writer.access_token, 'tools/list');
         assert.equal (response.status, 200);
         const tools = (await response.json ()).result.tools;
-        assert.ok (tools.length < 15);
+        assert.ok (tools.length < 25);
+        for (const name of ['auto3d.design', 'auto3d.commands', 'auto3d.capture', 'auto3d.modules', 'auto3d.sessions', 'auto3d.settings']) { assert.ok (tools.some (tool => tool.name === name)); }
+        const design = await rpc (writer.access_token, 'tools/call', { name : 'auto3d.design', arguments : {} });
+        const designGroups = JSON.parse ((await design.json ()).result.content[0].text); assert.ok (designGroups.categories.some (category => category.category === 'Objects')); assert.equal (designGroups.commands, undefined);
         assert.ok (tools.some (tool => tool.name === 'auto3d.commands.categories'));
         assert.ok (tools.some (tool => tool.name === 'auto3d.commands.list'));
         assert.ok (tools.some (tool => tool.name === 'auto3d.commands.invoke' && tool.annotations.readOnlyHint === false && tool.annotations.destructiveHint));
