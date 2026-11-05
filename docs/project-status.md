@@ -2,7 +2,7 @@
 
 ## MCP reconnect and grant lifecycle — proposed
 
-New agent registrations use renewable refresh credentials; the window bridge retries transient disconnects and idle pairings expire after one hour. See [MCP pilot](mcp-pilot.md) for reauthorization, timing, browser and harness limitations. Deployment updates the private broker before the Pages app. Live client verification is still required. A first headless tier stores an isolated FEFCO score-to-score CAD draft; full headless scene, rendering, import/export and Library support remain pending; see [headless build list](mcp-headless-roadmap.md).
+New agent registrations use renewable refresh credentials; the window bridge retries transient disconnects and idle pairings expire after one hour. See [MCP pilot](mcp-pilot.md) for reauthorization, timing, browser and harness limitations. Deployment updates the private broker before the Pages app. Live client verification is still required. The headless tier stores isolated FEFCO score-to-score CAD drafts and account-owned revision-checked CAD projects; full headless scene, rendering, import/export and Library support remain pending; see [headless build list](mcp-headless-roadmap.md).
 
 ## Build list: Library sharing optimization
 

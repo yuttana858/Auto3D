@@ -160,6 +160,51 @@ export class BrokerCore
         });
         return { mode : 'headless', draft };
     }
+    async HeadlessProjects ({ accountId, grantId })
+    {
+        await this.registrations.Assert ({ accountId, id : grantId });
+        const entries = await this.state.storage.list ({ prefix : 'headless-project:', limit : 21 });
+        return { projects : [...entries.values ()].map (({ id, name, revision, updatedAt }) => ({ id, name, revision, updatedAt })) };
+    }
+    async HeadlessProjectGet ({ accountId, grantId, projectId })
+    {
+        await this.registrations.Assert ({ accountId, id : grantId }); Identifier (projectId);
+        const project = await this.state.storage.get ('headless-project:' + projectId);
+        if (!project) { throw new Error ('Project unavailable.'); }
+        await this.registrations.Assert ({ accountId, id : grantId }); return { project };
+    }
+    async HeadlessProjectSave ({ accountId, grantId, name, projectId = null, expectedRevision = null })
+    {
+        const registration = await this.registrations.Assert ({ accountId, id : grantId });
+        if (!registration.scopes.includes ('auto3d.write')) { throw new Error ('Write permission required.'); }
+        name = AgentName (name);
+        if (projectId !== null) { Identifier (projectId); if (!Number.isSafeInteger (expectedRevision) || expectedRevision < 1) { throw new Error ('Expected revision required.'); } }
+        else if (expectedRevision !== null) { throw new Error ('Revision requires a project.'); }
+        const id = projectId || crypto.randomUUID ();
+        return this.state.storage.transaction (async storage => {
+            const currentGrant = await storage.get ('registration:' + grantId);
+            if (!currentGrant || currentGrant.revokedAt !== null || currentGrant.expiresAt <= this.now () || !currentGrant.scopes.includes ('auto3d.write') || await storage.get ('disabled')) { throw new Error ('Agent access revoked.'); }
+            const draft = await storage.get ('headless:' + grantId); if (!draft) { throw new Error ('Create a headless CAD draft first.'); }
+            const key = 'headless-project:' + id, existing = await storage.get (key);
+            if (projectId && (!existing || existing.revision !== expectedRevision)) { throw new Error ('Project changed or unavailable.'); }
+            if (!projectId && (await storage.list ({ prefix : 'headless-project:', limit : 20 })).size >= 20) { throw new Error ('Headless project limit reached.'); }
+            const project = { version : 1, id, name, revision : existing ? existing.revision + 1 : 1, updatedAt : this.now (), draft };
+            await storage.put (key, project); return { project };
+        });
+    }
+    async HeadlessProjectDelete ({ accountId, grantId, projectId, expectedRevision })
+    {
+        const registration = await this.registrations.Assert ({ accountId, id : grantId });
+        if (!registration.scopes.includes ('auto3d.write')) { throw new Error ('Write permission required.'); }
+        Identifier (projectId); if (!Number.isSafeInteger (expectedRevision) || expectedRevision < 1) { throw new Error ('Expected revision required.'); }
+        return this.state.storage.transaction (async storage => {
+            const currentGrant = await storage.get ('registration:' + grantId);
+            if (!currentGrant || currentGrant.revokedAt !== null || currentGrant.expiresAt <= this.now () || !currentGrant.scopes.includes ('auto3d.write') || await storage.get ('disabled')) { throw new Error ('Agent access revoked.'); }
+            const key = 'headless-project:' + projectId, project = await storage.get (key);
+            if (!project || project.revision !== expectedRevision) { throw new Error ('Project changed or unavailable.'); }
+            await storage.delete (key); return { deleted : projectId };
+        });
+    }
     async Revoke ({ accountId, id })
     {
         await this.registrations.Revoke ({ accountId, id });

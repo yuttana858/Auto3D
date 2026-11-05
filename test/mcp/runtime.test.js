@@ -194,7 +194,11 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         assert.equal (generated.result.structuredContent.result.draft.parameters.length, 304.8);
         const inspected = await (await rpc (writer.access_token, 'tools/call', { name : 'auto3d.headless.inspect', arguments : {} })).json ();
         assert.equal (inspected.result.structuredContent.result.draft.basis, 'score-to-score');
+        const saved = await (await rpc (writer.access_token, 'tools/call', { name : 'auto3d.headless.projects', arguments : { action : 'save', name : 'Test box' } })).json ();
+        const project = saved.result.structuredContent.result.project; assert.equal (project.revision, 1);
         const reader = await grant (); const denied = await (await rpc (reader.access_token, 'tools/call', { name : 'auto3d.headless.fefco', arguments : parameters })).json (); assert.equal (denied.result.isError, true);
+        const listed = await (await rpc (reader.access_token, 'tools/call', { name : 'auto3d.headless.projects', arguments : { action : 'list' } })).json (); assert.ok (listed.result.structuredContent.result.projects.some (item => item.id === project.id));
+        const deleteDenied = await (await rpc (reader.access_token, 'tools/call', { name : 'auto3d.headless.projects', arguments : { action : 'delete', projectId : project.id, expectedRevision : 1 } })).json (); assert.equal (deleteDenied.result.isError, true);
     });
     it ('exposes the generated full command catalog only with write consent', async () => {
         const reader = await grant (), readerList = await (await rpc (reader.access_token, 'tools/list')).json ();
