@@ -1,3 +1,4 @@
+import { ValidateProductDefinition } from '../../modules/primary-products/src/definition.js';
 import { ValidateTimelineActions } from './timelineactions.js';
 import { ValidateCameraViews } from './sessioncameras.js';
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
@@ -243,6 +244,7 @@ export function ReadSession (data)
                 if (name && !['__proto__', 'prototype', 'constructor'].includes (name)) { object.userData[name] = text; }
             }
         }
+        if (object.userData._auto3dPrimaryProduct !== undefined) { object.userData._auto3dPrimaryProduct = JSON.stringify (ValidateProductDefinition (JSON.parse (object.userData._auto3dPrimaryProduct))); }
         if (object.userData._auto3dFoldPreview !== undefined && (!object.userData._auto3dFefco || !object.userData._auto3dFoldPreview.trim () || !Number.isFinite (Number (object.userData._auto3dFoldPreview)) || Number (object.userData._auto3dFoldPreview) < 0 || Number (object.userData._auto3dFoldPreview) > 1)) { throw new Error ('Invalid visual fold position.'); }
         if (data.animationAsset) {
             object.animationAsset = { main : String (data.animationAsset.main), files : data.animationAsset.files.map ((file) => ({ name : String (file.name), buffer : DecodeBuffer (file.buffer) })) };

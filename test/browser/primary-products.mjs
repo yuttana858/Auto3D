@@ -16,7 +16,7 @@ try {
         try { const file = path.resolve (root, '.' + (name === '/' ? '/index.html' : name)); assert.ok (file.startsWith (root + path.sep)); return route.fulfill ({ body : await readFile (file), contentType : types[path.extname (file)] || 'application/octet-stream' }); }
         catch { return route.fulfill ({ status : 404, body : 'Missing fixture asset' }); }
     });
-    await page.goto ('https://auto3d.test/'); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
+    await page.goto ('https://auto3d.test/'); await page.getByRole ('button', { name : 'Welcome to Auto3D. Continue to sign in.' }).click (); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
     const call = async (id, args = {}) => { const response = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (response.ok, true, JSON.stringify (response)); return response.result; };
     const group = page.getByRole ('group', { name : 'Generation modules', exact : true });
     assert.deepEqual (await group.getByRole ('button').evaluateAll (nodes => nodes.map (node => node.getAttribute ('aria-label'))), ['AI Generative', 'Packaging design', 'Primary Products']);
@@ -34,7 +34,7 @@ try {
     const before = await call ('scene.inspect'), camera = await call ('camera.current.inspect');
     await group.getByRole ('button', { name : 'Primary Products', exact : true }).click ();
     const panel = page.getByRole ('region', { name : 'Primary Products', exact : true }); await panel.getByRole ('button', { name : 'Choose bottle' }).waitFor ();
-    assert.equal ((await call ('primary.inspect')).generationAvailable, false); assert.equal (await panel.getByRole ('button', { name : 'Add to session', exact : true }).isDisabled (), true);
+    assert.equal ((await call ('primary.inspect')).generationAvailable, true); assert.equal (await panel.getByRole ('button', { name : 'Add to session', exact : true }).isDisabled (), false);
     const height = panel.getByRole ('spinbutton', { name : 'Product height', exact : true }); await height.fill ('220'); await height.press ('Tab'); assert.equal ((await call ('primary.inspect')).heightMm, 220);
     await panel.getByRole ('slider', { name : 'Product roughness', exact : true }).focus (); await page.keyboard.press ('Delete'); assert.deepEqual (await call ('scene.inspect'), before);
     await panel.getByRole ('button', { name : 'Wrap label', exact : true }).click (); await mkdir ('work/primary-products-review', { recursive : true });
@@ -65,5 +65,29 @@ try {
     await call ('ui.module.mode', { module : 'primary-products', mode : 'closed' }); await call ('ui.module.mode', { module : 'data', mode : 'minimal' });
     assert.deepEqual (await call ('scene.inspect'), before); assert.deepEqual (await call ('camera.current.inspect'), camera); assert.deepEqual (errors, []);
     assert.equal (requests.filter (url => url.includes ('primary-products.module.js')).length, 1);
+    // Real generation and update via the same services used by commands.
+    await page.setViewportSize ({ width : 1500, height : 1000 }); await call ('ui.primary_products');
+    await call ('primary.configure', { family : 'bottle', heightMm : 190, diameterMm : 65 });
+    await panel.getByRole ('button', { name : 'Add to session', exact : true }).click ();
+    let generated;
+    for (let attempt = 0; attempt < 200; attempt++) {
+        const result = await page.evaluate (() => Auto3D.execute ('scene.inspect'));
+        if (result.ok && result.result.objects.length === 2) { generated = result.result.objects.find (o => !before.objects.some (old => old.id === o.id)); break; }
+        await page.waitForTimeout (100);
+    }
+    assert.ok (generated, 'UI must add the generated bottle');
+    // A completed strict read also establishes the editor has left its render lock.
+    await call ('primary.selected.load');
+    assert.equal ((await call ('primary.inspect')).heightMm, 190);
+    await call ('primary.configure', { heightMm : 250, color : '#cc5522', roughness : 0.2 });
+    const changed = await call ('primary.update'); assert.equal (changed.objectId, generated.id); assert.equal (changed.updated, true);
+    await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 250);
+    await call ('history.undo'); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 190);
+    await call ('history.redo'); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 250);
+    await call ('primary.configure', { material : 'glass' }); assert.equal ((await call ('primary.inspect')).generationAvailable, false);
+    assert.equal (await panel.getByRole ('button', { name : 'Add to session', exact : true }).isDisabled (), true);
+    const rejected = await page.evaluate (() => Auto3D.execute ('primary.generate')); assert.equal (rejected.ok, false);
+    assert.equal ((await call ('scene.inspect')).objects.length, 2); assert.deepEqual (errors, []);
+    console.log ('Primary Products scene flow passed: UI generation, strict update/load, identity, Undo/Redo and glass rejection.');
     console.log ('Primary Products desktop/mobile passed: module order/outline, lazy loading, draft controls, minimal/extended/close motion, rapid transitions, reduced motion, unit conversion and unchanged scene/camera.');
 } finally { await browser.close (); }
