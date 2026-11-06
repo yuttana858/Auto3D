@@ -5,9 +5,10 @@ import { Validate } from '../source/website/commandregistry.js';
 import { CommandIds } from '../mcp/command-catalog.js';
 
 const catalog = CreateAgentCommands ({ sessionEditor : {} }).Catalog ();
-// Commands whose verb-like names do not change persistent state.
-const NonMutatingVerbs = new Set (['packaging.draft.cancel', 'polygon.cancel', 'material.texture.save', 'ui.save', 'macro.cancel']);
-const MustMutate = ['auth.sign_out', 'auth.recover', 'diagnostics.clear', 'preferences.theme', 'preferences.units', 'preferences.viewport.quality', 'macro.save', 'lighting.effects', 'lighting.restore', 'view.background', 'camera.fov', 'render.now', 'render.queue.enqueue', 'render.queue.start', 'render.queue.clear', 'render.queue.delete', 'render.queue.cancel', 'object.array.playback', 'packaging.fefco.playback'];
+// Commands whose verb-like names do not change the open document or app data.
+// Sign-in session commands stay available in read-only viewers, which guard the document.
+const NonMutatingVerbs = new Set (['packaging.draft.cancel', 'polygon.cancel', 'material.texture.save', 'ui.save', 'macro.cancel', 'auth.sign_out', 'auth.recover']);
+const MustMutate = ['diagnostics.clear', 'preferences.theme', 'preferences.units', 'preferences.viewport.quality', 'macro.save', 'lighting.effects', 'lighting.restore', 'view.background', 'camera.fov', 'render.now', 'render.queue.enqueue', 'render.queue.start', 'render.queue.clear', 'render.queue.delete', 'render.queue.cancel', 'object.array.playback', 'packaging.fefco.playback'];
 
 describe ('Agent command catalog contract', () => {
     it ('has an example that satisfies every command schema', () => {

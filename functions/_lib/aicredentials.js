@@ -47,8 +47,39 @@ export async function ReadMeshyKey (env, owner)
 }
 export async function MeshyKey (context)
 {
+    return (await MeshyCredential (context)).key;
+}
+// shared marks the administrator key, whose tasks must be scoped per account.
+export async function MeshyCredential (context)
+{
     if (!context.data?.user?.id) { throw Object.assign (new Error ('Sign in to use Meshy.'), { status : 401 }); }
     const personal = await ReadMeshyKey (context.env, context.data.user.id);
-    if (personal) { return personal; }
-    return String (context.env.AUTO3D_AI_ALLOW_SHARED_KEY || '').toLowerCase () === 'true' ? String (context.env.MESHY_API_KEY || '').trim () : '';
+    if (personal) { return { key : personal, shared : false }; }
+    const shared = String (context.env.AUTO3D_AI_ALLOW_SHARED_KEY || '').toLowerCase () === 'true' ? String (context.env.MESHY_API_KEY || '').trim () : '';
+    return { key : shared, shared : Boolean (shared) };
+}
+// Task ownership for the shared key lives beside the credentials in the private AI bucket.
+const OwnedTaskLimit = 500;
+export function OwnedTasksPath (owner) { return CredentialPath (owner).replace ('meshy/v1/', 'meshy/v1/tasks/'); }
+export async function OwnedTasks (env, owner)
+{
+    if (!env.AUTO3D_AI_CREDENTIALS_R2) { throw unavailable (); }
+    const object = await env.AUTO3D_AI_CREDENTIALS_R2.get (OwnedTasksPath (owner));
+    if (!object) { return { tasks : [], etag : null }; }
+    if (object.size > 65536) { throw unavailable (); }
+    const record = await object.json ();
+    const tasks = Array.isArray (record?.tasks) ? record.tasks.filter (task => typeof task?.id === 'string' && task.id.length <= 200 && Number.isFinite (task.createdAt)) : [];
+    return { tasks, etag : object.etag || null };
+}
+export async function RecordOwnedTask (env, owner, id, now = Date.now ())
+{
+    if (typeof id !== 'string' || !id || id.length > 200) { return; }
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const { tasks, etag } = await OwnedTasks (env, owner);
+        const next = [{ id, createdAt : now }, ...tasks.filter (task => task.id !== id)].slice (0, OwnedTaskLimit);
+        const options = { httpMetadata : { contentType : 'application/json', cacheControl : 'no-store' }, ...(etag ? { onlyIf : { etagMatches : etag } } : {}) };
+        // R2 returns null when the conditional write lost a race; retry with the newer list.
+        if (await env.AUTO3D_AI_CREDENTIALS_R2.put (OwnedTasksPath (owner), JSON.stringify ({ version : 1, tasks : next }), options) !== null) { return; }
+    }
+    throw unavailable ();
 }

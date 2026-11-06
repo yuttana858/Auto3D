@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Repair release — Auto3D 0.50.0 / Packaging 1.10.3 / Primary Products 0.3.0 (2026-11-06)
+
+Fixes the 2026-11-06 review findings: MCP account lockout after ~1000 commands, window disconnect on any failed command, generic MCP errors, grant loss during identity outages, stored XSS through model/material names, missing CSP, wrong `mutates` flags, unbounded schemas, shared-key Meshy task visibility, and browser tests stalled at the welcome screen. Adds `macro.cancel`, `session.rename`, `session.recovery.discard` and `object.user_data.delete` (261 commands). See [release-0500.md](release-0500.md) and the [repair plan](repair-plan.md). Real-client MCP production verification remains pending.
+
 ## MCP connection before window pairing — Auto3D 0.49.2 / Packaging 1.10.3 / Primary Products 0.3.0
 
 OAuth approval no longer requires an app-window code. Live control still requires a separately selected or paired window. Real-client production verification remains pending. See [release-0492.md](release-0492.md).

@@ -381,7 +381,7 @@
       "title": "Request password recovery",
       "category": "Account",
       "description": "Request a one-time recovery email for an approved account. Returns the same response for unapproved or unknown addresses.",
-      "mutates": true,
+      "mutates": false,
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -419,7 +419,7 @@
       "title": "Request an account",
       "category": "Account",
       "description": "Open an interactive account request form. Submitting requires user confirmation in the form.",
-      "mutates": true,
+      "mutates": false,
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -598,7 +598,7 @@
       "title": "Sign out",
       "category": "Account",
       "description": "Sign out of the current account and revoke its refresh session. Device files remain local.",
-      "mutates": true,
+      "mutates": false,
       "inputSchema": {
         "type": "object",
         "properties": {},

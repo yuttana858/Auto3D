@@ -1,4 +1,4 @@
-import { Database, LimitedBody, MaxArchive, Folder, Failure, Reply } from '../../_lib/accountstorage.js';
+import { Database, JsonBody, LimitedBody, MaxArchive, Folder, Failure, Reply } from '../../_lib/accountstorage.js';
 const Uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function Item (row) { return { id : row.id, name : row.name, category : row.category, kind : row.kind, objects : row.object_count, updatedAt : row.updated_at, createdAt : row.created_at, size : row.file_size, personal : true }; }
 export async function onRequest ({ request, env, data, params })
@@ -45,7 +45,7 @@ export async function onRequest ({ request, env, data, params })
         }
         if (request.method === 'GET') { return Reply (Item (row)); }
         if (request.method === 'PATCH') {
-            const body = JSON.parse (await (await LimitedBody (request, 2048)).text ());
+            const body = await JsonBody (request, 2048);
             if (!body || !Object.keys (body).length || Object.keys (body).some ((key) => !['name', 'category'].includes (key))) { throw Failure ('Invalid item changes.'); }
             if (body.name !== undefined && (typeof body.name !== 'string' || !body.name.trim () || body.name.trim ().length > 100)) { throw Failure ('Invalid name.'); }
             const changes = { updated_at : new Date ().toISOString () };

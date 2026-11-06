@@ -1,6 +1,8 @@
 import { Database, LimitedBody, Reply, Failure } from '../../_lib/accountstorage.js';
 import { DefaultBoardDatabase, ValidateBoardDatabase } from '../../../modules/packaging/src/boarddatabase.js';
 const Revision = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Validation messages are written for users; any other failure stays generic.
+const BoardValidation = error => !(error instanceof TypeError || error instanceof ReferenceError) && /board|caliper|flute|paper|CSV|invalid/i.test (error?.message || '');
 export async function onRequest ({ request, env, data })
 {
     if (!data?.user) { return Reply ({ error : 'Sign in to use the board database.' }, 401); }
@@ -20,5 +22,5 @@ export async function onRequest ({ request, env, data })
         const rows = await Database (env, filter + match, 'PATCH', { board_database : { version : 1, revision, records } });
         if (!rows.length) { return Reply ({ error : 'Board database changed in another session. Reopen the editor before saving.' }, 409); }
         return Reply ({ revision, records });
-    } catch (error) { return Reply ({ error : error.status === 413 ? 'Board database requests must be at most 64 KiB.' : error.status ? error.message : error instanceof SyntaxError ? 'Invalid board database JSON.' : error.message || 'Board database unavailable.' }, error.status || (error instanceof SyntaxError || /board|caliper|flute|paper|CSV|invalid/i.test (error.message) ? 400 : 503)); }
+    } catch (error) { return Reply ({ error : error.status === 413 ? 'Board database requests must be at most 64 KiB.' : error.status ? error.message : error instanceof SyntaxError ? 'Invalid board database JSON.' : BoardValidation (error) ? error.message : 'Board database unavailable.' }, error.status || (error instanceof SyntaxError || BoardValidation (error) ? 400 : 503)); }
 }
