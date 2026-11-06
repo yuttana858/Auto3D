@@ -172,6 +172,8 @@ export class AgentAccess
         if (message.command === 'capture.image' && !this.screenshots) { throw Coded ('permission_required', 'Screenshots are not allowed for this window. Enable them in Agent access.'); }
         const metadata = this.website.commands.Catalog ().find (tool => tool.id === message.command);
         if (!metadata) { throw Coded ('unknown_command', 'Tool unavailable.'); }
+        // Cancellation must not wait behind the macro it cancels.
+        if (message.command === 'macro.cancel') { return { ok : true, command : message.command, result : await this.website.commands.Invoke (message.command, message.arguments) }; }
         // Guard inside the registry queue, immediately before execution, and after it.
         const result = await this.website.commands.Queue (async () => {
             if (!allowed ()) { throw Coded ('session_changed', 'Session changed.'); }
