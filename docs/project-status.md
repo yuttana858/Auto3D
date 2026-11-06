@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Standard MCP consent — Auto3D 0.50.1 / Packaging 1.10.3 / Primary Products 0.4.0
+
+PR #82 removes Agent connection instructions, registration/harness inputs and window-code controls from the dialog. OAuth consent derives connection labels from client metadata and asks only for Allow/Deny. Browser sharing, screenshot opt-in and revocation remain available. See [release-0501.md](release-0501.md).
+
 ## Generate readiness and pillow pouches — Auto3D 0.50.0 / Primary Products 0.4.0 / Packaging 1.10.3
 
 Renames Add to session to Generate and refreshes module availability when editor operations finish, with visible blocked-state feedback. Adds opaque pillow-pouch geometry, dimensions, front/back zone descriptors and the shared generate/edit/history/archive workflow. See [release-0500.md](release-0500.md). Not deployed.

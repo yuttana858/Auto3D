@@ -5,7 +5,7 @@
       "id": "agent.access.open",
       "title": "Open agent access",
       "category": "Account",
-      "description": "Open the interactive OAuth registration and browser-window connection controls. Does not grant access or connect a client by itself.",
+      "description": "Open MCP browser-window sharing and connection revocation controls. Initial client authorization uses Auto3D sign-in and OAuth consent.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
