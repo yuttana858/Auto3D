@@ -1,5 +1,9 @@
+import { CommandIds } from './command-catalog.js';
 import { AgentName, Identifier, ReadTools } from './common.js';
 import { Registrations } from './registrations.js';
+import { FefcoProfile, ValidateFefco } from '../modules/packaging/src/fefco.js';
+
+const ToolIds = new Set (CommandIds);
 
 function NormalizeWindowCode (code)
 {
@@ -59,7 +63,7 @@ export class BrokerCore
         const registration = await this.registrations.Assert ({ accountId, id : grantId });
         const target = this.Connections (accountId).find (({ data }) => data.connectionId === connectionId && data.sessions.some (session => session.id === sessionId && session.active));
         if (!target || !Number.isFinite (expiresAt) || expiresAt <= this.now ()) { throw new Error ('Session unavailable.'); }
-        await this.state.storage.put ('pair:' + grantId, { connectionId, sessionId, expiresAt : Math.min (expiresAt, registration.expiresAt), revision : crypto.randomUUID () });
+        await this.state.storage.put ('pair:' + grantId, { connectionId, sessionId, expiresAt : Math.min (expiresAt, registration.expiresAt), lastActivity : this.now (), revision : crypto.randomUUID () });
         await this.registrations.Assert ({ accountId, id : grantId });
         this.Notify (accountId);
     }
@@ -73,12 +77,20 @@ export class BrokerCore
             const key = 'used-window-code:' + codeHash, used = await storage.get (key);
             if (used?.expiresAt > this.now ()) { throw new Error ('App window code already used.'); }
             if (used) { await storage.delete (key); }
-            await storage.put ('pair:' + grantId, { connectionId : target.data.connectionId, sessionId : target.data.sessions.find (session => session.active).id, expiresAt : Math.min (expiresAt, registration.expiresAt), revision : crypto.randomUUID () });
+            await storage.put ('pair:' + grantId, { connectionId : target.data.connectionId, sessionId : target.data.sessions.find (session => session.active).id, expiresAt : Math.min (expiresAt, registration.expiresAt), lastActivity : this.now (), revision : crypto.randomUUID () });
             await storage.put (key, { expiresAt : target.data.windowCodeExpiresAt });
         });
         await this.registrations.Assert ({ accountId, id : grantId });
         this.Notify (accountId);
         return { paired : true };
+    }
+    async CheckWindowCode ({ accountId, code })
+    {
+        await this.registrations.Account (accountId);
+        const codeHash = await WindowCodeHash (code);
+        const target = this.Connections (accountId).find (({ data }) => data.windowCodeHash === codeHash && data.windowCodeExpiresAt > this.now () && data.sessions.some (session => session.active));
+        const used = await this.state.storage.get ('used-window-code:' + codeHash);
+        return Boolean (target && (!used || used.expiresAt <= this.now ()));
     }
     Notify (accountId)
     {
@@ -89,6 +101,10 @@ export class BrokerCore
     {
         await this.registrations.Assert ({ accountId, id : grantId });
         const pair = await this.state.storage.get ('pair:' + grantId);
+        if (pair && Number.isFinite (pair.lastActivity) && this.now () - pair.lastActivity >= 3600000) {
+            await this.state.storage.transaction (async storage => { const current = await storage.get ('pair:' + grantId); if (current?.revision === pair.revision && current.lastActivity === pair.lastActivity) { await storage.delete ('pair:' + grantId); } });
+            throw new Error ('Agent session disconnected after inactivity. Pair again.');
+        }
         const target = this.Connections (accountId).find (({ data }) => data.connectionId === pair?.connectionId && data.sessions.some (session => session.id === pair.sessionId && session.active));
         if (!pair || pair.expiresAt <= this.now () || !target) { throw new Error ('Paired session unavailable.'); }
         return { pair, target };
@@ -96,11 +112,12 @@ export class BrokerCore
     async Dispatch ({ accountId, grantId, requestId, command, arguments : args })
     {
         Identifier (requestId);
-        if (!ReadTools.includes (command) || !args || typeof args !== 'object' || Array.isArray (args)) { throw new Error ('Tool unavailable.'); }
+        if (!ToolIds.has (command) || !args || typeof args !== 'object' || Array.isArray (args)) { throw new Error ('Tool unavailable.'); }
         const registration = await this.registrations.Assert ({ accountId, id : grantId });
+        if (!ReadTools.includes (command) && !registration.scopes.includes ('auto3d.write')) { throw new Error ('Write permission required.'); }
         if (command === 'capture.image' && !registration.scopes.includes ('auto3d.capture')) { throw new Error ('Screenshot permission required.'); }
         const { pair, target } = await this.Resolve ({ accountId, grantId });
-        const message = JSON.stringify ({ type : 'request', requestId, command, arguments : args, sessionId : pair.sessionId });
+        const message = JSON.stringify ({ type : 'request', requestId, command, arguments : args, sessionId : pair.sessionId, ...(!ReadTools.includes (command) ? { writeAuthorized : true } : {}) });
         if (message.length > 65536 || this.pending.size >= 20) { throw new Error ('Request limit reached.'); }
         await this.state.storage.transaction (async storage => {
             const key = 'request:' + grantId + ':' + requestId;
@@ -110,6 +127,11 @@ export class BrokerCore
         });
         const fresh = await this.Resolve ({ accountId, grantId });
         if (fresh.pair.revision !== pair.revision || fresh.target.socket !== target.socket) { throw new Error ('Pairing changed.'); }
+        await this.state.storage.transaction (async storage => {
+            const current = await storage.get ('pair:' + grantId);
+            if (!current || current.revision !== pair.revision) { throw new Error ('Pairing changed.'); }
+            await storage.put ('pair:' + grantId, { ...current, lastActivity : this.now () });
+        });
         const key = target.data.connectionId + ':' + requestId;
         const result = await new Promise ((resolve, reject) => {
             const timer = setTimeout (() => { this.pending.delete (key); reject (new Error ('Timed out. Do not automatically replay.')); }, this.timeoutMs);
@@ -119,6 +141,69 @@ export class BrokerCore
         const current = await this.Resolve ({ accountId, grantId });
         if (current.pair.revision !== pair.revision || current.target.socket !== target.socket) { throw new Error ('Pairing changed. Result discarded.'); }
         return result;
+    }
+    async HeadlessInspect ({ accountId, grantId })
+    {
+        await this.registrations.Assert ({ accountId, id : grantId });
+        return { mode : 'headless', draft : await this.state.storage.get ('headless:' + grantId) || null };
+    }
+    async HeadlessGenerate ({ accountId, grantId, parameters })
+    {
+        const registration = await this.registrations.Assert ({ accountId, id : grantId });
+        if (!registration.scopes.includes ('auto3d.write')) { throw new Error ('Write permission required.'); }
+        const p = ValidateFefco (parameters); const profile = FefcoProfile (p);
+        const draft = { kind : 'fefco-cad', basis : 'score-to-score', units : 'mm', parameters : p, profile, updatedAt : this.now () };
+        await this.state.storage.transaction (async storage => {
+            const current = await storage.get ('registration:' + grantId);
+            if (!current || current.revokedAt !== null || current.expiresAt <= this.now () || await storage.get ('disabled')) { throw new Error ('Agent access revoked.'); }
+            await storage.put ('headless:' + grantId, draft);
+        });
+        return { mode : 'headless', draft };
+    }
+    async HeadlessProjects ({ accountId, grantId })
+    {
+        await this.registrations.Assert ({ accountId, id : grantId });
+        const entries = await this.state.storage.list ({ prefix : 'headless-project:', limit : 21 });
+        return { projects : [...entries.values ()].map (({ id, name, revision, updatedAt }) => ({ id, name, revision, updatedAt })) };
+    }
+    async HeadlessProjectGet ({ accountId, grantId, projectId })
+    {
+        await this.registrations.Assert ({ accountId, id : grantId }); Identifier (projectId);
+        const project = await this.state.storage.get ('headless-project:' + projectId);
+        if (!project) { throw new Error ('Project unavailable.'); }
+        await this.registrations.Assert ({ accountId, id : grantId }); return { project };
+    }
+    async HeadlessProjectSave ({ accountId, grantId, name, projectId = null, expectedRevision = null })
+    {
+        const registration = await this.registrations.Assert ({ accountId, id : grantId });
+        if (!registration.scopes.includes ('auto3d.write')) { throw new Error ('Write permission required.'); }
+        name = AgentName (name);
+        if (projectId !== null) { Identifier (projectId); if (!Number.isSafeInteger (expectedRevision) || expectedRevision < 1) { throw new Error ('Expected revision required.'); } }
+        else if (expectedRevision !== null) { throw new Error ('Revision requires a project.'); }
+        const id = projectId || crypto.randomUUID ();
+        return this.state.storage.transaction (async storage => {
+            const currentGrant = await storage.get ('registration:' + grantId);
+            if (!currentGrant || currentGrant.revokedAt !== null || currentGrant.expiresAt <= this.now () || !currentGrant.scopes.includes ('auto3d.write') || await storage.get ('disabled')) { throw new Error ('Agent access revoked.'); }
+            const draft = await storage.get ('headless:' + grantId); if (!draft) { throw new Error ('Create a headless CAD draft first.'); }
+            const key = 'headless-project:' + id, existing = await storage.get (key);
+            if (projectId && (!existing || existing.revision !== expectedRevision)) { throw new Error ('Project changed or unavailable.'); }
+            if (!projectId && (await storage.list ({ prefix : 'headless-project:', limit : 20 })).size >= 20) { throw new Error ('Headless project limit reached.'); }
+            const project = { version : 1, id, name, revision : existing ? existing.revision + 1 : 1, updatedAt : this.now (), draft };
+            await storage.put (key, project); return { project };
+        });
+    }
+    async HeadlessProjectDelete ({ accountId, grantId, projectId, expectedRevision })
+    {
+        const registration = await this.registrations.Assert ({ accountId, id : grantId });
+        if (!registration.scopes.includes ('auto3d.write')) { throw new Error ('Write permission required.'); }
+        Identifier (projectId); if (!Number.isSafeInteger (expectedRevision) || expectedRevision < 1) { throw new Error ('Expected revision required.'); }
+        return this.state.storage.transaction (async storage => {
+            const currentGrant = await storage.get ('registration:' + grantId);
+            if (!currentGrant || currentGrant.revokedAt !== null || currentGrant.expiresAt <= this.now () || !currentGrant.scopes.includes ('auto3d.write') || await storage.get ('disabled')) { throw new Error ('Agent access revoked.'); }
+            const key = 'headless-project:' + projectId, project = await storage.get (key);
+            if (!project || project.revision !== expectedRevision) { throw new Error ('Project changed or unavailable.'); }
+            await storage.delete (key); return { deleted : projectId };
+        });
     }
     async Revoke ({ accountId, id })
     {
@@ -171,5 +256,12 @@ export class BrokerCore
             for (const [key, record] of records) { if (record.expiresAt <= this.now ()) { await this.state.storage.delete (key); } }
         }
         for (const socket of this.state.getWebSockets ()) { if (socket.deserializeAttachment ()?.expiresAt <= this.now ()) { socket.close (1008, 'Connection expired'); this.Close (socket); } }
+        const pairs = await this.state.storage.list ({ prefix : 'pair:', limit : 1000 }); let remaining = false;
+        for (const [key, pair] of pairs) {
+            if (pair.expiresAt <= this.now () || Number.isFinite (pair.lastActivity) && this.now () - pair.lastActivity >= 3600000) {
+                await this.state.storage.transaction (async storage => { const current = await storage.get (key); if (current?.revision === pair.revision && current.lastActivity === pair.lastActivity) { await storage.delete (key); } });
+            } else { remaining = true; }
+        }
+        return remaining;
     }
 }

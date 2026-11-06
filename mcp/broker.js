@@ -17,7 +17,14 @@ export class Auto3DAgentBroker extends DurableObject
     Renew (input) { return this.core.Renew (input); }
     Pair (input) { return this.core.Pair (input); }
     PairWithCode (input) { return this.core.PairWithCode (input); }
+    CheckWindowCode (input) { return this.core.CheckWindowCode (input); }
     Dispatch (input) { return this.core.Dispatch (input); }
+    HeadlessInspect (input) { return this.core.HeadlessInspect (input); }
+    HeadlessGenerate (input) { return this.core.HeadlessGenerate (input); }
+    HeadlessProjects (input) { return this.core.HeadlessProjects (input); }
+    HeadlessProjectGet (input) { return this.core.HeadlessProjectGet (input); }
+    HeadlessProjectSave (input) { return this.core.HeadlessProjectSave (input); }
+    HeadlessProjectDelete (input) { return this.core.HeadlessProjectDelete (input); }
     Register (input) { return this.core.registrations.Create (input); }
     Registrations (accountId) { return this.core.registrations.List (accountId); }
     AssertRegistration (input) { return this.core.registrations.Assert (input); }
@@ -26,6 +33,6 @@ export class Auto3DAgentBroker extends DurableObject
     webSocketMessage (socket, message) { return this.core.Message (socket, message); }
     webSocketClose (socket) { this.core.Close (socket); }
     webSocketError (socket) { this.core.Close (socket); }
-    async alarm () { await this.core.Cleanup (); if (this.ctx.getWebSockets ().length) { await this.ctx.storage.setAlarm (Date.now () + 300000); } }
+    async alarm () { const paired = await this.core.Cleanup (); if (paired || this.ctx.getWebSockets ().length) { await this.ctx.storage.setAlarm (Date.now () + 300000); } }
 }
 export default { fetch () { return new Response ('Not found.', { status : 404 }); } };

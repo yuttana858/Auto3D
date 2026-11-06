@@ -480,6 +480,7 @@ export class ModelLibrary
         codeInput.addEventListener ('input', () => { codeInput.value = codeInput.value.replace (/\D/g, '').slice (0, 4); });
         const generate = document.createElement ('button'); generate.className = 'workspace_primary'; generate.textContent = 'Generate viewer link';
         const shareStatus = document.createElement ('p'); shareStatus.className = 'section_hint'; shareStatus.setAttribute ('role', 'status');
+        let originalConfirmed = false;
         const input = document.createElement ('input'); input.readOnly = true; input.hidden = true; input.setAttribute ('aria-label', 'Shared viewer link'); input.addEventListener ('click', () => input.select ());
         const copy = document.createElement ('button'); copy.textContent = 'Copy link'; copy.hidden = true;
         const link = document.createElement ('a'); link.target = '_blank'; link.rel = 'noopener'; link.textContent = 'Open mini viewer'; link.hidden = true;
@@ -517,8 +518,19 @@ export class ModelLibrary
         });
         generate.addEventListener ('click', async () => {
             if (requireCode.checked && !/^\d{4}$/.test (codeInput.value)) { shareStatus.textContent = 'Enter exactly four digits for the access code.'; codeInput.focus (); return; }
-            generate.disabled = true; shareStatus.textContent = 'Creating secure viewer link…';
+            generate.disabled = true; shareStatus.textContent = 'Checking saved model size…';
             try {
+                if (!originalConfirmed) {
+                    const owner = this.editor.website.auth.user?.id;
+                    const archive = await this.ArchiveForItem (item);
+                    if (owner !== this.editor.website.auth.user?.id || this.editor.website.accountReady === false) { throw new Error ('Account changed. Reopen the Library.'); }
+                    if (archive.byteLength > 5 * 1024 * 1024) {
+                        originalConfirmed = true; generate.textContent = 'Share original'; generate.disabled = false;
+                        shareStatus.textContent = 'This saved model is ' + (archive.byteLength / (1024 * 1024)).toFixed (1) + ' MiB. It may take longer to load on mobile. Click Share original to proceed.';
+                        return;
+                    }
+                }
+                shareStatus.textContent = 'Creating secure viewer link…';
                 const result = await this.sharing.Create (item, { allowDownload : allowDownload.checked, code : codeInput.value });
                 input.value = result.url; input.hidden = false; copy.hidden = false; link.hidden = false; link.href = result.url; qrButton.hidden = false; qrContainer.hidden = true; qrSave.hidden = true;
                 shareStatus.textContent = (result.codeRequired ? 'Access code required · ' : 'No access code · ') + (result.allowDownload ? 'Download enabled.' : 'Download hidden.');

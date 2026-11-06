@@ -56,7 +56,7 @@ The paper-packaging knowledge base separates box structure, board/material const
 
 ## MCP / plugin adapter contract
 
-This is an in-page execution API, not a deployed MCP server or a ChatGPT plugin connection. A future authenticated bridge should expose catalog search, execute, runMacro, and cancelMacro as MCP tools and relay them to a specific live viewer session. It must preserve schemas/results, session identity, read-only enforcement, and explicit authorization for publication. A remote server cannot directly reach a browser's `window` object without this bridge. Never expose arbitrary JavaScript execution or credentials as a command.
+The MCP pilot bridge at `/mcp` relays authorized commands to a specifically paired live viewer session; a remote server cannot directly reach a browser's `window` object. OAuth grants require explicit read access, with `auto3d.write` for command-catalog discovery and execution. MCP exposes a compact tool list, then category/search results with schemas and pagination, followed by validated command invocation. The bridge preserves schemas/results, account/session identity, existing authorization and read-only checks, and explicit server-side authorization for account/admin actions. Never expose arbitrary JavaScript execution or credentials as a command.
 
 ## Visual command workspace
 

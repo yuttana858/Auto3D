@@ -2935,7 +2935,7 @@
       "id": "view.focus",
       "title": "Focus object",
       "category": "View",
-      "description": "Frame an object in the viewport.",
+      "description": "Frame all selected visible objects or the group containing the specified object, and orbit around their combined center.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -4364,7 +4364,7 @@
       "id": "camera.orbit.focus_selected",
       "title": "Orbit selected object",
       "category": "Camera",
-      "description": "Use the selected visible object world-space center as the orbit pivot. Keeps current camera position, framing and zoom; right-drag uses the same method after the drag threshold.",
+      "description": "Use the combined center of the selected visible objects as the orbit target without changing the camera position; right-drag uses the same method after the drag threshold.",
       "mutates": false,
       "inputSchema": {
         "type": "object",

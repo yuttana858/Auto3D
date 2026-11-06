@@ -28,7 +28,6 @@ export class SessionTabs
             this.root.appendChild (row);
         }
         const add = document.createElement ('button'); add.type = 'button'; add.textContent = '+'; add.title = 'New session · save each open session before leaving'; add.setAttribute ('aria-label', 'New session'); add.onclick = () => this.New ().catch (error => this.editor.Status (error.message)); this.root.appendChild (add);
-        for (const [label, action] of [['Copy model', () => this.Copy ()], ['Paste model', () => this.Paste ()]]) { const button = document.createElement ('button'); button.type = 'button'; button.textContent = label; button.onclick = () => Promise.resolve ().then (action).catch (error => this.editor.Status (error.message)); this.root.appendChild (button); }
     }
     async Apply (tab)
     {

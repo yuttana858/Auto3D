@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "Auto3D": {
+      "type": "http",
+      "url": "https://auto3d-5av.pages.dev/mcp"
+    }
+  }
+}

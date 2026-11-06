@@ -17,6 +17,18 @@ The shared shell offers opt-in animated entry/exit with latest-action cancellati
 Validation: 718 app/module tests, 26 MCP tests, 11 backend tests, lint, independent/module/website/Pages builds and production audit (zero vulnerabilities) pass; desktop/mobile Chromium verifies rail order/outline, lazy loading, draft edits, compact/extended/close motion, rapid transitions, reduced motion, unit conversion and unchanged imported-model/camera state. The initial browser fixture captured the baseline before asynchronous model import finished; a bounded import-completion poll corrected the fixture without changing application behavior or increasing timeouts.
 
 
+## MCP reconnect and grant lifecycle — proposed
+
+New agent registrations use renewable refresh credentials; the window bridge retries transient disconnects and idle pairings expire after one hour. See [MCP pilot](mcp-pilot.md) for reauthorization, timing, browser and harness limitations. Deployment updates the private broker before the Pages app. Live client verification is still required. The headless tier stores isolated FEFCO score-to-score CAD drafts and account-owned revision-checked CAD projects; full headless scene, rendering, import/export and Library support remain pending; see [headless build list](mcp-headless-roadmap.md).
+
+## Build list: Library sharing optimization
+
+Pending: implement reviewed mobile/desktop share variants and an explicit optimization choice; preserve saved presentation, quota accounting and revocation. See [share optimization review](share-optimization-review.md). Current size warning shares the original only.
+
+## Selected-object focus — Auto3D 0.47.6 / Packaging 1.10.3
+
+Focus frames the combined visible selection and right-drag targets that selection’s center, including groups. See `docs/release-0476.md`.
+
 ## Welcome screen — draft Auto3D 0.47.5 / Packaging 1.10.3
 
 Restore the animated startup welcome and wait for an explicit click or keyboard activation before beginning the authentication flow. A remembered login can restore after continuing. The temporary 3D renderer is disposed when the splash closes. See `docs/release-0475.md`.
