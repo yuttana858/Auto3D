@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Branded agent consent — Auto3D 0.49.1 / Packaging 1.10.3 / Primary Products 0.3.0
+
+The agent authorization page uses Auto3D branding and requires a current app-window code for approval. See [release-0491.md](release-0491.md).
+
 ## Opaque Primary Products scene workflow — Auto3D 0.49.0 / Primary Products 0.3.0 / Packaging 1.10.3
 
 Adds opaque bottle/can generation, selected-definition loading and atomic rebuild with Undo/Redo. Shared strict commands drive UI actions; scene units, account/read-only guards, versioned archive definitions and recovery are covered. Glass generation remains blocked; profile/label-zone UI is illustrative and artwork is pending. See [release-0490.md](release-0490.md).
