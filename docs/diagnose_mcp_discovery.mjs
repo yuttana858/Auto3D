@@ -1,4 +1,4 @@
-// Run on the user's own computer: node tools/diagnose_mcp_discovery.mjs
+// Run on the user's own computer: node docs/diagnose_mcp_discovery.mjs
 // Tokens and authorization codes stay in memory and are never printed.
 import { createServer } from 'node:http';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
