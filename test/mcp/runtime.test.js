@@ -26,8 +26,16 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         const timer = setTimeout (() => reject (new Error ('Browser fixture timed out.')), 5000);
         ws.addEventListener ('message', event => { clearTimeout (timer); resolve (JSON.parse (event.data)); }, { once : true });
     });
-    async function begin (id = userA, scope = 'auto3d.read offline_access', appWindowCode = '')
+    async function begin (id = userA, scope = 'auto3d.read offline_access', appWindowCode = null)
     {
+        let fixtureSocket = null;
+        if (appWindowCode === null) {
+            const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            appWindowCode = [...crypto.getRandomValues (new Uint8Array (16))].map (n => alphabet[n & 31]).join ('').match (/.{4}/g).join ('-');
+            const upgrade = await fetch ('/api/agent/connect', { headers : { Cookie : cookieFor (id), Origin : origin, Upgrade : 'websocket' } }); assert.equal (upgrade.status, 101);
+            fixtureSocket = upgrade.webSocket; fixtureSocket.accept (); const ack = message (fixtureSocket);
+            fixtureSocket.send (JSON.stringify ({ type : 'hello', instanceId : crypto.randomUUID (), windowLabel : 'Test window', windowCode : appWindowCode, sessions : [{ id : 'fixture-tab', name : 'Fixture', active : true }] })); await ack;
+        }
         const verifier = Buffer.from (crypto.getRandomValues (new Uint8Array (32))).toString ('base64url');
         const challenge = Buffer.from (await crypto.subtle.digest ('SHA-256', new TextEncoder ().encode (verifier))).toString ('base64url');
         const params = new URLSearchParams ({ client_id : clientId, response_type : 'code', redirect_uri : 'https://client.example/callback', resource : origin + '/mcp', scope, state : 'test-state', code_challenge : challenge, code_challenge_method : 'S256' });
@@ -37,14 +45,14 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         const html = await response.text ();
         assert.ok (!html.includes ('<script>evil</script>')); assert.ok (html.includes ('&#60;script&#62;evil&#60;/script&#62;'));
         assert.ok (html.includes ('<label>App window code <input name="appWindowCode" required')); assert.ok (html.includes ('value="claude"'));
-        if (scope.includes ('auto3d.write')) { assert.match (html, /full 250-command catalog, including tools that change the app and account or administrator controls/); }
-        assert.ok (html.includes ('value="approve-manual" formnovalidate'));
-        const form = new URLSearchParams ({ handle : html.match (/name="handle" value="([^"]+)"/)[1], binding : html.match (/name="binding" value="([^"]+)"/)[1], name : 'My review agent', harness : 'chatgpt', appWindowCode, decision : appWindowCode ? 'approve' : 'approve-manual' });
+        if (scope.includes ('auto3d.write')) { assert.match (html, /full Auto3D command catalog, including tools that change the app and account or administrator controls/); }
+        assert.ok (!html.includes ('approve-manual')); assert.match (html, /SW Auto3D/); assert.match (html, /mcp-consent\.css/);
+        const form = new URLSearchParams ({ handle : html.match (/name="handle" value="([^"]+)"/)[1], binding : html.match (/name="binding" value="([^"]+)"/)[1], name : 'My review agent', harness : 'chatgpt', appWindowCode, decision : 'approve' });
         const cookies = [cookieFor (id), ...response.headers.getSetCookie ().map (value => value.split (';')[0])].join ('; ');
-        return { verifier, form, cookies };
+        return { verifier, form, cookies, fixtureSocket };
     }
-    const approve = (flow, id = userA) => fetch ('/oauth/authorize', { method : 'POST', headers : { Cookie : flow.cookies, Origin : origin, 'Content-Type' : 'application/x-www-form-urlencoded' }, body : flow.form.toString (), redirect : 'manual' });
-    async function grant (id = userA, scope, appWindowCode = '')
+    const approve = async (flow, id = userA) => { const result = await fetch ('/oauth/authorize', { method : 'POST', headers : { Cookie : flow.cookies, Origin : origin, 'Content-Type' : 'application/x-www-form-urlencoded' }, body : flow.form.toString (), redirect : 'manual' }); if (result.status === 302) { flow.fixtureSocket?.close (); } return result; };
+    async function grant (id = userA, scope, appWindowCode = null)
     {
         const before = await (await fetch ('/api/agent/registrations', { headers : userHeaders (id) })).json ();
         const flow = await begin (id, scope, appWindowCode), approval = await approve (flow, id); assert.equal (approval.status, 302);
@@ -98,7 +106,7 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         const noCookie = { ...flow, cookies : cookieFor (userA) };
         assert.notEqual ((await approve (noCookie)).status, 302);
         const success = await approve (flow); assert.equal (success.status, 302);
-        const reused = await approve (flow); assert.equal (reused.status, 400); assert.equal ((await reused.json ()).code, 'CONSENT_REQUEST_INVALID');
+        flow.form.set ('decision', 'deny'); const reused = await approve (flow); assert.equal (reused.status, 400); assert.equal ((await reused.json ()).code, 'CONSENT_REQUEST_INVALID');
     });
     it ('enforces PKCE and rejects a different token resource', async () => {
         const flow = await begin (), approved = await approve (flow), code = new URL (approved.headers.get ('Location')).searchParams.get ('code');
@@ -174,11 +182,11 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         assert.equal (paired.result.structuredContent.result.paired, true); assert.equal (JSON.stringify (paired).includes (code), false);
         const reused = await (await rpc (token.access_token, 'tools/call', { name : 'auto3d.sessions.pair_code', arguments : { code } })).json (); assert.equal (reused.result.isError, true);
     });
-    it ('requires a code for paired approval while preserving explicit manual approval', async () => {
-        const flow = await begin (), attempt = new URLSearchParams (flow.form); attempt.set ('decision', 'approve');
+    it ('rejects approval without a window code, including forged manual approval', async () => {
+        const flow = await begin (userA, undefined, ''), attempt = new URLSearchParams (flow.form); attempt.set ('decision', 'approve');
         const response = await fetch ('/oauth/authorize', { method : 'POST', headers : { Cookie : flow.cookies, Origin : origin, 'Content-Type' : 'application/x-www-form-urlencoded' }, body : attempt.toString () });
         assert.equal (response.status, 400); assert.match (await response.text (), /Enter the current app window code/);
-        assert.equal ((await approve (flow)).status, 302);
+        flow.form.set ('decision', 'approve-manual'); assert.equal ((await approve (flow)).status, 400);
     });
     it ('creates a long-lived revocable registration with a renewable refresh credential', async () => {
         const token = await grant (); const records = await (await fetch ('/api/agent/registrations', { headers : userHeaders (userA) })).json ();
