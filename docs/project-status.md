@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Generate readiness and pillow pouches — Auto3D 0.50.0 / Primary Products 0.4.0 / Packaging 1.10.3
+
+Renames Add to session to Generate and refreshes module availability when editor operations finish, with visible blocked-state feedback. Adds opaque pillow-pouch geometry, dimensions, front/back zone descriptors and the shared generate/edit/history/archive workflow. See [release-0500.md](release-0500.md). Not deployed.
+
 ## Meshy reliability — local candidate
 
 Transient polling failures retry, creation history loads concurrently with partial results, and uncertain submissions warn against duplicate paid tasks. The production connection failure remains undiagnosed and live verification is pending. See [Meshy reliability review](meshy-reliability-review.md).

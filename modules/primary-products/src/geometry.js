@@ -1,9 +1,11 @@
+import { CreatePillowPouch } from './pouch.js';
 import { DefaultProductDraft, UpdateProductDraft } from './state.js';
 
 // Neutral indexed meshes: base-centred, Y-up, millimeters; no engine dependencies.
 export function GetArtworkZones (input)
 {
     const d = UpdateProductDraft (DefaultProductDraft (), input);
+    if (d.family === 'pouch') { return ['front', 'back'].map (id => ({ id, componentId : 'body', surface : 'pillow', widthMm : d.widthMm * 0.8, heightMm : d.heightMm * 0.8, bottomMm : d.heightMm * 0.1, distortionCompensation : false })); }
     const height = d.heightMm * (d.family === 'bottle' ? 0.55 : 0.82);
     const radius = d.diameterMm / 2;
     return ['front', 'back', 'wrap'].map (id => ({ id, componentId : 'body', surface : 'cylinder', radiusMm : radius,
@@ -38,6 +40,7 @@ export function CreatePrimaryProduct (input, options = {})
     if (!options || typeof options !== 'object' || Array.isArray (options) || Object.keys (options).some (key => key !== 'segments')) { throw new Error ('Invalid geometry options.'); }
     const segments = options.segments ?? 64;
     if (!Number.isInteger (segments) || segments < 16 || segments > 128 || segments % 4 !== 0) { throw new Error ('Segments must be a multiple of four between 16 and 128.'); }
+    if (definition.family === 'pouch') { return { apiVersion : 1, generatorVersion : 1, units : 'mm', definition, components : [CreatePillowPouch (definition, segments)], bounds : { min : [-definition.widthMm / 2, 0, -definition.depthMm / 2], max : [definition.widthMm / 2, definition.heightMm, definition.depthMm / 2] }, artworkZones : GetArtworkZones (definition), quality : { construction : 'filled-pillow-presentation', hollowWalls : false, gusset : false, zipper : false, simulatedFill : false } }; }
     const h = definition.heightMm; const r = definition.diameterMm / 2; const components = [];
     const cylinder = (id, role, radius, low, high) => Revolve (id, role, [[0, low], [radius, low], [radius, high], [0, high]], segments);
     if (definition.family === 'bottle') {

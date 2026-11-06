@@ -51,6 +51,18 @@ describe ('Primary Products scene integration', function () {
         const invalid = structuredClone (packed); invalid.objects[0].userData[PrimaryProductDataKey] = JSON.stringify ({ schemaVersion : 999 }); assert.throws (() => ReadSession (invalid));
         const incomplete = structuredClone (packed); incomplete.objects[0].userData[PrimaryProductDataKey] = JSON.stringify ({ schemaVersion : 1, generatorVersion : 1, units : 'mm', draft : {} }); assert.throws (() => ReadSession (incomplete));
     });
+    it ('generates, edits and reopens pouches while preserving legacy bottle definitions', async function () {
+        const { panel, editor, workspace } = Fixture (); panel.draft = module.DefaultProductDraft ('pouch');
+        const commands = CreateAgentCommands ({ sessionEditor : editor, primaryProductsPanel : panel });
+        assert.equal ((await commands.Execute ('primary.generate')).ok, true);
+        const id = editor.selected.id; panel.draft.widthMm = 180;
+        await workspace.Generate (true); assert.equal (editor.selected.id, id);
+        const saved = OpenSessionArchive (CreateSessionArchive (PackSession (editor.document))).document;
+        const definition = module.ValidateProductDefinition (JSON.parse (saved.objects[0].userData[PrimaryProductDataKey]));
+        assert.equal (definition.draft.widthMm, 180); assert.equal (definition.draft.family, 'pouch');
+        await editor.history.Undo (); workspace.LoadSelected (); assert.equal (panel.draft.widthMm, 140);
+        assert.equal (module.ValidateProductDefinition (module.ProductDefinition (module.DefaultProductDraft ())).draft.diameterMm, 65);
+    });
     it ('converts mm geometry into known scene units and rejects unknown units/glass', function () {
         const data = module.CreatePrimaryProduct (module.DefaultProductDraft ('can'));
         for (const [unit, factor] of [[Unit.Millimeter, 1], [Unit.Meter, 1000], [Unit.Inch, 25.4]]) {

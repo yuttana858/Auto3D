@@ -33,7 +33,8 @@
 .pp_art_placeholder { display: flex; align-items: center; flex-direction: column; padding: 16px 10px; gap: 8px; margin-top: 10px; border: 1px dashed var(--ov_border_color, #cad2d3); border-radius: 7px; text-align: center; }
 .pp_art_placeholder svg { color: var(--pp-accent); }
 .pp_art_placeholder small { max-width: 200px; font-size: var(--workspace-help-font-size, 11px); line-height: 1.5; opacity: .6; }
-.pp_add { width: 100%; padding: 11px; border: 1px solid #458b9b60; border-radius: 6px; background: #458b9b22; color: inherit; opacity: .5; }
+.pp_add { width: 100%; padding: 11px; border: 1px solid var(--pp-accent); border-radius: 6px; background: var(--pp-accent); color: #fff; opacity: 1; cursor: pointer; }
+.pp_add:disabled { opacity: .45; cursor: default; }
 .pp_draft_note { font-size: var(--workspace-help-font-size, 11px); line-height: 1.5; text-align: center; opacity: .6; margin: 9px 0; }
 .pp_reset { display: block; padding: 5px; margin: 0 auto; background: transparent; border: 0; color: var(--pp-accent); cursor: pointer; }
 .pp_status { font-size: var(--workspace-help-font-size, 11px); color: #cb7856; line-height: 1.5; }
@@ -49,3 +50,5 @@
 .module_panel_body[data-mode=extended] .pp_drawing { max-width: 340px; height: 390px; }
 @media (max-width: 1000px) { .module_panel_body[data-mode=extended] .pp_layout { grid-template-columns: minmax(0, 1fr) 280px; } .module_panel_body[data-mode=extended] .pp_catalog { grid-column: 1 / -1; } .module_panel_body[data-mode=extended] .pp_product_cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } .module_panel_body[data-mode=extended] .pp_product_card { padding: 12px; } .module_panel_body[data-mode=extended] .pp_catalog_note { display: none; } }
 @media (max-width: 650px) { .module_panel_body[data-mode=extended] .pp_workspace { padding: 12px; } .module_panel_body[data-mode=extended] .pp_layout { grid-template-columns: minmax(0, 1fr); gap: 16px; } .module_panel_body[data-mode=extended] .pp_catalog { grid-column: auto; } .module_panel_body[data-mode=extended] .pp_stage { min-height: 280px; height: auto; padding: 14px; } .module_panel_body[data-mode=extended] .pp_drawing { height: 230px; } .module_panel_body[data-mode=extended] .pp_profile_name { position: static; } }
+/* Hidden family-specific fields must override the field's flex layout. */
+.pp_workspace [hidden] { display: none !important; }
