@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Generate readiness and pillow pouches — Auto3D 0.50.0 / Primary Products 0.4.0 / Packaging 1.10.3
+
+Renames Add to session to Generate and refreshes module availability when editor operations finish, with visible blocked-state feedback. Adds opaque pillow-pouch geometry, dimensions, front/back zone descriptors and the shared generate/edit/history/archive workflow. See [release-0500.md](release-0500.md). Not deployed.
+
 ## MCP connection before window pairing — Auto3D 0.49.2 / Packaging 1.10.3 / Primary Products 0.3.0
 
 OAuth approval no longer requires an app-window code. Live control still requires a separately selected or paired window. Real-client production verification remains pending. See [release-0492.md](release-0492.md).
