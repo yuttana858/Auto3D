@@ -1,6 +1,6 @@
 import { OAuthAuthorizationServer, OAuthError } from '@cloudflare/workers-oauth-provider';
 import { RequireAdmin } from '../functions/_lib/accounts.js';
-import { AgentName, Identifier, Json, PilotConfig, ReadBytes, ReadJson, Scopes, ValidScopes } from './common.js';
+import { AgentName, ErrorCode, Identifier, Json, PilotConfig, ReadBytes, ReadJson, Scopes, ValidScopes } from './common.js';
 import { ActiveRegistration, BrowserIdentity } from './identity.js';
 import { CompleteAgentConsent } from './consent-completion.js';
 
@@ -45,7 +45,11 @@ export function AuthorizationProvider (env)
         accessTokenTTL : 600, refreshTokenTTL : 31536000, refreshTokenIdleTTL : 31536000,
         tokenExchangeCallback : async options => {
             try { await ActiveRegistration (options.env, options.userId, options.props.registrationId); }
-            catch { throw new OAuthError ('invalid_grant', { description : 'Agent access was revoked or expired.' }); }
+            catch (error) {
+                // invalid_grant permanently revokes the grant, so reserve it for definitive denials.
+                if (ErrorCode (error) === 'revoked') { throw new OAuthError ('invalid_grant', { description : 'Agent access was revoked or expired.' }); }
+                throw new OAuthError ('temporarily_unavailable', { description : 'Auto3D is temporarily unavailable. Retry later; this grant remains valid.', statusCode : 503, headers : { 'Retry-After' : '30' } });
+            }
         }
     });
 }

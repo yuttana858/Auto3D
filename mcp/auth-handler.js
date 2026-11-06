@@ -1,6 +1,6 @@
-import { AuthorizationError, CimdFetchError } from '@cloudflare/workers-oauth-provider';
+import { AuthorizationError, CimdFetchError, OAuthError } from '@cloudflare/workers-oauth-provider';
 import { AuthorizationProvider, Consent, ManageRegistrations } from './authorization.js';
-import { PilotConfig, Json } from './common.js';
+import { ErrorCode, PilotConfig, Json } from './common.js';
 import { ActiveRegistration } from './identity.js';
 
 export async function AuthFetch (request, env, ctx)
@@ -24,6 +24,11 @@ export async function ValidateAccessToken (resource, token, env)
     const config = PilotConfig (env); if (resource !== config.resource) { return null; }
     const result = await AuthorizationProvider (env).validateToken (resource, token, env);
     if (!result?.userId || !result.props?.registrationId) { return null; }
-    try { await ActiveRegistration (env, result.userId, result.props.registrationId); } catch { return null; }
+    try { await ActiveRegistration (env, result.userId, result.props.registrationId); }
+    catch (error) {
+        // Revoked access is a 401; an outage must not look like an invalid token.
+        if (ErrorCode (error) === 'revoked') { return null; }
+        throw new OAuthError ('temporarily_unavailable', { description : 'Auto3D is temporarily unavailable. Retry later.', statusCode : 503, headers : { 'Retry-After' : '30' } });
+    }
     return result;
 }

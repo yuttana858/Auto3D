@@ -50,7 +50,7 @@ describe ('MCP registration and isolation boundary', () => {
         const state = State (), broker = new BrokerCore (state), socket = Socket ();
         await broker.registrations.Create (registration ());
         await broker.Attach ({ accountId : owner, sessionFingerprint : 'a'.repeat (64), expiresAt : Date.now () + 60000 }, socket);
-        await broker.Message (socket, JSON.stringify ({ type : 'hello', instanceId : 'window-a', windowLabel : 'Review', sessions : [{ id : 'tab-a', name : 'Box', active : true }] }));
+        await broker.Message (socket, JSON.stringify ({ type : 'hello', instanceId : 'window-a', windowLabel : 'Review', allowSelect : true, sessions : [{ id : 'tab-a', name : 'Box', active : true }] }));
         const connectionId = socket.data.connectionId;
         await broker.Pair ({ accountId : owner, grantId : 'grant-a', connectionId, sessionId : 'tab-a', expiresAt : Date.now () + 60000 });
         socket.onSend = message => { if (message.type === 'request') { queueMicrotask (() => broker.Message (socket, JSON.stringify ({ type : 'result', requestId : message.requestId, sessionId : message.sessionId, result : { ok : true, command : message.command, result : 'box' } }))); } };
@@ -65,7 +65,7 @@ describe ('MCP registration and isolation boundary', () => {
     it ('rejects pending results on revoke and enforces screenshot permission at the broker', async () => {
         const state = State (), broker = new BrokerCore (state), socket = Socket ();
         await broker.registrations.Create (registration ()); await broker.Attach ({ accountId : owner, sessionFingerprint : 'a'.repeat (64), expiresAt : Date.now () + 60000 }, socket);
-        await broker.Message (socket, JSON.stringify ({ type : 'hello', instanceId : 'window-a', windowLabel : 'Review', sessions : [{ id : 'tab-a', name : 'Box', active : true }] }));
+        await broker.Message (socket, JSON.stringify ({ type : 'hello', instanceId : 'window-a', windowLabel : 'Review', allowSelect : true, sessions : [{ id : 'tab-a', name : 'Box', active : true }] }));
         await broker.Pair ({ accountId : owner, grantId : 'grant-a', connectionId : socket.data.connectionId, sessionId : 'tab-a', expiresAt : Date.now () + 60000 });
         await assert.rejects (broker.Dispatch ({ accountId : owner, grantId : 'grant-a', requestId : 'capture-a', command : 'capture.image', arguments : {} }), /Screenshot/);
         let sent; const dispatched = new Promise (resolve => { sent = resolve; }); socket.onSend = message => { if (message.type === 'request') { sent (); } };
@@ -94,7 +94,7 @@ describe ('MCP registration and isolation boundary', () => {
         let now = Date.now (); const state = State (), broker = new BrokerCore (state, { now : () => now }), socket = Socket ();
         await broker.registrations.Create ({ ...registration (), expiresAt : now + 7200000 });
         await broker.Attach ({ accountId : owner, sessionFingerprint : 'a'.repeat (64), expiresAt : now + 60000 }, socket);
-        await broker.Message (socket, JSON.stringify ({ type : 'hello', instanceId : 'idle-window', windowLabel : 'Review', sessions : [{ id : 'tab-a', name : 'Box', active : true }] }));
+        await broker.Message (socket, JSON.stringify ({ type : 'hello', instanceId : 'idle-window', windowLabel : 'Review', allowSelect : true, sessions : [{ id : 'tab-a', name : 'Box', active : true }] }));
         await broker.Pair ({ accountId : owner, grantId : 'grant-a', connectionId : socket.data.connectionId, sessionId : 'tab-a', expiresAt : now + 7200000 });
         now += 3600000; await broker.Cleanup (); assert.equal (await state.storage.get ('pair:grant-a'), undefined);
         assert.ok (await broker.registrations.Assert ({ accountId : owner, id : 'grant-a' }));
