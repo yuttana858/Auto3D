@@ -4,6 +4,10 @@
 
 Renames Add to session to Generate and refreshes module availability when editor operations finish, with visible blocked-state feedback. Adds opaque pillow-pouch geometry, dimensions, front/back zone descriptors and the shared generate/edit/history/archive workflow. See [release-0500.md](release-0500.md). Not deployed.
 
+## Meshy reliability — local candidate
+
+Transient polling failures retry, creation history loads concurrently with partial results, and uncertain submissions warn against duplicate paid tasks. The production connection failure remains undiagnosed and live verification is pending. See [Meshy reliability review](meshy-reliability-review.md).
+
 ## MCP connection before window pairing — Auto3D 0.49.2 / Packaging 1.10.3 / Primary Products 0.3.0
 
 OAuth approval no longer requires an app-window code. Live control still requires a separately selected or paired window. Real-client production verification remains pending. See [release-0492.md](release-0492.md).
