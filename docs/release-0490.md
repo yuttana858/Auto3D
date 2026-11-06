@@ -1,6 +1,6 @@
 # Auto3D 0.49.0 — Primary Products scene integration
 
-Primary Products 0.3.0 / API 1; Packaging remains 1.10.3. Stacked above geometry PR #64; not deployed.
+Primary Products 0.3.0 / API 1; Packaging remains 1.10.3. Production release candidate consolidating the completed Primary Products stack and current main.
 
 The Primary Products panel can add opaque round bottles and cans, load a selected generated definition, and apply draft changes through shared strict commands (`primary.generate`, `primary.selected.load`, `primary.update`). Each add/update creates one Undo step. Updating keeps identity, placement, scale, name, group metadata, visibility and shadow flags. Component surfaces are rebuilt from the draft; this is stated in the UI/command description. Animated or partially hidden objects must be cleared before rebuilding. Duplicates remain independent.
 
@@ -11,3 +11,5 @@ Versioned authoring definitions are stored in existing bounded per-object metada
 Glass generation is explicitly blocked. The panel's profile remains illustrative, label zones are preparatory and no label artwork is applied. Hollow walls, transmission, real 3D draft preview, image import/mapping and expanded presets remain later build-plan steps.
 
 Validation: 734 app/module tests, 26 MCP tests, 11 backend tests, application/MCP lint, website/Pages builds and a focused opaque GLB export check pass. Built-app Chromium verifies desktop/mobile panel behavior, UI generation, strict selected-load/update, stable identity, Undo/Redo and glass rejection. Test HTTP servers required local loopback access; an initial pre-existing appearance-test timeout under concurrent Chromium load passed when the suite ran sequentially.
+
+Release integration preserves main's selected-focus, MCP reconnect/grant lifecycle and isolated headless CAD project work. The generated MCP command catalog includes Primary Products; its category-count test now derives the expected count from that catalog. Integrated validation: 737 app/module tests, 47 MCP tests, 11 backend tests, both linters, dependency licenses, production audit (zero vulnerabilities) and website/Pages builds pass.
