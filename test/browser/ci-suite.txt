@@ -1,12 +1,16 @@
+account-storage
 admin-controls
+animation
 board-appearance
 board-appearance-controls
 board-array-buffers
+board-database
 board-panel-visibility
 board-toggle-stability
 cad-apply
 command-design
 corrugate-review
+errorlogs-panel
 feedback
 fold-actions
 library-sharing

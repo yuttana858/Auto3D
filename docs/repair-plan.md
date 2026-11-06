@@ -28,7 +28,7 @@ Status legend: ☐ open · ☑ done · ⏸ planned for a later release (feature 
 
 | ID | Issue | Repair | Status |
 |---|---|---|---|
-| K1 | Mutating commands marked `mutates:false` (render/queue, lighting, view, preferences, diagnostics.clear, macro.save, camera.fov, playback). | 19 flags corrected; registry test asserts naming rules with an explicit allowlist. Sign-in session commands (`auth.sign_out`, `auth.recover`) and `commands.text` stay non-mutating so read-only viewers can still sign out and run view phrases; each `commands.text` step is checked. | ☑ |
+| K1 | Mutating commands marked `mutates:false` (render/queue, lighting, view, camera.fov, playback). | 14 flags corrected; registry test asserts naming rules with an explicit allowlist. `mutates` means a change to the open document/session or shared data, so sign-in, personal preferences, local diagnostics/macros and `commands.text` (each step checked) stay non-mutating for read-only viewers. | ☑ |
 | K2 | 10 command examples fail their own schema; no test checks examples. | Fix examples; test validates every example against its schema. | ☑ |
 | K3 | 112 unbounded strings/numbers/indexes. | Shared `text` helper gets `maxLength` (default 4096; IDs 128; data URIs 12 MB); integer indexes get `maximum`; numeric transforms get finite bounds; `number` indexes become `integer`. | ☑ |
 | K4 | `macro.cancel` has no command, so MCP can't stop a macro. | Add `macro.cancel` (fast path outside the queue). | ☑ |
@@ -51,7 +51,7 @@ Status legend: ☐ open · ☑ done · ⏸ planned for a later release (feature 
 
 | ID | Issue | Repair | Status |
 |---|---|---|---|
-| P1 | 61 of 63 browser tests not in CI. | New `browser` CI job (Chromium, serial) running the stable suite on ready PRs and `main`. | ☐ |
+| P1 | 61 of 63 browser tests not in CI. | Root cause: the 0.47.5 welcome screen blocked every test; it now continues for `navigator.webdriver`. New CI `browser` job runs the 35 passing regressions serially. 26 tests fail identically on unchanged 0.49.2 (stale expectations) and are follow-up work. | ☑ |
 | P2 | Production deploy can cancel itself mid-way (broker vs Pages skew). | `cancel-in-progress: false` for the production deploy. | ☑ |
 | P3 | Shared Meshy key: users can list everyone's tasks; no rate limit; unvalidated 28 MB bodies; model proxy without timeout/size cap. | Record task ownership per account; list/read filtered to owner; per-account rate limit; body schema/size validation; proxy timeout + size cap + host-checked redirects. | ☑ |
 | P4 | Malformed JSON returns 503; raw `error.message` leak in boards route. | 400 `invalid_json`; generic error text. | ☑ |

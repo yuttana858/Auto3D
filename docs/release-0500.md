@@ -17,7 +17,7 @@ Repair release from the 2026-11-06 review. See [repair-plan.md](repair-plan.md) 
 
 ## Commands
 
-- 19 state-changing commands are now marked `mutates : true` (render queue, lighting/view, preferences, diagnostics.clear, macro.save, playback cancel, camera.fov), so read-only viewers block them. Sign-in session commands and `commands.text` stay non-mutating; `commands.text` checks each step.
+- 14 commands that change the open session or scene are now marked `mutates : true` (render view mode, render and render queue, lighting, background, camera FOV, playback cancel that restores geometry), so read-only viewers block them. `mutates` means a change to the open document/session or shared data: sign-in, personal preferences, local diagnostics, local macros and `commands.text` (which checks each step) stay available in read-only viewers.
 - Every example validates against its schema. Every string and number is bounded (4 KB text, 256 KB definitions, 16 MB data URIs, integer index ranges).
 - New commands: `macro.cancel` (runs outside the queue it cancels), `session.rename`, `session.recovery.discard`, `object.user_data.delete`. The catalog has 261 commands.
 - File pickers and full screen return `requiresUserGesture : true` when the browser has no user activation instead of reporting success. AI pickers use shared workspace methods rather than simulated clicks.
@@ -26,12 +26,12 @@ Repair release from the 2026-11-06 review. See [repair-plan.md](repair-plan.md) 
 
 - Model, mesh, material, zip and missing-file names are rendered as text. Previously they reached `innerHTML`, so a crafted model or shared `.auto3d` archive could run script in a viewer's signed-in session.
 - Pages now sends a Content-Security-Policy. Inline bootstrap scripts are allowed only by SHA-256 hashes computed in `tools/build_pages.mjs`; `object-src 'none'`, `base-uri 'self'` and same-origin editor framing apply. `'unsafe-eval'` remains because the embind-based STEP/IFC/3DM importers loaded from jsdelivr generate functions at runtime.
-- Shared Meshy key: each account sees and reads only tasks it created (ownership is recorded in the private AI credential bucket), creation is limited to 20 per hour per account, request bodies must be flat objects (64 KB for text routes, 28 MB for image routes) and model downloads have a 120 s timeout and a 200 MB streaming cap.
+- Shared Meshy key: each account sees and reads only tasks it created (ownership is recorded in the private AI credential bucket), creation is limited to 20 per hour per account (the shared key now requires the private AI credential bucket; without it shared-key requests return `MESHY_STORAGE_UNAVAILABLE`), request bodies must be flat objects (64 KB for text routes, 28 MB for image routes) and model downloads have a 120 s timeout and a 200 MB streaming cap.
 - Malformed JSON returns 400. The board catalog route no longer echoes unexpected error text. Recovery contact text uses `AUTO3D_SUPPORT_CONTACT` instead of a hard-coded personal address. Stored client IP hashes are keyed with `AUTO3D_IP_HASH_SECRET` (falling back to the server Supabase key).
 
 ## Build, CI and tests
 
-- Browser tests stalled at the welcome screen added in 0.47.5. The welcome screen now continues automatically when `navigator.webdriver` is true; authentication is unchanged.
+- Browser tests stalled at the welcome screen added in 0.47.5. The welcome screen now continues automatically when `navigator.webdriver` is true; authentication is unchanged. 35 browser regressions pass and run in a new CI `browser` job (`test/browser/ci-suite.txt`). 26 others fail identically on the unchanged 0.49.2 code (out-of-date toolbar labels, auth mocks and fixtures) and stay manual until updated; `ai-extended` passes but is timing-sensitive.
 - CI runs `lint_mcp`, `test_mcp` and checks that the committed MCP catalog matches the registry. Production deploys queue instead of cancelling a running deploy.
 - `build_website_dev` writes the mini viewer and animation decoders into `build/website_dev` instead of the production build directory.
 - New tests: `test/mcp/reliability.test.js`, `test/command-catalog.test.js`, `test/dom-safety.test.js`, `test/csp-headers.test.js`, the shared-key AI scoping test and updated browser-bridge tests.

@@ -325,7 +325,7 @@
       "title": "Clear error logs",
       "category": "Diagnostics",
       "description": "Clear this account browser-tab error log.",
-      "mutates": true,
+      "mutates": false,
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -3390,7 +3390,7 @@
       "title": "Set theme",
       "category": "Preferences",
       "description": "Apply and remember a light or dark theme.",
-      "mutates": true,
+      "mutates": false,
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3416,7 +3416,7 @@
       "title": "Set display units",
       "category": "Preferences",
       "description": "Apply metric or standard display units.",
-      "mutates": true,
+      "mutates": false,
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3442,7 +3442,7 @@
       "title": "Set viewport quality",
       "category": "Preferences",
       "description": "Remember Auto, Fast or Quality display resolution. Original geometry and final render resolution are preserved.",
-      "mutates": true,
+      "mutates": false,
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5305,7 +5305,7 @@
       "title": "Save macro",
       "category": "Macros",
       "description": "Save a named version 1 macro locally. Definition is a JSON string; matching names are replaced.",
-      "mutates": true,
+      "mutates": false,
       "inputSchema": {
         "type": "object",
         "properties": {
