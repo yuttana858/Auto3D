@@ -34,7 +34,8 @@ try {
     const before = await call ('scene.inspect'), camera = await call ('camera.current.inspect');
     await group.getByRole ('button', { name : 'Primary Products', exact : true }).click ();
     const panel = page.getByRole ('region', { name : 'Primary Products', exact : true }); await panel.getByRole ('button', { name : 'Choose bottle' }).waitFor ();
-    assert.equal ((await call ('primary.inspect')).generationAvailable, true); assert.equal (await panel.getByRole ('button', { name : 'Add to session', exact : true }).isDisabled (), false);
+    assert.equal ((await call ('primary.inspect')).generationAvailable, true); assert.equal (await panel.getByRole ('button', { name : 'Generate', exact : true }).isDisabled (), false);
+    assert.equal (await panel.getByRole ('button', { name : 'Generate', exact : true }).evaluate (node => getComputedStyle (node).opacity), '1');
     const height = panel.getByRole ('spinbutton', { name : 'Product height', exact : true }); await height.fill ('220'); await height.press ('Tab'); assert.equal ((await call ('primary.inspect')).heightMm, 220);
     await panel.getByRole ('slider', { name : 'Product roughness', exact : true }).focus (); await page.keyboard.press ('Delete'); assert.deepEqual (await call ('scene.inspect'), before);
     await panel.getByRole ('button', { name : 'Wrap label', exact : true }).click (); await mkdir ('work/primary-products-review', { recursive : true });
@@ -68,7 +69,7 @@ try {
     // Real generation and update via the same services used by commands.
     await page.setViewportSize ({ width : 1500, height : 1000 }); await call ('ui.primary_products');
     await call ('primary.configure', { family : 'bottle', heightMm : 190, diameterMm : 65 });
-    await panel.getByRole ('button', { name : 'Add to session', exact : true }).click ();
+    await panel.getByRole ('button', { name : 'Generate', exact : true }).click ();
     let generated;
     for (let attempt = 0; attempt < 200; attempt++) {
         const result = await page.evaluate (() => Auto3D.execute ('scene.inspect'));
@@ -85,9 +86,31 @@ try {
     await call ('history.undo'); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 190);
     await call ('history.redo'); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 250);
     await call ('primary.configure', { material : 'glass' }); assert.equal ((await call ('primary.inspect')).generationAvailable, false);
-    assert.equal (await panel.getByRole ('button', { name : 'Add to session', exact : true }).isDisabled (), true);
+    assert.equal (await panel.getByRole ('button', { name : 'Generate', exact : true }).isDisabled (), true);
     const rejected = await page.evaluate (() => Auto3D.execute ('primary.generate')); assert.equal (rejected.ok, false);
     assert.equal ((await call ('scene.inspect')).objects.length, 2); assert.deepEqual (errors, []);
+    await panel.getByRole ('button', { name : 'Choose pouch' }).click ();
+    assert.equal (await panel.getByRole ('spinbutton', { name : 'Product diameter', exact : true }).isVisible (), false);
+    const pouchWidth = panel.getByRole ('spinbutton', { name : 'Product width', exact : true }); await pouchWidth.fill ('180'); await pouchWidth.press ('Tab');
+    assert.equal ((await call ('primary.inspect')).widthMm, 180);
+    await panel.getByRole ('button', { name : 'Back label', exact : true }).click ();
+    assert.equal (await panel.getByRole ('button', { name : 'Wrap label', exact : true }).isVisible (), false);
+    await panel.getByRole ('button', { name : 'Generate', exact : true }).click ();
+    let pouchReady = false;
+    for (let attempt = 0; attempt < 200; attempt++) {
+        const result = await page.evaluate (() => Auto3D.execute ('scene.inspect'));
+        if (result.ok && result.result.objects.length === 3) { pouchReady = true; break; }
+        await page.waitForTimeout (100);
+    }
+    assert.equal (pouchReady, true); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).family, 'pouch');
+    assert.equal (await panel.getByRole ('button', { name : 'Generate', exact : true }).isDisabled (), false);
+    await call ('ui.module.mode', { module : 'primary-products', mode : 'extended' });
+    await page.screenshot ({ path : 'work/primary-products-review/pouch-extended.png' });
+    await page.setViewportSize ({ width : 390, height : 844 });
+    assert.equal (await panel.evaluate (node => node.scrollWidth > node.clientWidth + 1), false);
+    await page.screenshot ({ path : 'work/primary-products-review/pouch-mobile.png' });
+    assert.deepEqual (errors, []);
+    console.log ('Generate readiness and pillow-pouch generation/layout passed.');
     console.log ('Primary Products scene flow passed: UI generation, strict update/load, identity, Undo/Redo and glass rejection.');
     console.log ('Primary Products desktop/mobile passed: module order/outline, lazy loading, draft controls, minimal/extended/close motion, rapid transitions, reduced motion, unit conversion and unchanged scene/camera.');
 } finally { await browser.close (); }

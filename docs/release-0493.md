@@ -1,7 +1,5 @@
-# Auto3D 0.49.3 / Packaging 1.10.3 / Primary Products 0.3.0
+# Auto3D 0.49.3 / Packaging 1.10.3 / Primary Products 0.3.0 — Meshy reliability candidate
 
-MCP authorization uses Auto3D sign-in and standard OAuth consent with Allow/Deny. Connection labels come from client metadata; registration and harness inputs are removed. The MCP connections dialog keeps window sharing, screenshot permission and revocation without Agent connection instructions or code fields. Session selection remains separate and account-bound. Pending legacy consent forms still work.
+A transient Meshy polling failure no longer immediately abandons tracking. History loads concurrently and reports partial failures. Uncertain submissions warn users to check history before retrying, and Meshy 403 responses retain the provider's explanation. See [Meshy reliability review](meshy-reliability-review.md).
 
-Plugin-side OAuth configuration and a real-client reconnect remain required to verify the complete installed integration.
-
-Validation: 737 application/module tests, 49 MCP runtime tests, backend tests, application/MCP lint, dependency license checks and production audit (zero vulnerabilities) pass. Website and Pages builds pass. Chromium verifies the branded consent form, cross-origin callback, S256 code exchange, code-free connection dialog, explicit window sharing, remote read, disconnect and revocation.
+The reported production connection failure is not yet diagnosed. Live key and generation tests remain necessary; this candidate does not assert that credentials or provider access work.

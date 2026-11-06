@@ -687,6 +687,7 @@ export class SessionEditor
     }
     RefreshButtons ()
     {
+        this.website?.primaryProductsPanel?.RefreshAvailability ();
         this.processing?.Sync (this.busy && !this.packaging?.foldOperation && !this.packaging?.dimensionUpdating && this.arrayOperation?.stage !== 'revealing' && !this.website?.rendering?.running); this.commandBar?.SetBusy (this.busy);
         this.website?.packagingPanel?.fefcoPanel?.SetDisabled ();
         for (const [key, button] of this.buttons) {

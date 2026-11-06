@@ -12,7 +12,17 @@ export class PrimaryProductsPanel
         website.auth?.Subscribe?.(user => { const owner = user?.id || null; if (owner !== this.owner) { this.owner = owner; this.draft = DefaultProductDraft (); this.Refresh (); } });
     }
     Blocked () { return !this.website.auth?.user || this.website.accountReady === false || this.website.sessionEditor.readOnly || this.website.sessionEditor.busy || this.products?.active; }
-    Inspect () { return { schemaVersion : 1, units : 'mm', ...this.draft, draftOnly : false, generationAvailable : this.draft.material !== 'glass' }; }
+    UnavailableReason ()
+    {
+        if (!this.website.auth?.user) { return 'Sign in to generate a product.'; }
+        if (this.website.accountReady === false) { return 'Wait for your account to finish loading.'; }
+        if (this.website.sessionEditor.readOnly) { return 'Open an editable session to generate a product.'; }
+        if (this.products?.active) { return 'Generating product…'; }
+        if (this.website.sessionEditor.busy) { return 'Wait for the current scene operation to finish.'; }
+        return this.draft.material === 'glass' ? 'Glass generation is not available yet. Choose opaque plastic.' : '';
+    }
+    RefreshAvailability () { this.workspace?.SetDisabled (); }
+    Inspect () { return { schemaVersion : 1, units : 'mm', ...this.draft, draftOnly : false, generationAvailable : this.draft.material !== 'glass', unavailableReason : this.UnavailableReason (), generating : this.products?.active === true }; }
     Configure (changes)
     {
         if (this.Blocked ()) { throw new Error ('Open an editable session before changing the product draft.'); }

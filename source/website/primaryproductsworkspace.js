@@ -37,7 +37,7 @@ export class PrimaryProductsWorkspace
             const module = await this.load (); unchanged ();
             const unit = target.objects.length ? previousUnit : Unit.Millimeter;
             const model = PrimaryProductModel (module.CreatePrimaryProduct (definition.draft), unit);
-            object = target.AddImported (model, source?.name || (definition.draft.family === 'bottle' ? 'Round bottle' : 'Standard can'));
+            object = target.AddImported (model, source?.name || module.PrimaryFamilies[definition.draft.family].name);
             if (source) {
                 for (const key of ['id', 'name', 'source', 'visible', 'castShadow', 'receiveShadow']) { object[key] = source[key]; }
                 for (const key of ['position', 'rotation', 'scale']) { object[key] = [...source[key]]; }
