@@ -179,7 +179,7 @@ export class EmbeddedViewer
                 if (importError.message !== null) {
                     message += ' (' + importError.message + ')';
                 }
-                this.progressDiv.innerHTML = message;
+                this.progressDiv.textContent = message;
                 if (this.parameters.onModelLoadFailed) {
                     this.parameters.onModelLoadFailed ();
                 }

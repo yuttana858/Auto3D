@@ -1,4 +1,4 @@
-import { AddDiv, CreateDiv } from '../engine/viewer/domutils.js';
+import { AddDiv, CreateDiv, CreateDomElementFromTrustedHtml } from '../engine/viewer/domutils.js';
 import { AddSvgIconElement, CreateInlineColorCircle, IsHoverEnabled } from './utils.js';
 import { FadeOut } from './popuptransition.js';
 
@@ -147,14 +147,14 @@ export class ProgressDialog extends Dialog
         let contentDiv = this.GetContentDiv ();
         contentDiv.classList.add ('ov_progress');
 
-        AddDiv (contentDiv, 'ov_progress_img', '<svg><use href="assets/images/auto3d-logo.svg?v=sw-auto3d#logo"></use></svg>');
+        contentDiv.appendChild (CreateDomElementFromTrustedHtml ('div', 'ov_progress_img', '<svg><use href="assets/images/auto3d-logo.svg?v=sw-auto3d#logo"></use></svg>'));
         this.textDiv = AddDiv (contentDiv, 'ov_progress_text');
         this.SetText (text);
     }
 
     SetText (text)
     {
-        this.textDiv.innerHTML = text;
+        this.textDiv.textContent = text;
     }
 }
 

@@ -46,28 +46,38 @@ export function GetDomElementClientCoordinates (element, clientX, clientY)
     return (new Coord2D (clientX, clientY));
 }
 
-export function CreateDomElement (elementType, className, innerHTML)
+// Content is always plain text. Names from models, archives and archives'
+// materials reach these helpers, so they must never be parsed as HTML.
+export function CreateDomElement (elementType, className, text)
 {
     let element = document.createElement (elementType);
     if (className) {
         element.className = className;
     }
-    if (innerHTML) {
-        element.innerHTML = innerHTML;
+    if (text !== undefined && text !== null && text !== '') {
+        element.textContent = String (text);
     }
     return element;
 }
 
-export function AddDomElement (parentElement, elementType, className, innerHTML)
+// Only for fixed markup authored in this code base; never pass external data.
+export function CreateDomElementFromTrustedHtml (elementType, className, trustedHtml)
 {
-    let element = CreateDomElement (elementType, className, innerHTML);
+    let element = CreateDomElement (elementType, className);
+    element.innerHTML = trustedHtml;
+    return element;
+}
+
+export function AddDomElement (parentElement, elementType, className, text)
+{
+    let element = CreateDomElement (elementType, className, text);
     parentElement.appendChild (element);
     return element;
 }
 
-export function AddDiv (parentElement, className, innerHTML)
+export function AddDiv (parentElement, className, text)
 {
-    return AddDomElement (parentElement, 'div', className, innerHTML);
+    return AddDomElement (parentElement, 'div', className, text);
 }
 
 export function ClearDomElement (element)
