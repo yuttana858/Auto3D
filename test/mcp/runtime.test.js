@@ -44,7 +44,7 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         assert.match (response.headers.get ('Content-Security-Policy'), /form-action 'self' https:\/\/client\.example;/);
         const html = await response.text ();
         assert.ok (!html.includes ('<script>evil</script>')); assert.ok (html.includes ('&#60;script&#62;evil&#60;/script&#62;'));
-        assert.ok (html.includes ('<label>App window code <input name="appWindowCode" required')); assert.ok (html.includes ('value="claude"'));
+        assert.ok (!html.includes ('name="appWindowCode"')); assert.ok (html.includes ('value="claude"'));
         if (scope.includes ('auto3d.write')) { assert.match (html, /full Auto3D command catalog, including tools that change the app and account or administrator controls/); }
         assert.ok (!html.includes ('approve-manual')); assert.match (html, /SW Auto3D/); assert.match (html, /mcp-consent\.css/);
         const form = new URLSearchParams ({ handle : html.match (/name="handle" value="([^"]+)"/)[1], binding : html.match (/name="binding" value="([^"]+)"/)[1], name : 'My review agent', harness : 'chatgpt', appWindowCode, decision : 'approve' });
@@ -99,7 +99,7 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
     it ('binds consent to its original browser and account', async () => {
         const unsigned = await fetch ('/oauth/authorize?client_id=' + encodeURIComponent (clientId));
         assert.equal (unsigned.status, 401); const signInPage = await unsigned.text ();
-        assert.match (signInPage, /Continue to permissions/); assert.match (signInPage, /enter the app window code on the permissions page/);
+        assert.match (signInPage, /Continue to permissions/); assert.match (signInPage, /Select an Auto3D window later/);
         const flow = await begin ();
         const wrongAccount = { ...flow, cookies : flow.cookies.replace (cookieFor (userA), cookieFor (userB)) };
         assert.equal ((await approve (wrongAccount, userB)).status, 403);
@@ -120,7 +120,7 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         socket = upgrade.webSocket; socket.accept (); const ack = message (socket);
         socket.send (JSON.stringify ({ type : 'hello', instanceId : 'window-a', windowLabel : 'Review window', sessions : [{ id : 'tab-a', name : 'Test box', active : true }] }));
         const hello = await ack;
-        const initialized = await rpc (token.access_token, 'initialize', { protocolVersion : '2025-03-26', capabilities : {}, clientInfo : { name : 'test client', version : '1' } }); assert.equal (initialized.status, 200); assert.match ((await initialized.json ()).result.serverInfo.version, /^0\.49\.1\+[a-f0-9]{16}$/);
+        const initialized = await rpc (token.access_token, 'initialize', { protocolVersion : '2025-03-26', capabilities : {}, clientInfo : { name : 'test client', version : '1' } }); assert.equal (initialized.status, 200); assert.match ((await initialized.json ()).result.serverInfo.version, /^0\.49\.2\+[a-f0-9]{16}$/);
         const listResponse = await rpc (token.access_token, 'tools/list'); assert.equal (listResponse.headers.get ('Cache-Control'), 'no-store');
         const tools = await listResponse.json (); assert.ok (!tools.result.tools.some (tool => tool.name === 'capture.image' || tool.name === 'auth.sign_out'));
         if (other) { const otherList = await (await rpc (other.access_token, 'tools/call', { name : 'auto3d.sessions.list', arguments : {} })).json (); assert.deepEqual (JSON.parse (otherList.result.content[0].text), []); }
@@ -183,11 +183,12 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         assert.equal (paired.result.structuredContent.result.paired, true); assert.equal (JSON.stringify (paired).includes (code), false);
         const reused = await (await rpc (token.access_token, 'tools/call', { name : 'auto3d.sessions.pair_code', arguments : { code } })).json (); assert.equal (reused.result.isError, true);
     });
-    it ('rejects approval without a window code, including forged manual approval', async () => {
-        const flow = await begin (userA, undefined, ''), attempt = new URLSearchParams (flow.form); attempt.set ('decision', 'approve');
-        const response = await fetch ('/oauth/authorize', { method : 'POST', headers : { Cookie : flow.cookies, Origin : origin, 'Content-Type' : 'application/x-www-form-urlencoded' }, body : attempt.toString () });
-        assert.equal (response.status, 400); assert.match (await response.text (), /Enter the current app window code/);
-        flow.form.set ('decision', 'approve-manual'); assert.equal ((await approve (flow)).status, 400);
+    it ('authorizes without a window and rejects unsupported decisions', async () => {
+        const flow = await begin (userA, undefined, ''); flow.form.delete ('appWindowCode');
+        assert.equal ((await approve (flow)).status, 302);
+        const invalid = await begin (userA, undefined, ''); invalid.form.set ('decision', 'approve-manual'); assert.equal ((await approve (invalid)).status, 400);
+        const token = await grant (userA, undefined, '');
+        const request = await (await rpc (token.access_token, 'tools/call', { name : 'scene.inspect', arguments : {} })).json (); assert.equal (request.result.isError, true);
     });
     it ('creates a long-lived revocable registration with a renewable refresh credential', async () => {
         const token = await grant (); const records = await (await fetch ('/api/agent/registrations', { headers : userHeaders (userA) })).json ();

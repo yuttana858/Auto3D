@@ -1,7 +1,7 @@
 // Keep pairing and OAuth completion failures distinct without disclosing secrets.
 export async function CompleteAgentConsent ({ broker, oauth, accountId, registrationId, record, approved, name, harness, decision, appWindowCode })
 {
-    if (decision === 'approve') {
+    if (decision === 'approve' && appWindowCode) {
         try { await broker.PairWithCode ({ accountId, grantId : registrationId, code : appWindowCode, expiresAt : record.expiresAt }); }
         catch { await broker.RevokeRegistration ({ accountId, id : registrationId }); return { error : 'pair' }; }
     }

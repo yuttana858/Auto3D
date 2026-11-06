@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## MCP connection before window pairing — Auto3D 0.49.2 / Packaging 1.10.3 / Primary Products 0.3.0
+
+OAuth approval no longer requires an app-window code. Live control still requires a separately selected or paired window. Real-client production verification remains pending. See [release-0492.md](release-0492.md).
+
 ## Branded agent consent — Auto3D 0.49.1 / Packaging 1.10.3 / Primary Products 0.3.0
 
 The agent authorization page uses Auto3D branding and requires a current app-window code for approval. See [release-0491.md](release-0491.md).
