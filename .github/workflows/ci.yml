@@ -53,3 +53,33 @@ jobs:
       - run: npm run build_engine
       - run: npm run build_engine_module
       - run: npm run build_website
+
+  browser:
+    # Real-browser regressions listed in test/browser/ci-suite.txt; add a test there once it passes reliably.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright-core install --with-deps chromium
+      - name: Expose Chromium where the browser tests expect it
+        run: sudo ln -sf "$(node -e "console.log(require('playwright-core').chromium.executablePath())")" /usr/bin/chromium
+      - run: npm run build_dev
+      - name: Run browser regressions
+        shell: bash
+        run: |
+          npm start > dev-server.log 2>&1 &
+          for attempt in $(seq 90); do curl -sf http://127.0.0.1:8080/website/index.html > /dev/null && break; sleep 2; done
+          mkdir -p work; failed=()
+          while read -r name; do
+            [ -z "$name" ] && continue
+            echo "::group::$name"
+            timeout 300 node "test/browser/$name.mjs" || failed+=("$name")
+            echo "::endgroup::"
+          done < test/browser/ci-suite.txt
+          if [ ${#failed[@]} -gt 0 ]; then echo "Failed: ${failed[*]}"; exit 1; fi
