@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Plugin connection simplification — local candidate
+
+OAuth authorization no longer asks for an agent name or harness; it uses the signed-in account and retains approval, scoped revocable grants and existing window selection. See [MCP pilot](mcp-pilot.md). Live verification and deployment are pending.
+
 ## Meshy reliability — local candidate
 
 Transient polling failures retry, creation history loads concurrently with partial results, and uncertain submissions warn against duplicate paid tasks. The production connection failure remains undiagnosed and live verification is pending. See [Meshy reliability review](meshy-reliability-review.md).

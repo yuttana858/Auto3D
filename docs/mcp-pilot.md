@@ -6,7 +6,7 @@ This candidate rebuilds the missing MCP source from the available app and the de
 
 ## Authorization design
 
-Use the maintained Cloudflare OAuth provider for discovery, exact redirect validation, PKCE, browser-bound single-use consent, resource-bound tokens and refresh rotation. Each authorization creates a named registration owned by one account. Registrations identify the harness (ChatGPT, Claude, desktop, CLI or another OAuth client), client ID, scopes, creation/expiry and revocation. Names are labels supplied by the user, not verified client identities. Consent displays the client's actual domain and redirect host separately.
+Use the maintained Cloudflare OAuth provider for discovery, exact redirect validation, PKCE, browser-bound single-use consent, resource-bound tokens and refresh rotation. Each authorization creates a revocable connection record owned by the signed-in account. Users do not enter an agent name or choose a harness; internal records retain client ID, scopes, creation/expiry and revocation for account isolation and compatibility. Consent displays the client's actual domain and redirect host separately.
 
 OAuth-capable clients receive individual revocable grants. Public desktop/CLI clients use authorization code plus S256 PKCE and a loopback callback; confidential hosted clients use the provider's supported client authentication. No shared bearer key, personal API key, client-secret generator or password field is exposed by Auto3D. Harnesses without supported OAuth need a separately reviewed adapter; they cannot bypass consent using an application credential. Dynamic client registration identifies software and does not grant account access.
 
