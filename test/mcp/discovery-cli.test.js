@@ -5,7 +5,7 @@ import { get } from 'node:http';
 describe ('MCP discovery diagnostic', function () {
     this.timeout (10000);
     it ('uses a loopback callback and reports only the server and tool names', async () => {
-        const child = spawn (process.execPath, ['--import', './test/fixtures/mcp-discovery-mock.mjs', './tools/diagnose_mcp_discovery.mjs'], { cwd : process.cwd (), stdio : ['ignore', 'pipe', 'pipe'] });
+        const child = spawn (process.execPath, ['--import', './test/fixtures/mcp-discovery-mock.mjs', './docs/diagnose_mcp_discovery.mjs'], { cwd : process.cwd (), stdio : ['ignore', 'pipe', 'pipe'] });
         let output = '', errors = '', called = false;
         child.stdout.on ('data', chunk => {
             output += chunk.toString ();
