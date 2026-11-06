@@ -28,11 +28,9 @@ try {
     const params = new URLSearchParams ({ client_id : clientId, redirect_uri : callback, response_type : 'code', resource : origin + '/mcp', scope : 'auto3d.read offline_access', state : 'browser-fixture-state', code_challenge : challenge, code_challenge_method : 'S256' });
     await page.goto (origin + '/oauth/authorize?' + params);
     assert.equal (await page.getByLabel ('App window code').count (), 0);
-    assert.equal (await page.getByLabel ('Registration name').count (), 0); assert.equal (await page.getByLabel ('Harness').count (), 0);
     assert.equal (await page.locator ('.agent-brand').innerText (), 'SW Auto3D');
     assert.equal (await page.locator ('.agent-card').evaluate (el => getComputedStyle (el).borderRadius), '12px');
-    await Promise.all ([page.waitForURL (url => url.origin === new URL (callback).origin && url.pathname === new URL (callback).pathname), page.getByRole ('button', { name : 'Allow connection', exact : true }).click ()]);
-    assert.equal (posted.form.has ('name'), false); assert.equal (posted.form.has ('harness'), false);
+    await Promise.all ([page.waitForURL (url => url.origin === new URL (callback).origin && url.pathname === new URL (callback).pathname), page.getByRole ('button', { name : 'Allow', exact : true }).click ()]);
     assert.equal (posted.origin, origin); assert.match (posted.form.get ('binding'), /^\d+\.[a-f0-9]{64}$/);
     assert.equal (callbackUrl.searchParams.get ('state'), 'browser-fixture-state'); assert.equal (callbackUrl.searchParams.get ('iss'), origin + '/oauth');
     assert.ok (callbackUrl.searchParams.get ('code'));

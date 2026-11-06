@@ -121,19 +121,12 @@ export class AgentAccess
     }
     async Open ()
     {
-        const config = await this.Request ('config'), dialog = WorkspaceDialog ('Agent access'); dialog.dataset.capturePrivate = '';
+        await this.Request ('config');
+        const dialog = WorkspaceDialog ('MCP connections'); dialog.dataset.capturePrivate = '';
         const form = document.createElement ('div'); form.className = 'workspace_save_form';
-        const note = document.createElement ('p'); note.textContent = (config.mode === 'live-admin' ? 'Administrator live test · ' : 'Staging pilot · ') + 'Connect your OAuth client to ' + config.mcpUrl + '. Authorize the agent with your Auto3D account, then provide this window code to pair it for live control. The separate auto3d.write scope enables the full command catalog; account/admin operations keep their Auto3D permission checks. Screenshots require permission here and in OAuth.';
-        const codeLabel = document.createElement ('label'); codeLabel.textContent = 'App window code ';
-        const code = document.createElement ('input'); code.readOnly = true; code.autocomplete = 'off'; code.placeholder = 'Connect this window to generate a code'; code.value = this.windowCode || ''; code.setAttribute ('aria-label', 'App window code'); codeLabel.appendChild (code); this.codeInput = code;
-        const copy = document.createElement ('button'); copy.type = 'button'; copy.textContent = 'Copy'; copy.disabled = !this.windowCode; this.copyButton = copy;
         const captureLabel = document.createElement ('label'), capture = document.createElement ('input'); capture.type = 'checkbox'; captureLabel.append (capture, 'Allow screenshots from this window');
         const status = document.createElement ('p'); status.setAttribute ('role', 'status'); status.textContent = this.status; this.statusElement = status;
-        const connect = document.createElement ('button'); connect.textContent = 'Connect this window'; connect.onclick = () => { this.Connect ({ screenshots : capture.checked }).then (result => { code.value = result.windowCode; copy.disabled = false; status.textContent = 'Connected. Give this code to your authorized agent to pair this window. It expires in 10 minutes and can be used once.'; }).catch (error => { this.Disconnect (); code.value = ''; copy.disabled = true; status.textContent = error.message; }); };
-        copy.onclick = async () => {
-            try { await navigator.clipboard.writeText (code.value); status.textContent = 'Window code copied.'; }
-            catch { code.select (); status.textContent = 'Clipboard unavailable. The code is selected; copy it manually.'; }
-        };
+        const connect = document.createElement ('button'); connect.textContent = 'Connect this window'; connect.onclick = () => { this.Connect ({ screenshots : capture.checked }).then (() => { status.textContent = 'Connected'; }).catch (error => { this.Disconnect (); status.textContent = error.message; }); };
         const disconnect = document.createElement ('button'); disconnect.textContent = 'Disconnect'; disconnect.onclick = () => { this.Disconnect (); status.textContent = this.status; };
         const list = document.createElement ('div');
         const refresh = async () => {
@@ -143,7 +136,7 @@ export class AgentAccess
                 if (record.revokedAt === null && record.expiresAt > Date.now ()) { const revoke = document.createElement ('button'); revoke.textContent = 'Revoke'; revoke.onclick = () => { this.Request ('registrations', { action : 'revoke', id : record.id }).then (refresh).catch (error => { status.textContent = error.message; }); }; row.appendChild (revoke); } list.appendChild (row);
             }
         };
-        form.append (note, codeLabel, copy, captureLabel, connect, disconnect, status, list); dialog.appendChild (form); await refresh (); return { opened : true };
+        form.append (captureLabel, connect, disconnect, status, list); dialog.appendChild (form); await refresh (); return { opened : true };
     }
     async OpenAdmin ()
     {

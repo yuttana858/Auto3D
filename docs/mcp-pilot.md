@@ -1,3 +1,11 @@
+## Initial connection authorization
+
+Configure the MCP client/plugin to use OAuth authorization-code flow with S256 PKCE, not unauthenticated access or a shared API key. For production, use `https://auto3d-5av.pages.dev/mcp` as the resource. Discover authorization metadata from `https://auto3d-5av.pages.dev/.well-known/oauth-protected-resource/mcp` and its advertised authorization server; use the advertised registration, authorization and token endpoints. Request `auto3d.read offline_access`, adding `auto3d.write` or `auto3d.capture` only when needed.
+
+The user signs in through Auto3D and approves the client and requested scopes on an Allow/Deny screen. New consent forms do not request Agent names, harness details or window codes. The server derives the registration label from OAuth client metadata. Existing account eligibility and administrator restrictions still apply. Existing pending legacy forms remain accepted for compatibility.
+
+Connecting a browser window and selecting its session happens separately after authorization. The MCP connections dialog retains sharing, screenshot opt-in and grant revocation, with no Agent connection instructions or code fields. Headless tools do not require a browser connection. Changing this source does not configure the installed ChatGPT plugin: its OAuth settings must be enabled and a reconnect tested against the deployed server.
+
 # Isolated MCP pilot and agent registrations
 
 The user has subsequently authorized a limited live-site test using the existing administrator. See [release-0470.md](release-0470.md). That explicit live-admin mode uses the existing Pages identity configuration, a separate private broker and OAuth KV, and requires enrollment plus current administrator status. The staging plan below remains available; it is not a prerequisite for this separately authorized live-admin test.
@@ -6,7 +14,7 @@ This candidate rebuilds the missing MCP source from the available app and the de
 
 ## Authorization design
 
-Use the maintained Cloudflare OAuth provider for discovery, exact redirect validation, PKCE, browser-bound single-use consent, resource-bound tokens and refresh rotation. Each authorization creates a revocable connection record owned by the signed-in account. Users do not enter an agent name or choose a harness; internal records retain client ID, scopes, creation/expiry and revocation for account isolation and compatibility. Consent displays the client's actual domain and redirect host separately.
+Use the maintained Cloudflare OAuth provider for discovery, exact redirect validation, PKCE, browser-bound single-use consent, resource-bound tokens and refresh rotation. Each authorization creates a named registration owned by one account. Registrations identify the harness (ChatGPT, Claude, desktop, CLI or another OAuth client), client ID, scopes, creation/expiry and revocation. Names are labels supplied by the user, not verified client identities. Consent displays the client's actual domain and redirect host separately.
 
 OAuth-capable clients receive individual revocable grants. Public desktop/CLI clients use authorization code plus S256 PKCE and a loopback callback; confidential hosted clients use the provider's supported client authentication. No shared bearer key, personal API key, client-secret generator or password field is exposed by Auto3D. Harnesses without supported OAuth need a separately reviewed adapter; they cannot bypass consent using an application credential. Dynamic client registration identifies software and does not grant account access.
 
