@@ -10,11 +10,6 @@ const callbackServer = createServer ((request, response) => { callbackUrl = new 
 await new Promise (resolve => callbackServer.listen (0, '127.0.0.1', resolve));
 const callback = 'http://127.0.0.1:' + callbackServer.address ().port + '/callback';
 const { runtime, origin, clientId, accessCookie } = await BrowserOAuthRuntime (callback);
-const pairingCode = 'ABCD-EFGH-JKLM-NPQR';
-const upgrade = await runtime.dispatchFetch (origin + '/api/agent/connect', { headers : { Cookie : '__Host-auto3d-access=' + accessCookie, Origin : origin, Upgrade : 'websocket' } });
-assert.equal (upgrade.status, 101); const windowSocket = upgrade.webSocket; windowSocket.accept ();
-const acknowledged = new Promise (resolve => windowSocket.addEventListener ('message', resolve, { once : true }));
-windowSocket.send (JSON.stringify ({ type : 'hello', instanceId : 'consent-window', windowLabel : 'Consent test', windowCode : pairingCode, sessions : [{ id : 'tab-a', name : 'Box', active : true }] })); await acknowledged;
 const browser = await chromium.launch ({ executablePath : process.env.BROWSER_EXECUTABLE || (process.env.CI ? chromium.executablePath () : '/usr/bin/chromium'), args : ['--no-sandbox'] });
 try {
     const context = await browser.newContext ();
@@ -32,11 +27,10 @@ try {
     const verifier = 'v'.repeat (43), challenge = Buffer.from (await crypto.subtle.digest ('SHA-256', new TextEncoder ().encode (verifier))).toString ('base64url');
     const params = new URLSearchParams ({ client_id : clientId, redirect_uri : callback, response_type : 'code', resource : origin + '/mcp', scope : 'auto3d.read offline_access', state : 'browser-fixture-state', code_challenge : challenge, code_challenge_method : 'S256' });
     await page.goto (origin + '/oauth/authorize?' + params);
-    await page.getByLabel ('App window code').fill (pairingCode);
-    assert.equal (await page.getByRole ('button', { name : 'Allow without pairing' }).count (), 0);
+    assert.equal (await page.getByLabel ('App window code').count (), 0);
     assert.equal (await page.locator ('.agent-brand').innerText (), 'SW Auto3D');
     assert.equal (await page.locator ('.agent-card').evaluate (el => getComputedStyle (el).borderRadius), '12px');
-    await Promise.all ([page.waitForURL (url => url.origin === new URL (callback).origin && url.pathname === new URL (callback).pathname), page.getByRole ('button', { name : 'Allow and pair', exact : true }).click ()]);
+    await Promise.all ([page.waitForURL (url => url.origin === new URL (callback).origin && url.pathname === new URL (callback).pathname), page.getByRole ('button', { name : 'Allow connection', exact : true }).click ()]);
     assert.equal (posted.origin, origin); assert.match (posted.form.get ('binding'), /^\d+\.[a-f0-9]{64}$/);
     assert.equal (callbackUrl.searchParams.get ('state'), 'browser-fixture-state'); assert.equal (callbackUrl.searchParams.get ('iss'), origin + '/oauth');
     assert.ok (callbackUrl.searchParams.get ('code'));
@@ -45,4 +39,4 @@ try {
     assert.equal (token.status, 200, 'The code returned to the browser client must exchange successfully.');
     assert.equal (typeof (await token.json ()).access_token, 'string');
     console.log ('Chromium consent form -> validated cross-origin callback -> S256 code exchange passed, with browser-managed consent cookies and canonical Origin.');
-} finally { windowSocket.close (); await browser.close (); await runtime.dispose (); await new Promise (resolve => callbackServer.close (resolve)); }
+} finally { await browser.close (); await runtime.dispose (); await new Promise (resolve => callbackServer.close (resolve)); }
