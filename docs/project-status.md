@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Standard MCP consent — Auto3D 0.49.3 / Packaging 1.10.3 / Primary Products 0.3.0
+
+OAuth consent derives connection labels from client metadata and asks only for Allow/Deny. Removes Agent connection instructions, registration/harness inputs and window-code controls from the dialog. Browser sharing, screenshot opt-in and revocation remain available. See [release-0493.md](release-0493.md).
+
 ## MCP connection before window pairing — Auto3D 0.49.2 / Packaging 1.10.3 / Primary Products 0.3.0
 
 OAuth approval no longer requires an app-window code. Live control still requires a separately selected or paired window. Real-client production verification remains pending. See [release-0492.md](release-0492.md).

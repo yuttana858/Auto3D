@@ -30,7 +30,7 @@ try {
     assert.equal (await page.getByLabel ('App window code').count (), 0);
     assert.equal (await page.locator ('.agent-brand').innerText (), 'SW Auto3D');
     assert.equal (await page.locator ('.agent-card').evaluate (el => getComputedStyle (el).borderRadius), '12px');
-    await Promise.all ([page.waitForURL (url => url.origin === new URL (callback).origin && url.pathname === new URL (callback).pathname), page.getByRole ('button', { name : 'Allow connection', exact : true }).click ()]);
+    await Promise.all ([page.waitForURL (url => url.origin === new URL (callback).origin && url.pathname === new URL (callback).pathname), page.getByRole ('button', { name : 'Allow', exact : true }).click ()]);
     assert.equal (posted.origin, origin); assert.match (posted.form.get ('binding'), /^\d+\.[a-f0-9]{64}$/);
     assert.equal (callbackUrl.searchParams.get ('state'), 'browser-fixture-state'); assert.equal (callbackUrl.searchParams.get ('iss'), origin + '/oauth');
     assert.ok (callbackUrl.searchParams.get ('code'));

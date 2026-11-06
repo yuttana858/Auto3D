@@ -44,10 +44,11 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         assert.match (response.headers.get ('Content-Security-Policy'), /form-action 'self' https:\/\/client\.example;/);
         const html = await response.text ();
         assert.ok (!html.includes ('<script>evil</script>')); assert.ok (html.includes ('&#60;script&#62;evil&#60;/script&#62;'));
-        assert.ok (!html.includes ('name="appWindowCode"')); assert.ok (html.includes ('value="claude"'));
+        assert.ok (!html.includes ('name="appWindowCode"')); assert.ok (!html.includes ('name="harness"')); assert.ok (!html.includes ('name="name"'));
         if (scope.includes ('auto3d.write')) { assert.match (html, /full Auto3D command catalog, including tools that change the app and account or administrator controls/); }
         assert.ok (!html.includes ('approve-manual')); assert.match (html, /SW Auto3D/); assert.match (html, /mcp-consent\.css/);
         const form = new URLSearchParams ({ handle : html.match (/name="handle" value="([^"]+)"/)[1], binding : html.match (/name="binding" value="([^"]+)"/)[1], name : 'My review agent', harness : 'chatgpt', appWindowCode, decision : 'approve' });
+        if (!appWindowCode) { form.delete ('name'); form.delete ('harness'); }
         const cookies = [cookieFor (id), ...response.headers.getSetCookie ().map (value => value.split (';')[0])].join ('; ');
         return { verifier, form, cookies, fixtureSocket };
     }

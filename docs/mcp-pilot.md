@@ -1,3 +1,11 @@
+## Initial connection authorization
+
+Configure the MCP client/plugin to use OAuth authorization-code flow with S256 PKCE, not unauthenticated access or a shared API key. For production, use `https://auto3d-5av.pages.dev/mcp` as the resource. Discover authorization metadata from `https://auto3d-5av.pages.dev/.well-known/oauth-protected-resource/mcp` and its advertised authorization server; use the advertised registration, authorization and token endpoints. Request `auto3d.read offline_access`, adding `auto3d.write` or `auto3d.capture` only when needed.
+
+The user signs in through Auto3D and approves the client and requested scopes on an Allow/Deny screen. New consent forms do not request Agent names, harness details or window codes. The server derives the registration label from OAuth client metadata. Existing account eligibility and administrator restrictions still apply. Existing pending legacy forms remain accepted for compatibility.
+
+Connecting a browser window and selecting its session happens separately after authorization. The MCP connections dialog retains sharing, screenshot opt-in and grant revocation, with no Agent connection instructions or code fields. Headless tools do not require a browser connection. Changing this source does not configure the installed ChatGPT plugin: its OAuth settings must be enabled and a reconnect tested against the deployed server.
+
 # Isolated MCP pilot and agent registrations
 
 The user has subsequently authorized a limited live-site test using the existing administrator. See [release-0470.md](release-0470.md). That explicit live-admin mode uses the existing Pages identity configuration, a separate private broker and OAuth KV, and requires enrollment plus current administrator status. The staging plan below remains available; it is not a prerequisite for this separately authorized live-admin test.
