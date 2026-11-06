@@ -120,8 +120,9 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         socket = upgrade.webSocket; socket.accept (); const ack = message (socket);
         socket.send (JSON.stringify ({ type : 'hello', instanceId : 'window-a', windowLabel : 'Review window', sessions : [{ id : 'tab-a', name : 'Test box', active : true }] }));
         const hello = await ack;
-        const initialized = await rpc (token.access_token, 'initialize', { protocolVersion : '2025-03-26', capabilities : {}, clientInfo : { name : 'test client', version : '1' } }); assert.equal (initialized.status, 200);
-        const tools = await (await rpc (token.access_token, 'tools/list')).json (); assert.ok (!tools.result.tools.some (tool => tool.name === 'capture.image' || tool.name === 'auth.sign_out'));
+        const initialized = await rpc (token.access_token, 'initialize', { protocolVersion : '2025-03-26', capabilities : {}, clientInfo : { name : 'test client', version : '1' } }); assert.equal (initialized.status, 200); assert.match ((await initialized.json ()).result.serverInfo.version, /^0\.49\.1\+[a-f0-9]{16}$/);
+        const listResponse = await rpc (token.access_token, 'tools/list'); assert.equal (listResponse.headers.get ('Cache-Control'), 'no-store');
+        const tools = await listResponse.json (); assert.ok (!tools.result.tools.some (tool => tool.name === 'capture.image' || tool.name === 'auth.sign_out'));
         if (other) { const otherList = await (await rpc (other.access_token, 'tools/call', { name : 'auto3d.sessions.list', arguments : {} })).json (); assert.deepEqual (JSON.parse (otherList.result.content[0].text), []); }
         const selected = await rpc (token.access_token, 'tools/call', { name : 'auto3d.sessions.select', arguments : { connectionId : hello.connectionId, sessionId : 'tab-a' } }); assert.equal (selected.status, 200);
         const waiting = message (socket); // access_changed from pairing is sent before dispatch

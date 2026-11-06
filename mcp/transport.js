@@ -3,17 +3,20 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { CaptureContent } from './service.js';
 import { ReadBytes } from './common.js';
+import { DiscoveryVersion } from './discovery.js';
+import packageMetadata from '../package.json';
 
 export async function HandleMcp (request, service, actor)
 {
     await service.Assert (actor);
-    const server = new Server ({ name : 'Auto3D', version : '0.1.0' }, { capabilities : { tools : {} } });
-    server.setRequestHandler (ListToolsRequestSchema, async () => { await service.Assert (actor); return { tools : [
+    const tools = [
         { name : 'auto3d.sessions.list', description : 'List this account’s connected browser windows and sessions.', inputSchema : { type : 'object', properties : {}, additionalProperties : false }, annotations : { readOnlyHint : true } },
         { name : 'auto3d.sessions.select', description : 'Pair with an active session explicitly chosen by the user. Does not edit the scene.', inputSchema : { type : 'object', properties : { connectionId : { type : 'string' }, sessionId : { type : 'string' } }, required : ['connectionId', 'sessionId'], additionalProperties : false }, annotations : { readOnlyHint : false, destructiveHint : false, idempotentHint : false } },
         { name : 'auto3d.sessions.pair_code', description : 'Pair this authenticated agent with the active Auto3D window using the one-time code the user explicitly supplied. The code belongs to the signed-in account; it is single-use and expires. Does not edit the scene.', inputSchema : { type : 'object', properties : { code : { type : 'string', pattern : '^(?:[A-HJ-NP-Za-hj-np-z2-9]{4}-){3}[A-HJ-NP-Za-hj-np-z2-9]{4}$' } }, required : ['code'], additionalProperties : false }, annotations : { readOnlyHint : false, destructiveHint : false, idempotentHint : false } },
         ...service.Tools (actor).map (tool => ({ name : tool.id, title : tool.title, description : tool.description, inputSchema : tool.inputSchema, annotations : { readOnlyHint : !tool.mutates, ...(tool.id === 'auto3d.commands.invoke' ? { destructiveHint : true, idempotentHint : false } : {}) } }))
-    ] }; });
+    ];
+    const server = new Server ({ name : 'Auto3D', version : await DiscoveryVersion (packageMetadata.version, { tools, catalog : service.tools }) }, { capabilities : { tools : {} } });
+    server.setRequestHandler (ListToolsRequestSchema, async () => { await service.Assert (actor); return { tools }; });
     server.setRequestHandler (CallToolRequestSchema, async ({ params }) => {
         try {
             const result = await service.Call (actor, params.name, params.arguments || {});
@@ -24,5 +27,9 @@ export async function HandleMcp (request, service, actor)
     const transport = new WebStandardStreamableHTTPServerTransport ({ enableJsonResponse : true, sessionIdGenerator : undefined });
     if (request.method === 'POST') { request = new Request (request.url, { method : 'POST', headers : request.headers, body : await ReadBytes (request, 65536), signal : request.signal }); }
     await server.connect (transport);
-    try { return await transport.handleRequest (request); } finally { await server.close (); }
+    try {
+        const response = await transport.handleRequest (request);
+        const headers = new Headers (response.headers); headers.set ('Cache-Control', 'no-store');
+        return new Response (response.body, { status : response.status, statusText : response.statusText, headers });
+    } finally { await server.close (); }
 }
