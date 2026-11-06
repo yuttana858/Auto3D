@@ -5844,6 +5844,151 @@
       "example": {}
     },
     {
+      "id": "ui.primary_products",
+      "title": "Open Primary Products",
+      "category": "Panels",
+      "description": "Open the Primary Products draft panel. Does not generate geometry or change the scene.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "primary.inspect",
+      "title": "Inspect product draft",
+      "category": "Primary Products",
+      "description": "Read canonical-mm draft dimensions and whether opaque generation is available. Label zones are preparatory; no artwork is applied.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "primary.configure",
+      "title": "Configure product draft",
+      "category": "Primary Products",
+      "description": "Validate and update the session-local bottle/can draft. Does not change scene geometry or upload artwork.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "family": {
+            "type": "string",
+            "enum": [
+              "bottle",
+              "can"
+            ]
+          },
+          "heightMm": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 1000
+          },
+          "diameterMm": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 500
+          },
+          "material": {
+            "type": "string",
+            "enum": [
+              "plastic",
+              "glass",
+              "aluminum",
+              "steel"
+            ]
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[a-fA-F0-9]{6}$"
+          },
+          "roughness": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "labelZone": {
+            "type": "string",
+            "enum": [
+              "front",
+              "wrap"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "family": "can",
+        "heightMm": 122,
+        "diameterMm": 66
+      }
+    },
+    {
+      "id": "primary.generate",
+      "title": "Add product to session",
+      "category": "Primary Products",
+      "description": "Generate the current opaque bottle/can draft as one undoable session object. Glass and artwork are unavailable.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "primary.selected.load",
+      "title": "Load selected product",
+      "category": "Primary Products",
+      "description": "Load a selected generated product definition into the draft without changing scene geometry.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "primary.update",
+      "title": "Apply draft to selected product",
+      "category": "Primary Products",
+      "description": "Rebuild the selected generated product in one Undo step, preserving identity and placement. Replaces component surfaces with the draft settings; hidden parts and animations must be removed first.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "primary.reset",
+      "title": "Reset product draft",
+      "category": "Primary Products",
+      "description": "Reset only the Primary Products draft. Does not remove or change scene objects.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
       "id": "ui.packaging",
       "title": "Open Packaging panel",
       "category": "Panels",

@@ -1,4 +1,4 @@
-export const PrimaryProductsVersion = '0.1.0';
+export const PrimaryProductsVersion = '0.3.0';
 export const PrimaryFamilies = Object.freeze ({ bottle : { name : 'Round bottle', material : 'plastic', heightMm : 190, diameterMm : 65, color : '#e8eceb', roughness : 0.45, labelZone : 'front' }, can : { name : 'Standard can', material : 'aluminum', heightMm : 122, diameterMm : 66, color : '#c9d2d4', roughness : 0.3, labelZone : 'wrap' } });
 const fields = ['family', 'heightMm', 'diameterMm', 'material', 'color', 'roughness', 'labelZone'];
 export function DefaultProductDraft (family = 'bottle')

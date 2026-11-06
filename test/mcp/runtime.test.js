@@ -215,7 +215,7 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         assert.ok (tools.some (tool => tool.name === 'auto3d.commands.invoke' && tool.annotations.readOnlyHint === false && tool.annotations.destructiveHint));
         const categories = await rpc (writer.access_token, 'tools/call', { name : 'auto3d.commands.categories', arguments : {} });
         const categoryList = JSON.parse ((await categories.json ()).result.content[0].text);
-        assert.equal (categoryList.length, 22); assert.equal (categoryList.reduce ((sum, category) => sum + category.total, 0), commandCatalog.commands.length);
+        assert.equal (categoryList.length, new Set (commandCatalog.commands.map (command => command.category)).size); assert.equal (categoryList.reduce ((sum, category) => sum + category.total, 0), commandCatalog.commands.length);
         const ids = [];
         for (let offset = 0; offset < commandCatalog.commands.length; offset += 25) {
             const page = await rpc (writer.access_token, 'tools/call', { name : 'auto3d.commands.list', arguments : { offset, limit : 25 } });

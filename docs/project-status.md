@@ -1,5 +1,22 @@
 # Auto3D development log and handoff
 
+## Opaque Primary Products scene workflow — Auto3D 0.49.0 / Primary Products 0.3.0 / Packaging 1.10.3
+
+Adds opaque bottle/can generation, selected-definition loading and atomic rebuild with Undo/Redo. Shared strict commands drive UI actions; scene units, account/read-only guards, versioned archive definitions and recovery are covered. Glass generation remains blocked; profile/label-zone UI is illustrative and artwork is pending. See [release-0490.md](release-0490.md).
+
+## Primary Products geometry — module 0.2.0 / Auto3D 0.48.0 / Packaging 1.10.3
+
+Independent bottle/can presentation meshes and physical label-zone descriptors extend the panel stack. No scene insertion or actual artwork/glass rendering is enabled. Draft PRs skip costly CI/MCP jobs until ready for review; production checks remain. See [primary-products-geometry.md](primary-products-geometry.md).
+
+## Primary Products UI shell — Auto3D 0.48.0 / Packaging 1.10.3 / Primary Products 0.1.0 (2026-11-04)
+
+Adds Primary Products directly below Packaging within the same outlined module rail group. Independent module-owned compact/extended UI supplies bottle/can cards, canonical-mm draft dimensions, surface controls and front/wrap label zones with an explicitly illustrative SVG profile. Add to session is disabled until generator work lands. Drafts survive panel changes, reset on account changes and respect account/read-only/busy guards. No scene or camera changes, artwork uploads or paid calls occur.
+
+The shared shell offers opt-in animated entry/exit with latest-action cancellation and reduced-motion fallback; Primary Products uses it while existing modules retain their behavior. Separate JS/CSS assets load on demand and are included in release hash verification. Stable commands are `ui.primary_products`, `primary.inspect/configure/reset` and existing `ui.module.mode`. Website/dev builds include independent module assets. See [primary-products-ui.md](primary-products-ui.md) and [release-0480.md](release-0480.md).
+
+Validation: 718 app/module tests, 26 MCP tests, 11 backend tests, lint, independent/module/website/Pages builds and production audit (zero vulnerabilities) pass; desktop/mobile Chromium verifies rail order/outline, lazy loading, draft edits, compact/extended/close motion, rapid transitions, reduced motion, unit conversion and unchanged imported-model/camera state. The initial browser fixture captured the baseline before asynchronous model import finished; a bounded import-completion poll corrected the fixture without changing application behavior or increasing timeouts.
+
+
 ## MCP reconnect and grant lifecycle — proposed
 
 New agent registrations use renewable refresh credentials; the window bridge retries transient disconnects and idle pairings expire after one hour. See [MCP pilot](mcp-pilot.md) for reauthorization, timing, browser and harness limitations. Deployment updates the private broker before the Pages app. Live client verification is still required. The headless tier stores isolated FEFCO score-to-score CAD drafts and account-owned revision-checked CAD projects; full headless scene, rendering, import/export and Library support remain pending; see [headless build list](mcp-headless-roadmap.md).

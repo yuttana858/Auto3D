@@ -38,11 +38,19 @@ export class PrimaryProductsPanel
         const roughLabel = Element ('label', 'pp_field', 'Roughness', finish); this.roughness = Element ('input', '', undefined, roughLabel); this.roughness.type = 'range'; this.roughness.min = '0'; this.roughness.max = '1'; this.roughness.step = '.01'; this.roughness.setAttribute ('aria-label', 'Product roughness'); this.roughness.addEventListener ('input', () => this.Change ({ roughness : this.roughness.valueAsNumber }));
         const artwork = Element ('section', 'pp_section', undefined, controls); Element ('h3', '', 'Label art', artwork); const zones = Element ('div', 'pp_zone_buttons', undefined, artwork); this.zones = new Map ();
         for (const [zone, label] of [['front', 'Front label'], ['wrap', 'Wrap label']]) { const button = Element ('button', '', label, zones); button.type = 'button'; button.addEventListener ('click', () => this.Change ({ labelZone : zone })); this.zones.set (zone, button); }
-        const art = Element ('div', 'pp_art_placeholder', undefined, artwork); art.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="m4 17 5-5 4 4 3-3 4 4M8 8h.01"/></svg>'; Element ('span', '', 'Your artwork goes here', art); Element ('small', '', 'Artwork placement comes with model generation.', art);
-        const footer = Element ('div', 'pp_footer', undefined, controls); const add = Element ('button', 'pp_add', 'Add to session', footer); add.type = 'button'; add.disabled = true; add.title = 'Model generation is coming next.';
-        Element ('p', 'pp_draft_note', 'Draft workspace · model generation coming next.', footer);
+        const art = Element ('div', 'pp_art_placeholder', undefined, artwork); art.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="m4 17 5-5 4 4 3-3 4 4M8 8h.01"/></svg>'; Element ('span', '', 'Your artwork goes here', art); Element ('small', '', 'Artwork import and mapping are coming next.', art);
+        const footer = Element ('div', 'pp_footer', undefined, controls); this.add = Element ('button', 'pp_add', 'Add to session', footer); this.add.type = 'button'; this.add.addEventListener ('click', () => this.Action (() => host.generate ()));
+        this.load = Element ('button', 'pp_reset', 'Load selected product', footer); this.load.type = 'button'; this.load.addEventListener ('click', () => this.Action (() => host.loadSelected ()));
+        this.apply = Element ('button', 'pp_reset', 'Apply to selected product', footer); this.apply.type = 'button'; this.apply.addEventListener ('click', () => this.Action (() => host.update ()));
+        Element ('p', 'pp_draft_note', 'Opaque presentation models · glass and artwork coming next. Applying rebuilds component surfaces from this draft.', footer);
         const reset = Element ('button', 'pp_reset', 'Reset draft', footer); reset.type = 'button'; reset.addEventListener ('click', () => { try { host.reset (); this.Refresh (); } catch (error) { this.status.textContent = error.message; } }); this.reset = reset;
         this.status = Element ('p', 'pp_status', '', controls); this.status.setAttribute ('role', 'status'); this.Refresh ();
+    }
+    async Action (action)
+    {
+        try { await action (); this.status.textContent = 'Product action completed.'; }
+        catch (error) { this.status.textContent = error.message; }
+        finally { this.Refresh (); }
     }
     Factor () { return this.host.units () === 'standard' ? 25.4 : 1; }
     Change (changes)
@@ -53,9 +61,11 @@ export class PrimaryProductsPanel
     Refresh ()
     {
         const draft = this.host.inspect (), factor = this.Factor (), unit = factor === 1 ? 'mm' : 'in', disabled = this.host.blocked ();
+        this.add.disabled = disabled || !draft.generationAvailable; this.apply.disabled = disabled || !draft.generationAvailable; this.load.disabled = disabled;
+        this.add.title = draft.generationAvailable ? 'Add an opaque presentation model.' : 'Glass generation is not available yet.';
         for (const [family, button] of this.cards) { button.setAttribute ('aria-pressed', String (draft.family === family)); button.disabled = disabled; }
         for (const key of ['heightMm', 'diameterMm']) { const input = this.inputs.get (key); input.value = String (Math.round (draft[key] / factor * 1000) / 1000); input.disabled = disabled; input.min = String ((key === 'heightMm' ? 20 : 10) / factor); input.max = String ((key === 'heightMm' ? 1000 : 500) / factor); this.inputs.get (key + 'Unit').textContent = unit; }
-        const names = { plastic : 'Opaque plastic', glass : 'Glass', aluminum : 'Aluminum', steel : 'Steel' }; this.material.replaceChildren ();
+        const names = { plastic : 'Opaque plastic', glass : 'Glass (draft only)', aluminum : 'Aluminum', steel : 'Steel' }; this.material.replaceChildren ();
         for (const key of draft.family === 'bottle' ? ['plastic', 'glass'] : ['aluminum', 'steel']) { const option = Element ('option', '', names[key], this.material); option.value = key; }
         this.material.value = draft.material; this.material.disabled = disabled; this.color.value = draft.color; this.color.disabled = disabled; this.roughness.value = String (draft.roughness); this.roughness.disabled = disabled; this.reset.disabled = disabled;
         for (const [zone, button] of this.zones) { button.setAttribute ('aria-pressed', String (draft.labelZone === zone)); button.disabled = disabled; }

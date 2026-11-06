@@ -6,7 +6,7 @@ Auto3D is a branded, self-hostable browser 3D viewer based on [Online3DViewer](h
 
 Auto3D supports temporary email/password sign-in with administrator-created Supabase Auth accounts. The login appears below the logo after the startup animation and remains available through the header's Sign in / Account button. Device and file workflows can be used without signing in. Setup and security details are in [docs/temporary-auth.md](docs/temporary-auth.md). Cloud Library publishing remains disabled pending ownership/authorization implementation.
 
-Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.47.3**.
+Install the npm dependencies, then run `npm start`. The server at `http://localhost:8080/website/index.html` watches source changes and automatically rebuilds the development viewer. Browser caching is disabled. Refresh after the watcher reports a successful build; save your session first to retain edits. The header displays the application version, currently **v0.49.0**.
 
 ## Hosting
 
@@ -121,3 +121,7 @@ Auto3D v0.30.0 starts Dark appearance with a dark viewer even if a conflicting L
 ### Personal Meshy keys (0.47.3)
 
 Preferences → AI connections → Manage Meshy key supports private masked entry, encrypted account storage, balance testing and removal. Keys are not stored in browser persistence or project files. Production and preview use separate private credential buckets and encryption secrets. See [secure Meshy key setup](docs/meshy-api-keys.md).
+
+### Primary Products draft panel (0.48.0)
+
+Primary Products appears below Packaging in the module tool rail. Compact and extended panels provide bottle/can draft dimensions, surface settings and label zones, with shared open/close animation and reduced-motion support. This is the UI shell: the profile is illustrative, and model generation/artwork placement come next. See [Primary Products UI](docs/primary-products-ui.md).
