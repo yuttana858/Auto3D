@@ -20,7 +20,13 @@ try {
     await call ('view.fit');
     await page.locator ('#main_viewer canvas').first ().click ({ button : 'right' });
     const stripLabels = await page.locator ('.scene_tools button').evaluateAll (nodes => nodes.map (node => node.getAttribute ('aria-label')));
-    const menuLabels = await page.locator ('.auto3d_context_menu button').allTextContents (); assert.deepEqual (menuLabels, stripLabels);
+    const menuLabels = await page.locator ('.auto3d_context_menu button').allTextContents ();
+    /* The vertical strip omits menu-only actions (visibility, delete, add/save/export/library); undo/redo live in the toolbar history group. The context menu keeps every action. */
+    const historyLabels = await page.locator ('.session_history_tools button').evaluateAll (nodes => nodes.map (node => node.getAttribute ('aria-label')));
+    assert.deepEqual (historyLabels, ['Undo object edit (Ctrl+Z)', 'Redo object edit (Ctrl+Shift+Z)']);
+    const menuOnlyLabels = ['Hide or show object (H)', 'Delete object', 'Add model', 'Save or open session (Ctrl+S)', 'Export', 'Model library'];
+    for (const label of [...historyLabels, ...menuOnlyLabels]) { assert.ok (menuLabels.includes (label), label); }
+    assert.deepEqual (menuLabels.filter (label => !menuOnlyLabels.includes (label) && !historyLabels.includes (label)), stripLabels);
     await page.getByRole ('menuitem', { name : 'Move (W)', exact : true }).click ();
     assert.equal (await page.getByRole ('button', { name : 'Move (W)', exact : true }).getAttribute ('aria-pressed'), 'true');
     await call ('object.tool', { mode : 'select' });
