@@ -8,12 +8,18 @@ try {
     await page.route ('**/api/auth/**', r => r.fulfill ({ json : { user : { id : 'cad-review', email : 'test@example.com' } } }));
     await page.route ('**/api/preferences', r => r.fulfill ({ json : { preferences : { theme : 2, units : 'metric' }, folders : [] } }));
     for (const path of ['accounts/**', 'personal/items', 'environments']) { await page.route ('**/api/' + path, r => r.fulfill ({ json : path.startsWith ('accounts') ? { isAdmin : false } : [] })); }
-    await page.goto ('http://127.0.0.1:8080/website/index.html'); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
+    await page.goto ('http://127.0.0.1:8080/website/index.html'); await page.locator ('#startup_splash').waitFor ({ state : 'detached' }); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
     const call = async (id, args = {}) => { const result = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (result.ok, true, JSON.stringify (result)); return result.result; };
     await call ('packaging.fefco.preset', { code : '0201', length : 100, width : 80, height : 60, thickness : 3 });
     const objectId = (await call ('scene.inspect')).selectedObjectId;
     await call ('packaging.open_selected'); const dialog = page.locator ('.packaging_dialog');
     assert.equal ((await call ('packaging.inspect')).tool, 'select');
+    const preview = dialog.locator ('.packaging_scene_preview'); await preview.waitFor (); assert.equal (await preview.isVisible (), true);
+    assert.equal (await preview.locator ('canvas').evaluate (node => node.getContext ('2d').getImageData (0, 0, node.width, node.height).data.some ((value, index) => index % 4 === 3 && value !== 0)), true);
+    const beforeFace = (await call ('packaging.inspect')).paths; await dialog.getByLabel ('CAD face and dimension basis').selectOption ('outside'); assert.deepEqual ((await call ('packaging.inspect')).paths, beforeFace); await dialog.getByLabel ('CAD face and dimension basis').selectOption ('inside');
+    const oldPos = await preview.boundingBox (); await preview.getByRole ('button', { name : /Move 3D preview/ }).focus (); await page.keyboard.press ('ArrowLeft'); assert.ok ((await preview.boundingBox ()).x < oldPos.x);
+    await call ('packaging.cad.preview', { visible : false }); assert.equal (await preview.isVisible (), false); await call ('packaging.cad.preview', { visible : true }); assert.equal (await preview.isVisible (), true);
+
     const canvas = page.locator ('.packaging_canvas'); await canvas.click ({ position : { x : 5, y : 5 } }); assert.deepEqual ((await call ('packaging.inspect')).draftPoints, []);
     const scores = (await call ('packaging.inspect')).paths.filter (p => p.type === 'score');
     const clickPath = async (id, modifiers = []) => {
@@ -23,7 +29,7 @@ try {
     };
     await page.screenshot ({ path : 'work/cad-review/before-select.png' }); await clickPath (scores[0].id); await clickPath (scores[1].id, ['Control']); assert.equal ((await call ('packaging.inspect')).selectedPathIds.length, 2);
     await dialog.getByRole ('button', { name : 'Crease and perforation settings', exact : true }).click ();
-    await dialog.getByLabel ('Crease / perforation type', { exact : true }).selectOption ('perforation'); await dialog.getByLabel ('Perforation cut (mm)', { exact : true }).fill ('3.25'); await dialog.getByLabel ('Perforation tie (mm)', { exact : true }).fill ('1.5'); await dialog.getByRole ('button', { name : 'Apply crease settings', exact : true }).click ();
+    await dialog.getByLabel ('Score function', { exact : true }).selectOption ('perforation'); await dialog.getByLabel ('Perforation cut length (mm)', { exact : true }).fill ('3.25'); await dialog.getByLabel ('Perforation gap length (mm)', { exact : true }).fill ('1.5'); await dialog.getByRole ('button', { name : 'Apply score function', exact : true }).click ();
     await page.waitForFunction (async () => (await Auto3D.execute ('packaging.inspect')).result.paths.filter (p => p.process?.kind === 'perforation').length === 2);
     await dialog.getByRole ('button', { name : 'Apply to 3D', exact : true }).click (); await page.waitForFunction (() => document.querySelector ('.packaging_status').textContent.includes ('CAD applied'));
     assert.equal ((await call ('scene.inspect')).selectedObjectId, objectId);
