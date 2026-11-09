@@ -79,12 +79,15 @@
 		"jsdoc": "^4.0.5",
 		"miniflare": "5.20261103.0-beta",
 		"mocha": "^11.8.0",
+		"occt-import-js": "0.0.22",
 		"oslllo-svg-fixer": "^3.0.0",
 		"playwright-core": "1.63.0",
+		"rhino3dm": "8.17.0",
 		"rollup": "^4.64.0",
 		"run-python3": "^0.0.5",
 		"svgo": "^3.3.5",
 		"typescript": "^5.9.3",
+		"web-ifc": "0.0.68",
 		"wrangler": "4.157.0"
 	},
 	"dependencies": {

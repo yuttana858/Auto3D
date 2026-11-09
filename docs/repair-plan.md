@@ -67,6 +67,15 @@ Status legend: ☐ open · ☑ done · ⏸ planned for a later release (feature 
 | D2 | `agent-project-overview.md`, `mcp-pilot.md` (250 commands), status test counts stale. | Update. | ☑ |
 | D3 | Release alignment. | Bump to 0.51.0 (main reached 0.50.2 during the work) in package.json/AppVersion, `docs/release-0510.md`, project-status entry. | ☑ |
 
+## Milestone 7 — Self-hosted runtime resources
+
+| ID | Issue | Repair | Status |
+|---|---|---|---|
+| R1 | Format importers load `draco3d` and `rhino3dm` from cdn.jsdelivr.net at runtime. | Engine library URLs are configurable; the site uses its bundled three.js Draco decoder and a build-time copy of rhino3dm 8.17.0 (MIT) with notices. Verified in Chromium with the CDN blocked. | ☑ |
+| R2 | `occt-import-js` (LGPL-2.1) and `web-ifc` (MPL-2.0) load from the CDN. | Hosted under `/o3dv/libs/` as unmodified files with license texts and source notices (owner approved 2026-11-09); jsdelivr removed from the CSP. Verified STEP and IFC import on the CSP-protected Pages build. | ☑ |
+
+Other external origins are first-party: HDRI environments come from the account's own Supabase Storage and Meshy models are proxied through `/api/ai`. Fonts are already bundled.
+
 ## Out of scope for this release (roadmap)
 
 Headless rendering/scene editing/import-export, Entra ID, SMTP delivery, glass rendering and label artwork, mobile share variants, and splitting `sessioneditor.js`/`agentcommands.js`/`packagingworkspace.js` are feature or refactor projects already listed in `project-status.md`; they are not repairs and are not executed here.

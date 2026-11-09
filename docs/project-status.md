@@ -1,16 +1,20 @@
 # Auto3D development log and handoff
 
-## Source-linked model dimensions — Auto3D 0.53.0 / Primary Products 0.5.0 / Packaging 1.10.3
+## Source-linked model dimensions — Auto3D 0.53.0 / Primary Products 0.5.0 / Packaging 1.10.4
 
 Adds the edge-drag dimension tool, live canonical source references and high-contrast brackets. Renames Meshes to Layers and adds a Dimensions visibility/list row, history and file/recovery persistence. See [release-0530.md](release-0530.md). Based on merged #86; not deployed.
 
+
+## Browser CI and settled view commands — Auto3D 0.52.1 / Packaging 1.10.4 / Primary Products 0.5.0 (2026-11-09)
+
+Fixes the first CI run of the browser job (missing production/Pages/MCP builds, a disabled sign-in wait in two tests) and makes `view.focus`, `view.fit` and `camera.activate` return after the camera settles. Packaging 1.10.4 keeps board-surface controls in step with the editor's busy state. Hosts all four format libraries with the site (Draco, rhino3dm, occt-import-js, web-ifc) and removes cdn.jsdelivr.net from the CSP. The 36-test CI browser list passes locally from a clean build. See [release-0521.md](release-0521.md).
 ## Primary Products materials and artwork — Auto3D 0.52.0 / Primary Products 0.5.0 / Packaging 1.10.3
 
 Adds the shared H × W × D row, adjacent native color swatch, category PBR presets and local PNG/JPEG/WebP label import with actual surface application. Original embedded pixels and physical label descriptors survive file/recovery and portable image/material export. See [release-0520.md](release-0520.md). Not deployed.
 
 ## Repair release — Auto3D 0.51.0 / Packaging 1.10.3 / Primary Products 0.4.0 (2026-11-09)
 
-Fixes the 2026-11-06 review findings: MCP account lockout after ~1000 commands, window disconnect on any failed command, generic MCP errors, grant loss during identity outages, stored XSS through model/material names, missing CSP, wrong `mutates` flags, unbounded schemas, shared-key Meshy task visibility, and browser tests stalled at the welcome screen. Adds `macro.cancel`, `session.rename`, `session.recovery.discard` and `object.user_data.delete` (261 commands). See [release-0510.md](release-0510.md) and the [repair plan](repair-plan.md). Real-client MCP production verification remains pending.
+Fixes the 2026-11-06 review findings: MCP account lockout after ~1000 commands, window disconnect on any failed command, generic MCP errors, grant loss during identity outages, stored XSS through model/material names, missing CSP, wrong `mutates` flags, unbounded schemas, shared-key Meshy task visibility, and browser tests stalled at the welcome screen. Adds `macro.cancel`, `session.rename`, `session.recovery.discard` and `object.user_data.delete` (261 commands). Draco and rhino3dm import libraries are now hosted with the site; STEP/IGES and IFC libraries remain on the CDN pending a license decision. See [release-0510.md](release-0510.md) and the [repair plan](repair-plan.md). Real-client MCP production verification remains pending.
 ## MCP connection display — Auto3D 0.50.2 candidate
 
 Connection and administrator lists show client labels and status without harness labels. Existing grants remain revocable.

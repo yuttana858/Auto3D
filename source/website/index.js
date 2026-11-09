@@ -1,4 +1,5 @@
 import { ErrorLogs } from './errorlogs.js';
+import { UseBundledLibraries } from './externallibraries.js';
 import { InstallAuthGate } from './authgate.js';
 import { StartWelcomeSequence } from './welcome.js';
 import { AccountAdmin } from './accountadmin.js';
@@ -63,6 +64,7 @@ export function RegisterToolbarPlugin (plugin)
 
 export function StartWebsite ()
 {
+    UseBundledLibraries ();
     let storage = null; try { storage = window.sessionStorage; } catch { /* Logging works in memory. */ }
     const errorLogs = new ErrorLogs (window, storage).Install ();
     window.addEventListener ('load', () => {
@@ -117,6 +119,7 @@ export function StartWebsite ()
 
 export function StartEmbed ()
 {
+    UseBundledLibraries ();
     window.addEventListener ('load', () => {
         let embed = new Embed ({
             viewerDiv : document.getElementById ('embed_viewer'),

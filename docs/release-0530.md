@@ -1,6 +1,6 @@
 # Auto3D 0.53.0 — source-linked model dimensions
 
-Primary Products remains 0.5.0 (API 1); Packaging remains 1.10.3. Based on the merged material/artwork PR #86. Not deployed.
+Primary Products remains 0.5.0 (API 1); Packaging remains 1.10.4. Based on the merged material/artwork PR #86. Not deployed.
 
 ## Using the tool
 
@@ -29,3 +29,7 @@ These are viewport annotations; they are not baked into GLB/STL geometry or the 
 Shared UI/command services: `dimensions.tool`, `dimensions.inspect`, `dimensions.edges` (paged canonical anchors and world endpoints), `dimensions.add`, `dimensions.offset`, `dimensions.delete`, `dimensions.layer.visible`. Schemas, numeric/string bounds, examples, mutation flags and app/MCP catalogs are synchronized. Reference anchors are validated before committing; up to 500 annotations are supported per session. Read-only sessions can display existing dimensions; saved-layer edits require an editable session.
 
 Validation: 775 app/module tests, 64 MCP tests, 11 backend tests, application/MCP lint and website/Pages builds pass. Browser tests perform actual edge drags and existing-bracket repositioning on a 3D model, verify no preview mutation, layer eyes, scaling, units, Escape, deletion/Undo and mobile layout, and drag an actual unfolded FEFCO CAD line to a path-linked bracket. Dark/light and CAD screenshots were reviewed. Geometry tests exclude tessellation diagonals; reference tests cover CAD edits, stale topology, file/recovery, read-only denial and account/session cancellation. Macro tests resolve newly created annotation IDs into later edits. An existing 15-second folding audit timed out while Chromium was generating CAD in parallel, then passed in the sequential suite without increasing its timeout.
+
+## Main integration after PR #87
+
+Conflict resolution retains Auto3D 0.53.0, Primary Products 0.5.0 and main's Packaging 1.10.4. Both the new dimension commands and main's settled view.focus/view.fit/camera.activate behavior are preserved. Main's locally hosted format libraries, CSP and browser CI fixes remain intact. The dimensions browser test is now part of the CI browser list. Updated validation: 781 app/module tests, 64 MCP tests, 11 backend tests, both linters, engine/ESM/website/Pages builds, and the dimension plus Primary Products browser regressions pass.

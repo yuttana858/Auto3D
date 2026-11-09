@@ -13,6 +13,7 @@ corrugate-review
 errorlogs-panel
 feedback
 fold-actions
+format-libraries
 library-sharing
 lighting-isolation
 lighting-ui
@@ -25,6 +26,7 @@ multiwall-glue
 popup-fonts
 preview-context-lifecycle
 primary-products
+dimensions
 render-workspace
 rendercore-state
 saved-rsc-materials
