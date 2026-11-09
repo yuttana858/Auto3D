@@ -102,6 +102,31 @@ export class ColorToMaterialConverter
 	}
 }
 
+// Default CDN locations for libraries loaded only when a matching format is opened.
+// Hosts that ship their own copies (as the Auto3D site does) override them with SetExternalLibraryUrl.
+const ExternalLibraryUrls = {
+	rhino3dm : 'https://cdn.jsdelivr.net/npm/rhino3dm@8.17.0/rhino3dm.min.js',
+	webifc : 'https://cdn.jsdelivr.net/npm/web-ifc@0.0.68/web-ifc-api-iife.js',
+	draco3d : 'https://cdn.jsdelivr.net/npm/draco3d@1.5.7/draco_decoder_nodejs.min.js',
+	occt : 'https://cdn.jsdelivr.net/npm/occt-import-js@0.0.22/dist/'
+};
+
+export function SetExternalLibraryUrl (libraryName, url)
+{
+	if (!Object.hasOwn (ExternalLibraryUrls, libraryName) || typeof url !== 'string' || !url) {
+		throw new Error ('Unknown external library or URL.');
+	}
+	ExternalLibraryUrls[libraryName] = url;
+	if (libraryName === 'occt') {
+		occtWorkerUrl = null;
+	}
+}
+
+export function GetExternalLibraryUrl (libraryName)
+{
+	return Object.hasOwn (ExternalLibraryUrls, libraryName) ? ExternalLibraryUrls[libraryName] : null;
+}
+
 let occtWorkerUrl = null;
 
 export function CreateOcctWorker (worker)
@@ -112,7 +137,7 @@ export function CreateOcctWorker (worker)
 			return;
 		}
 
-		let baseUrl = 'https://cdn.jsdelivr.net/npm/occt-import-js@0.0.22/dist/';
+		let baseUrl = ExternalLibraryUrls.occt;
 		fetch (baseUrl + 'occt-import-js-worker.js')
 			.then ((response) => {
 				if (!response.ok) {
@@ -133,12 +158,8 @@ export function CreateOcctWorker (worker)
 
 export function LoadExternalLibrary (libraryName)
 {
-	if (libraryName === 'rhino3dm') {
-		return LoadExternalLibraryFromUrl ('https://cdn.jsdelivr.net/npm/rhino3dm@8.17.0/rhino3dm.min.js');
-	} else if (libraryName === 'webifc') {
-		return LoadExternalLibraryFromUrl ('https://cdn.jsdelivr.net/npm/web-ifc@0.0.68/web-ifc-api-iife.js');
-	} else if (libraryName === 'draco3d') {
-		return LoadExternalLibraryFromUrl ('https://cdn.jsdelivr.net/npm/draco3d@1.5.7/draco_decoder_nodejs.min.js');
+	if (libraryName === 'rhino3dm' || libraryName === 'webifc' || libraryName === 'draco3d') {
+		return LoadExternalLibraryFromUrl (ExternalLibraryUrls[libraryName]);
 	} else {
 		return null;
 	}
