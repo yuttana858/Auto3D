@@ -69,7 +69,12 @@ jobs:
       - run: npx playwright-core install --with-deps chromium
       - name: Expose Chromium where the browser tests expect it
         run: sudo ln -sf "$(node -e "console.log(require('playwright-core').chromium.executablePath())")" /usr/bin/chromium
-      - run: npm run build_dev
+      - name: Build the dev site, production site, Pages output and MCP workers the regressions load
+        run: |
+          npm run build_dev
+          npm run build_website
+          node tools/build_pages.mjs
+          node tools/build_mcp_workers.mjs
       - name: Run browser regressions
         shell: bash
         run: |

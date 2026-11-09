@@ -317,13 +317,32 @@ export class Navigation
 	StopCameraMovement ()
 	{
 		this.cameraMoveGeneration = (this.cameraMoveGeneration || 0) + 1;
+		const movement = this.cameraMovement;
+		this.cameraMovement = null;
+		movement?.resolve ();
+	}
+
+	// Resolves when the current animated camera move ends or is superseded, so callers can await a settled view.
+	WaitForCameraMovement ()
+	{
+		return this.cameraMovement ? this.cameraMovement.promise : Promise.resolve ();
+	}
+
+	// Jumps an in-progress animated move to its destination.
+	FinishCameraMovement ()
+	{
+		const movement = this.cameraMovement;
+		if (!movement) { return; }
+		this.StopCameraMovement ();
+		this.camera = movement.target;
+		this.Update ();
 	}
 
 	MoveCamera (newCamera, stepCount)
 	{
-		function Step (obj, steps, count, index, generation)
+		function Step (obj, steps, count, index, generation, movement)
 		{
-			if (obj.cameraMoveGeneration !== generation) { return; }
+			if (obj.cameraMoveGeneration !== generation) { movement.resolve (); return; }
 			obj.camera.eye = steps.eye[index];
 			obj.camera.center = steps.center[index];
 			obj.camera.up = steps.up[index];
@@ -331,8 +350,11 @@ export class Navigation
 
 			if (index < count - 1) {
 				requestAnimationFrame (() => {
-					Step (obj, steps, count, index + 1, generation);
+					Step (obj, steps, count, index + 1, generation, movement);
 				});
+			} else {
+				if (obj.cameraMovement === movement) { obj.cameraMovement = null; }
+				movement.resolve ();
 			}
 		}
 
@@ -345,6 +367,10 @@ export class Navigation
 		if (stepCount === 0 || CameraIsEqual3D (this.camera, newCamera)) {
 			this.camera = newCamera;
 		} else {
+			let resolve = null;
+			const promise = new Promise ((done) => { resolve = done; });
+			const movement = { target : newCamera.Clone (), promise, resolve };
+			this.cameraMovement = movement;
 			let tweenFunc = ParabolicTweenFunction;
 			let steps = {
 				eye : TweenCoord3D (this.camera.eye, newCamera.eye, stepCount, tweenFunc),
@@ -352,7 +378,7 @@ export class Navigation
 				up : TweenCoord3D (this.camera.up, newCamera.up, stepCount, tweenFunc)
 			};
 			requestAnimationFrame (() => {
-				Step (this, steps, stepCount, 0, generation);
+				Step (this, steps, stepCount, 0, generation, movement);
 			});
 		}
 

@@ -3029,7 +3029,7 @@
       "id": "view.focus",
       "title": "Focus object",
       "category": "View",
-      "description": "Frame all selected visible objects or the group containing the specified object, and orbit around their combined center.",
+      "description": "Frame all selected visible objects or the group containing the specified object, and orbit around their combined center. Returns after the camera finishes moving.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -3048,7 +3048,7 @@
       "id": "view.fit",
       "title": "Fit scene",
       "category": "View",
-      "description": "Frame all visible objects.",
+      "description": "Frame all visible objects. Returns after the camera finishes moving.",
       "mutates": false,
       "inputSchema": {
         "type": "object",

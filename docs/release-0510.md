@@ -29,6 +29,14 @@ Repair release from the 2026-11-06 review, merged onto 0.50.2 (PR #84). See [rep
 - Shared Meshy key: each account sees and reads only tasks it created (ownership is recorded in the private AI credential bucket), creation is limited to 20 per hour per account (the shared key now requires the private AI credential bucket; without it shared-key requests return `MESHY_STORAGE_UNAVAILABLE`), request bodies must be flat objects (64 KB for text routes, 28 MB for image routes) and model downloads have a 120 s timeout and a 200 MB streaming cap.
 - Malformed JSON returns 400. The board catalog route no longer echoes unexpected error text. Recovery contact text uses `AUTO3D_SUPPORT_CONTACT` instead of a hard-coded personal address. Stored client IP hashes are keyed with `AUTO3D_IP_HASH_SECRET` (falling back to the server Supabase key).
 
+## Self-hosted format libraries
+
+- Draco-compressed glTF now uses the Draco decoder the site already ships under `/o3dv/draco/` (from three.js) instead of `draco3d` from cdn.jsdelivr.net.
+- Rhino `.3dm` import and export use `rhino3dm` 8.17.0 (MIT) copied to `/o3dv/libs/rhino3dm/` at build time, with its license notice. It is pinned as a development dependency.
+- The engine keeps its CDN defaults for npm consumers and gains `SetExternalLibraryUrl`/`GetExternalLibraryUrl`; the site switches to its own copies at startup.
+- STEP/IGES/BREP/FreeCAD (`occt-import-js`, LGPL-2.1) and IFC (`web-ifc`, MPL-2.0) still load from cdn.jsdelivr.net. Hosting them means redistributing copyleft-licensed files, which is outside the MIT/permissive dependency policy and needs an owner decision; the mechanism is in place to switch them with one entry each.
+- New browser regression `format-libraries` imports a Draco glTF and a 3DM file with the CDN blocked.
+
 ## Build, CI and tests
 
 - Browser tests stalled at the welcome screen added in 0.47.5. The welcome screen now continues automatically when `navigator.webdriver` is true; authentication is unchanged. 35 browser regressions pass and run in a new CI `browser` job (`test/browser/ci-suite.txt`). 26 others fail identically on the unchanged 0.49.2 code (out-of-date toolbar labels, auth mocks and fixtures) and stay manual until updated; `ai-extended` passes but is timing-sensitive.

@@ -24,8 +24,13 @@ try {
     const original = (await call ('scene.inspect')).objects[0];
     const creation = call ('object.array', { width : 3, length : 2, height : 2, duration : 6, autoFit : true });
     // Playback inspection bypasses the pending mutation queue.
-    const revealing = await wait ('object.array.playback.inspect', state => state.stage === 'revealing' && state.state === 'playing');
-    assert.equal (revealing.cameraAutoFit, true); await call ('object.array.playback', { action : 'pause' }); assert.equal ((await call ('object.array.playback.inspect')).state, 'paused');
+    // Inspect and pause in one page task, as the cancellation step below does: a slow runner can otherwise finish the reveal between round trips.
+    let revealing = null;
+    for (let retry = 0; retry < 600 && !revealing; retry++) {
+        revealing = await page.evaluate (async () => { const state = (await Auto3D.execute ('object.array.playback.inspect')).result; if (state.stage !== 'revealing' || state.state !== 'playing') { return null; } return { state, paused : (await Auto3D.execute ('object.array.playback', { action : 'pause' })).ok }; });
+        if (!revealing) { await page.waitForTimeout (50); }
+    }
+    assert.equal (revealing?.paused, true); assert.equal (revealing.state.cameraAutoFit, true); assert.equal ((await call ('object.array.playback.inspect')).state, 'paused');
     await page.screenshot ({ path : 'work/array-drop-reveal.png' }); await call ('object.array.playback', { action : 'resume' }); await creation;
     const scene = await call ('scene.inspect'); assert.equal (scene.objects.length, 12); assert.equal (scene.groups.length, 1);
     assert.deepEqual (scene.objects[0].position, original.position); assert.ok (scene.objects[1].position[0] > original.position[0]); assert.equal (scene.objects[3].position[0], original.position[0]); assert.ok (scene.objects[6].position[1] > original.position[1]);
