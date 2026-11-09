@@ -18,9 +18,8 @@ await page.route ('**/api/auth/**', async (route) => {
             await route.fulfill ({ json : { user } });
         });
         await page.goto (process.env.AUTO3D_TEST_URL || 'http://127.0.0.1:8080/website/index.html', { waitUntil : 'domcontentloaded' });
+        // The landing page holds the sign-in panel; there is no separate click-to-continue step.
         const welcome = page.locator ('#startup_splash'); await welcome.waitFor ({ state : 'visible' });
-        assert.equal (await welcome.getAttribute ('role'), 'button');
-        await welcome.click ();
         const splash = page.locator ('#auth_gate'); const form = splash.locator ('form');
         await form.waitFor ({ state : 'visible' });
         const aligned = async panel => {

@@ -140,24 +140,23 @@ function StartTour ()
     document.body.appendChild (dialog); dialog.showModal (); show ();
 }
 
-export function StartWelcomeSequence (onContinue, { createScene = CreateScene, fade = FadeOut } = {})
+// The landing page is also the sign-in page. It shows the welcome scene with the sign-in
+// panel in place and waits for the user: sign in, or continue with a saved sign-in.
+// The authentication gate decides when the landing is dismissed; nothing here unlocks the app.
+export function StartLanding ({ createScene = CreateScene, fade = FadeOut } = {})
 {
     const splash = document.getElementById ('startup_splash');
-    if (!splash) { onContinue (); return; }
+    if (!splash) { return null; }
     splash.querySelector ('.splash_version').textContent = 'v' + AppVersion;
     const dispose = createScene (splash.querySelector ('canvas'), true);
-    const hint = document.createElement ('span'); hint.className = 'splash_continue'; hint.textContent = 'Click anywhere to continue'; splash.querySelector ('.splash_identity').appendChild (hint);
-    splash.setAttribute ('role', 'button'); splash.setAttribute ('aria-label', 'Welcome to Auto3D. Continue to sign in.'); splash.tabIndex = 0;
-    let finished = false;
-    const finish = async () => {
-        if (finished) { return; } finished = true;
-        splash.style.pointerEvents = 'none';
-        await fade (splash, 500);
-        dispose (); splash.remove (); onContinue ();
+    splash.classList.add ('splash_landing'); splash.setAttribute ('role', 'region'); splash.setAttribute ('aria-label', 'Welcome to Auto3D');
+    const host = document.createElement ('div'); host.className = 'splash_signin'; splash.appendChild (host);
+    let dismissed = null;
+    return {
+        element : splash, host,
+        Dismiss () {
+            if (!dismissed) { dismissed = (async () => { splash.style.pointerEvents = 'none'; await fade (splash, 500); dispose (); splash.remove (); }) (); }
+            return dismissed;
+        }
     };
-    splash.addEventListener ('click', finish);
-    splash.addEventListener ('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault (); finish (); } });
-    splash.focus ();
-    // Automated browsers (tests, browser-driving agents) continue to sign-in without a click; authentication is unchanged.
-    if (typeof navigator !== 'undefined' && navigator.webdriver === true) { finish (); }
 }

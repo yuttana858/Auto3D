@@ -1,7 +1,7 @@
 import { ErrorLogs } from './errorlogs.js';
 import { UseBundledLibraries } from './externallibraries.js';
 import { InstallAuthGate } from './authgate.js';
-import { StartWelcomeSequence } from './welcome.js';
+import { StartLanding } from './welcome.js';
 import { AccountAdmin } from './accountadmin.js';
 import { Loc } from '../engine/core/localization.js';
 import { AddDiv, AddDomElement } from '../engine/viewer/domutils.js';
@@ -113,7 +113,8 @@ export function StartWebsite ()
         window.setInterval (refreshAccount, 240000);
         website.commands = CreateAgentCommands (website);
         window.Auto3D = Object.freeze ({ apiVersion : 1, catalog : (query) => website.commands.Catalog (query), execute : (id, args) => website.commands.Execute (id, args), runMacro : (macro) => website.commands.RunMacro (macro), cancelMacro : () => website.commands.Cancel () });
-        StartWelcomeSequence (() => { welcomeComplete = true; InstallAuthGate (website); });
+        // One landing page: welcome scene plus sign-in, waiting for the user to sign in or continue.
+        welcomeComplete = true; InstallAuthGate (website, { landing : StartLanding () });
     });
 }
 

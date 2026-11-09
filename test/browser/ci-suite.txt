@@ -1,6 +1,7 @@
 account-storage
 admin-controls
 animation
+auth
 board-appearance
 board-appearance-controls
 board-array-buffers
@@ -16,6 +17,7 @@ feedback
 fold-actions
 fold-camera-fit
 format-libraries
+landing-signin
 library-sharing
 lighting-isolation
 lighting-ui
