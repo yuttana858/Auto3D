@@ -35,6 +35,17 @@ export function CreateAgentCommands (website)
         const selected = id ? editor.document.objects.find ((item) => item.id === id) : editor.selected;
         if (!selected) { throw new Error ('Select an object or supply a valid objectId.'); } return selected;
     };
+    // View commands return only after their animated camera move settles, so a following
+    // capture or keyframe sees the final view. Paused animation frames (background tabs) jump to the end.
+    const settleCamera = async (result) => {
+        const navigation = website.viewer?.navigation;
+        if (!navigation?.WaitForCameraMovement) { return result; }
+        let timer = null;
+        const finished = await Promise.race ([navigation.WaitForCameraMovement ().then (() => true), new Promise (resolve => { timer = setTimeout (() => resolve (false), 3000); })]);
+        clearTimeout (timer);
+        if (!finished) { navigation.FinishCameraMovement (); }
+        return result;
+    };
     const describe = (item) => ({ id : item.id, name : item.name, visible : item.visible, position : [...item.position], rotation : [...item.rotation], scale : [...item.scale], userData : { ...(item.userData || {}) } });
     const add = (id, title, category, description, properties, required, mutates, handler, example = {}) => registry.Register ({ id, title, category, description, mutates, inputSchema : { type : 'object', properties, required, additionalProperties : false }, example }, handler);
     add ('agent.access.open', 'Open agent access', 'Account', 'Open MCP browser-window sharing and connection revocation controls. Initial client authorization uses Auto3D sign-in and OAuth consent.', {}, [], false, () => AgentAccessFor (website).Open ());
@@ -172,8 +183,8 @@ export function CreateAgentCommands (website)
     }, { name : 'SKU', value : 'ABC-123' });
     add ('object.visibility', 'Set visibility', 'Objects', 'Explicitly show or hide an object. Undo supported.', { objectId : text, visible : boolean }, ['visible'], true, (args) => { const item = object (args.objectId); editor.Select (item); if (item.visible !== args.visible) { editor.ToggleVisibility (); } return describe (item); }, { visible : true });
     add ('object.delete', 'Delete object', 'Objects', 'Remove an object from this session. Recover with history.undo.', { objectId : text }, [], true, async (args) => { const item = object (args.objectId); editor.Select (item); await editor.Delete (); return { deletedId : item.id }; });
-    add ('view.focus', 'Focus object', 'View', 'Frame all selected visible objects or the group containing the specified object, and orbit around their combined center.', { objectId : text }, [], false, (args) => { if (args.objectId) { editor.Select (object (args.objectId)); } const result = editor.Focus (); return { ...result, focusedId : editor.selected?.id || null }; });
-    add ('view.fit', 'Fit scene', 'View', 'Frame all visible objects.', {}, [], false, () => { return { fitted : website.FitModelToWindow (false) === true }; });
+    add ('view.focus', 'Focus object', 'View', 'Frame all selected visible objects or the group containing the specified object, and orbit around their combined center. Returns after the camera finishes moving.', { objectId : text }, [], false, (args) => { if (args.objectId) { editor.Select (object (args.objectId)); } const result = editor.Focus (); return settleCamera ({ ...result, focusedId : editor.selected?.id || null }); });
+    add ('view.fit', 'Fit scene', 'View', 'Frame all visible objects. Returns after the camera finishes moving.', {}, [], false, () => settleCamera ({ fitted : website.FitModelToWindow (false) === true }));
     add ('view.fullscreen', 'Set full screen', 'View', 'Enter or exit browser full-screen mode. Entering requires a user gesture; otherwise returns requiresUserGesture.', { enabled : boolean }, ['enabled'], false, async ({ enabled }) => (enabled && !website.IsFullscreen () && !UserGestureAvailable () ? { fullscreen : false, requiresUserGesture : true } : { fullscreen : await website.SetFullscreen (enabled) }), { enabled : true });
     for (const [id, method] of [['history.undo', 'Undo'], ['history.redo', 'Redo']]) {
         add (id, method, 'History', 'Step through object edit history.', {}, [], true, async () => { await editor[method] (); return { undo : editor.history.undo.length, redo : editor.history.redo.length }; });
@@ -251,7 +262,7 @@ export function CreateAgentCommands (website)
     add ('camera.current.inspect', 'Inspect current camera', 'Camera', 'Read current camera position, target, orientation, projection and FOV, including during fold or array animation. Does not create a saved camera.', {}, [], false, () => CaptureCameraState (website.viewer));
     add ('camera.fov', 'Set camera field of view', 'Camera', 'Set current camera FOV in degrees and update view framing. Stops camera playback.', { fov : { ...number, minimum : 10, maximum : 120 } }, ['fov'], true, ({ fov }) => editor.cameras.SetFov (fov), { fov : 45 });
     add ('camera.create', 'Save camera view', 'Camera', 'Save current position, target, orientation, projection and FOV as a named session camera. Undo supported.', { name : { type : 'string', minLength : 1, maxLength : 100 } }, ['name'], true, ({ name }) => editor.cameras.Create (name), { name : 'Front view' });
-    add ('camera.activate', 'Go to saved camera', 'Camera', 'Restore a saved camera view and stop timeline playback. Works in read-only viewers.', { id : text }, ['id'], false, ({ id }) => editor.cameras.Activate (id), { id : 'camera-id' });
+    add ('camera.activate', 'Go to saved camera', 'Camera', 'Restore a saved camera view and stop timeline playback. Works in read-only viewers.', { id : text }, ['id'], false, async ({ id }) => settleCamera (await editor.cameras.Activate (id)), { id : 'camera-id' });
     add ('camera.update', 'Update saved camera', 'Camera', 'Replace a named camera with the current view, retaining its name and ID. Undo supported.', { id : text }, ['id'], true, ({ id }) => editor.cameras.Update (id), { id : 'camera-id' });
     add ('camera.rename', 'Rename saved camera', 'Camera', 'Rename a saved session camera. Undo supported.', { id : text, name : { type : 'string', minLength : 1, maxLength : 100 } }, ['id', 'name'], true, ({ id, name }) => editor.cameras.Rename (id, name), { id : 'camera-id', name : 'Overview' });
     add ('camera.delete', 'Delete saved camera', 'Camera', 'Remove a saved camera from this session. Undo supported.', { id : text }, ['id'], true, ({ id }) => editor.cameras.Delete (id), { id : 'camera-id' });
