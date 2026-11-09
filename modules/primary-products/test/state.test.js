@@ -11,7 +11,7 @@ describe ('Primary Products draft state', () => {
     });
     it ('rejects malformed drafts before mutation and retains canonical mm values', () => {
         const draft = DefaultProductDraft (); const original = structuredClone (draft);
-        for (const changes of [{ family : 'clamshell' }, { heightMm : NaN }, { diameterMm : 0 }, { color : '<svg>' }, { roughness : 2 }, { injected : true }, { labelZone : 'unknown' }]) { assert.throws (() => UpdateProductDraft (draft, changes)); assert.deepEqual (draft, original); }
+        for (const changes of [{ family : 'unknown' }, { heightMm : NaN }, { diameterMm : 0 }, { color : '<svg>' }, { roughness : 2 }, { injected : true }, { labelZone : 'unknown' }]) { assert.throws (() => UpdateProductDraft (draft, changes)); assert.deepEqual (draft, original); }
         assert.equal (UpdateProductDraft (draft, { heightMm : 10 * 25.4 }).heightMm, 254);
     });
     it ('validates explicit bottle shapes, isolates nested data and preserves legacy defaults', () => {

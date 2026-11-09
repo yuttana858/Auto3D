@@ -1,3 +1,4 @@
+import { ProductCategories, ListProductDesigns, ProductDesign } from '../../modules/primary-products/src/catalog.js';
 import { PrimaryProductsArtwork } from './primaryproductsartwork.js';
 import { ValidateProductArtwork } from '../../modules/primary-products/src/artwork.js';
 import { PrimaryProductsWorkspace } from './primaryproductsworkspace.js';
@@ -11,7 +12,7 @@ export class PrimaryProductsPanel
         this.website = website; this.artwork = new PrimaryProductsArtwork (this); this.products = new PrimaryProductsWorkspace (this, async () => { await this.Ensure (); return this.module; }); this.draft = DefaultProductDraft (); this.owner = website.auth?.user?.id || null;
         this.panel = document.createElement ('section'); this.panel.id = 'primary_products_module_panel'; this.panel.className = 'primary_products_module_panel'; this.panel.hidden = true; this.panel.setAttribute ('aria-label', 'Primary Products'); website.parameters.rightContainerDiv.appendChild (this.panel);
         website.modulePanels.Register ('primary-products', { title : 'Primary Products', body : this.panel, animated : true, onOpen : () => this.Ensure (), onMode : () => this.Refresh () });
-        website.auth?.Subscribe?.(user => { const owner = user?.id || null; if (owner !== this.owner) { this.owner = owner; this.artwork.Clear (); this.draft = DefaultProductDraft (); this.Refresh (); } });
+        website.auth?.Subscribe?.(user => { const owner = user?.id || null; if (owner !== this.owner) { this.owner = owner; this.catalogOpen = false; this.artwork.Clear (); this.draft = DefaultProductDraft (); this.Refresh (); } });
     }
     Blocked () { return !this.website.auth?.user || this.website.accountReady === false || this.website.sessionEditor.readOnly || this.website.sessionEditor.busy || this.products?.active; }
     UnavailableReason ()
@@ -24,13 +25,25 @@ export class PrimaryProductsPanel
         return this.draft.material === 'glass' ? 'Glass generation is not available yet. Choose opaque plastic.' : '';
     }
     RefreshAvailability () { this.workspace?.SetDisabled (); }
-    Inspect () { const shape = this.draft.family === 'bottle' ? BottleShape (this.draft) : null; return { profile : shape ? { ...shape, bodyHeightMm : this.draft.heightMm - shape.shoulderHeightMm - shape.neckHeightMm - shape.capHeightMm } : null, schemaVersion : 1, units : 'mm', ...this.draft, artwork : this.artwork?.Inspect () || [], draftOnly : false, generationAvailable : this.draft.material !== 'glass', unavailableReason : this.UnavailableReason (), generating : this.products?.active === true }; }
+    Inspect () { const shape = this.draft.family === 'bottle' ? BottleShape (this.draft) : null; return { catalogCategory : this.catalogCategory || 'bottles', catalogOpen : this.catalogOpen === true, profile : shape ? { ...shape, bodyHeightMm : this.draft.heightMm - shape.shoulderHeightMm - shape.neckHeightMm - shape.capHeightMm } : null, schemaVersion : 1, units : 'mm', ...this.draft, artwork : this.artwork?.Inspect () || [], draftOnly : false, generationAvailable : this.draft.material !== 'glass', unavailableReason : this.UnavailableReason (), generating : this.products?.active === true }; }
     Configure (changes)
     {
         if (this.Blocked ()) { throw new Error ('Open an editable session before changing the product draft.'); }
         const next = UpdateProductDraft (this.draft, changes);
         if (next.family !== this.draft.family && this.artwork?.entries.length) { throw new Error ('Remove artwork before changing product family.'); }
         ValidateProductArtwork (next, this.artwork?.Inspect () || []); this.draft = next; this.Refresh (); return this.Inspect ();
+    }
+    Catalog (category = 'bottles', open = true)
+    {
+        if (!Object.hasOwn (ProductCategories, category) || typeof open !== 'boolean') { throw new Error ('Choose a valid product category and drawer state.'); }
+        this.catalogCategory = category; this.catalogOpen = open; this.Refresh (); return { category, open, designs : ListProductDesigns (category) };
+    }
+    SelectDesign (id)
+    {
+        if (this.Blocked ()) { throw new Error ('Open an editable idle session.'); }
+        const next = ProductDesign (id); ValidateProductArtwork (next, this.artwork?.Inspect () || []);
+        if (next.family !== this.draft.family && this.artwork?.entries.length) { throw new Error ('Remove artwork before changing product family.'); }
+        this.draft = next; this.Refresh (); return this.Inspect ();
     }
     Reset ()
     {
@@ -49,7 +62,7 @@ export class PrimaryProductsPanel
                 }
                 const url = new URL (moduleUrl); if (this.attempts) { url.searchParams.set ('retry', String (this.attempts)); } this.attempts = (this.attempts || 0) + 1;
                 const module = await import (url.href); if (module.PrimaryProductsAPIVersion !== 1) { throw new Error ('Unsupported Primary Products module.'); } this.module = module; this.panel.replaceChildren ();
-                this.workspace = new module.PrimaryProductsPanel ({ inspect : () => this.Inspect (), configure : changes => this.Configure (changes), reset : () => this.Reset (), generate : () => this.products.Generate (), update : () => this.products.Generate (true), loadSelected : () => this.products.LoadSelected (), artworkOpen : () => this.artwork.Open (), artworkRemove : zone => this.artwork.Remove ({ zone }), artworkMapping : args => this.artwork.Mapping (args), artworkPreview : zone => { if (this.previewUrl) { URL.revokeObjectURL (this.previewUrl); this.previewUrl = null; } const a = this.artwork.entries.find (a => a.zone === zone), r = a && this.artwork.resources.get (a.resourceId); if (r) { this.previewUrl = URL.createObjectURL (new Blob ([r.buffer], { type : a.mime })); } return this.previewUrl; }, units : () => this.website.preferences.units, blocked : () => this.Blocked () }, this.panel);
+                this.workspace = new module.PrimaryProductsPanel ({ catalog : (category, open) => this.Catalog (category, open), selectDesign : id => this.SelectDesign (id), inspect : () => this.Inspect (), configure : changes => this.Configure (changes), reset : () => this.Reset (), generate : () => this.products.Generate (), update : () => this.products.Generate (true), loadSelected : () => this.products.LoadSelected (), artworkOpen : () => this.artwork.Open (), artworkRemove : zone => this.artwork.Remove ({ zone }), artworkMapping : args => this.artwork.Mapping (args), artworkPreview : zone => { if (this.previewUrl) { URL.revokeObjectURL (this.previewUrl); this.previewUrl = null; } const a = this.artwork.entries.find (a => a.zone === zone), r = a && this.artwork.resources.get (a.resourceId); if (r) { this.previewUrl = URL.createObjectURL (new Blob ([r.buffer], { type : a.mime })); } return this.previewUrl; }, units : () => this.website.preferences.units, blocked : () => this.Blocked () }, this.panel);
             })().catch (error => { this.loading = null; this.panel.textContent = error.message; throw error; });
         }
         await this.loading; this.Refresh ();
