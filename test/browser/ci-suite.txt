@@ -14,6 +14,7 @@ dimensions
 errorlogs-panel
 feedback
 fold-actions
+fold-camera-fit
 format-libraries
 library-sharing
 lighting-isolation

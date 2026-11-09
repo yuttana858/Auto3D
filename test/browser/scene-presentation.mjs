@@ -19,7 +19,8 @@ try {
     await page.screenshot ({ path : 'work/fold-camera-flat-endpoint.png' });
     await call ('packaging.fefco.camera', { autoFit : false }); const manual = await call ('camera.current.inspect');
     await call ('packaging.fefco.animate', { duration : 1 }); await wait ('packaging.fefco.playback.inspect', state => state.state === 'completed');
-    const unchanged = await call ('camera.current.inspect'); for (const key of ['eye', 'center', 'up']) { assert.deepEqual (unchanged[key], manual[key]); }
+    // Auto-fit off must not move the camera; allow only floating-point rounding.
+    const unchanged = await call ('camera.current.inspect'); for (const key of ['eye', 'center', 'up']) { assert.ok (unchanged[key].every ((value, index) => Math.abs (value - manual[key][index]) < 1e-6), key + ' moved: ' + JSON.stringify ([unchanged[key], manual[key]])); }
     await call ('view.focus');
     const original = (await call ('scene.inspect')).objects[0];
     const creation = call ('object.array', { width : 3, length : 2, height : 2, duration : 6, autoFit : true });

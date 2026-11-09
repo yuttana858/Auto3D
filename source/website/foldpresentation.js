@@ -3,7 +3,7 @@ import { LoadPackagingModule, PackagingModel, ApplyFefcoFoldPose, FefcoSurfaces,
 import { FefcoProfile, ValidateFefco } from '../../modules/packaging/src/fefco.js';
 import { ConvertModelToThreeObject, ModelToThreeConversionParams, ModelToThreeConversionOutput } from '../engine/threejs/threeconverter.js';
 import { TimelineFoldSample } from './timelineactions.js';
-import { FoldCameraFrame, CameraBottomInset } from './foldcamera.js';
+import { FoldCameraFrame, CameraBottomInset, VisibleBounds } from './foldcamera.js';
 export function BaseFoldPose (object)
 {
     const manual = Number (object.userData?._auto3dFoldPreview); if (object.userData?._auto3dFoldPreview !== undefined && Number.isFinite (manual) && manual >= 0 && manual <= 1) { return manual; }
@@ -60,7 +60,7 @@ export class FoldPresentation
             const manual = this.manual.get (record.object.id); const hasSaved = record.object.userData?._auto3dFoldPreview !== undefined;
             if (manual !== undefined || sample || hasSaved) {
                 this.SetPose (record, manual ?? sample?.pose ?? BaseFoldPose (record.object));
-                if (sample && record.object.visible) { active.push (sample); currentBounds.union (new Box3 ().setFromObject (record.preview)); }
+                if (sample && record.object.visible) { active.push (sample); currentBounds.union (VisibleBounds (record.preview)); }
             } else { record.preview.visible = false; record.children.forEach (([child, visible]) => { child.visible = visible; }); }
         }
         editor.website.viewModes?.Refresh ();
@@ -68,7 +68,7 @@ export class FoldPresentation
         const key = active.map (sample => sample.action.id).join (':');
         if (!this.cameraRun || this.cameraRun.key !== key || time < this.cameraRun.time) { this.cameraRun = { key, initial : editor.website.viewer.GetCamera ().Clone (), time, manual : false }; editor.website.viewer.navigation.StopCameraMovement?.(); }
         const run = this.cameraRun; run.time = time;
-        if (!run.manual && !currentBounds.isEmpty ()) { const size = editor.website.viewer.GetImageSize (); const sphere = currentBounds.getBoundingSphere (new Sphere ()); const progress = Math.min (...active.map (sample => sample.progress)); editor.website.viewer.SetCamera (FoldCameraFrame (run.initial, sphere, 0, progress, size.width / size.height, CameraBottomInset (editor.website.viewer, editor.status))); }
+        if (!run.manual && !currentBounds.isEmpty ()) { const size = editor.website.viewer.GetImageSize (); const sphere = currentBounds.getBoundingSphere (new Sphere ()); const progress = Math.min (...active.map (sample => sample.progress)); editor.website.viewer.SetCamera (FoldCameraFrame (run.initial, sphere, 0, progress, size.width / size.height, CameraBottomInset (editor.website.viewer, editor.status), currentBounds)); }
     }
     WithOriginal (object, callback)
     {
