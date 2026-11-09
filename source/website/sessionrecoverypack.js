@@ -32,6 +32,7 @@ export function PackRecoverySnapshot (snapshot)
     }), children : node.children.map (packNode) });
     const nodes = snapshot.objects.map ((object) => packNode (object.node));
     return {
+        dimensions : snapshot.dimensions || [], dimensionsVisible : snapshot.dimensionsVisible !== false,
         format : 'SW Auto3D', version : SessionVersion, metadata : { savedAt : new Date ().toISOString () }, kind : snapshot.kind || 'session', name : snapshot.name, view : snapshot.view, packaging : snapshot.packaging || null,
         objects : snapshot.objects.map ((object) => {
             const { node, ...data } = object;

@@ -26,6 +26,7 @@ multiwall-glue
 popup-fonts
 preview-context-lifecycle
 primary-products
+dimensions
 render-workspace
 rendercore-state
 saved-rsc-materials

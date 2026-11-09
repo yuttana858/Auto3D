@@ -135,3 +135,5 @@ export function StartEmbed ()
 }
 
 import './css/primaryproducts.css';
+
+import './css/dimensions.css';

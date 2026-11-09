@@ -57,6 +57,7 @@ export function DropToFloorDelta (box, upVector)
 const Icons = {
     'primary-products' : '<path d="M6 2h5v4l2 4v12H4V10l2-4ZM4 14h9M17 7q4-2 7 0v14q-4 2-7 0ZM17 9q4 2 7 0"/>',
     packaging : '<path d="M3 4h18v16H3Z M8 4v16 M16 4v16 M3 10h18"/>',
+    dimension : '<path d="M4 3v18M20 3v18M4 12h16M8 8l-4 4 4 4m8-8 4 4-4 4"/>',
     select : '<path d="m6 3 13 10-7 1-3 7Z"/>', move : '<path d="M12 2v20M2 12h20m-13-7 3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3m14-6 3 3-3 3"/>',
     rotate : '<path d="M20 8a9 9 0 1 0 1 8M20 3v6h-6"/>', scale : '<path d="M4 13v7h7M13 4h7v7M4 20l16-16"/>', duplicate : '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M15 8V4H4v11h4"/>',
     visible : '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>', remove : '<path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/>',
@@ -97,7 +98,7 @@ export class SessionEditor
             if (!active && panControlsEnabled !== null) { this.controls.enabled = panControlsEnabled; panControlsEnabled = null; }
         };
         const render = viewer.onRender;
-        viewer.SetRenderHandler ((camera) => { if (render) { render (camera); } if (this.controls.camera !== camera) { this.controls.camera = camera; } });
+        viewer.SetRenderHandler ((camera) => { if (render) { render (camera); } if (this.controls.camera !== camera) { this.controls.camera = camera; } this.website.dimensions?.Draw (camera); });
         this.controls.addEventListener ('change', () => this.RequestInteractionRender ());
         this.controls.addEventListener ('dragging-changed', (event) => {
             viewer.navigation.enabled = !event.value; viewer.navigation.clickDetector.Cancel ();
@@ -230,7 +231,7 @@ export class SessionEditor
 
     ModelTools ()
     {
-        return [['ai', 'AI Generative', () => this.website.aiWorkspace?.Open ()], ['packaging', 'Packaging design', () => this.website.packagingPanel?.Open ()], ['primary-products', 'Primary Products', () => this.website.primaryProductsPanel?.Open ()], ['select', 'Select (V)', () => this.SetMode ('select')], ['move', 'Move (W)', () => this.SetMode ('translate')], ['rotate', 'Rotate (E)', () => this.SetMode ('rotate')], ['scale', 'Scale (R)', () => this.SetMode ('scale')], ['duplicate', 'Duplicate object (Ctrl+D)', () => this.Duplicate ()], ['array', 'Array selected object', () => this.ArrayDialog ()], ['floor', 'Drop selected object to floor', () => this.DropToFloor ()], ['visible', 'Hide or show object (H)', () => this.ToggleVisibility ()], ['remove', 'Delete object', () => this.Delete ()], ['focus', 'Focus object (F)', () => this.Focus ()], ['fit', 'Fit all objects to screen', () => this.FitScene ()], ['update', 'Update selected model', () => this.UpdateModel ()], ['undo', 'Undo object edit (Ctrl+Z)', () => this.Undo ()], ['redo', 'Redo object edit (Ctrl+Shift+Z)', () => this.Redo ()], ['add', 'Add model', () => this.AddModel ()], ['save', 'Save or open session (Ctrl+S)', () => this.library.SaveDialog (true)], ['export', 'Export', () => this.Export ()], ['library', 'Model library', () => this.library.Open ()]];
+        return [['ai', 'AI Generative', () => this.website.aiWorkspace?.Open ()], ['packaging', 'Packaging design', () => this.website.packagingPanel?.Open ()], ['primary-products', 'Primary Products', () => this.website.primaryProductsPanel?.Open ()], ['select', 'Select (V)', () => this.SetMode ('select')], ['move', 'Move (W)', () => this.SetMode ('translate')], ['rotate', 'Rotate (E)', () => this.SetMode ('rotate')], ['scale', 'Scale (R)', () => this.SetMode ('scale')], ['dimension', 'Dimensions · drag an edge', () => this.website.dimensions.SetActive (!this.website.dimensions.active)], ['duplicate', 'Duplicate object (Ctrl+D)', () => this.Duplicate ()], ['array', 'Array selected object', () => this.ArrayDialog ()], ['floor', 'Drop selected object to floor', () => this.DropToFloor ()], ['visible', 'Hide or show object (H)', () => this.ToggleVisibility ()], ['remove', 'Delete object', () => this.Delete ()], ['focus', 'Focus object (F)', () => this.Focus ()], ['fit', 'Fit all objects to screen', () => this.FitScene ()], ['update', 'Update selected model', () => this.UpdateModel ()], ['undo', 'Undo object edit (Ctrl+Z)', () => this.Undo ()], ['redo', 'Redo object edit (Ctrl+Shift+Z)', () => this.Redo ()], ['add', 'Add model', () => this.AddModel ()], ['save', 'Save or open session (Ctrl+S)', () => this.library.SaveDialog (true)], ['export', 'Export', () => this.Export ()], ['library', 'Model library', () => this.library.Open ()]];
     }
 
     ToolDisabled (key)
@@ -613,7 +614,7 @@ export class SessionEditor
         apply ('after'); this.history.Push ({ undo : () => apply ('before'), redo : () => apply ('after') }); return { objectIds : objects.map ((object) => object.id) };
     }
 
-    SetMode (mode) { if (this.readOnly && mode !== 'select') { return; } this.SetRotationAxisOverride (null); this.mode = mode; this.Select (this.selected, false, true); }
+    SetMode (mode) { if (this.website.dimensions?.active) { this.website.dimensions.SetActive (false); } if (this.readOnly && mode !== 'select') { return; } this.SetRotationAxisOverride (null); this.mode = mode; this.Select (this.selected, false, true); }
     SetRotationAxisOverride (axis)
     {
         if (axis !== null && !['X', 'Y', 'Z'].includes (axis)) { throw new Error ('Choose X, Y or Z.'); }
@@ -708,11 +709,13 @@ export class SessionEditor
     }
     RefreshButtons ()
     {
+        this.website?.dimensions?.Draw (this.website.viewer.camera);
         this.website?.primaryProductsPanel?.RefreshAvailability ();
         this.processing?.Sync (this.busy && !this.packaging?.foldOperation && !this.packaging?.dimensionUpdating && this.arrayOperation?.stage !== 'revealing' && !this.website?.rendering?.running); this.commandBar?.SetBusy (this.busy);
         this.website?.packagingPanel?.fefcoPanel?.SetDisabled ();
         for (const [key, button] of this.buttons) {
             button.disabled = this.ToolDisabled (key) || button.hasAttribute?.('aria-busy') === true;
+            if (key === 'dimension') { button.setAttribute ('aria-pressed', String (this.website.dimensions?.active === true)); }
             if (['select', 'move', 'rotate', 'scale'].includes (key)) { button.setAttribute ('aria-pressed', String ((key === 'move' ? 'translate' : key) === this.mode)); }
         }
         const groupButtons = this.objectList?.querySelectorAll ('.selection_group_tools button');

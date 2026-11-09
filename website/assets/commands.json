@@ -3026,6 +3026,247 @@
       "example": {}
     },
     {
+      "id": "dimensions.tool",
+      "title": "Dimension tool",
+      "category": "Dimensions",
+      "description": "Activate edge-drag dimensions or close the tool. Read-only viewing of existing annotations remains available.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "active"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "active": true
+      }
+    },
+    {
+      "id": "dimensions.inspect",
+      "title": "Inspect live dimensions",
+      "category": "Dimensions",
+      "description": "Read linked source geometry lengths, placed lengths, stale references and layer visibility. CAD source lengths are in millimeters; no screen-distance estimates.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "dimensions.edges",
+      "title": "List dimensionable edges",
+      "category": "Dimensions",
+      "description": "List source CAD segments or genuine boundary/crease edges, excluding coplanar triangle diagonals. Returns stable anchors for dimensions.add.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "objectId"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "objectId": "object-id",
+        "offset": 0,
+        "limit": 25
+      }
+    },
+    {
+      "id": "dimensions.add",
+      "title": "Add linked dimension",
+      "category": "Dimensions",
+      "description": "Create one undoable annotation from an anchor returned by dimensions.edges. The offset is a bounded screen-space bracket distance in pixels; the measured length always comes from source geometry.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "anchor": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "cad",
+                  "edge"
+                ]
+              },
+              "objectId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "pathId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "segment": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 200000
+              },
+              "pathSize": {
+                "type": "integer",
+                "minimum": 2,
+                "maximum": 200000
+              },
+              "mesh": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 200000
+              },
+              "meshName": {
+                "type": "string",
+                "maxLength": 1000
+              },
+              "topology": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{8}$",
+                "maxLength": 8
+              },
+              "a": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000000
+              },
+              "b": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000000
+              }
+            },
+            "required": [
+              "kind",
+              "objectId"
+            ]
+          },
+          "offset": {
+            "type": "number",
+            "minimum": -2000,
+            "maximum": 2000
+          }
+        },
+        "required": [
+          "anchor"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "anchor": {
+          "kind": "cad",
+          "objectId": "object-id",
+          "pathId": "outline",
+          "pathSize": 4,
+          "segment": 0
+        },
+        "offset": 40
+      }
+    },
+    {
+      "id": "dimensions.offset",
+      "title": "Move dimension bracket",
+      "category": "Dimensions",
+      "description": "Change the bracket offset without changing geometry or its authoritative length. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "offset": {
+            "type": "number",
+            "minimum": -2000,
+            "maximum": 2000
+          }
+        },
+        "required": [
+          "id",
+          "offset"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "dimension-id",
+        "offset": 60
+      }
+    },
+    {
+      "id": "dimensions.delete",
+      "title": "Delete dimension",
+      "category": "Dimensions",
+      "description": "Remove a linked annotation with one Undo step; source geometry remains unchanged.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "dimension-id"
+      }
+    },
+    {
+      "id": "dimensions.layer.visible",
+      "title": "Dimensions layer visibility",
+      "category": "Dimensions",
+      "description": "Show or hide the saved Dimensions layer under Layers. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "visible": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "visible"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "visible": false
+      }
+    },
+    {
       "id": "view.focus",
       "title": "Focus object",
       "category": "View",

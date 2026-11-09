@@ -8,7 +8,7 @@ function SnapshotNode (node)
 export function RecoverySnapshot (document, view, kind = 'session', name = document.name)
 {
     return {
-        name, kind, view, packaging : kind === 'session' ? document.packaging : null, unit : document.model.unit, properties : document.model.propertyGroups,
+        name, kind, view, dimensions : (document.dimensions || []).filter (d => document.objects.some (o => o.id === d.objectId)).map (d => ({ ...d })), dimensionsVisible : document.dimensionsVisible !== false, packaging : kind === 'session' ? document.packaging : null, unit : document.model.unit, properties : document.model.propertyGroups,
         meshes : document.model.meshes, materials : document.model.materials,
         objects : document.objects.map ((object) => {
             const { threeObject, player, node, animationError, ...data } = object;
