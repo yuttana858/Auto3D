@@ -9,7 +9,7 @@ try {
     await page.route ('**/api/preferences', (route) => route.fulfill ({ json : { preferences : { units : 'metric' }, folders : [] } }));
     await page.route ('**/api/accounts/**', (route) => route.fulfill ({ json : { isAdmin : false, requests : [] } }));
     await page.route ('**/api/environments', (route) => route.fulfill ({ json : [] }));
-    await page.goto ('http://127.0.0.1:8080/website/index.html', { waitUntil : 'domcontentloaded' }); await page.locator ('#startup_splash').waitFor ({ state : 'detached' });
+    await page.goto ('http://127.0.0.1:8080/website/index.html', { waitUntil : 'domcontentloaded' }); await page.locator ('#startup_splash').waitFor ({ state : 'detached' }); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked')); /* the welcome screen can close before sign-in is restored */
     const call = async (id, args = {}) => { const response = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (response.ok, true, response.error?.message); return response.result; };
     await call ('packaging.path.add', { points : [[0, 0], [100, 0], [100, 60], [0, 60]], type : 'cut', closed : true, units : 'mm' }); await call ('packaging.board', { thickness : 20, units : 'mm' }); await call ('packaging.extrude'); await call ('view.fit');
     const viewport = await CaptureForChat (page, { scope : 'viewport', maxSize : 800 }); assert.ok (viewport.structuredContent.width <= 800); await writeFile ('work/agent-viewport-capture.png', Buffer.from (viewport.content[0].data, 'base64'));

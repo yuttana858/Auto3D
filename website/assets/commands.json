@@ -401,6 +401,20 @@
       }
     },
     {
+      "id": "auth.continue",
+      "title": "Continue from the landing page",
+      "category": "Account",
+      "description": "Leave the combined landing and sign-in page and open the workspace with the saved sign-in. Requires a signed-in account; returns continued false otherwise. Does not sign in.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
       "id": "auth.open",
       "title": "Open account sign-in",
       "category": "Account",

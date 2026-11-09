@@ -2,7 +2,11 @@
 
 ## Planar dimension brackets — Auto3D 0.54.0 / Packaging 1.10.4 / Primary Products 0.5.0
 
-Replaces camera-dependent pixel placement with adjoining-plane 3D placement. Adds editable generated-box OD (folded) and ID (CAD), semantic rebuild/unfold links, Undo and shared MCP commands. See [release-0540.md](release-0540.md). Based on main after merged #88; not deployed.
+Replaces camera-dependent pixel placement with adjoining-plane 3D placement. Adds editable generated-box OD (folded) and ID (CAD), semantic rebuild/unfold links, Undo and shared MCP commands. See [release-0540.md](release-0540.md). PR #90, updated with merged #89; not deployed.
+
+## Landing sign-in, right-drag sideways pan, closer fold framing — Auto3D 0.53.1 / Packaging 1.10.4 / Primary Products 0.5.0 (2026-11-09)
+
+The welcome scene and sign-in are one landing page that waits for the user to sign in or continue with a saved sign-in (`auth.continue`). Main-viewer right-drag left/right now pans the camera sideways instead of orbiting; vertical right-drag still tilts and the mini viewer keeps full orbit. Fold/unfold auto-fit frames the current pose's visible meshes with a projected crop and re-frames the finished box (closed 0201 box: 18% × 24% of the view → about 53% × 64%). Seven browser tests now wait for sign-in after the welcome screen; `selected-orbit` and `fold-camera-fit` join CI. See [release-0531.md](release-0531.md).
 
 ## Source-linked model dimensions — Auto3D 0.53.0 / Primary Products 0.5.0 / Packaging 1.10.4
 

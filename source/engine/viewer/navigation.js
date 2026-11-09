@@ -255,6 +255,8 @@ export class Navigation
         this.spacePan = false;
         this.panGesture = false;
         this.orbitCenter = null; this.rightOrbitStarted = false; this.heldOrbitAxes = [];
+        // When true, the horizontal part of a right-drag pans the camera sideways instead of orbiting; vertical movement still tilts.
+        this.rightDragPansHorizontally = false;
 
 		if (this.canvas.addEventListener) {
 			this.canvas.addEventListener ('mousedown', this.OnMouseDown.bind (this));
@@ -467,7 +469,8 @@ export class Navigation
 
 		let navigationType = NavigationType.None;
         // Auto3D desktop navigation:
-        // left = selection click only, middle-drag = pan, right-drag = orbit.
+        // left = selection click only, middle-drag = pan, right-drag = orbit
+        // (or, with rightDragPansHorizontally, sideways pan plus vertical tilt).
         if (mouseButton === 2 || (mouseButton === 1 && this.panGesture)) {
             navigationType = NavigationType.Pan;
         } else if (mouseButton === 3) {
@@ -477,7 +480,11 @@ export class Navigation
             }
         }
 
-		if (navigationType === NavigationType.Orbit) {
+		if (navigationType === NavigationType.Orbit && mouseButton === 3 && this.rightDragPansHorizontally) {
+			let panRatio = 0.001 * CoordDistance3D (this.camera.eye, this.camera.center);
+			if (moveDiff.x !== 0) { this.Pan (moveDiff.x * panRatio, 0); }
+			if (moveDiff.y !== 0) { this.Orbit (0, moveDiff.y * 0.5); }
+		} else if (navigationType === NavigationType.Orbit) {
 			let orbitRatio = 0.5;
 			this.Orbit (moveDiff.x * orbitRatio, moveDiff.y * orbitRatio);
 		} else if (navigationType === NavigationType.Pan) {

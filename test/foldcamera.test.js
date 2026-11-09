@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { Camera } from '../source/engine/viewer/camera.js';
 import { Coord3D } from '../source/engine/geometry/coord3d.js';
-import { FoldCameraFrame, FoldMotionProgress, CameraBottomInset } from '../source/website/foldcamera.js';
+import { FoldCameraFrame, FoldMotionProgress, CameraBottomInset, VisibleBounds, FoldFitMargin } from '../source/website/foldcamera.js';
+import * as THREE from 'three';
 import { SessionTimeline } from '../source/website/sessiontimeline.js';
 import { PackagingWorkspace } from '../source/website/packagingworkspace.js';
 import { SceneHistory } from '../source/website/scenedocument.js';
@@ -30,6 +31,26 @@ describe ('Smooth folding camera', () => {
         assert.ok (distance <= previous / 1.5); assert.ok (distance >= safe);
         assert.deepEqual (frame, FoldCameraFrame (camera (), sphere, 20, .5, 1));
         assert.deepEqual ([frame.center.x, frame.center.y, frame.center.z], [30, 40, 10]);
+    });
+    it ('Measures visible meshes in their current pose, not cached flat bounds or hidden helpers', () => {
+        const root = new THREE.Group (); const panel = new THREE.Mesh (new THREE.BoxGeometry (10, 10, 10)); const hidden = new THREE.Mesh (new THREE.BoxGeometry (1000, 1, 1));
+        hidden.visible = false; root.add (panel, hidden); panel.geometry.computeBoundingBox ();
+        const position = panel.geometry.attributes.position; for (let i = 0; i < position.count; i++) { position.setX (i, position.getX (i) + 100); } position.needsUpdate = true;
+        const bounds = VisibleBounds (root);
+        assert.deepEqual ([bounds.min.x, bounds.max.x], [95, 105]); assert.equal (new THREE.Box3 ().setFromObject (root).max.x > 105, true, 'setFromObject keeps the stale flat bounds');
+    });
+    it ('Crops the projected box closely instead of fitting its bounding sphere', () => {
+        const initial = camera (); const bounds = new THREE.Box3 (new THREE.Vector3 (-150, 0, -100), new THREE.Vector3 (150, 150, 100)); const sphere = bounds.getBoundingSphere (new THREE.Sphere ());
+        const aspect = 1.6, fit = FoldCameraFrame (initial, sphere, 0, 1, aspect, 0, bounds), loose = FoldCameraFrame (initial, sphere, 0, 1, aspect, 0);
+        const distance = c => Math.hypot (c.eye.x - c.center.x, c.eye.y - c.center.y, c.eye.z - c.center.z);
+        assert.ok (distance (fit) < distance (loose), distance (fit) + ' vs ' + distance (loose));
+        const sheet = new THREE.Box3 (new THREE.Vector3 (-35, 0, -250), new THREE.Vector3 (1000, 3, 100));
+        assert.ok (distance (FoldCameraFrame (initial, sheet.getBoundingSphere (new THREE.Sphere ()), 0, 1, aspect, 0, sheet)) < distance (FoldCameraFrame (initial, sheet.getBoundingSphere (new THREE.Sphere ()), 0, 1, aspect, 0)) * 0.8, 'a flat dieline is cropped much closer than its sphere');
+        // Every corner lies inside the view, and the tightest one touches the margin.
+        const three = new THREE.PerspectiveCamera (45, aspect, 1, 100000); three.position.set (fit.eye.x, fit.eye.y, fit.eye.z); three.up.set (0, 1, 0); three.lookAt (fit.center.x, fit.center.y, fit.center.z); three.updateMatrixWorld (); three.updateProjectionMatrix ();
+        let extent = 0;
+        for (const x of [-150, 150]) { for (const y of [0, 150]) { for (const z of [-100, 100]) { const p = new THREE.Vector3 (x, y, z).project (three); assert.ok (Math.abs (p.x) <= 1 && Math.abs (p.y) <= 1); extent = Math.max (extent, Math.abs (p.x), Math.abs (p.y)); } } }
+        assert.ok (extent > FoldFitMargin - 0.08 && extent <= FoldFitMargin + 0.01, 'extent ' + extent);
     });
     it ('Keeps the camera unchanged during manual scrub even with auto-fit enabled', async () => {
         const object = { id : 'box', userData : { _auto3dFefco : '{}' } }, initial = camera (), cameraState = JSON.stringify (initial); let fits = 0, stopped = 0, cameraWrites = 0;

@@ -8,9 +8,9 @@ import { DisplayUnitLabel } from './preferences.js';
 import { DefaultFefco, ValidateFefco, FefcoProfile, FefcoPreset, FefcoAnimationPlan } from '../../modules/packaging/src/fefco.js';
 import { EngineeringAxes, DefaultEngineering, EngineeringMeasurements, EditEngineering, ScoreForTarget, DrivePathDimension } from '../../modules/packaging/src/engineering.js';
 import { FefcoDimensions, ResolveFefcoDimensions } from '../../modules/packaging/src/dimensions.js';
-import { Box3, Sphere } from 'three';
+import { Sphere } from 'three';
 import { LoadPackagingModule, PackagingModel, FefcoSurfaces, ApplyFefcoFoldPose, BoardAppearanceMaterialChanges, PreparePackagingPresentations, ApplyPackagingPresentation } from './packagingadapter.js';
-import { FoldMotionProgress, FoldCameraFrame, CameraBottomInset } from './foldcamera.js';
+import { FoldMotionProgress, FoldCameraFrame, CameraBottomInset, VisibleBounds } from './foldcamera.js';
 import { ApplyCameraState } from './sessiontimeline.js';
 
 
@@ -200,7 +200,7 @@ export class PackagingWorkspace
                 const motion = FoldMotionProgress (progress, autoFit); const pose = module.FefcoFoldPose (rig, plan.from + (plan.to - plan.from) * motion); operation.stage = plan.action === 'unfold' ? ({ 'closing top' : 'opening top', 'closing base' : 'opening base', 'erecting walls' : 'unwrapping walls' }[pose.stage] || pose.stage) : pose.stage;
                 if (preview.threeObject) {
                     ApplyFefcoFoldPose (preview.threeObject, rig, pose, unit);
-                    if (operation.cameraAutoFit && cameraBefore) { const viewer = editor.website.viewer; const sphere = new Box3 ().setFromObject (preview.threeObject).getBoundingSphere (new Sphere ()); const size = viewer.GetImageSize (); viewer.SetCamera (FoldCameraFrame (cameraBefore, sphere, 0, progress, size.width / size.height, CameraBottomInset (viewer, editor.status))); }
+                    if (operation.cameraAutoFit && cameraBefore) { const viewer = editor.website.viewer; const bounds = VisibleBounds (preview.threeObject); const sphere = bounds.getBoundingSphere (new Sphere ()); const size = viewer.GetImageSize (); viewer.SetCamera (FoldCameraFrame (cameraBefore, sphere, 0, progress, size.width / size.height, CameraBottomInset (viewer, editor.status), bounds)); }
                     else if (!operation.cameraManual && editor.timeline?.cameraKeyframes?.length) { const timeline = editor.timeline; ApplyCameraState (editor.website.viewer, timeline.CameraStateAt (timeline.rangeStart + progress * (timeline.rangeEnd - timeline.rangeStart))); }
                     else { editor.website.viewer.Render (); }
                 } else { editor.website.viewer?.Render (); } editor.Status ('Folding · ' + operation.stage + ' · ' + Math.round (progress * 100) + '%'); editor.website.packagingPanel?.fefcoPanel?.RefreshPlayback ();
@@ -210,11 +210,27 @@ export class PackagingWorkspace
                 if (!result.completed) { await restore (); this.lastFold = { state : 'cancelled', progress : 0, objectId : source.id }; editor.Status ('Folding cancelled · original object restored'); return; }
                 const next = { ...parameters, closure : plan.targetClosure }; const data = plan.targetState === 'flat' ? module.UnfoldFefco (next, profile) : module.CreateFefcoBox (next, profile); final = target.AddImported (PackagingModel (data, unit, surfaces), source.name.replace (/ · (Dieline|Folded|Open|Closed)$/, '') + (plan.targetState === 'flat' ? ' · Dieline' : plan.targetClosure === 'open' ? ' · Open' : ' · Closed')); assign (final, plan.targetState, data.parameters); final.source = 'FEFCO ' + parameters.code + ' ' + plan.targetState;
                 target.Remove (final); target.Remove (preview); target.Restore (final, index); target.packaging = profile; editor.selected = final; await editor.Render ();
+                await this.FitFoldResult (operation, final);
                 const apply = async forward => { target.Remove (forward ? source : final); target.Restore (forward ? final : source, index); target.packaging = forward ? profile : before; editor.selected = forward ? final : previous; await editor.Render (true); this.Refresh (); editor.website.packagingPanel?.Refresh (); };
                 editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); this.lastFold = { state : 'completed', progress : 1, stage : plan.stages.at (-1), action : plan.action, objectId : final.id }; editor.Status ('Folding complete · ' + plan.stages.at (-1) + ' · Undo available');
             }).catch (async error => { try { await restore (); } catch { /* Retain the playback error. */ } this.lastFold = { state : 'failed', progress : 0, error : error.message }; editor.website.errorLogs?.Record ('error', 'packaging-fold', error.message); editor.Status (error.message); }).finally (() => { removeCameraListeners (); this.foldOperation = null; editor.UpdateSelectionBox?.(); editor.busy = false; editor.RefreshButtons?.(); this.Refresh (); editor.website.packagingPanel?.Refresh (); });
             editor.website.packagingPanel?.fefcoPanel?.RefreshPlayback (); return { started : true, objectId : source.id, duration, action : plan.action, stages : plan.stages, clearance };
         } catch (error) { removeCameraListeners (); try { await restore (); } finally { this.foldOperation = null; editor.busy = false; editor.RefreshButtons?.(); } throw error; }
+    }
+    // The finished object replaces the animated preview; ease the camera to frame it closely.
+    // Completion is reported only after this settles, so a following inspect or capture sees the final view.
+    async FitFoldResult (operation, object)
+    {
+        const viewer = this.editor.website.viewer;
+        if (!operation.cameraAutoFit || operation.cameraManual || !object?.threeObject || !viewer?.navigation) { return false; }
+        const bounds = VisibleBounds (object.threeObject); if (bounds.isEmpty ()) { return false; }
+        const size = viewer.GetImageSize (); const frame = FoldCameraFrame (viewer.GetCamera (), bounds.getBoundingSphere (new Sphere ()), 0, 1, size.width / size.height, CameraBottomInset (viewer, this.editor.status), bounds);
+        const navigation = viewer.navigation; navigation.MoveCamera (frame, viewer.settings?.animationSteps ?? 0);
+        if (navigation.WaitForCameraMovement) {
+            let timer = null; const settled = await Promise.race ([navigation.WaitForCameraMovement ().then (() => true), new Promise (resolve => { timer = setTimeout (() => resolve (false), 3000); })]);
+            clearTimeout (timer); if (!settled) { navigation.FinishCameraMovement (); }
+        }
+        return true;
     }
     SetFoldCameraAutoFit (autoFit)
     {
