@@ -1,4 +1,4 @@
-# Auto3D 0.51.1 / Packaging 1.10.3 / Primary Products 0.4.0
+# Auto3D 0.51.1 / Packaging 1.10.4 / Primary Products 0.4.0
 
 Follow-up to PR #85 (0.51.0), which merged before its last commit and before the new browser CI job finished.
 
@@ -23,4 +23,9 @@ The first CI run of the `browser` job failed five tests:
 - `primary-products` (and `mcp-access`, which runs in the MCP workflow) had a comment added in 0.51.0 that also commented out the wait for sign-in; fixed.
 - `animation` captured a camera keyframe before `view.focus` finished moving the camera; fixed by the command change above.
 
-The full CI list (`test/browser/ci-suite.txt`, now including `format-libraries`) passes locally from a clean build, run serially as in CI.
+The second CI run failed two different tests, both reproduced locally under parallel load:
+
+- `board-panel-visibility`: board-surface controls could look enabled while the editor was busy after a fold scrub, and `SessionEditor.Run` ignores actions while busy, so the click was dropped silently and the checkbox reverted. Packaging 1.10.4 refreshes those controls on every busy-state change and shows a wait message if a change still arrives while busy.
+- `scene-presentation`: the test inspected and paused the array reveal in separate round trips; a slow runner finished the 6 s reveal in between. It now inspects and pauses in one page task, as its cancellation step already did.
+
+Both pass in two stress rounds (three board tests and two scene tests in parallel). The full CI list (`test/browser/ci-suite.txt`, now including `format-libraries`) passes locally from a clean build, run serially as in CI.
