@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Planar dimension brackets — Auto3D 0.54.0 / Packaging 1.10.4 / Primary Products 0.5.0
+
+Replaces camera-dependent pixel placement with adjoining-plane 3D placement. Adds editable generated-box OD (folded) and ID (CAD), semantic rebuild/unfold links, Undo and shared MCP commands. See [release-0540.md](release-0540.md). Based on main after merged #88; not deployed.
+
 ## Source-linked model dimensions — Auto3D 0.53.0 / Primary Products 0.5.0 / Packaging 1.10.4
 
 Adds the edge-drag dimension tool, live canonical source references and high-contrast brackets. Renames Meshes to Layers and adds a Dimensions visibility/list row, history and file/recovery persistence. See [release-0530.md](release-0530.md). Based on merged #86; not deployed.
