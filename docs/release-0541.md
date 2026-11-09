@@ -1,0 +1,13 @@
+# Auto3D 0.54.1 — browser regression suite repaired
+
+Packaging 1.10.5; Primary Products remains 0.5.0. Based on main after merged PR #90. Not deployed.
+
+All 23 browser tests that were outside CI with stale expectations now pass and are part of the CI `browser` job (`test/browser/ci-suite.txt`, 64 tests). They failed because the app had intentionally changed: the board caliper limit is 15 mm, the Packaging designer starts on the select tool, FEFCO style cards generate directly and asynchronously, new boxes default to the inside dimension basis (which needs converter allowance factors outside FEFCO 0201), selected-box dimensions moved to the selected column, Fold/Unfold is one state-aware control, Details, Lighting and Session sections start collapsed, "Apply scale" was replaced by live fields, array reveal and fold playback make the viewer busy, and Auto pixel ratio briefly lowers after camera updates. Tests read the app and module versions from package metadata instead of hard-coded numbers. No test was skipped or loosened to pass; assertions were updated to the documented behavior, and several were strengthened (for example, engineering-linked inside/outside dimensions are checked through `packaging.dimensions.inspect` and `packaging.measurements.inspect`).
+
+Product fix (Packaging 1.10.5): the standalone Packaging preview failed at the end of every animated fold or unfold with "Cannot read properties of undefined (reading 'role')". The fold rig carries only liner and edge materials, so restoring inner and closed materials wrote `undefined` into the material list. The preview now falls back to the original box's materials. The Auto3D host path was not affected.
+
+CI also starts the standalone Packaging preview (port 8082) for `packaging-module`, and waits for it before the run. `ai-extended` (timing-sensitive) and `mcp-access` (covered by the MCP workflow) stay outside the browser job.
+
+Known UX notes, not changed here: `FefcoPreset` silently replaces an invalid 0202 overlap with the default (`packaging.fefco.configure` still rejects it), and an engineering-linked dimension edit sets no status, so an earlier "Enter a converter allowance factor…" message can remain after a later edit succeeds.
+
+Validation: 787 app/module tests, 64 MCP tests and application lint pass; the full 64-test browser suite was run serially against fresh dev, website, Pages and MCP builds.

@@ -95,6 +95,10 @@ Optional presentation meshes add restrained panel bowing, score fillets and comp
 
 `FefcoPanel` uses `animation().action` to label the idle Fold/Unfold button and `playback().state` for Pause/Resume. A host may supply `toggleFold()` to own the shared state-aware action and `playbackBlocked()` to report authentication/read-only restrictions separately from ordinary busy state. Existing hosts without `toggleFold()` use `run(animate)` when idle and `control('pause'/'resume')` during playback. The host's control service must enforce its own editing permissions. Idle playback status/progress/cancel UI is hidden; manufacturing and CAD state remain host-owned.
 
+### Standalone preview fold completion (1.10.5)
+
+The standalone preview restores inner and closed materials from the original box when an animated fold or unfold finishes; previously it wrote undefined entries and failed with a `role` error.
+
 ### Busy-state board surface controls (1.10.4)
 
 `SetDisabled`, which hosts call whenever their busy state changes, also refreshes the board-surface controls. A change that still arrives while the host is busy shows a wait message and restores the control instead of being ignored silently.

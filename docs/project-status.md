@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Browser regression suite repaired — Auto3D 0.54.1 / Packaging 1.10.5 / Primary Products 0.5.0 (2026-11-09)
+
+The 23 stale browser tests now pass against current behavior and joined the CI `browser` job (64 tests). Fixes the standalone Packaging preview's fold/unfold completion error. `ai-extended` and `mcp-access` remain outside the job. See [release-0541.md](release-0541.md).
+
 ## Planar dimension brackets — Auto3D 0.54.0 / Packaging 1.10.4 / Primary Products 0.5.0
 
 Replaces camera-dependent pixel placement with adjoining-plane 3D placement. Adds editable generated-box OD (folded) and ID (CAD), semantic rebuild/unfold links, Undo and shared MCP commands. See [release-0540.md](release-0540.md). PR #90, updated with merged #89; not deployed.
