@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Browser CI and settled view commands — Auto3D 0.51.1 / Packaging 1.10.3 / Primary Products 0.4.0 (2026-11-09)
+
+Fixes the first CI run of the browser job (missing production/Pages/MCP builds, a disabled sign-in wait in two tests) and makes `view.focus`, `view.fit` and `camera.activate` return after the camera settles. Carries the self-hosted Draco/rhino3dm libraries that missed the PR #85 merge. The 36-test CI browser list passes locally from a clean build. See [release-0511.md](release-0511.md).
+
 ## Repair release — Auto3D 0.51.0 / Packaging 1.10.3 / Primary Products 0.4.0 (2026-11-09)
 
 Fixes the 2026-11-06 review findings: MCP account lockout after ~1000 commands, window disconnect on any failed command, generic MCP errors, grant loss during identity outages, stored XSS through model/material names, missing CSP, wrong `mutates` flags, unbounded schemas, shared-key Meshy task visibility, and browser tests stalled at the welcome screen. Adds `macro.cancel`, `session.rename`, `session.recovery.discard` and `object.user_data.delete` (261 commands). Draco and rhino3dm import libraries are now hosted with the site; STEP/IGES and IFC libraries remain on the CDN pending a license decision. See [release-0510.md](release-0510.md) and the [repair plan](repair-plan.md). Real-client MCP production verification remains pending.

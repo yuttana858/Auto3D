@@ -1,6 +1,6 @@
 # Project orientation
 
-Read `docs/project-status.md` for the current release, development log, validation and outstanding work, then `docs/agent-project-overview.md` for architecture and data flows. Production uses Cloudflare Pages Functions, private R2, Supabase account metadata and temporary approved-account sign-in; Microsoft Entra ID remains future work. Main includes merged PR #84 (Auto3D 0.50.2 / Packaging 1.10.3 / Primary Products 0.4.0). The repair candidate is Auto3D 0.51.0 with unchanged modules; see `docs/repair-plan.md`. Report the app version, every module version and the PR number for every new PR. Read `docs/pr16-reconciliation.md` before changing legacy published Library storage. Historical SQL in `database/history/pr16/` must not be replayed.
+Read `docs/project-status.md` for the current release, development log, validation and outstanding work, then `docs/agent-project-overview.md` for architecture and data flows. Production uses Cloudflare Pages Functions, private R2, Supabase account metadata and temporary approved-account sign-in; Microsoft Entra ID remains future work. Main includes merged PR #85 (Auto3D 0.51.0 / Packaging 1.10.3 / Primary Products 0.4.0, the review repair release; see `docs/repair-plan.md`). The follow-up candidate is Auto3D 0.51.1. Report the app version, every module version and the PR number for every new PR. Read `docs/pr16-reconciliation.md` before changing legacy published Library storage. Historical SQL in `database/history/pr16/` must not be replayed.
 
 # Agent-accessible features
 
