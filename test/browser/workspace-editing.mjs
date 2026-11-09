@@ -8,7 +8,7 @@ try {
     await page.route ('**/api/preferences', (route) => route.fulfill ({ json : { preferences : { units : 'metric', theme : 1 }, folders : ['Uncategorized'] } }));
     await page.route ('**/api/personal/items', (route) => route.fulfill ({ json : [] }));
     await page.route ('**/api/auth/session', (route) => route.fulfill ({ json : { user : { id : 'browser-user', email : 'browser@example.com' } } }));
-await page.goto ('http://127.0.0.1:8080/website/index.html', { waitUntil : 'domcontentloaded' });
+await page.goto (process.env.AUTO3D_TEST_URL || 'http://127.0.0.1:8080/website/index.html', { waitUntil : 'domcontentloaded' });
     await page.waitForFunction (() => window.Auto3D);
     await page.waitForFunction (() => !document.querySelector ('#startup_splash'));
     assert.equal (await page.getByText ('Open model URL', { exact : true }).count (), 0);
@@ -24,6 +24,9 @@ await page.locator ('#open_file').setInputFiles ('test/testfiles/animation/anima
     const initial = (await call ('scene.inspect')).objects[0];
     await call ('preferences.units', { units : 'standard' });
     if (await page.locator ('#data_panel_toggle').getAttribute ('aria-expanded') === 'false') { await page.locator ('#data_panel_toggle').click (); }
+    /* Details starts minimized; expand it to reach the W/L/H inputs. */
+    const detailsToggle = page.locator ('.details_collapse'); if (await detailsToggle.getAttribute ('aria-expanded') === 'false') { await detailsToggle.click (); }
+    assert.equal (await detailsToggle.getAttribute ('aria-expanded'), 'true');
     const width = page.getByLabel ('W dimension in inches', { exact : true });
     const before = Number (await width.inputValue ()); assert.ok (before > 0);
     await width.fill (String (before * 2)); await width.dispatchEvent ('change');
@@ -39,7 +42,9 @@ await page.locator ('#open_file').setInputFiles ('test/testfiles/animation/anima
     const canvas = page.locator ('#main_viewer canvas').first (); const box = await canvas.boundingBox (); assert.ok (box);
     await page.mouse.click (box.x + box.width / 2, box.y + box.height / 2, { button : 'right' });
     assert.equal (await page.locator ('.auto3d_context_menu').count (), 1);
-    assert.deepEqual (await page.locator ('.auto3d_context_menu button').allTextContents (), ['Move', 'Rotate', 'Scale', 'Focus', 'Duplicate', 'Hide', 'Delete']);
+    /* The context menu lists every shared model tool (same actions as the tool strip and toolbar); object tools are enabled for the selected model. */
+    assert.deepEqual (await page.locator ('.auto3d_context_menu button').allTextContents (), ['AI Generative', 'Packaging design', 'Primary Products', 'Select (V)', 'Move (W)', 'Rotate (E)', 'Scale (R)', 'Dimensions · drag an edge', 'Duplicate object (Ctrl+D)', 'Array selected object', 'Drop selected object to floor', 'Hide or show object (H)', 'Delete object', 'Focus object (F)', 'Fit all objects to screen', 'Update selected model', 'Undo object edit (Ctrl+Z)', 'Redo object edit (Ctrl+Shift+Z)', 'Add model', 'Save or open session (Ctrl+S)', 'Export', 'Model library']);
+    for (const name of ['Move (W)', 'Rotate (E)', 'Scale (R)', 'Focus object (F)', 'Duplicate object (Ctrl+D)', 'Hide or show object (H)', 'Delete object']) { assert.equal (await page.getByRole ('menuitem', { name, exact : true }).isDisabled (), false, name); }
     assert.equal (await page.locator ('.ov_popup').count (), 0);
     await page.keyboard.press ('Escape');
     assert.equal (await page.locator ('.auto3d_context_menu').count (), 0);
