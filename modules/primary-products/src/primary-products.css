@@ -52,3 +52,12 @@
 @media (max-width: 650px) { .module_panel_body[data-mode=extended] .pp_workspace { padding: 12px; } .module_panel_body[data-mode=extended] .pp_layout { grid-template-columns: minmax(0, 1fr); gap: 16px; } .module_panel_body[data-mode=extended] .pp_catalog { grid-column: auto; } .module_panel_body[data-mode=extended] .pp_stage { min-height: 280px; height: auto; padding: 14px; } .module_panel_body[data-mode=extended] .pp_drawing { height: 230px; } .module_panel_body[data-mode=extended] .pp_profile_name { position: static; } }
 /* Hidden family-specific fields must override the field's flex layout. */
 .pp_workspace [hidden] { display: none !important; }
+.pp_dimension_row { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.pp_dimension_row .pp_input_wrap input { min-width: 0; padding-left: 6px; }
+.pp_material_row { display: flex; align-items: end; gap: 8px; }
+.pp_material_row > :first-child { flex: 1; min-width: 0; }
+.pp_swatch_field { flex: 0 0 38px; }
+.pp_swatch_field .pp_color { width: 38px; height: 36px; padding: 2px; cursor: pointer; }
+.pp_art_image { display: block; max-width: 100%; max-height: 140px; margin: 10px auto; object-fit: contain; }
+.pp_art_dimensions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.pp_art_import { width: 100%; padding: 9px; color: inherit; background: transparent; border: 1px solid var(--pp-accent); border-radius: 5px; cursor: pointer; }

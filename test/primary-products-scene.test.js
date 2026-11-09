@@ -108,3 +108,27 @@ describe ('Primary Products scene integration', function () {
         await assert.rejects (pending, /changed/); assert.equal (old.objects.length, 0); assert.equal (f.editor.document.objects.length, 0);
     });
 });
+
+describe ('Primary Products embedded label source', function () {
+    it ('keeps label pixels, dielectric ink and authoring through archives, recovery, reload, edits and GLB', async function () {
+        const { readFileSync } = await import ('node:fs'), { createHash } = await import ('node:crypto');
+        const { PrimaryProductsArtwork } = await import ('../source/website/primaryproductsartwork.js');
+        const source = readFileSync ('test/testfiles/obj/texture.png'), buffer = source.buffer.slice (source.byteOffset, source.byteOffset + source.byteLength), id = createHash ('sha256').update (source).digest ('hex');
+        const f = Fixture (); f.panel.draft = module.DefaultProductDraft ('can'); f.panel.artwork = new PrimaryProductsArtwork (f.panel);
+        f.panel.artwork.entries = [{ resourceId : id, name : 'Original.png', mime : 'image/png', zone : 'front', widthMm : 40, heightMm : 60 }];
+        f.panel.artwork.resources.set (id, { buffer }); await f.workspace.Generate ();
+        const label = f.editor.document.model.materials.find (m => m.name.startsWith ('Primary label'));
+        assert.equal (label.metalness, 0); assert.equal (label.transparent, true); assert.deepEqual (new Uint8Array (label.diffuseMap.buffer), new Uint8Array (buffer));
+        label.name = 'Renamed ink surface';
+        const packed = PackSession (f.editor.document), saved = OpenSessionArchive (CreateSessionArchive (packed)).document;
+        f.editor.document = saved; f.editor.selected = saved.objects[0]; f.panel.artwork.Clear (); f.workspace.LoadSelected ();
+        assert.equal (f.panel.artwork.Inspect ()[0].name, 'Original.png'); assert.deepEqual (new Uint8Array (f.panel.artwork.resources.get (id).buffer), new Uint8Array (buffer));
+        f.panel.draft.heightMm = 150; await f.workspace.Generate (true); assert.equal (f.panel.artwork.Inspect ()[0].heightMm, 60);
+        const recovery = ReadSession (PackRecoverySnapshot (structuredClone (RecoverySnapshot (f.editor.document, {})))).document;
+        assert.ok (recovery.model.materials.some (m => m.diffuseMap?.buffer.byteLength === buffer.byteLength));
+        const files = await new Promise (resolve => new ExporterGltf ().Export (new ExporterModel (f.editor.document.CompactModel ()), FileFormat.Binary, resolve));
+        const glb = files[0].GetBufferContent (), view = new DataView (glb), json = JSON.parse (new TextDecoder ().decode (new Uint8Array (glb, 20, view.getUint32 (12, true))).trim ());
+        assert.ok (json.images?.length); assert.ok (json.materials.some (m => m.alphaMode === 'BLEND' && m.pbrMetallicRoughness.metallicFactor === 0));
+        const metadata = JSON.parse (f.editor.selected.userData[PrimaryProductDataKey]); assert.ok (JSON.stringify (metadata).length < 2000);
+    });
+});

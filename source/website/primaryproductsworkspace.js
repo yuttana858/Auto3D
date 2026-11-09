@@ -16,13 +16,13 @@ export class PrimaryProductsWorkspace
     LoadSelected ()
     {
         if (this.panel.Blocked ()) { throw new Error ('Open an editable, idle session.'); }
-        this.panel.draft = this.Selected ().definition.draft; this.panel.Refresh (); return this.panel.Inspect ();
+        const { object, definition } = this.Selected (); this.panel.artwork?.Load (definition, this.panel.website.sessionEditor.document.CompactModel ([object], true)); this.panel.draft = definition.draft; this.panel.Refresh (); return this.panel.Inspect ();
     }
     async Generate (update = false)
     {
         const panel = this.panel; const editor = panel.website.sessionEditor;
         if (this.active || panel.Blocked ()) { throw new Error ('Open an editable, idle session.'); }
-        const definition = ProductDefinition (panel.draft);
+        const definition = ProductDefinition (panel.draft, panel.artwork?.Inspect () || []);
         if (definition.draft.material === 'glass') { throw new Error ('Glass generation needs transmission and hollow-wall support. Choose opaque plastic.'); }
         const target = editor.document; const owner = panel.website.auth.user.id; const source = update ? this.Selected ().object : null;
         if (source?.hiddenParts?.length || source?.animationAsset || source?.keyframes?.length) { throw new Error ('Remove hidden parts and animation before rebuilding this product.'); }
@@ -36,7 +36,7 @@ export class PrimaryProductsWorkspace
         try {
             const module = await this.load (); unchanged ();
             const unit = target.objects.length ? previousUnit : Unit.Millimeter;
-            const model = PrimaryProductModel (module.CreatePrimaryProduct (definition.draft), unit);
+            const model = PrimaryProductModel (module.CreatePrimaryProduct (definition.draft), unit, definition.artwork || [], panel.artwork?.resources);
             object = target.AddImported (model, source?.name || module.PrimaryFamilies[definition.draft.family].name);
             if (source) {
                 for (const key of ['id', 'name', 'source', 'visible', 'castShadow', 'receiveShadow']) { object[key] = source[key]; }
