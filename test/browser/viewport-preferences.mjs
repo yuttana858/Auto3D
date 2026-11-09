@@ -13,7 +13,7 @@ try {
             if (route.request ().method () === 'PUT') { profiles[account] = route.request ().postDataJSON ().preferences; }
             await route.fulfill ({ json : { preferences : profiles[account], folders : ['Uncategorized'] } });
         });
-        const url = process.env.AUTO3D_TEST_URL || 'http://127.0.0.1:8082/';
+        const url = process.env.AUTO3D_TEST_URL || 'http://127.0.0.1:8080/website/index.html';
         await page.goto (url); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
         const inspect = () => page.evaluate (async () => (await Auto3D.execute ('preferences.viewport.quality.inspect')).result);
         assert.equal ((await inspect ()).mode, 'fast'); assert.equal ((await inspect ()).pixelRatio, 1);

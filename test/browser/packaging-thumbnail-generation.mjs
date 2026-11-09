@@ -8,7 +8,7 @@ try {
  for (const path of ['accounts/**', 'personal/items', 'environments']) { await page.route ('**/api/' + path, r => r.fulfill ({ json : path.startsWith ('accounts') ? { isAdmin : false } : [] })); }
  // UI/geometry regression; rasterization is covered by separate effects/rendering probes.
  await page.addInitScript (() => { for (const Type of [window.WebGLRenderingContext, window.WebGL2RenderingContext]) { if (Type) { for (const method of ['drawArrays', 'drawElements', 'drawArraysInstanced', 'drawElementsInstanced']) { if (Type.prototype[method]) { Type.prototype[method] = () => {}; } } } } });
- await page.goto (process.env.AUTO3D_TEST_URL || 'http://127.0.0.1:8082/'); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
+ await page.goto (process.env.AUTO3D_TEST_URL || 'http://127.0.0.1:8080/website/index.html'); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
  const call = async (id, args = {}) => { const r = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (r.ok, true, JSON.stringify (r)); return r.result; };
  await call ('ui.ai.packaging');
  for (const [i, [code, acronym]] of [['0201', 'RSC'], ['0200', 'HSC'], ['0202', 'OSC'], ['0203', 'FOL']].entries ()) {

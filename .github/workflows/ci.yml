@@ -79,6 +79,7 @@ jobs:
         shell: bash
         run: |
           npm start > dev-server.log 2>&1 &
+          npm run preview_packaging > packaging-preview.log 2>&1 &
           for attempt in $(seq 90); do curl -sf http://127.0.0.1:8080/website/index.html > /dev/null && break; sleep 2; done
           mkdir -p work; failed=()
           while read -r name; do
