@@ -27,6 +27,15 @@ for (const file of ['index.html', 'embed.html', 'info/index.html', 'info/cookies
     const tagged = html.replace ('</head>', `<meta name="auto3d-build" content="${build}">\n</head>`);
     await writeFile (target, tagged.replace (/<!-- website start -->[\s\S]*?<!-- website end -->/, `<!-- website start -->\n<link rel="stylesheet" href="${prefix}o3dv/o3dv.website.min.css?v=${version}">\n<script src="${prefix}o3dv/o3dv.website.min.js?v=${version}"></script>\n<!-- website end -->`));
 }
+// The CSP allows only the exact inline bootstrap scripts shipped in these pages.
+const inlineHashes = new Set ();
+for (const file of ['index.html', 'embed.html', 'mini.html', 'info/index.html', 'info/cookies.html', 'info/faq.html']) {
+    const html = await readFile (path.join (output, file), 'utf8');
+    for (const match of html.matchAll (/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)) { inlineHashes.add (`'sha256-${createHash ('sha256').update (match[1]).digest ('base64')}'`); }
+}
+const headersPath = path.join (output, '_headers'), headers = await readFile (headersPath, 'utf8');
+if (!headers.includes ('__INLINE_SCRIPT_HASHES__')) { throw new Error ('The _headers CSP placeholder is missing.'); }
+await writeFile (headersPath, headers.replace ('__INLINE_SCRIPT_HASHES__', [...inlineHashes].sort ().join (' ')));
 await cp ('LICENSE.md', path.join (output, 'LICENSE.md'));
 await writeFile (path.join (output, '.nojekyll'), '');
 console.log (`Pages site built at ${output}`);

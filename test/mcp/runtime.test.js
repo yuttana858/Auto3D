@@ -120,7 +120,7 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         const token = await grant (), other = live ? null : await grant (userB);
         const upgrade = await fetch ('/api/agent/connect', { headers : { Cookie : cookieFor (userA), Origin : origin, Upgrade : 'websocket' } }); assert.equal (upgrade.status, 101);
         socket = upgrade.webSocket; socket.accept (); const ack = message (socket);
-        socket.send (JSON.stringify ({ type : 'hello', instanceId : 'window-a', windowLabel : 'Review window', sessions : [{ id : 'tab-a', name : 'Test box', active : true }] }));
+        socket.send (JSON.stringify ({ type : 'hello', instanceId : 'window-a', windowLabel : 'Review window', allowSelect : true, sessions : [{ id : 'tab-a', name : 'Test box', active : true }] }));
         const hello = await ack;
         const initialized = await rpc (token.access_token, 'initialize', { protocolVersion : '2025-03-26', capabilities : {}, clientInfo : { name : 'test client', version : '1' } }); assert.equal (initialized.status, 200); const serverVersion = (await initialized.json ()).result.serverInfo.version; assert.equal (serverVersion.split ('+')[0], releaseVersion); assert.match (serverVersion.split ('+')[1], /^[a-f0-9]{16}$/);
         const listResponse = await rpc (token.access_token, 'tools/list'); assert.equal (listResponse.headers.get ('Cache-Control'), 'no-store');
@@ -178,7 +178,7 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         const token = await grant (); const code = 'WXYZ-2345-6789-ABCD';
         const upgrade = await fetch ('/api/agent/connect', { headers : { Cookie : cookieFor (userA), Origin : origin, Upgrade : 'websocket' } }); assert.equal (upgrade.status, 101);
         socket = upgrade.webSocket; socket.accept (); const ack = message (socket);
-        socket.send (JSON.stringify ({ type : 'hello', instanceId : 'agent-code-window', windowLabel : 'Agent code window', windowCode : code, sessions : [{ id : 'tab-a', name : 'Box', active : true }] })); await ack;
+        socket.send (JSON.stringify ({ type : 'hello', instanceId : 'agent-code-window', windowLabel : 'Agent code window', allowSelect : true, windowCode : code, sessions : [{ id : 'tab-a', name : 'Box', active : true }] })); await ack;
         const tools = await (await rpc (token.access_token, 'tools/list')).json (); assert.ok (tools.result.tools.some (tool => tool.name === 'auto3d.sessions.pair_code'));
         if (!live) { const other = await grant (userB); const wrong = await (await rpc (other.access_token, 'tools/call', { name : 'auto3d.sessions.pair_code', arguments : { code } })).json (); assert.equal (wrong.result.isError, true); }
         const paired = await (await rpc (token.access_token, 'tools/call', { name : 'auto3d.sessions.pair_code', arguments : { code } })).json ();
@@ -261,7 +261,7 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
     it ('forwards standard MCP image content only with screenshot scope and rejects account revocation', async () => {
         const token = await grant (userA, 'auto3d.read auto3d.capture offline_access');
         const listed = await (await rpc (token.access_token, 'tools/call', { name : 'auto3d.sessions.list', arguments : {} })).json ();
-        const target = JSON.parse (listed.result.content[0].text)[0];
+        const target = JSON.parse (listed.result.content[0].text).find (item => item.instanceId === 'agent-code-window');
         await rpc (token.access_token, 'tools/call', { name : 'auto3d.sessions.select', arguments : { connectionId : target.connectionId, sessionId : 'tab-a' } });
         const waiting = message (socket), pending = rpc (token.access_token, 'tools/call', { name : 'capture.image', arguments : { maxSize : 256 } });
         let request = await waiting; if (request.type === 'access_changed') { request = await message (socket); }

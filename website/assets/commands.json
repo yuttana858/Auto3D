@@ -33,12 +33,15 @@
       "id": "agent.access.connect",
       "title": "Connect this browser window",
       "category": "Account",
-      "description": "Explicitly share this browser window with individually authorized OAuth agents. Returns a short-lived pairing code; paste it into the Auto3D authorization page to pair automatically. Screenshots need a separate opt-in and OAuth scope.",
+      "description": "Explicitly share this browser window with this account's authorized MCP agents, which can then select it with auto3d.sessions.select. Also returns a short-lived single-use code for auto3d.sessions.pair_code. Set allowSelect false to require that code. Screenshots need a separate opt-in and OAuth scope.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
         "properties": {
           "screenshots": {
+            "type": "boolean"
+          },
+          "allowSelect": {
             "type": "boolean"
           }
         },
@@ -46,7 +49,8 @@
         "additionalProperties": false
       },
       "example": {
-        "screenshots": false
+        "screenshots": false,
+        "allowSelect": true
       }
     },
     {
@@ -448,7 +452,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -484,7 +489,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -528,7 +534,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -550,7 +557,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -572,7 +580,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -608,7 +617,8 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [],
@@ -626,7 +636,8 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "duration": {
             "type": "number",
@@ -682,7 +693,7 @@
       "title": "Control box folding",
       "category": "Packaging",
       "description": "Pause, resume or cancel active folding playback. Available while playback blocks ordinary editing. Cancel restores the original object.",
-      "mutates": false,
+      "mutates": true,
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -728,7 +739,8 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [],
@@ -786,7 +798,8 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "basis": {
             "type": "string",
@@ -972,13 +985,19 @@
             ]
           },
           "length": {
-            "type": "number"
+            "type": "number",
+            "minimum": -1000000000,
+            "maximum": 1000000000
           },
           "width": {
-            "type": "number"
+            "type": "number",
+            "minimum": -1000000000,
+            "maximum": 1000000000
           },
           "height": {
-            "type": "number"
+            "type": "number",
+            "minimum": -1000000000,
+            "maximum": 1000000000
           }
         },
         "required": [
@@ -1223,8 +1242,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 120
+            "maxLength": 120,
+            "minLength": 1
           },
           "mode": {
             "type": "string",
@@ -1277,18 +1296,18 @@
         "properties": {
           "name": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 120
+            "maxLength": 120,
+            "minLength": 1
           },
           "flute": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 120
+            "maxLength": 120,
+            "minLength": 1
           },
           "provenance": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 120
+            "maxLength": 120,
+            "minLength": 1
           },
           "calibrated": {
             "type": "boolean"
@@ -1315,28 +1334,28 @@
           },
           "outsideLinerGrade": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 120
+            "maxLength": 120,
+            "minLength": 1
           },
           "insideLinerGrade": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 120
+            "maxLength": 120,
+            "minLength": 1
           },
           "mediumGrade": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 120
+            "maxLength": 120,
+            "minLength": 1
           },
           "scoreProcess": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 120
+            "maxLength": 120,
+            "minLength": 1
           },
           "conditioning": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 120
+            "maxLength": 120,
+            "minLength": 1
           },
           "outsideLinerGsm": {
             "type": "number",
@@ -1428,8 +1447,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 120
+            "maxLength": 120,
+            "minLength": 1
           }
         },
         "required": [
@@ -1452,8 +1471,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 120
+            "maxLength": 120,
+            "minLength": 1
           }
         },
         "required": [
@@ -1496,7 +1515,8 @@
             ]
           },
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [],
@@ -1636,7 +1656,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "target": {
             "type": "string",
@@ -1701,7 +1722,8 @@
           "revision": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 4096
               },
               {
                 "type": "null"
@@ -1769,7 +1791,8 @@
         "properties": {
           "value": {
             "type": "number",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000000
           },
           "units": {
             "type": "string",
@@ -1803,7 +1826,9 @@
             "minItems": 2,
             "maxItems": 2,
             "items": {
-              "type": "number"
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
             }
           },
           "units": {
@@ -1896,7 +1921,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "additive": {
             "type": "boolean"
@@ -1957,7 +1983,9 @@
               "minItems": 2,
               "maxItems": 2,
               "items": {
-                "type": "number"
+                "type": "number",
+                "minimum": -1000000000,
+                "maximum": 1000000000
               }
             }
           },
@@ -2020,7 +2048,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "points": {
             "type": "array",
@@ -2031,7 +2060,9 @@
               "minItems": 2,
               "maxItems": 2,
               "items": {
-                "type": "number"
+                "type": "number",
+                "minimum": -1000000000,
+                "maximum": 1000000000
               }
             }
           },
@@ -2073,7 +2104,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -2096,7 +2128,8 @@
         "properties": {
           "thickness": {
             "type": "number",
-            "minimum": 0.000001
+            "minimum": 0.000001,
+            "maximum": 1000000000
           },
           "grade": {
             "type": "string",
@@ -2249,7 +2282,8 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "additive": {
             "type": "boolean"
@@ -2263,7 +2297,9 @@
         ],
         "additionalProperties": false
       },
-      "example": {}
+      "example": {
+        "objectId": "object-1"
+      }
     },
     {
       "id": "object.tool",
@@ -2303,14 +2339,17 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "position": {
             "type": "array",
             "minItems": 3,
             "maxItems": 3,
             "items": {
-              "type": "number"
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
             }
           },
           "rotation": {
@@ -2318,7 +2357,9 @@
             "minItems": 3,
             "maxItems": 3,
             "items": {
-              "type": "number"
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
             }
           },
           "scale": {
@@ -2326,7 +2367,9 @@
             "minItems": 3,
             "maxItems": 3,
             "items": {
-              "type": "number"
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
             }
           },
           "units": {
@@ -2359,7 +2402,8 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [],
@@ -2377,14 +2421,17 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "position": {
             "type": "array",
             "minItems": 3,
             "maxItems": 3,
             "items": {
-              "type": "number"
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
             }
           }
         },
@@ -2411,7 +2458,8 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "width": {
             "type": "number",
@@ -2477,7 +2525,9 @@
               45,
               90,
               180
-            ]
+            ],
+            "minimum": 0,
+            "maximum": 180
           }
         },
         "required": [
@@ -2498,7 +2548,7 @@
       "title": "Control array reveal",
       "category": "Objects",
       "description": "Pause, resume or cancel an active array reveal while normal editing is blocked. Cancel restores the pre-array scene and camera.",
-      "mutates": false,
+      "mutates": true,
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -2544,7 +2594,8 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [],
@@ -2562,7 +2613,8 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "dimension": {
             "type": "string",
@@ -2574,7 +2626,8 @@
           },
           "value": {
             "type": "number",
-            "minimum": 0.000001
+            "minimum": 0.000001,
+            "maximum": 1000000000
           },
           "proportional": {
             "type": "boolean"
@@ -2623,7 +2676,8 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "percent": {
             "type": "number",
@@ -2654,7 +2708,9 @@
             "minItems": 3,
             "maxItems": 3,
             "items": {
-              "type": "number"
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
             }
           },
           "rotation": {
@@ -2662,7 +2718,9 @@
             "minItems": 3,
             "maxItems": 3,
             "items": {
-              "type": "number"
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
             }
           },
           "scale": {
@@ -2670,7 +2728,9 @@
             "minItems": 3,
             "maxItems": 3,
             "items": {
-              "type": "number"
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
             }
           },
           "units": {
@@ -2703,7 +2763,8 @@
         "type": "object",
         "properties": {
           "name": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [],
@@ -2859,6 +2920,34 @@
       "example": {}
     },
     {
+      "id": "object.user_data.delete",
+      "title": "Delete object user data",
+      "category": "Objects",
+      "description": "Remove a user-defined metadata field from an object.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "name": "SKU"
+      }
+    },
+    {
       "id": "object.user_data",
       "title": "Set object user data",
       "category": "Objects",
@@ -2868,13 +2957,16 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "value": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -2898,7 +2990,8 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "visible": {
             "type": "boolean"
@@ -2923,7 +3016,8 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [],
@@ -2941,7 +3035,8 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [],
@@ -2967,7 +3062,7 @@
       "id": "view.fullscreen",
       "title": "Set full screen",
       "category": "View",
-      "description": "Enter or exit browser full-screen mode.",
+      "description": "Enter or exit browser full-screen mode. Entering requires a user gesture; otherwise returns requiresUserGesture.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -3018,7 +3113,7 @@
       "title": "Set background",
       "category": "View",
       "description": "Choose a viewport background preset.",
-      "mutates": false,
+      "mutates": true,
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3071,7 +3166,7 @@
       "title": "Set ambient fill, reflections and shadows",
       "category": "Lighting",
       "description": "Set ambient diffuse/specular fill, reflections and floor-shadow options using the same functions as the Lighting panel.",
-      "mutates": false,
+      "mutates": true,
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3081,7 +3176,9 @@
             "maximum": 3
           },
           "ambientColor": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "maxLength": 7
           },
           "environmentIntensity": {
             "type": "number",
@@ -3154,7 +3251,7 @@
       "title": "Set lighting",
       "category": "Lighting",
       "description": "Apply a lighting configuration obtained from lighting.inspect.",
-      "mutates": false,
+      "mutates": true,
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3166,7 +3263,8 @@
             ]
           },
           "environment": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "brightness": {
             "type": "number",
@@ -3220,8 +3318,9 @@
         "type": "object",
         "properties": {
           "index": {
-            "type": "number",
-            "minimum": 0
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
           },
           "property": {
             "type": "string",
@@ -3238,7 +3337,9 @@
             ]
           },
           "value": {
-            "type": "number"
+            "type": "number",
+            "minimum": -1000000000,
+            "maximum": 1000000000
           }
         },
         "required": [
@@ -3264,11 +3365,13 @@
         "type": "object",
         "properties": {
           "index": {
-            "type": "number",
-            "minimum": 0
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
           },
           "color": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -3386,7 +3489,8 @@
         "properties": {
           "index": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000
           },
           "slot": {
             "type": "string",
@@ -3403,10 +3507,12 @@
             ]
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "dataUri": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 16777216
           }
         },
         "required": [
@@ -3417,7 +3523,12 @@
         ],
         "additionalProperties": false
       },
-      "example": {}
+      "example": {
+        "index": 0,
+        "slot": "map",
+        "name": "label.png",
+        "dataUri": "data:image/png;base64,iVBORw0KGgo="
+      }
     },
     {
       "id": "material.texture.inspect",
@@ -3430,7 +3541,8 @@
         "properties": {
           "index": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000
           },
           "slot": {
             "type": "string",
@@ -3469,7 +3581,8 @@
         "properties": {
           "index": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000
           },
           "slot": {
             "type": "string",
@@ -3536,7 +3649,8 @@
         "properties": {
           "index": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000
           },
           "enabled": {
             "type": "boolean"
@@ -3574,7 +3688,8 @@
             "maximum": 1
           },
           "maskDataUri": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 16777216
           }
         },
         "required": [
@@ -3598,7 +3713,8 @@
         "properties": {
           "index": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000
           },
           "grain": {
             "type": "number",
@@ -3663,7 +3779,8 @@
             "maximum": 1
           },
           "maskDataUri": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 16777216
           },
           "clearMask": {
             "type": "boolean"
@@ -3694,10 +3811,12 @@
         "properties": {
           "index": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000
           },
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "overwrite": {
             "type": "boolean"
@@ -3721,7 +3840,8 @@
         "properties": {
           "index": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000
           },
           "slot": {
             "type": "string",
@@ -3760,7 +3880,8 @@
         "properties": {
           "index": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000
           },
           "slot": {
             "type": "string",
@@ -3799,7 +3920,8 @@
         "properties": {
           "index": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000
           },
           "slot": {
             "type": "string",
@@ -3838,7 +3960,8 @@
         "properties": {
           "index": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000
           },
           "mode": {
             "type": "string",
@@ -3871,7 +3994,8 @@
         "properties": {
           "index": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000
           }
         },
         "required": [
@@ -3894,7 +4018,8 @@
         "properties": {
           "index": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000
           }
         },
         "required": [
@@ -3916,7 +4041,8 @@
         "type": "object",
         "properties": {
           "query": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -3984,7 +4110,7 @@
       "title": "Set model view mode",
       "category": "Rendering",
       "description": "Set the reversible model view to default, wireframe, cel shade or X-ray. Changes display materials without changing saved model materials.",
-      "mutates": false,
+      "mutates": true,
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4026,7 +4152,7 @@
       "title": "Render scene now",
       "category": "Rendering",
       "description": "Render the main viewer scene and open the right render workspace. Returns immediately. Background mode permits camera navigation while scene edits pause.",
-      "mutates": false,
+      "mutates": true,
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4043,7 +4169,8 @@
             "type": "boolean"
           },
           "cameraId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "allCameras": {
             "type": "boolean"
@@ -4065,7 +4192,7 @@
       "title": "Queue PNG renders",
       "category": "Rendering",
       "description": "Queue the current screen, one saved camera or all saved cameras. Alpha exports only models. No remote upload or automatic download.",
-      "mutates": false,
+      "mutates": true,
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4082,7 +4209,8 @@
             "type": "boolean"
           },
           "cameraId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "allCameras": {
             "type": "boolean"
@@ -4116,7 +4244,7 @@
       "title": "Start render queue",
       "category": "Rendering",
       "description": "Start sequential local PNG rendering. Background mode leaves camera navigation enabled. Returns immediately; inspect progress or cancel through queue commands.",
-      "mutates": false,
+      "mutates": true,
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4136,7 +4264,7 @@
       "title": "Stop rendering",
       "category": "Rendering",
       "description": "Cancel the active job at the next tile and leave pending jobs queued.",
-      "mutates": false,
+      "mutates": true,
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -4150,12 +4278,13 @@
       "title": "Cancel render job",
       "category": "Rendering",
       "description": "Cancel one pending or active render job.",
-      "mutates": false,
+      "mutates": true,
       "inputSchema": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -4172,7 +4301,7 @@
       "title": "Clear render queue",
       "category": "Rendering",
       "description": "Empty the session render queue and close its image windows. Set all false to remove only finished jobs. Active jobs cancel between tiles.",
-      "mutates": false,
+      "mutates": true,
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4192,7 +4321,7 @@
       "title": "Delete selected renders",
       "category": "Rendering",
       "description": "Delete selected session jobs, release image memory and close their image windows. Active jobs cancel between tiles.",
-      "mutates": false,
+      "mutates": true,
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4201,7 +4330,8 @@
             "minItems": 1,
             "maxItems": 50,
             "items": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 262144
             }
           }
         },
@@ -4226,7 +4356,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -4248,7 +4379,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "action": {
             "type": "string",
@@ -4298,7 +4430,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -4393,7 +4526,7 @@
       "title": "Set camera field of view",
       "category": "Camera",
       "description": "Set current camera FOV in degrees and update view framing. Stops camera playback.",
-      "mutates": false,
+      "mutates": true,
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4446,7 +4579,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -4468,7 +4602,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -4490,7 +4625,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "name": {
             "type": "string",
@@ -4519,7 +4655,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -4569,7 +4706,8 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "time": {
             "type": "number",
@@ -4609,7 +4747,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -4686,7 +4825,8 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "progress": {
             "type": "number",
@@ -4731,7 +4871,8 @@
         "properties": {
           "time": {
             "type": "number",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000000
           }
         },
         "required": [
@@ -4776,11 +4917,13 @@
         "properties": {
           "start": {
             "type": "number",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000000
           },
           "end": {
             "type": "number",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000000
           }
         },
         "required": [
@@ -4891,10 +5034,12 @@
             ]
           },
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -4903,7 +5048,11 @@
         ],
         "additionalProperties": false
       },
-      "example": {}
+      "example": {
+        "type": "object",
+        "id": "keyframe-1",
+        "objectId": "object-1"
+      }
     },
     {
       "id": "animation.embedded.inspect",
@@ -4915,7 +5064,8 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -4923,7 +5073,9 @@
         ],
         "additionalProperties": false
       },
-      "example": {}
+      "example": {
+        "objectId": "object-1"
+      }
     },
     {
       "id": "animation.embedded.playback",
@@ -4935,7 +5087,8 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "action": {
             "type": "string",
@@ -4948,7 +5101,8 @@
           },
           "time": {
             "type": "number",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000000
           }
         },
         "required": [
@@ -4957,7 +5111,10 @@
         ],
         "additionalProperties": false
       },
-      "example": {}
+      "example": {
+        "objectId": "object-1",
+        "action": "play"
+      }
     },
     {
       "id": "animation.embedded.configure",
@@ -4969,11 +5126,13 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "clip": {
             "type": "number",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000000
           },
           "speed": {
             "type": "number",
@@ -4992,7 +5151,12 @@
         ],
         "additionalProperties": false
       },
-      "example": {}
+      "example": {
+        "objectId": "object-1",
+        "clip": 0,
+        "speed": 1,
+        "loop": true
+      }
     },
     {
       "id": "animation.keyframe.object",
@@ -5004,11 +5168,13 @@
         "type": "object",
         "properties": {
           "objectId": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "time": {
             "type": "number",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000000
           },
           "interpolation": {
             "type": "string",
@@ -5025,6 +5191,7 @@
         "additionalProperties": false
       },
       "example": {
+        "objectId": "object-1",
         "time": 0,
         "interpolation": "smooth"
       }
@@ -5040,7 +5207,8 @@
         "properties": {
           "time": {
             "type": "number",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000000
           },
           "interpolation": {
             "type": "string",
@@ -5069,7 +5237,8 @@
         "type": "object",
         "properties": {
           "definition": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 262144
           },
           "action": {
             "type": "string",
@@ -5081,10 +5250,13 @@
             ]
           },
           "step": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 262144
           },
           "index": {
-            "type": "number"
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
           }
         },
         "required": [
@@ -5099,6 +5271,20 @@
         "action": "add",
         "step": "{\"command\":\"scene.inspect\",\"arguments\":{}}"
       }
+    },
+    {
+      "id": "macro.cancel",
+      "title": "Cancel running macro",
+      "category": "Macros",
+      "description": "Request cancellation of the running macro or typed command sequence. Stops before the next step; completed steps are not undone.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
     },
     {
       "id": "macro.list",
@@ -5124,10 +5310,12 @@
         "type": "object",
         "properties": {
           "name": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "definition": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 262144
           }
         },
         "required": [
@@ -5136,7 +5324,10 @@
         ],
         "additionalProperties": false
       },
-      "example": {}
+      "example": {
+        "name": "Fit and inspect",
+        "definition": "{\"version\":1,\"steps\":[{\"id\":\"fit\",\"command\":\"view.fit\",\"arguments\":{}}]}"
+      }
     },
     {
       "id": "ui.materials",
@@ -5209,6 +5400,44 @@
       "example": {}
     },
     {
+      "id": "session.recovery.discard",
+      "title": "Discard unsaved recovery",
+      "category": "Sessions",
+      "description": "Permanently delete this account's device recovery checkpoint. Use only when the user chose not to restore it.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "session.rename",
+      "title": "Rename session",
+      "category": "Sessions",
+      "description": "Rename the active session. Undo restores the previous name; save to persist it.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "name": "Carton review"
+      }
+    },
+    {
       "id": "session.recovery.restore",
       "title": "Restore unsaved recovery",
       "category": "Sessions",
@@ -5260,7 +5489,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -5268,7 +5498,9 @@
         ],
         "additionalProperties": false
       },
-      "example": {}
+      "example": {
+        "id": "session-2"
+      }
     },
     {
       "id": "session.tabs.close",
@@ -5280,7 +5512,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "discard": {
             "type": "boolean"
@@ -5291,7 +5524,10 @@
         ],
         "additionalProperties": false
       },
-      "example": {}
+      "example": {
+        "id": "session-2",
+        "discard": false
+      }
     },
     {
       "id": "session.model.copy",
@@ -5432,7 +5668,8 @@
             ]
           },
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "append": {
             "type": "boolean"
@@ -5468,7 +5705,8 @@
             ]
           },
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -5500,7 +5738,8 @@
             ]
           },
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "code": {
             "type": "string",
@@ -5552,7 +5791,8 @@
         "type": "object",
         "properties": {
           "token": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -5588,7 +5828,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 4096
           },
           "expanded": {
             "type": "boolean"
@@ -5809,7 +6050,7 @@
       "id": "commands.text",
       "title": "Run typed commands",
       "category": "Commands",
-      "description": "Run supported phrases such as array model 4x4x6, fit, undo, or run macro Name. Semicolons run a sequence through the strict registry. Each action retains authentication, read-only and busy checks; saved macros may partially complete before a runtime failure. Does not accept arbitrary code.",
+      "description": "Run supported phrases such as array model 4x4x6, fit, undo, or run macro Name. Semicolons run a sequence through the strict registry. Each action retains authentication, read-only and busy checks; saved macros may partially complete before a runtime failure. Does not accept arbitrary code. Marked non-mutating so read-only viewers can run view phrases; each mutating step is checked and blocked individually.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -6279,7 +6520,7 @@
       "id": "ai.project.open_file",
       "title": "Open AI project picker",
       "category": "AI",
-      "description": "Open an interactive .auto3d AI project file picker. No file is opened until selected.",
+      "description": "Open an interactive .auto3d AI project file picker. No file is opened until selected. Requires a user gesture; otherwise returns requiresUserGesture.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -6293,7 +6534,7 @@
       "id": "ai.reference.open",
       "title": "Choose AI reference image",
       "category": "AI",
-      "description": "Open the interactive PNG/JPEG/WebP reference image picker. Does not upload or generate until an explicit submission.",
+      "description": "Open the interactive PNG/JPEG/WebP reference image picker. Does not upload or generate until an explicit submission. Requires a user gesture; otherwise returns requiresUserGesture.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -6422,7 +6663,8 @@
           },
           "actionId": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 1000000
           },
           "height": {
             "type": "number",
@@ -6472,7 +6714,7 @@
       "id": "ui.add_model",
       "title": "Open model picker",
       "category": "Panels",
-      "description": "Open a local file picker to add models. Requires interactive file selection.",
+      "description": "Open a local file picker to add models. Requires interactive file selection and a user gesture; otherwise returns requiresUserGesture.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -6486,7 +6728,7 @@
       "id": "ui.update_model",
       "title": "Open replacement model picker",
       "category": "Panels",
-      "description": "Open a local file picker to replace the selected model. Requires interactive file selection.",
+      "description": "Open a local file picker to replace the selected model. Requires interactive file selection and a user gesture; otherwise returns requiresUserGesture.",
       "mutates": true,
       "inputSchema": {
         "type": "object",

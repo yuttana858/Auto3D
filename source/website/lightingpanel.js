@@ -81,7 +81,8 @@ export class LightingPanel
             button.className = 'background_card';
             button.setAttribute ('data-preset', id);
             button.setAttribute ('aria-label', name + ' background');
-            button.innerHTML = '<span class="background_swatch" aria-hidden="true"></span><span>' + name + '</span>';
+            const swatch = document.createElement ('span'); swatch.className = 'background_swatch'; swatch.setAttribute ('aria-hidden', 'true');
+            const label = document.createElement ('span'); label.textContent = name; button.append (swatch, label);
             button.addEventListener ('click', () => website.ApplyBackgroundPreset (id));
             backgrounds.appendChild (button);
         }
@@ -188,7 +189,12 @@ export class LightingPanel
             const button = document.createElement ('button');
             button.className = 'hdri_card';
             button.setAttribute ('aria-pressed', String (environment.id === this.selected));
-            button.innerHTML = `<img src="${environment.thumbnailUrl}" alt="" loading="lazy"><strong>${environment.name}</strong><span>${environment.category}</span>`;
+            // Environment records come from the database; build them as text nodes.
+            const image = document.createElement ('img'); image.alt = ''; image.loading = 'lazy';
+            if (/^(?:https:|\/|assets\/)/.test (String (environment.thumbnailUrl || ''))) { image.src = environment.thumbnailUrl; }
+            const title = document.createElement ('strong'); title.textContent = environment.name;
+            const category = document.createElement ('span'); category.textContent = environment.category;
+            button.append (image, title, category);
             button.addEventListener ('click', () => this.Select (environment, button, true));
             this.gallery.appendChild (button);
         }

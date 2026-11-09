@@ -1,4 +1,4 @@
-import { Database, LimitedBody, Preferences, Folder, Failure, Reply } from '../_lib/accountstorage.js';
+import { Database, JsonBody, Preferences, Folder, Failure, Reply } from '../_lib/accountstorage.js';
 export async function onRequest ({ request, env, data })
 {
     if (!data?.user) { return Reply ({ error : 'Sign in to use account preferences.' }, 401); }
@@ -9,7 +9,7 @@ export async function onRequest ({ request, env, data })
             const rows = await Database (env, filter + '&select=preferences,folders'); return Reply (rows[0]);
         }
         if (request.method !== 'PUT') { return Reply ({ error : 'Method not allowed.' }, 405); }
-        const body = JSON.parse (await (await LimitedBody (request, 16384)).text ());
+        const body = await JsonBody (request, 16384);
         if (!body || Object.keys (body).some ((key) => !['preferences', 'folders'].includes (key))) { throw Failure ('Invalid preference fields.'); }
         const row = { user_id : owner, updated_at : new Date ().toISOString () };
         if (body.preferences !== undefined) { row.preferences = Preferences (body.preferences); }

@@ -1,6 +1,12 @@
 import { SupabaseConfig, SupabaseHeaders, RequireServerKey } from './supabase.js';
 export const MaxArchive = 32 * 1024 * 1024;
 export function Failure (message, status = 400) { return Object.assign (new Error (message), { status }); }
+// Malformed request JSON is a client error, not a service outage.
+export async function JsonBody (request, limit)
+{
+    const text = await (await LimitedBody (request, limit)).text ();
+    try { return JSON.parse (text); } catch { throw Failure ('Invalid JSON request.'); }
+}
 export function Reply (body, status = 200) { return Response.json (body, { status, headers : { 'Cache-Control' : 'private, no-store', 'X-Content-Type-Options' : 'nosniff' } }); }
 export async function Database (env, path, method = 'GET', body = undefined, prefer = 'return=representation')
 {

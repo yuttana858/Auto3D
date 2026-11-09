@@ -12,7 +12,8 @@ permissions:
 
 concurrency:
   group: cloudflare-pages-production
-  cancel-in-progress: true
+  # A half-finished deploy can leave the MCP broker and Pages app on different versions; queue instead.
+  cancel-in-progress: false
 
 jobs:
   deploy:

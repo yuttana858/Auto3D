@@ -81,6 +81,30 @@ describe ('Private account Meshy credentials', () => {
             c.env.MESHY_API_BASE_URL = 'http://insecure.test'; assert.equal ((await proxy (c)).status, 503); assert.equal (calls, 1);
         } finally { globalThis.fetch = original; }
     });
+    it ('scopes shared-key tasks to their creating account, rate-limits creation and validates bodies', async () => {
+        const env = Environment (); env.MESHY_API_KEY = 'shared_key_value'; env.AUTO3D_AI_ALLOW_SHARED_KEY = 'true';
+        const original = globalThis.fetch; let next = 0; const upstream = [];
+        globalThis.fetch = async (url, init = {}) => {
+            upstream.push ({ url : String (url), init });
+            if (init.method === 'POST') { return Response.json ({ result : 'task-' + (++next) }); }
+            if (/text-to-3d\?/.test (String (url))) { return Response.json ([{ id : 'task-1' }, { id : 'task-2' }, { id : 'foreign' }]); }
+            return Response.json ({ id : 'task' });
+        };
+        const call = (owner, method, path, body) => { const c = Context (env, method, body, owner); c.request = new Request ('https://auto3d.test/api/ai/' + path.join ('/'), { method, headers : { 'Content-Type' : 'application/json' }, ...(body !== undefined ? { body : JSON.stringify (body) } : {}) }); c.params = { path }; return proxy (c); };
+        try {
+            assert.equal ((await call ('owner', 'POST', ['text-to-3d'], { mode : 'preview', prompt : 'box' })).status, 200);
+            assert.equal ((await call ('other', 'POST', ['text-to-3d'], { mode : 'preview', prompt : 'cup' })).status, 200);
+            assert.deepEqual (await (await call ('owner', 'GET', ['text-to-3d'])).json (), [{ id : 'task-1' }]);
+            assert.deepEqual (await (await call ('other', 'GET', ['text-to-3d'])).json (), [{ id : 'task-2' }]);
+            assert.equal ((await call ('owner', 'GET', ['text-to-3d', 'task-2'])).status, 404);
+            assert.equal ((await call ('owner', 'GET', ['text-to-3d', 'task-1'])).status, 200);
+            for (const body of [{ nested : { a : 1 } }, { 'Bad-Key' : 1 }, [1]]) { assert.equal ((await call ('owner', 'POST', ['text-to-3d'], body)).status, 400); }
+            const large = await call ('owner', 'POST', ['text-to-3d'], { prompt : 'x'.repeat (70000) }); assert.equal (large.status, 413);
+            for (let index = 0; index < 19; index++) { assert.equal ((await call ('owner', 'POST', ['text-to-3d'], { prompt : 'p' })).status, 200); }
+            const limited = await call ('owner', 'POST', ['text-to-3d'], { prompt : 'p' }); assert.equal (limited.status, 429); assert.equal ((await limited.json ()).code, 'MESHY_SHARED_RATE_LIMITED');
+            assert.ok (upstream.every (request => !String (request.url).includes ('shared_key_value')));
+        } finally { globalThis.fetch = original; }
+    });
     it ('distinguishes a missing key, unavailable secure storage, and provider rejection without returning the key', async () => {
         const original = globalThis.fetch; const env = Environment (); const c = Context (env); c.params = { path : ['balance'] };
         try {

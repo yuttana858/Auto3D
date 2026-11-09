@@ -6,7 +6,7 @@ export function LiveMcpPath (pathname)
 }
 export function Identifier (value)
 {
-    if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test (value)) { throw new Error ('Invalid identifier.'); }
+    if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test (value)) { throw AgentError ('invalid_arguments', 'Invalid identifier.'); }
     return value;
 }
 export function AgentName (value)
@@ -66,4 +66,45 @@ export function PilotConfig (env)
 export function PilotAccount (env, accountId)
 {
     if (!PilotConfig (env).accounts.includes (accountId)) { throw new Error ('This account is not enrolled in the pilot.'); }
+}
+// Agent-facing error taxonomy. The code travels inside the message so it
+// survives Durable Object RPC, which preserves only an Error's message.
+export const AgentErrorCodes = Object.freeze ({
+    invalid_arguments : 'Arguments do not match the command schema.',
+    unknown_command : 'Unknown or unavailable command.',
+    permission_required : 'This grant lacks the required permission.',
+    revoked : 'Agent access was revoked or expired. Authorize again.',
+    not_paired : 'No app window is paired. Use auto3d.sessions.pair_code with the window code from Agent access.',
+    session_unavailable : 'The paired app window or tab is unavailable.',
+    session_changed : 'The app tab changed while the request ran. Inspect before retrying.',
+    invalid_code : 'The app window code is invalid, expired or already used.',
+    timeout : 'Timed out. The command may still complete in the app; inspect before retrying. Requests are never replayed.',
+    result_too_large : 'The result exceeded the transfer limit.',
+    rate_limited : 'Too many requests. Wait and retry.',
+    command_failed : 'The app rejected the command.',
+    conflict : 'The resource changed. Read it again and retry with the current revision.',
+    not_found : 'The requested resource is unavailable.',
+    unavailable : 'Auto3D is temporarily unavailable. Retry later.'
+});
+const ErrorPattern = /^\[([a-z_]+)\] ([\s\S]*)$/;
+export function AgentError (code, message = AgentErrorCodes[code])
+{
+    if (!Object.hasOwn (AgentErrorCodes, code)) { code = 'unavailable'; }
+    return new Error ('[' + code + '] ' + SafeText (message || AgentErrorCodes[code]));
+}
+export function SafeText (value, limit = 300)
+{
+    return [...String (value ?? '')].filter (char => { const code = char.codePointAt (0); return code >= 32 && !(code >= 127 && code <= 159) && !(code >= 8234 && code <= 8238) && !(code >= 8294 && code <= 8297); }).join ('').slice (0, limit);
+}
+export function ErrorCode (error)
+{
+    const match = ErrorPattern.exec (error?.message || '');
+    return match && Object.hasOwn (AgentErrorCodes, match[1]) ? match[1] : null;
+}
+// Only coded errors are disclosed; anything else stays generic.
+export function PublicError (error)
+{
+    const match = ErrorPattern.exec (error?.message || '');
+    if (!match || !Object.hasOwn (AgentErrorCodes, match[1])) { return { code : 'unavailable', message : 'Request unavailable. Check the selected session, connection and permissions. Timed-out requests are not replayed.' }; }
+    return { code : match[1], message : SafeText (match[2]) || AgentErrorCodes[match[1]] };
 }

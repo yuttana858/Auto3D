@@ -158,4 +158,6 @@ export function StartWelcomeSequence (onContinue, { createScene = CreateScene, f
     splash.addEventListener ('click', finish);
     splash.addEventListener ('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault (); finish (); } });
     splash.focus ();
+    // Automated browsers (tests, browser-driving agents) continue to sign-in without a click; authentication is unchanged.
+    if (typeof navigator !== 'undefined' && navigator.webdriver === true) { finish (); }
 }

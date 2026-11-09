@@ -1,12 +1,12 @@
 # Auto3D: agent project overview
 
-Updated 2026-10-10. Start with [project-status.md](project-status.md) for the development log, deployed commit, local release, validation and TODO list. This document describes the current application; earlier proposed R2/auth architecture has been superseded by the implemented account routes.
+Updated 2026-11-09 for 0.51.0 (repair release; see [repair-plan.md](repair-plan.md)). Start with [project-status.md](project-status.md) for the development log, deployed commit, local release, validation and TODO list. This document describes the current application; earlier proposed R2/auth architecture has been superseded by the implemented account routes.
 
 ## Product and stack
 
 Auto3D is a browser 3D viewer/editor derived from MIT-licensed Online3DViewer. It imports CAD/mesh files, assembles multi-object scenes, edits transforms/materials, controls environments/lighting, creates arrays, previews polygon reduction, plays embedded animation and authors scene/camera timelines. It saves portable `.auto3d` sessions, private account Library entries and device-local entries. Packaging is an independently built module with cut/score profiles, board extrusion, 0200–0203 folded-box generation and selected-box unfolding. Its geometry, textures and catalog UI load on demand through a small Auto3D adapter; its standalone preview has no account or Auto3D dependency. Render queues produce screen/HD/4K/16K PNGs, including model-only alpha output.
 
-The frontend uses JavaScript ES modules, imperative DOM, Three.js, fflate, Pickr and CSS. There is no React app. esbuild bundles the website and two workers; rollup/TypeScript produce engine distribution artifacts. CI targets Node 22. The separate Node backend is an alternate implementation, not the deployed Pages API.
+The frontend uses JavaScript ES modules, imperative DOM, Three.js, fflate, Pickr and CSS. DOM helpers render names as text; Pages sends a hash-based CSP. Agents reach the live app through the MCP Workers in `mcp/` (OAuth, per-account broker Durable Object, browser bridge in `agentaccess.js`). There is no React app. esbuild bundles the website and two workers; rollup/TypeScript produce engine distribution artifacts. CI targets Node 22. The separate Node backend is an alternate implementation, not the deployed Pages API.
 
 Current production: Cloudflare Pages Functions, private Cloudflare R2 objects, Supabase Auth/PostgreSQL account metadata. Temporary approved-account email/password login is implemented. Microsoft Entra ID is a future migration; the Node Entra verifier does not mean browser Entra sign-in exists.
 

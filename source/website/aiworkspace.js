@@ -104,7 +104,7 @@ export class AIWorkspace
         const toolbar = Element ('div', 'ai_project_toolbar', undefined, panel);
         this.addButton = Element ('button', null, 'Add to session', toolbar); this.addButton.disabled = true; this.addButton.addEventListener ('click', () => this.Run (() => this.AddSelected ()));
         const save = Element ('button', null, 'Save project to Library', toolbar); save.addEventListener ('click', () => this.Run (() => this.OpenSaveDialog ()));
-        const open = Element ('button', null, 'Open AI project', toolbar); this.projectInput = Element ('input', null, undefined, toolbar); this.projectInput.type = 'file'; this.projectInput.accept = '.auto3d'; this.projectInput.hidden = true; open.addEventListener ('click', () => this.projectInput.click ()); this.projectInput.addEventListener ('change', () => this.Run (async () => { const file = this.projectInput.files[0]; if (file) { await this.OpenProject (await file.arrayBuffer ()); } this.projectInput.value = ''; }));
+        const open = Element ('button', null, 'Open AI project', toolbar); this.projectInput = Element ('input', null, undefined, toolbar); this.projectInput.type = 'file'; this.projectInput.accept = '.auto3d'; this.projectInput.hidden = true; open.addEventListener ('click', () => this.OpenProjectPicker ()); this.projectInput.addEventListener ('change', () => this.Run (async () => { const file = this.projectInput.files[0]; if (file) { await this.OpenProject (await file.arrayBuffer ()); } this.projectInput.value = ''; }));
         Element ('span', 'section_hint', 'Library save includes all completed 3D creations below.', toolbar);
         this.projectName = Element ('input', null, undefined, toolbar); this.projectName.placeholder = 'AI project'; this.projectName.maxLength = 120; this.projectName.setAttribute ('aria-label', 'AI project name'); this.projectName.addEventListener ('input', () => this.ScheduleWorkspaceSave ());
         this.aiPane = Element ('div', 'ai_workspace_pane', undefined, panel);
@@ -137,7 +137,7 @@ export class AIWorkspace
 
         const imageRow = Element ('div', 'ai_image_row', undefined, inputSection);
         this.imageInput = Element ('input', null, undefined, imageRow); this.imageInput.type = 'file'; this.imageInput.accept = 'image/png,image/jpeg,image/webp'; this.imageInput.hidden = true;
-        this.imageButton = Element ('button', null, 'Upload reference image', imageRow); this.imageButton.addEventListener ('click', () => this.imageInput.click ());
+        this.imageButton = Element ('button', null, 'Upload reference image', imageRow); this.imageButton.addEventListener ('click', () => this.OpenReferencePicker ());
         this.imageName = Element ('span', 'ai_image_name', 'No image selected', imageRow);
         this.imageInput.addEventListener ('change', () => { this.imageFile = this.imageInput.files[0] || null; this.imageName.textContent = this.imageFile?.name || 'No image selected'; this.RefreshActions (); });
 
@@ -395,6 +395,9 @@ export class AIWorkspace
             const result = await editor.AppendArchive (saved, PlaceAIModel); this.status.textContent = 'Model added to session with textures and scale.'; return result;
         } finally { this.adding = false; }
     }
+    // Shared by the toolbar buttons and the agent commands.
+    OpenProjectPicker () { this.projectInput.click (); }
+    OpenReferencePicker () { this.imageInput.click (); }
     async OpenProject (buffer)
     {
         this.AssertEditable (); const session = OpenSessionArchive (buffer); const assets = new Map (); const tasks = [];

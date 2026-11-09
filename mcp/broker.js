@@ -29,7 +29,7 @@ export class Auto3DAgentBroker extends DurableObject
     Registrations (accountId) { return this.core.registrations.List (accountId); }
     AssertRegistration (input) { return this.core.registrations.Assert (input); }
     RevokeRegistration (input) { return this.core.Revoke (input); }
-    DisableAgents (input) { return this.core.registrations.Disable (input); }
+    DisableAgents (input) { return this.core.DisableAgents (input); }
     webSocketMessage (socket, message) { return this.core.Message (socket, message); }
     webSocketClose (socket) { this.core.Close (socket); }
     webSocketError (socket) { this.core.Close (socket); }

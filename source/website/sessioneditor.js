@@ -352,11 +352,18 @@ export class SessionEditor
     RenameSession ()
     {
         if (this.readOnly) { return; }
-        const previous = this.document.name;
-        const value = window.prompt ('Rename session', previous);
+        const value = window.prompt ('Rename session', this.document.name);
         if (value === null) { return; }
-        const next = value.trim ().slice (0, 100);
-        if (!next || next === previous) { return; }
+        try { this.SetSessionName (value); } catch (error) { this.Status (error.message); }
+    }
+    // Shared by the header prompt and session.rename.
+    SetSessionName (value)
+    {
+        if (this.readOnly) { throw new Error ('This shared viewer is read-only.'); }
+        const previous = this.document.name;
+        const next = String (value).trim ().slice (0, 100);
+        if (!next) { throw new Error ('Use a session name of 1–100 characters.'); }
+        if (next === previous) { return { name : next, changed : false }; }
         const apply = (name) => {
             this.document.name = name;
             this.website.parameters.fileNameDiv.textContent = name;
@@ -364,6 +371,20 @@ export class SessionEditor
         };
         apply (next);
         this.PushHistory (() => apply (previous), () => apply (next));
+        return { name : next, changed : true };
+    }
+    async DiscardRecovery ()
+    {
+        if (this.readOnly) { throw new Error ('This shared viewer is read-only.'); }
+        await this.library.deviceStorage.ClearRecovery ();
+        return { discarded : true };
+    }
+    RemoveUserData (item, key)
+    {
+        if (this.readOnly) { throw new Error ('This shared viewer is read-only.'); }
+        if (!item.userData || !Object.hasOwn (item.userData, key) || key.startsWith ('_auto3d')) { throw new Error ('User data field not found.'); }
+        delete item.userData[key]; this.MarkDirty ();
+        return { objectId : item.id, userData : { ...item.userData } };
     }
 
     RequestInteractionRender ()
@@ -497,7 +518,7 @@ export class SessionEditor
         discard.addEventListener ('click', async () => {
             dismiss ();
             try {
-                await this.library.deviceStorage.ClearRecovery ();
+                await this.DiscardRecovery ();
                 this.Status ('Recovery checkpoint discarded.');
             } catch (error) {
                 this.Status ('Recovery could not be discarded: ' + error.message);
@@ -817,7 +838,7 @@ export class SessionEditor
                     key = nextKey;
                 };
                 keyInput.addEventListener ('change', save); valueInput.addEventListener ('change', save);
-                remove.addEventListener ('click', () => { delete object.userData[key]; this.MarkDirty (); renderUserData (); });
+                remove.addEventListener ('click', () => { try { this.RemoveUserData (object, key); } catch (error) { this.Status (error.message); } renderUserData (); });
             });
         };
         renderUserData ();

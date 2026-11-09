@@ -1,3 +1,4 @@
+import { KeyedIpHash } from '../../_lib/privacy.js';
 import { AuthResponse, AuthRequest } from '../../_lib/auth.js';
 import { DatabaseRequest, RequireAdmin } from '../../_lib/accounts.js';
 import { ReadBody } from '../auth/[[path]].js';
@@ -13,8 +14,7 @@ export async function onRequest (context)
         if (action === 'request') {
             const body = await ReadBody (context.request);
             if (typeof body?.email !== 'string' || body.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test (body.email.trim ()) || typeof body.name !== 'string' || !body.name.trim () || body.name.length > 100 || typeof body.reason !== 'string' || body.reason.length > 1000 || Object.keys (body).some ((key) => !['email', 'name', 'reason'].includes (key))) { return AuthResponse ({ error : 'Enter a valid name, email and reason (up to 1000 characters).' }, 400); }
-            const digest = await crypto.subtle.digest ('SHA-256', new TextEncoder ().encode (context.request.headers.get ('CF-Connecting-IP') || 'local'));
-            const ipHash = Array.from (new Uint8Array (digest), (byte) => byte.toString (16).padStart (2, '0')).join ('');
+            const ipHash = await KeyedIpHash (context.env, context.request.headers.get ('CF-Connecting-IP'));
             await DatabaseRequest (context.env, 'rpc/auto3d_request_account', { method : 'POST', body : JSON.stringify ({ p_email : body.email.trim ().toLowerCase (), p_name : body.name.trim (), p_reason : body.reason.trim (), p_ip_hash : ipHash }) });
             return AuthResponse ({ message }, 202);
         }

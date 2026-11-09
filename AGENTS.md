@@ -1,6 +1,6 @@
 # Project orientation
 
-Read `docs/project-status.md` for the current release, development log, validation and outstanding work, then `docs/agent-project-overview.md` for architecture and data flows. Production uses Cloudflare Pages Functions, private R2, Supabase account metadata and temporary approved-account sign-in; Microsoft Entra ID remains future work. Current main includes merged PR #45 (Auto3D 0.40.0 / Packaging 1.9.0). The Packaging cleanup candidate is Auto3D 0.41.0 with Packaging 1.9.1; report both versions and the PR number for every new PR. Read `docs/pr16-reconciliation.md` before changing legacy published Library storage. Historical SQL in `database/history/pr16/` must not be replayed.
+Read `docs/project-status.md` for the current release, development log, validation and outstanding work, then `docs/agent-project-overview.md` for architecture and data flows. Production uses Cloudflare Pages Functions, private R2, Supabase account metadata and temporary approved-account sign-in; Microsoft Entra ID remains future work. Main includes merged PR #84 (Auto3D 0.50.2 / Packaging 1.10.3 / Primary Products 0.4.0). The repair candidate is Auto3D 0.51.0 with unchanged modules; see `docs/repair-plan.md`. Report the app version, every module version and the PR number for every new PR. Read `docs/pr16-reconciliation.md` before changing legacy published Library storage. Historical SQL in `database/history/pr16/` must not be replayed.
 
 # Agent-accessible features
 
@@ -10,9 +10,13 @@ Every new user-facing action must have a stable command in `source/website/agent
 
 Keep `website/assets/commands.json` synchronized with the registry. Document any commands that open interactive dialogs instead of completing an action. Validate inputs before mutation, await completion, and respect read-only sessions. Remote uploads and publication must remain explicit user actions. Add meaningful tests for execution, validation and macro behavior when changing these paths.
 
+# MCP and agent errors
+
+Agent-facing failures use the coded errors in `mcp/common.js` (`AgentError`, `PublicError`). Throw a coded error for anything an agent can act on; uncoded errors are reported as generic `unavailable`. The browser bridge returns command failures as results and must not disconnect for them. Keep request records short-lived, and test new broker state for growth limits.
+
 # Packaging module boundary
 
-FEFCO generators, extrusion, textures, catalog UI and module styles belong in modules/packaging. Its neutral API and independent tests/build/preview must work without imports from source/engine or source/website. Auto3D integrates through source/website/packagingadapter.js and PackagingWorkspace. Load geometry/UI on demand; archive-safe pure profile validation may be shared at startup. Preserve this boundary when adding packaging features and report both app and module versions in release PRs.
+FEFCO generators, extrusion, textures, catalog UI and module styles belong in modules/packaging. Its neutral API and independent tests/build/preview must work without imports from source/engine or source/website. Auto3D integrates through source/website/packagingadapter.js and PackagingWorkspace. Load geometry/UI on demand; archive-safe pure profile validation may be shared at startup. Preserve this boundary when adding packaging features and report both app and module versions in release PRs. The Primary Products module (`modules/primary-products`, integrated through `primaryproductsadapter.js` and `PrimaryProductsWorkspace`) follows the same boundary.
 
 # Module panels and design consistency
 

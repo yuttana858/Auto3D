@@ -1,6 +1,10 @@
-import { MeshyKey } from '../../_lib/aicredentials.js';
+import { MeshyCredential, OwnedTasks, RecordOwnedTask } from '../../_lib/aicredentials.js';
 const MeshyBaseUrl = 'https://api.meshy.ai';
 const MeshyAssetHost = 'assets.meshy.ai';
+const ModelLimit = 200 * 1024 * 1024, ImageRequestLimit = 28 * 1024 * 1024, TextRequestLimit = 65536;
+// Routes whose requests may carry reference images as data URIs.
+const ImageRoutes = new Set (['image-to-3d', 'retexture', 'text-to-image']);
+const SharedCreateLimit = 20, SharedCreateWindowMs = 3600000;
 
 async function boundedText (message, limit)
 {
@@ -30,9 +34,9 @@ function meshyUrl (context, path)
     return String (context.env.MESHY_API_BASE_URL || MeshyBaseUrl).replace (/\/$/, '') + path;
 }
 
-async function upstreamJson (context, path, init = {})
+async function upstreamJson (context, path, init = {}, credential = null)
 {
-    const key = await MeshyKey (context);
+    const { key } = credential || await MeshyCredential (context);
     if (!key) { return json ({ error : 'No Meshy key is configured. Save a key in AI connections.', code : 'MESHY_KEY_MISSING' }, 401); }
     const headers = new Headers (init.headers || {});
     headers.set ('Authorization', 'Bearer ' + key);
@@ -69,8 +73,10 @@ async function model (context)
     if (source.protocol !== 'https:' || source.hostname !== MeshyAssetHost) {
         return json ({ error : 'Only Meshy-generated asset URLs can be proxied.' }, 400);
     }
-    const response = await fetch (source.toString (), { redirect : 'follow' });
+    const response = await fetch (source.toString (), { redirect : 'follow', signal : AbortSignal.timeout (120000) });
     if (!response.ok) { return json ({ error : 'Generated model is unavailable.' }, response.status === 404 ? 404 : 502); }
+    if (response.url && new URL (response.url).protocol !== 'https:') { await response.body?.cancel (); return json ({ error : 'Generated model is unavailable.' }, 502); }
+    if (Number (response.headers.get ('Content-Length')) > ModelLimit) { await response.body?.cancel (); return json ({ error : 'Generated model exceeds the 200 MB limit.' }, 413); }
     const headers = new Headers ({
         'Content-Type' : response.headers.get ('Content-Type') || 'model/gltf-binary',
         'Cache-Control' : 'private, max-age=300',
@@ -79,7 +85,19 @@ async function model (context)
     });
     const length = response.headers.get ('Content-Length');
     if (length) { headers.set ('Content-Length', length); }
-    return new Response (response.body, { status : 200, headers });
+    // Count bytes as they stream so a missing or false Content-Length cannot exceed the cap.
+    let received = 0;
+    const limited = response.body?.pipeThrough (new TransformStream ({ transform (chunk, controller) { received += chunk.byteLength; if (received > ModelLimit) { controller.error (new Error ('Generated model exceeds the size limit.')); return; } controller.enqueue (chunk); } }));
+    return new Response (limited ?? null, { status : 200, headers });
+}
+// Meshy request bodies are flat objects of simple fields; reject anything else before spending credits.
+function ValidPayload (payload)
+{
+    if (!payload || Array.isArray (payload) || typeof payload !== 'object') { return false; }
+    const entries = Object.entries (payload);
+    if (entries.length > 40) { return false; }
+    const simple = value => value === null || ['string', 'number', 'boolean'].includes (typeof value);
+    return entries.every (([key, value]) => /^[a-z][a-z0-9_]{0,63}$/.test (key) && (simple (value) || Array.isArray (value) && value.length <= 16 && value.every (simple)));
 }
 
 export async function onRequest (context)
@@ -93,6 +111,7 @@ export async function onRequest (context)
         if (path.length === 1 && path[0] === 'balance' && method === 'GET') {
             return await upstreamJson (context, '/openapi/v1/balance');
         }
+        const owner = context.data.user.id;
 
         if (path.length === 1 && path[0] === 'model' && method === 'GET') {
             return await model (context);
@@ -102,19 +121,38 @@ export async function onRequest (context)
         const version = routes[path[0]];
         if (Object.hasOwn (routes, path[0]) && typeof version === 'string') {
             const base = '/openapi/' + version + '/' + path[0];
+            const credential = await MeshyCredential (context);
             if (path.length === 1 && method === 'POST') {
-                const body = await boundedText (context.request, 28 * 1024 * 1024);
-                if (body.length > 28 * 1024 * 1024) { return json ({ error : 'AI request exceeds the reference image limit.' }, 413); }
+                const limit = ImageRoutes.has (path[0]) ? ImageRequestLimit : TextRequestLimit;
+                const body = await boundedText (context.request, limit);
                 let payload; try { payload = JSON.parse (body); } catch { return json ({ error : 'Invalid AI JSON request.' }, 400); }
-                if (!payload || Array.isArray (payload) || typeof payload !== 'object') { return json ({ error : 'Expected AI request fields.' }, 400); }
-                return await upstreamJson (context, base, { method : 'POST', body });
+                if (!ValidPayload (payload)) { return json ({ error : 'Expected flat AI request fields.' }, 400); }
+                if (credential.shared) {
+                    const { tasks } = await OwnedTasks (context.env, owner);
+                    if (tasks.filter (task => Date.now () - task.createdAt < SharedCreateWindowMs).length >= SharedCreateLimit) { return json ({ error : 'The shared Meshy key allows ' + SharedCreateLimit + ' generations per hour per account. Save a personal key in AI connections for more.', code : 'MESHY_SHARED_RATE_LIMITED' }, 429, new Headers ({ 'Retry-After' : '600' })); }
+                }
+                const response = await upstreamJson (context, base, { method : 'POST', body }, credential);
+                if (credential.shared && response.ok) {
+                    const created = await response.clone ().json ().catch (() => null);
+                    if (typeof created?.result === 'string') { await RecordOwnedTask (context.env, owner, created.result); }
+                }
+                return response;
             }
             if (path.length === 1 && method === 'GET') {
                 const requestUrl = new URL (context.request.url); const pageSize = cleanPageSize (requestUrl.searchParams.get ('page_size'), 8);
                 const sortBy = requestUrl.searchParams.get ('sort_by') === '+created_at' ? '+created_at' : '-created_at';
-                return await upstreamJson (context, base + '?page_size=' + pageSize + '&sort_by=' + encodeURIComponent (sortBy));
+                if (!credential.shared) { return await upstreamJson (context, base + '?page_size=' + pageSize + '&sort_by=' + encodeURIComponent (sortBy), {}, credential); }
+                // The shared key's account holds every user's tasks; return only this account's.
+                const owned = new Set ((await OwnedTasks (context.env, owner)).tasks.map (task => task.id));
+                const response = await upstreamJson (context, base + '?page_size=100&sort_by=' + encodeURIComponent (sortBy), {}, credential);
+                if (!response.ok) { return response; }
+                const listed = await response.json ();
+                return json (Array.isArray (listed) ? listed.filter (task => owned.has (task?.id)).slice (0, pageSize) : [], 200);
             }
-            if (path.length === 2 && method === 'GET' && String (path[1]).length <= 200) { return await upstreamJson (context, base + '/' + encodeURIComponent (String (path[1]))); }
+            if (path.length === 2 && method === 'GET' && String (path[1]).length <= 200) {
+                if (credential.shared && !(await OwnedTasks (context.env, owner)).tasks.some (task => task.id === String (path[1]))) { return json ({ error : 'AI task not found.' }, 404); }
+                return await upstreamJson (context, base + '/' + encodeURIComponent (String (path[1])), {}, credential);
+            }
         }
 
         return json ({ error : 'AI API route not found.' }, 404);

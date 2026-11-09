@@ -70,8 +70,9 @@ import { ThreeModelLoader } from './threejs/threemodelloader.js';
 import { ThreeColorConverter, ThreeLinearToSRGBColorConverter, ThreeSRGBToLinearColorConverter, HasHighpDriverIssue, GetShadingType, ConvertThreeColorToColor, ConvertColorToThreeColor, ConvertThreeGeometryToMesh, CreateHighlightMaterial, CreateHighlightMaterials, DisposeThreeObjects, GetLineSegmentsProjectedDistance, ShadingType } from './threejs/threeutils.js';
 import { GetBackgroundPreset, GetBackgroundGradientCSS, BackgroundStops } from './viewer/background.js';
 import { Camera, CameraIsEqual3D, NavigationMode, ProjectionMode } from './viewer/camera.js';
-import { GetIntegerFromStyle, GetDomElementExternalWidth, GetDomElementExternalHeight, GetDomElementInnerDimensions, GetDomElementClientCoordinates, CreateDomElement, AddDomElement, AddDiv, ClearDomElement, InsertDomElementBefore, InsertDomElementAfter, ShowDomElement, IsDomElementVisible, SetDomElementWidth, SetDomElementHeight, GetDomElementOuterWidth, GetDomElementOuterHeight, SetDomElementOuterWidth, SetDomElementOuterHeight, CreateDiv } from './viewer/domutils.js';
+import { GetIntegerFromStyle, GetDomElementExternalWidth, GetDomElementExternalHeight, GetDomElementInnerDimensions, GetDomElementClientCoordinates, CreateDomElement, CreateDomElementFromTrustedHtml, AddDomElement, AddDiv, ClearDomElement, InsertDomElementBefore, InsertDomElementAfter, ShowDomElement, IsDomElementVisible, SetDomElementWidth, SetDomElementHeight, GetDomElementOuterWidth, GetDomElementOuterHeight, SetDomElementOuterWidth, SetDomElementOuterHeight, CreateDiv } from './viewer/domutils.js';
 import { EmbeddedViewer, Init3DViewerFromUrlList, Init3DViewerFromFileList, Init3DViewerElements } from './viewer/embeddedviewer.js';
+import { VisibleSceneBounds, FitVisibleCamera } from './viewer/fitview.js';
 import { FloorShadow, FloorShadowDirection, FloorShadowProjection } from './viewer/floorshadow.js';
 import { HDRILighting, ProjectHDRI } from './viewer/hdrilighting.js';
 import { MaterialReflectionStrength, SetMaterialReflectionStrength } from './viewer/materialreflection.js';
@@ -332,6 +333,7 @@ export {
     GetDomElementInnerDimensions,
     GetDomElementClientCoordinates,
     CreateDomElement,
+    CreateDomElementFromTrustedHtml,
     AddDomElement,
     AddDiv,
     ClearDomElement,
@@ -350,6 +352,8 @@ export {
     Init3DViewerFromUrlList,
     Init3DViewerFromFileList,
     Init3DViewerElements,
+    VisibleSceneBounds,
+    FitVisibleCamera,
     FloorShadow,
     FloorShadowDirection,
     FloorShadowProjection,

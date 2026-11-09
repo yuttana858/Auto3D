@@ -70,7 +70,7 @@ describe ('Extended AI workspace services', () => {
  });
  it ('Preserves Meshy 403 details instead of reporting every refusal as a bad key', async () => {
   const previous = globalThis.fetch; globalThis.fetch = async () => Response.json ({ message : 'Content moderation blocked the input.' }, { status : 403 });
-  try { const c = { data : { user : { id : 'owner' } }, params : { path : ['text-to-3d'] }, env : { MESHY_API_KEY : 'test-server-key', AUTO3D_AI_ALLOW_SHARED_KEY : 'true' }, request : new Request ('https://auto3d.test/api/ai/text-to-3d', { method : 'POST', body : '{}' }) }; const response = await onRequest (c); assert.equal (response.status, 403); assert.match ((await response.json ()).message, /moderation/); } finally { globalThis.fetch = previous; }
+  try { const c = { data : { user : { id : 'owner' } }, params : { path : ['text-to-3d'] }, env : { MESHY_API_KEY : 'test-server-key', AUTO3D_AI_ALLOW_SHARED_KEY : 'true', AUTO3D_AI_CREDENTIALS_R2 : { async get () { return null; }, async put () { return {}; } } }, request : new Request ('https://auto3d.test/api/ai/text-to-3d', { method : 'POST', body : '{}' }) }; const response = await onRequest (c); assert.equal (response.status, 403); assert.match ((await response.json ()).message, /moderation/); } finally { globalThis.fetch = previous; }
  });
  it ('Retries transient polling failures and stops on permanent failures', async () => {
   const { workspace } = Workspace (); workspace.PollTask = AIWorkspace.prototype.PollTask; const timer = globalThis.setTimeout; let calls = 0;
@@ -98,7 +98,8 @@ describe ('Extended AI workspace services', () => {
  });
  it ('Proxies only allow-listed Meshy routes, preserves retry headers and rejects malformed/oversized submissions', async () => {
   const previous = globalThis.fetch; const calls = []; globalThis.fetch = async (url, init) => { calls.push ([url, init]); return new Response ('{"result":"task"}', { headers : { 'Retry-After' : '5' } }); };
-  const context = (path, body = '{}') => ({ data : { user : { id : 'owner' } }, params : { path }, env : { MESHY_API_KEY : 'test-server-key', AUTO3D_AI_ALLOW_SHARED_KEY : 'true' }, request : new Request ('https://auto3d.test/api/ai/' + path.join ('/'), { method : 'POST', body }) });
+  const objects = new Map (), bucket = { async get (key) { const body = objects.get (key); return body ? { size : body.length, async json () { return JSON.parse (body); } } : null; }, async put (key, body) { objects.set (key, body); return {}; } };
+  const context = (path, body = '{}') => ({ data : { user : { id : 'owner' } }, params : { path }, env : { MESHY_API_KEY : 'test-server-key', AUTO3D_AI_ALLOW_SHARED_KEY : 'true', AUTO3D_AI_CREDENTIALS_R2 : bucket }, request : new Request ('https://auto3d.test/api/ai/' + path.join ('/'), { method : 'POST', body }) });
   try {
    for (const route of ['text-to-3d', 'image-to-3d', 'text-to-image', 'retexture', 'rigging', 'animations']) { const response = await onRequest (context ([route])); assert.equal (response.status, 200); assert.equal (response.headers.get ('Retry-After'), '5'); assert.ok (calls.at (-1)[0].includes ('/openapi/' + (route === 'text-to-3d' ? 'v2' : 'v1') + '/' + route)); }
    assert.equal ((await onRequest (context (['unknown']))).status, 404); assert.equal ((await onRequest (context (['rigging'], '[]'))).status, 400); assert.equal ((await onRequest (context (['rigging'], '{'))).status, 400);

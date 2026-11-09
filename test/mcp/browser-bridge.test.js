@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { AgentAccess } from '../../source/website/agentaccess.js';
+import { AgentAccess, FitResult } from '../../source/website/agentaccess.js';
 import { CommandRegistry } from '../../source/website/commandregistry.js';
 
 function Fixture ()
@@ -34,24 +34,53 @@ describe ('Browser-side MCP guards', () => {
             await timer.callback (); assert.equal (attempts, 1);
         } finally { globalThis.setTimeout = oldSet; globalThis.clearTimeout = oldClear; }
     });
-    it ('executes only the read allowlist and requires a separate screenshot opt-in', async () => {
-        const { access, request } = Fixture ();
+    it ('executes only the read allowlist and returns structured denials without disconnecting', async () => {
+        const { access, request } = Fixture (); let lost = 0; access.ConnectionLost = () => { lost++; };
         await access.Message (request ('scene.inspect'), access.socket, 0); assert.equal (access.socket.sent[0].result.ok, true);
-        await assert.rejects (access.Message (request ('auth.sign_out'), access.socket, 0));
-        await assert.rejects (access.Message (request ('capture.image'), access.socket, 0));
-        await assert.rejects (access.Message (request ('objects.delete'), access.socket, 0));
-        await access.Message (request ('objects.delete', true), access.socket, 0); assert.equal (access.socket.sent[1].result.ok, true);
-        access.screenshots = true; await access.Message (request ('capture.image'), access.socket, 0); assert.equal (access.socket.sent.length, 3);
+        await access.Message (request ('auth.sign_out'), access.socket, 0); assert.equal (access.socket.sent[1].error.code, 'permission_required');
+        await access.Message (request ('capture.image'), access.socket, 0); assert.equal (access.socket.sent[2].error.code, 'permission_required');
+        await access.Message (request ('objects.delete'), access.socket, 0); assert.equal (access.socket.sent[3].error.code, 'permission_required');
+        await access.Message (request ('objects.delete', true), access.socket, 0); assert.equal (access.socket.sent[4].result.ok, true);
+        access.screenshots = true; await access.Message (request ('capture.image'), access.socket, 0); assert.equal (access.socket.sent[5].result.ok, true);
+        assert.equal (lost, 0); assert.ok (access.socket.sent.every (message => message.requestId === 'request-a' && message.sessionId === 'tab-a'));
     });
-    it ('checks account and tab after the registry queue and discards late results', async () => {
+    it ('reports command failures and invalid arguments as results', async () => {
+        const { website, access, request } = Fixture ();
+        website.commands.Register ({ id : 'object.select', mutates : true, inputSchema : { type : 'object', properties : { id : { type : 'string' } }, required : ['id'] } }, async () => { throw new Error ('Object not found.'); });
+        await access.Message (request ('object.select', true), access.socket, 0); assert.deepEqual (access.socket.sent[0].error, { code : 'invalid_arguments', message : 'arguments.id is required.' });
+        const bad = { data : JSON.stringify ({ type : 'request', command : 'object.select', requestId : 'request-b', sessionId : 'tab-a', arguments : { id : 'x' }, writeAuthorized : true }) };
+        await access.Message (bad, access.socket, 0); assert.deepEqual (access.socket.sent[1].error, { code : 'command_failed', message : 'Object not found.' });
+        await assert.rejects (access.Message ({ data : '{"type":"bogus"}' }, access.socket, 0), /Invalid message/);
+    });
+    it ('checks account and tab after the registry queue and reports late changes', async () => {
         const { website, access, request } = Fixture (); let release;
         const blocked = website.commands.Queue (() => new Promise (resolve => { release = resolve; }));
         await Promise.resolve ();
         const waiting = access.Message (request ('scene.inspect'), access.socket, 0); website.sessionEditor.sessions.active = 'tab-b';
-        release (); await blocked; await assert.rejects (waiting); assert.equal (access.socket.sent.length, 0);
+        release (); await blocked; await waiting; assert.equal (access.socket.sent[0].error.code, 'session_changed');
         website.sessionEditor.sessions.active = 'tab-a';
         website.commands.commands.get ('scene.inspect').handler = async () => { website.sessionEditor.sessions.revision++; return {}; };
-        await assert.rejects (access.Message (request ('scene.inspect'), access.socket, 0)); assert.equal (access.socket.sent.length, 0);
+        await access.Message (request ('scene.inspect'), access.socket, 0); assert.equal (access.socket.sent[1].error.code, 'session_changed');
         website.auth.user = { id : 'other' }; await assert.rejects (access.Message (request ('scene.inspect'), access.socket, 0));
+    });
+    it ('lets agent tab commands change the active tab and reports the new tab', async () => {
+        const { website, access } = Fixture ();
+        website.sessionEditor.sessions.Inspect = () => ({ tabs : [{ id : website.sessionEditor.sessions.active, name : 'Box', active : true }] });
+        website.commands.Register ({ id : 'session.tabs.new', mutates : true, inputSchema : { type : 'object', properties : {} } }, async () => { website.sessionEditor.sessions.active = 'tab-new'; website.sessionEditor.sessions.revision++; return { activeId : 'tab-new' }; });
+        await access.Message ({ data : JSON.stringify ({ type : 'request', command : 'session.tabs.new', requestId : 'request-t', sessionId : 'tab-a', arguments : {}, writeAuthorized : true }) }, access.socket, 0);
+        assert.equal (access.socket.sent[0].type, 'sessions'); assert.equal (access.socket.sent[0].sessions[0].id, 'tab-new');
+        assert.equal (access.socket.sent[1].result.activeSessionId, 'tab-new'); assert.equal (access.socket.sent[1].sessionId, 'tab-a');
+    });
+    it ('shortens oversized results instead of discarding them', () => {
+        const payload = { ok : true, command : 'scene.inspect', result : { objects : Array.from ({ length : 4000 }, (_, index) => ({ id : 'object-' + index, name : 'Part ' + index })) } };
+        const fitted = FitResult (payload, 65000);
+        assert.ok (JSON.stringify (fitted).length <= 65000); assert.equal (fitted.truncated.path, 'objects'); assert.equal (fitted.truncated.total, 4000);
+        assert.equal (fitted.result.objects.length, fitted.truncated.returned); assert.equal (payload.result.objects.length, 4000);
+        assert.throws (() => FitResult ({ ok : true, result : { blob : 'x'.repeat (70000) } }, 65000), /transfer limit/);
+    });
+    it ('cancels a running text command when the broker times out', async () => {
+        const { website, access } = Fixture (); let cancelled = 0; website.commands.Cancel = () => { cancelled++; return { requested : true }; };
+        access.running.set ('request-c', 'commands.text'); await access.Message ({ data : JSON.stringify ({ type : 'cancel', requestId : 'request-c' }) }, access.socket, 0);
+        await access.Message ({ data : JSON.stringify ({ type : 'cancel', requestId : 'other' }) }, access.socket, 0); assert.equal (cancelled, 1);
     });
 });
