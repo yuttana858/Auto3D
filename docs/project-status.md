@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## MCP connection display — Auto3D 0.50.2 candidate
+
+Connection and administrator lists show client labels and status without harness labels. Existing grants remain revocable.
+
 ## Standard MCP consent — Auto3D 0.50.1 / Packaging 1.10.3 / Primary Products 0.4.0
 
 PR #82 removes Agent connection instructions, registration/harness inputs and window-code controls from the dialog. OAuth consent derives connection labels from client metadata and asks only for Allow/Deny. Browser sharing, screenshot opt-in and revocation remain available. See [release-0501.md](release-0501.md).

@@ -132,7 +132,7 @@ export class AgentAccess
         const refresh = async () => {
             const result = await this.Request ('registrations'); list.replaceChildren ();
             for (const record of result.registrations) {
-                const row = document.createElement ('p'); row.textContent = record.name + ' · ' + record.harness + ' · ' + (record.revokedAt !== null ? 'Revoked' : record.expiresAt <= Date.now () ? 'Expired' : 'Active');
+                const row = document.createElement ('p'); row.textContent = record.name + ' · ' + (record.revokedAt !== null ? 'Revoked' : record.expiresAt <= Date.now () ? 'Expired' : 'Active');
                 if (record.revokedAt === null && record.expiresAt > Date.now ()) { const revoke = document.createElement ('button'); revoke.textContent = 'Revoke'; revoke.onclick = () => { this.Request ('registrations', { action : 'revoke', id : record.id }).then (refresh).catch (error => { status.textContent = error.message; }); }; row.appendChild (revoke); } list.appendChild (row);
             }
         };
@@ -149,7 +149,7 @@ export class AgentAccess
         const refresh = async () => {
             const data = await this.Request ('admin?accountId=' + encodeURIComponent (account.value)); list.replaceChildren (); status.textContent = data.disabled ? 'Agent access disabled' : 'Agent access enabled';
             for (const record of data.registrations) {
-                const row = document.createElement ('p'); row.textContent = record.name + ' · ' + record.harness + ' · ' + (record.revokedAt !== null ? 'Revoked' : 'Expires ' + new Date (record.expiresAt).toLocaleString ());
+                const row = document.createElement ('p'); row.textContent = record.name + ' · ' + (record.revokedAt !== null ? 'Revoked' : 'Expires ' + new Date (record.expiresAt).toLocaleString ());
                 if (record.revokedAt === null) { const revoke = document.createElement ('button'); revoke.textContent = 'Revoke'; revoke.onclick = () => run (async () => { await this.Request ('admin', { accountId : account.value, id : record.id, action : 'revoke' }); await refresh (); }); row.appendChild (revoke); } list.appendChild (row);
             }
         };

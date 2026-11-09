@@ -45,7 +45,7 @@ try {
     await page.goto (origin + '/'); await page.getByRole ('button', { name : 'Welcome to Auto3D. Continue to sign in.' }).click (); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
     const call = async (id, args = {}) => { const result = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (result.ok, true, JSON.stringify (result)); return result.result; };
     await page.getByRole ('button', { name : 'Preferences', exact : true }).click (); await page.getByRole ('button', { name : 'Agent access', exact : true }).click ();
-    const dialog = page.getByRole ('dialog', { name : 'MCP connections', exact : true }); await dialog.waitFor (); assert.ok (await dialog.getByText ('Named review agent', { exact : false }).count ());
+    const dialog = page.getByRole ('dialog', { name : 'MCP connections', exact : true }); await dialog.waitFor (); assert.ok (await dialog.getByText ('Named review agent', { exact : false }).count ()); assert.equal (await dialog.getByText ('chatgpt', { exact : false }).count (), 0);
     assert.equal (await dialog.locator ('input[type=checkbox]').isChecked (), false);
     assert.equal (await dialog.getByLabel ('App window code').count (), 0);
     assert.equal (await dialog.getByRole ('button', { name : 'Copy', exact : true }).count (), 0);
