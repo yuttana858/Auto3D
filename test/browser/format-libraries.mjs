@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
-// Draco glTF and Rhino 3DM import must use the decoders hosted beside the site bundle, never the CDN.
+// Draco glTF, Rhino 3DM, STEP and IFC import must use the libraries hosted beside the site bundle, never the CDN.
 const browser = await chromium.launch ({ executablePath : '/usr/bin/chromium', args : ['--no-sandbox', '--enable-unsafe-swiftshader'] });
 try {
     const cdn = [], local = new Set ();
-    for (const files of [['test/testfiles/gltf/Box/glTF-Draco/Box.gltf', 'test/testfiles/gltf/Box/glTF-Draco/Box.bin'], ['test/testfiles/3dm/cube-mesh.3dm']]) {
+    for (const files of [['test/testfiles/gltf/Box/glTF-Draco/Box.gltf', 'test/testfiles/gltf/Box/glTF-Draco/Box.bin'], ['test/testfiles/3dm/cube-mesh.3dm'], ['test/testfiles/step/cube-20mm.step'], ['test/testfiles/ifc/wall.ifc']]) {
         const page = await browser.newPage (); page.setDefaultTimeout (90000); const errors = [];
         page.on ('pageerror', error => errors.push (error.message));
         await page.route ('https://cdn.jsdelivr.net/**', route => { cdn.push (route.request ().url ()); route.abort (); });
-        page.on ('request', request => { const match = /\/(draco\/draco_decoder\.js|libs\/rhino3dm\/rhino3dm\.(?:min\.js|wasm))$/.exec (request.url ()); if (match) { local.add (match[1]); } });
+        page.on ('request', request => { const match = /\/(draco\/draco_decoder\.js|libs\/rhino3dm\/rhino3dm\.(?:min\.js|wasm)|libs\/occt-import-js\/occt-import-js-worker\.js|libs\/web-ifc\/web-ifc(?:-api-iife\.js|\.wasm))$/.exec (request.url ()); if (match) { local.add (match[1]); } });
         await page.route ('**/api/preferences', route => route.fulfill ({ json : { preferences : { units : 'metric', theme : 1 }, folders : ['Uncategorized'] } }));
         await page.route ('**/api/personal/items', route => route.fulfill ({ json : [] }));
         await page.route ('**/api/auth/session', route => route.fulfill ({ json : { user : { id : 'browser-user', email : 'browser@example.com' } } }));
@@ -22,6 +22,6 @@ try {
         assert.deepEqual (errors, []); await page.close ();
     }
     assert.deepEqual (cdn, []);
-    assert.deepEqual ([...local].sort (), ['draco/draco_decoder.js', 'libs/rhino3dm/rhino3dm.min.js', 'libs/rhino3dm/rhino3dm.wasm']);
-    console.log ('Draco glTF and Rhino 3DM import passed using site-hosted libraries with the CDN blocked.');
+    assert.deepEqual ([...local].sort (), ['draco/draco_decoder.js', 'libs/occt-import-js/occt-import-js-worker.js', 'libs/rhino3dm/rhino3dm.min.js', 'libs/rhino3dm/rhino3dm.wasm', 'libs/web-ifc/web-ifc-api-iife.js', 'libs/web-ifc/web-ifc.wasm']);
+    console.log ('Draco glTF, Rhino 3DM, STEP and IFC import passed using site-hosted libraries with the CDN blocked.');
 } finally { await browser.close (); }

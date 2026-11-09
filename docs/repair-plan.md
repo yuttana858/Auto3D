@@ -72,7 +72,7 @@ Status legend: ☐ open · ☑ done · ⏸ planned for a later release (feature 
 | ID | Issue | Repair | Status |
 |---|---|---|---|
 | R1 | Format importers load `draco3d` and `rhino3dm` from cdn.jsdelivr.net at runtime. | Engine library URLs are configurable; the site uses its bundled three.js Draco decoder and a build-time copy of rhino3dm 8.17.0 (MIT) with notices. Verified in Chromium with the CDN blocked. | ☑ |
-| R2 | `occt-import-js` (LGPL-2.1) and `web-ifc` (MPL-2.0) load from the CDN. | ⏸ Needs an owner decision on redistributing copyleft files; switching each is one `BundledLibraries` entry plus a build copy and notices. The CSP keeps cdn.jsdelivr.net until then. | ⏸ |
+| R2 | `occt-import-js` (LGPL-2.1) and `web-ifc` (MPL-2.0) load from the CDN. | Hosted under `/o3dv/libs/` as unmodified files with license texts and source notices (owner approved 2026-11-09); jsdelivr removed from the CSP. Verified STEP and IFC import on the CSP-protected Pages build. | ☑ |
 
 Other external origins are first-party: HDRI environments come from the account's own Supabase Storage and Meshy models are proxied through `/api/ai`. Fonts are already bundled.
 

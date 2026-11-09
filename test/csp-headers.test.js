@@ -9,6 +9,7 @@ describe ('Content-Security-Policy', () => {
         assert.ok (!script.includes ("'unsafe-inline'")); assert.ok (script.includes ('__INLINE_SCRIPT_HASHES__'));
         assert.match (policy, /object-src 'none'/); assert.match (policy, /base-uri 'self'/); assert.match (policy, /default-src 'self'/);
         assert.match (headers, /\/index\.html\n {2}X-Frame-Options: SAMEORIGIN/);
+        assert.ok (!policy.includes ('cdn.jsdelivr.net'), 'format libraries are self-hosted');
     });
     it ('hashes every inline bootstrap script in the Pages build', () => {
         const build = fs.readFileSync ('tools/build_pages.mjs', 'utf8');

@@ -2,7 +2,7 @@
 
 ## Browser CI and settled view commands — Auto3D 0.51.1 / Packaging 1.10.3 / Primary Products 0.4.0 (2026-11-09)
 
-Fixes the first CI run of the browser job (missing production/Pages/MCP builds, a disabled sign-in wait in two tests) and makes `view.focus`, `view.fit` and `camera.activate` return after the camera settles. Carries the self-hosted Draco/rhino3dm libraries that missed the PR #85 merge. The 36-test CI browser list passes locally from a clean build. See [release-0511.md](release-0511.md).
+Fixes the first CI run of the browser job (missing production/Pages/MCP builds, a disabled sign-in wait in two tests) and makes `view.focus`, `view.fit` and `camera.activate` return after the camera settles. Hosts all four format libraries with the site (Draco, rhino3dm, occt-import-js, web-ifc) and removes cdn.jsdelivr.net from the CSP. The 36-test CI browser list passes locally from a clean build. See [release-0511.md](release-0511.md).
 
 ## Repair release — Auto3D 0.51.0 / Packaging 1.10.3 / Primary Products 0.4.0 (2026-11-09)
 

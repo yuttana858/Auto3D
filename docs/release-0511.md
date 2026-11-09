@@ -7,7 +7,9 @@ Follow-up to PR #85 (0.51.0), which merged before its last commit and before the
 - Draco-compressed glTF uses the Draco decoder the site already ships under `/o3dv/draco/` (from three.js) instead of `draco3d` from cdn.jsdelivr.net.
 - Rhino `.3dm` import and export use `rhino3dm` 8.17.0 (MIT), copied to `/o3dv/libs/rhino3dm/` at build time with its license notice and pinned as a development dependency.
 - The engine keeps its CDN defaults for npm consumers and gains `SetExternalLibraryUrl`/`GetExternalLibraryUrl`; the site switches to its own copies at startup.
-- STEP/IGES/BREP/FreeCAD (`occt-import-js`, LGPL-2.1) and IFC (`web-ifc`, MPL-2.0) still load from the CDN pending an owner decision on redistributing copyleft files.
+- STEP/IGES/BREP/FreeCAD (`occt-import-js` 0.0.22, LGPL-2.1) and IFC (`web-ifc` 0.0.68, MPL-2.0) are hosted under `/o3dv/libs/` as unmodified files with their license texts and source notices, as approved by the project owner. Nothing loads from cdn.jsdelivr.net any more, so the CSP no longer allows it.
+- `'unsafe-eval'` remains in the CSP: removing it was tested and stops the app before sign-in.
+- `format-libraries` imports Draco glTF, 3DM, STEP and IFC with the CDN blocked, using an original 20 mm STEP cube and a minimal IFC4 wall as fixtures. The same four imports pass on the production Pages build served with its CSP.
 
 ## Agent view commands wait for the camera
 
