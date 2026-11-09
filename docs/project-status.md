@@ -1,8 +1,11 @@
 # Auto3D development log and handoff
 
-## Browser CI and settled view commands — Auto3D 0.51.1 / Packaging 1.10.4 / Primary Products 0.4.0 (2026-11-09)
+## Browser CI and settled view commands — Auto3D 0.52.1 / Packaging 1.10.4 / Primary Products 0.5.0 (2026-11-09)
 
-Fixes the first CI run of the browser job (missing production/Pages/MCP builds, a disabled sign-in wait in two tests) and makes `view.focus`, `view.fit` and `camera.activate` return after the camera settles. Packaging 1.10.4 keeps board-surface controls in step with the editor's busy state. Hosts all four format libraries with the site (Draco, rhino3dm, occt-import-js, web-ifc) and removes cdn.jsdelivr.net from the CSP. The 36-test CI browser list passes locally from a clean build. See [release-0511.md](release-0511.md).
+Fixes the first CI run of the browser job (missing production/Pages/MCP builds, a disabled sign-in wait in two tests) and makes `view.focus`, `view.fit` and `camera.activate` return after the camera settles. Packaging 1.10.4 keeps board-surface controls in step with the editor's busy state. Hosts all four format libraries with the site (Draco, rhino3dm, occt-import-js, web-ifc) and removes cdn.jsdelivr.net from the CSP. The 36-test CI browser list passes locally from a clean build. See [release-0521.md](release-0521.md).
+## Primary Products materials and artwork — Auto3D 0.52.0 / Primary Products 0.5.0 / Packaging 1.10.3
+
+Adds the shared H × W × D row, adjacent native color swatch, category PBR presets and local PNG/JPEG/WebP label import with actual surface application. Original embedded pixels and physical label descriptors survive file/recovery and portable image/material export. See [release-0520.md](release-0520.md). Not deployed.
 
 ## Repair release — Auto3D 0.51.0 / Packaging 1.10.3 / Primary Products 0.4.0 (2026-11-09)
 

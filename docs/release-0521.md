@@ -1,6 +1,6 @@
-# Auto3D 0.51.1 / Packaging 1.10.4 / Primary Products 0.4.0
+# Auto3D 0.52.1 / Packaging 1.10.4 / Primary Products 0.5.0
 
-Follow-up to PR #85 (0.51.0), which merged before its last commit and before the new browser CI job finished.
+Follow-up to PR #85 (0.51.0), which merged before its last commit and before the new browser CI job finished. Based on 0.52.0 (PR #86).
 
 ## Self-hosted format libraries (carried over from the PR #85 branch)
 

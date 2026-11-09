@@ -6102,7 +6102,7 @@
       "id": "primary.inspect",
       "title": "Inspect product draft",
       "category": "Primary Products",
-      "description": "Read canonical-mm draft dimensions and whether opaque generation is available. Label zones are preparatory; no artwork is applied.",
+      "description": "Read canonical-mm draft dimensions and whether opaque generation is available. Includes imported local label descriptors; Generate or Apply renders them.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -6155,7 +6155,15 @@
               "plastic",
               "glass",
               "aluminum",
-              "steel"
+              "steel",
+              "hdpe",
+              "pp",
+              "petOpaque",
+              "coatedMetal",
+              "brushedMetal",
+              "matteFilm",
+              "glossFilm",
+              "foil"
             ]
           },
           "color": {
@@ -6189,7 +6197,7 @@
       "id": "primary.generate",
       "title": "Generate product",
       "category": "Primary Products",
-      "description": "Generate the current opaque bottle/can/pouch draft as one undoable session object. Glass and artwork are unavailable.",
+      "description": "Generate the current opaque bottle/can/pouch draft as one undoable session object. Clear glass is unavailable. Imported local labels render on the generated model.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -6226,6 +6234,115 @@
         "additionalProperties": false
       },
       "example": {}
+    },
+    {
+      "id": "primary.materials.list",
+      "title": "List product materials",
+      "category": "Primary Products",
+      "description": "List supported physical material presets for a product family.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "family": {
+            "type": "string",
+            "enum": [
+              "bottle",
+              "can",
+              "pouch"
+            ]
+          }
+        },
+        "required": [
+          "family"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "family": "bottle"
+      }
+    },
+    {
+      "id": "primary.artwork.open",
+      "title": "Import label image",
+      "category": "Primary Products",
+      "description": "Open an interactive local PNG/JPEG/WebP picker. Returns opened, not imported; source bytes stay local until an explicit save.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "primary.artwork.mapping",
+      "title": "Set physical label size",
+      "category": "Primary Products",
+      "description": "Set physical label dimensions in millimeters; validates fit before mutation. Generate or Apply to update the scene.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zone": {
+            "type": "string",
+            "enum": [
+              "front",
+              "back",
+              "wrap"
+            ]
+          },
+          "widthMm": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1600
+          },
+          "heightMm": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "zone",
+          "widthMm",
+          "heightMm"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "zone": "front",
+        "widthMm": 40,
+        "heightMm": 60
+      }
+    },
+    {
+      "id": "primary.artwork.remove",
+      "title": "Remove label image",
+      "category": "Primary Products",
+      "description": "Remove a draft label and its unused local source. Generate or Apply to update the scene.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zone": {
+            "type": "string",
+            "enum": [
+              "front",
+              "back",
+              "wrap"
+            ]
+          }
+        },
+        "required": [
+          "zone"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "zone": "front"
+      }
     },
     {
       "id": "primary.reset",

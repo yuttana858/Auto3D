@@ -1,6 +1,6 @@
 # Primary Products module — build plan
 
-Status: implementation in progress. UI shell is stacked in #63/#62; independent geometry follows in #64 (module 0.2.0). Opaque scene generation/update and versioned persistence are now in development in module 0.3.0; see [the scene increment](release-0490.md). The 0.50.0 increment adds Generate readiness and opaque pillow pouches; advanced bottle/can artwork/glass gates and other pouch types remain incomplete. See [current increment](release-0500.md). No deployment of that increment is implied. See [geometry progress](primary-products-geometry.md).
+Status: implementation in progress. The [0.52.0 increment](release-0520.md) adds category PBR presets and actual local label artwork application/persistence; clear-pack rendering remains incomplete. UI shell is stacked in #63/#62; independent geometry follows in #64 (module 0.2.0). Opaque scene generation/update and versioned persistence are now in development in module 0.3.0; see [the scene increment](release-0490.md). The 0.50.0 increment adds Generate readiness and opaque pillow pouches; advanced bottle/can artwork/glass gates and other pouch types remain incomplete. See [current increment](release-0500.md). No deployment of that increment is implied. See [geometry progress](primary-products-geometry.md).
 Created: 2026-11-04. Repository baseline: Auto3D 0.47.3, Packaging 1.10.3.
 Proposed package: `@auto3d/primary-products`, initial module version 0.1.0; API version 1.
 
