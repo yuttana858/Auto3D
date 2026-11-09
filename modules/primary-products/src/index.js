@@ -3,3 +3,5 @@ export * from './state.js';
 export { PrimaryProductsPanel } from './panel.js';
 export { CreatePrimaryProduct, GetArtworkZones } from './geometry.js';
 export { ProductDefinition, ValidateProductDefinition } from './definition.js';
+export { ProductMaterials, ListProductMaterials } from './materials.js';
+export { ValidateProductArtwork, CreateLabelMesh } from './artwork.js';

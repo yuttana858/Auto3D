@@ -19,6 +19,13 @@ const GltfBufferType =
     ELEMENT_ARRAY_BUFFER : 34963
 };
 
+function TextureSource (mainJson, texture, source)
+{
+    if (texture.mimeType !== 'image/webp' && GetFileExtension (texture.name).toLowerCase () !== 'webp') { return { source }; }
+    for (const key of ['extensionsUsed', 'extensionsRequired']) { mainJson[key] ||= []; if (!mainJson[key].includes ('EXT_texture_webp')) { mainJson[key].push ('EXT_texture_webp'); } }
+    return { extensions : { EXT_texture_webp : { source } } };
+}
+
 export class ExporterGltf extends ExporterBase
 {
 	constructor ()
@@ -83,9 +90,7 @@ export class ExporterGltf extends ExporterBase
                     uri : fileName
                 });
 
-                mainJson.textures.push ({
-                    source : textureIndex
-                });
+                mainJson.textures.push (TextureSource (mainJson, texture, textureIndex));
 
                 return textureIndex;
             }
@@ -143,11 +148,9 @@ export class ExporterGltf extends ExporterBase
                 textureOffset += textureBuffer.byteLength;
                 mainJson.images.push ({
                     bufferView : bufferViewIndex,
-                    mimeType : 'image/' + extension
+                    mimeType : texture.mimeType || 'image/' + (extension === 'jpg' ? 'jpeg' : extension)
                 });
-                mainJson.textures.push ({
-                    source : textureIndex
-                });
+                mainJson.textures.push (TextureSource (mainJson, texture, textureIndex));
 
                 return textureIndex;
             }
