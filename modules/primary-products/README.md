@@ -1,4 +1,4 @@
-# Primary Products 0.5.0
+# Primary Products 0.6.0
 
 Independent bottle/can/pillow-pouch UI and neutral geometry package, API 1. No Auto3D engine, account or Packaging imports. Auto3D integrates its lazy module bundle through separate host adapter/workspace services.
 
@@ -17,3 +17,5 @@ See [the build plan](../../docs/primary-products-build-plan.md) and [scene incre
 Pouches use `DefaultProductDraft("pouch")`, with widthMm, heightMm and depthMm (filled outside envelope). Material is opaque plastic; labels are front/back zone descriptors. Round products retain diameterMm. `Generate` availability follows host editor readiness without rebuilding draft controls. See [0.50.0](../../docs/release-0500.md).
 
 Category material presets expose real PBR defaults through `ListProductMaterials`. `ValidateProductArtwork` validates physical zones; `CreateLabelMesh` creates conforming patches. Authoring definitions may include up to two bounded image descriptors. Original bytes remain in embedded material maps supplied by the host. The panel receives artworkOpen/artworkMapping/artworkRemove/artworkPreview callbacks. Dimensions use one H × W × D row, with linked round W/D and a native material color swatch. See [0.52.0](../../docs/release-0520.md).
+
+Optional `bottleShape` contains all four canonical-mm fields: `neckDiameterMm`, `shoulderHeightMm`, `neckHeightMm`, `capHeightMm`. Missing shape data retains the original proportional profile. Explicit profiles keep a straight body of at least 20% overall height and a cap within the body diameter. Labels are bounded to the remaining straight body; incompatible existing labels block draft mutation. See [0.55.0](../../docs/release-0550.md).

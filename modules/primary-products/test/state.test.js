@@ -14,4 +14,11 @@ describe ('Primary Products draft state', () => {
         for (const changes of [{ family : 'clamshell' }, { heightMm : NaN }, { diameterMm : 0 }, { color : '<svg>' }, { roughness : 2 }, { injected : true }, { labelZone : 'unknown' }]) { assert.throws (() => UpdateProductDraft (draft, changes)); assert.deepEqual (draft, original); }
         assert.equal (UpdateProductDraft (draft, { heightMm : 10 * 25.4 }).heightMm, 254);
     });
+    it ('validates explicit bottle shapes, isolates nested data and preserves legacy defaults', () => {
+        const legacy = DefaultProductDraft (), shape = { neckDiameterMm : 24,shoulderHeightMm : 28,neckHeightMm : 16,capHeightMm : 20 };
+        const next = UpdateProductDraft (legacy,{ bottleShape : shape }); shape.neckDiameterMm = 999; assert.equal (next.bottleShape.neckDiameterMm,24); assert.equal (legacy.bottleShape,undefined);
+        for (const changes of [{ bottleShape : {} },{ bottleShape : { ...next.bottleShape,extra : 1 } },{ bottleShape : { ...next.bottleShape,neckDiameterMm : 65 } },{ bottleShape : { ...next.bottleShape,shoulderHeightMm : 180 } },{ heightMm : 20 }]) { assert.throws (() => UpdateProductDraft (next,changes)); }
+        assert.equal (UpdateProductDraft (next,{ family : 'can' }).bottleShape,undefined); assert.throws (() => UpdateProductDraft (DefaultProductDraft ('can'),{ bottleShape : next.bottleShape }));
+    });
+
 });

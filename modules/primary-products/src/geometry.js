@@ -1,7 +1,7 @@
 import { GetArtworkZones } from './zones.js';
 export { GetArtworkZones } from './zones.js';
 import { CreatePillowPouch } from './pouch.js';
-import { DefaultProductDraft, UpdateProductDraft } from './state.js';
+import { DefaultProductDraft, UpdateProductDraft, BottleShape } from './state.js';
 
 // Neutral indexed meshes: base-centred, Y-up, millimeters; no engine dependencies.
 function Revolve (id, role, profile, segments)
@@ -35,9 +35,9 @@ export function CreatePrimaryProduct (input, options = {})
     const h = definition.heightMm; const r = definition.diameterMm / 2; const components = [];
     const cylinder = (id, role, radius, low, high) => Revolve (id, role, [[0, low], [radius, low], [radius, high], [0, high]], segments);
     if (definition.family === 'bottle') {
-        const neck = r * 0.42;
-        components.push (Revolve ('body', 'body', [[0, 0], [r, 0], [r, h * 0.65], [neck, h * 0.82], [neck, h * 0.9], [0, h * 0.9]], segments));
-        components.push (cylinder ('cap', 'closure', neck * 1.08, h * 0.9, h));
+        const shape = BottleShape (definition), neck = shape.neckDiameterMm / 2, capBottom = h - shape.capHeightMm, neckBottom = capBottom - shape.neckHeightMm, bodyTop = neckBottom - shape.shoulderHeightMm;
+        components.push (Revolve ('body', 'body', [[0, 0], [r, 0], [r, bodyTop], [neck, neckBottom], [neck, capBottom], [0, capBottom]], segments));
+        components.push (cylinder ('cap', 'closure', neck * 1.08, capBottom, h));
     } else {
         components.push (cylinder ('body', 'body', r, h * 0.025, h * 0.975));
         components.push (cylinder ('bottom', 'end', r, 0, h * 0.025));

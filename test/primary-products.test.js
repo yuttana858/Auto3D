@@ -15,6 +15,14 @@ describe ('Primary Products panel services', () => {
         const inspected = (await commands.Execute ('primary.inspect')).result; assert.equal (inspected.generationAvailable, true); assert.equal (inspected.heightMm, 254);
         panel.website.sessionEditor.readOnly = true; assert.equal ((await commands.Execute ('primary.reset')).ok, false); assert.equal (panel.Inspect ().heightMm, 254);
     });
+    it ('exposes shape edits through strict commands/macros and rejects artwork conflicts atomically', async () => {
+        const panel=Object.assign(Object.create(PrimaryProductsPanel.prototype),{website:{auth:{user:{id:'test'}},sessionEditor:{}},draft:DefaultProductDraft(),Refresh(){}}), commands=CreateAgentCommands({sessionEditor:{},primaryProductsPanel:panel});
+        const shape={neckDiameterMm:24,shoulderHeightMm:30,neckHeightMm:20,capHeightMm:20};
+        const macro=await commands.RunMacro({version:1,steps:[{id:'shape',command:'primary.configure',arguments:{bottleShape:shape}},{id:'read',command:'primary.inspect',arguments:{}}]}); assert.equal(macro.ok,true); assert.deepEqual(macro.completed[1].result.bottleShape,shape);
+        assert.equal((await commands.Execute('primary.configure',{bottleShape:{...shape,extra:1}})).ok,false);
+        panel.artwork={entries:[],Inspect:()=>[{resourceId:'a'.repeat(64),name:'Label',mime:'image/png',zone:'front',widthMm:40,heightMm:90}]}; const before=structuredClone(panel.draft);
+        const failed=await commands.Execute('primary.configure',{bottleShape:{...shape,shoulderHeightMm:110}}); assert.equal(failed.ok,false); assert.match(failed.error.message,/fit/); assert.deepEqual(panel.draft,before);
+    });
     it ('keeps module source independent of the application and its assets lazy', () => {
         for (const name of ['index.js', 'state.js', 'panel.js']) { assert.doesNotMatch (readFileSync (new URL ('../modules/primary-products/src/' + name, import.meta.url), 'utf8'), /from ['"].*(source\/engine|source\/website)/); }
         const adapter = readFileSync (new URL ('../source/website/primaryproductspanel.js', import.meta.url), 'utf8'); assert.match (adapter, /await import/);

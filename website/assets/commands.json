@@ -6479,6 +6479,38 @@
               "pouch"
             ]
           },
+          "bottleShape": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "neckDiameterMm": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 1000
+              },
+              "shoulderHeightMm": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 1000
+              },
+              "neckHeightMm": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 1000
+              },
+              "capHeightMm": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 1000
+              }
+            },
+            "required": [
+              "neckDiameterMm",
+              "shoulderHeightMm",
+              "neckHeightMm",
+              "capHeightMm"
+            ]
+          },
           "heightMm": {
             "type": "number",
             "minimum": 20,

@@ -1,5 +1,6 @@
+import { GetArtworkZones } from './zones.js';
 import { ListProductMaterials } from './materials.js';
-import { PrimaryFamilies, PrimaryProductsVersion } from './state.js';
+import { PrimaryFamilies, PrimaryProductsVersion, BottleShape, DefaultProductDraft } from './state.js';
 function Element (tag, className, text, parent)
 {
     const node = document.createElement (tag); if (className) { node.className = className; } if (text !== undefined) { node.textContent = text; } parent?.appendChild (node); return node;
@@ -34,6 +35,13 @@ export class PrimaryProductsPanel
             const field = Element ('label', 'pp_field', label, row); const wrap = Element ('span', 'pp_input_wrap', undefined, field); const input = Element ('input', '', undefined, wrap); input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', 'Product ' + label.toLowerCase ()); this.inputs.set (key, input); const unit = Element ('span', 'pp_unit', '', wrap); this.inputs.set (key + 'Unit', unit);
             input.addEventListener ('change', () => this.Change ({ [this.host.inspect ().family !== 'pouch' && key !== 'heightMm' ? 'diameterMm' : key] : input.valueAsNumber * this.Factor () }));
         }
+        this.shapeSection = Element ('section', 'pp_section', undefined, controls); Element ('h3', '', 'Bottle shape', this.shapeSection); this.shapeInputs = new Map ();
+        for (const [key, title] of [['neckDiameterMm', 'Neck diameter'], ['shoulderHeightMm', 'Shoulder height'], ['neckHeightMm', 'Neck height'], ['capHeightMm', 'Cap height']]) {
+            const label = Element ('label', 'pp_field', title, this.shapeSection), wrap = Element ('span', 'pp_input_wrap', undefined, label), input = Element ('input', '', undefined, wrap), unit = Element ('span', 'pp_unit', '', wrap);
+            input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', title); this.shapeInputs.set (key, { input, unit });
+            input.addEventListener ('change', () => { const draft = this.host.inspect (); this.Change ({ bottleShape : { ...BottleShape (draft), [key] : input.valueAsNumber*this.Factor () } }); });
+        }
+        Element ('p', 'pp_draft_note', 'Overall height includes the cap. The straight body uses the remaining height. Shape edits preserve label size; artwork must still fit.', this.shapeSection);
         const surfaces = Element ('section', 'pp_section', undefined, controls); Element ('h3', '', 'Surface', surfaces);
         const materialRow = Element ('div', 'pp_material_row', undefined, surfaces);
         const materialLabel = Element ('label', 'pp_field', 'Material', materialRow); this.material = Element ('select', '', undefined, materialLabel); this.material.setAttribute ('aria-label', 'Product material'); this.material.addEventListener ('change', () => this.Change ({ material : this.material.value }));
@@ -88,6 +96,8 @@ export class PrimaryProductsPanel
             input.min = String ((key === 'heightMm' ? 20 : key === 'depthMm' && draft.family === 'pouch' ? 2 : 10) / factor); input.max = String ((key === 'heightMm' ? 1000 : key === 'depthMm' && draft.family === 'pouch' ? 200 : 500) / factor); this.inputs.get (key + 'Unit').textContent = unit;
             input.title = draft.family === 'pouch' || key === 'heightMm' ? '' : 'Width and depth share the round product diameter.';
         }
+        this.shapeSection.hidden = draft.family !== 'bottle';
+        if (draft.family === 'bottle') { const shape = BottleShape (draft); for (const [key, { input, unit : suffix }] of this.shapeInputs) { input.value = String (Number ((shape[key]/factor).toFixed (6))); input.min = String (.5/factor); input.max = String (1000/factor); suffix.textContent = unit; } }
         this.material.replaceChildren ();
         for (const item of ListProductMaterials (draft.family)) { const option = Element ('option', '', item.name, this.material); option.value = item.id; option.disabled = item.id === 'glass'; }
         this.material.value = draft.material; this.material.disabled = disabled; this.color.value = draft.color; this.color.disabled = disabled; this.roughness.value = String (draft.roughness); this.roughness.disabled = disabled; this.reset.disabled = disabled;
@@ -101,8 +111,11 @@ export class PrimaryProductsPanel
         this.size.textContent = draft.family === 'pouch' ? [draft.heightMm, draft.widthMm, draft.depthMm].map (n => (n / factor).toFixed (factor === 1 ? 0 : 2)).join (' × ') + ' ' + unit : 'Ø ' + (draft.diameterMm / factor).toFixed (factor === 1 ? 0 : 2) + ' × ' + (draft.heightMm / factor).toFixed (factor === 1 ? 0 : 2) + ' ' + unit;
         this.SetDisabled ();
         const bottle = draft.family === 'bottle', pouch = draft.family === 'pouch'; const width = Math.max (70, Math.min (160, (draft.diameterMm || draft.widthMm) / draft.heightMm * 280)), x = 120 - width / 2;
-        const body = pouch ? `M${x} 75H${x + width}L${x + width - 8} 180L${x + width} 305H${x}L${x + 8} 180Z` : bottle ? `M102 65H138V90C138 108 ${120 + width / 2} 116 ${120 + width / 2} 143V294Q${120 + width / 2} 305 ${120 + width / 2 - 12} 305H${x + 12}Q${x} 305 ${x} 294V143C${x} 116 102 108 102 90Z` : `M${x} 90Q120 78 ${x + width} 90V294Q120 307 ${x} 294Z`;
+        const shape = bottle ? BottleShape (draft) : null, sy = value => 305-value/draft.heightMm*250, neckWidth = bottle ? width*shape.neckDiameterMm/draft.diameterMm : 0, capBottom = bottle ? sy (draft.heightMm-shape.capHeightMm) : 0, neckBottom = bottle ? sy (draft.heightMm-shape.capHeightMm-shape.neckHeightMm) : 0, bodyTop = bottle ? sy (draft.heightMm-shape.capHeightMm-shape.neckHeightMm-shape.shoulderHeightMm) : 0;
+        const body = pouch ? `M${x} 75H${x + width}L${x + width - 8} 180L${x + width} 305H${x}L${x + 8} 180Z` : bottle ? `M${120-neckWidth/2} ${capBottom}H${120+neckWidth/2}V${neckBottom}L${x+width} ${bodyTop}V305H${x}V${bodyTop}L${120-neckWidth/2} ${neckBottom}Z` : `M${x} 90Q120 78 ${x + width} 90V294Q120 307 ${x} 294Z`;
+        const zoneDraft = DefaultProductDraft (draft.family); for (const key of Object.keys (zoneDraft)) { zoneDraft[key] = draft[key]; } if (draft.bottleShape) { zoneDraft.bottleShape = draft.bottleShape; }
+        const zone = GetArtworkZones (zoneDraft).find (z => z.id === draft.labelZone), artHeight = art?.heightMm || zone.heightMm*.7, labelY = sy (zone.bottomMm+(zone.heightMm+artHeight)/2), labelHeight = artHeight/draft.heightMm*250;
         const labelX = draft.labelZone === 'wrap' ? x + 1 : 120 - width * .32, labelW = draft.labelZone === 'wrap' ? width - 2 : width * .64;
-        this.drawing.innerHTML = `<svg viewBox="0 0 240 350" role="img" aria-label="${pouch ? 'Pouch' : bottle ? 'Bottle' : 'Can'} profile reference"><ellipse cx="120" cy="319" rx="75" ry="9" fill="currentColor" opacity=".07"/><path d="${body}" fill="${draft.color}" fill-opacity="${draft.material === 'glass' ? '.3' : '1'}" stroke="currentColor" stroke-opacity=".23" stroke-width="1.5"/>${pouch ? `<path d="M${x} 85h${width}M${x} 295h${width}" stroke="currentColor" stroke-opacity=".3"/>` : bottle ? '<rect x="100" y="46" width="40" height="25" rx="5" fill="#859497"/><path d="M105 51v15m5-15v15m5-15v15m5-15v15m5-15v15m5-15v15m5-15v15" stroke="#b7c2c2" stroke-width="1"/>' : `<ellipse cx="120" cy="90" rx="${width / 2}" ry="6" fill="#cbd3d4" stroke="#7a898b"/><ellipse cx="120" cy="91" rx="12" ry="3" fill="#859497"/>`}${preview ? `<image href="${preview}" x="${labelX}" y="174" width="${labelW}" height="79" preserveAspectRatio="xMidYMid meet"/>` : `<rect x="${labelX}" y="174" width="${labelW}" height="79" fill="none" stroke="#458b9b" stroke-dasharray="4 4"/>`}</svg>`;
+        this.drawing.innerHTML = `<svg viewBox="0 0 240 350" role="img" aria-label="${pouch ? 'Pouch' : bottle ? 'Bottle' : 'Can'} profile reference"><ellipse cx="120" cy="319" rx="75" ry="9" fill="currentColor" opacity=".07"/><path d="${body}" fill="${draft.color}" fill-opacity="${draft.material === 'glass' ? '.3' : '1'}" stroke="currentColor" stroke-opacity=".23" stroke-width="1.5"/>${pouch ? `<path d="M${x} 85h${width}M${x} 295h${width}" stroke="currentColor" stroke-opacity=".3"/>` : bottle ? `<rect x="${120-neckWidth*.54}" y="55" width="${neckWidth*1.08}" height="${capBottom-55}" fill="#859497"/>` : `<ellipse cx="120" cy="90" rx="${width / 2}" ry="6" fill="#cbd3d4" stroke="#7a898b"/><ellipse cx="120" cy="91" rx="12" ry="3" fill="#859497"/>`}${preview ? `<image href="${preview}" x="${labelX}" y="${labelY}" width="${labelW}" height="${labelHeight}" preserveAspectRatio="xMidYMid meet"/>` : `<rect x="${labelX}" y="${labelY}" width="${labelW}" height="${labelHeight}" fill="none" stroke="#458b9b" stroke-dasharray="4 4"/>`}</svg>`;
     }
 }

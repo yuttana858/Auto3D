@@ -1,6 +1,6 @@
 # Primary Products module — build plan
 
-Status: implementation in progress. The [0.52.0 increment](release-0520.md) adds category PBR presets and actual local label artwork application/persistence; clear-pack rendering remains incomplete. UI shell is stacked in #63/#62; independent geometry follows in #64 (module 0.2.0). Opaque scene generation/update and versioned persistence are now in development in module 0.3.0; see [the scene increment](release-0490.md). The 0.50.0 increment adds Generate readiness and opaque pillow pouches; advanced bottle/can artwork/glass gates and other pouch types remain incomplete. See [current increment](release-0500.md). No deployment of that increment is implied. See [geometry progress](primary-products-geometry.md).
+Status: implementation in progress. Auto3D 0.55.0 / Primary Products 0.6.0 adds optional bottle shoulder, neck and cap dimensions, safe straight-body label zones and persisted profile editing. See [0.55.0](release-0550.md). Primitive/Boolean research and a proposed delivery sequence are in [primitive-solid-editing-research.md](primitive-solid-editing-research.md); this feature is not enabled yet. The [0.52.0 increment](release-0520.md) adds category PBR presets and actual local label artwork application/persistence; clear-pack rendering remains incomplete. UI shell is stacked in #63/#62; independent geometry follows in #64 (module 0.2.0). Opaque scene generation/update and versioned persistence are now in development in module 0.3.0; see [the scene increment](release-0490.md). The 0.50.0 increment adds Generate readiness and opaque pillow pouches; advanced bottle/can artwork/glass gates and other pouch types remain incomplete. See [current increment](release-0500.md). No deployment of that increment is implied. See [geometry progress](primary-products-geometry.md).
 Created: 2026-11-04. Repository baseline: Auto3D 0.47.3, Packaging 1.10.3.
 Proposed package: `@auto3d/primary-products`, initial module version 0.1.0; API version 1.
 
@@ -14,7 +14,7 @@ The main workflow is:
 2. Choose a category and preset; enter dimensions in the global mm/in preference.
 3. Adjust shape, closure and component options in an independent draft preview.
 4. Set component materials and import/place label artwork.
-5. **Add to session** creates one logical product object. Later, **Apply changes** replaces that object's generated geometry without changing its ID or placement; one Undo restores the previous product.
+5. **Generate** creates one logical product object. Later, **Apply changes** replaces that object's generated geometry without changing its ID or placement; one Undo restores the previous product.
 6. Duplicate/array, arrange, animate and render using existing Auto3D tools. Save to file, Device Library or owned Account Library through existing explicit save actions.
 
 Opening the panel, choosing a preset or changing a draft must not modify the main scene, submit an AI task or upload a file. Draft preview and session application are distinct actions. Selecting an existing generated product loads its saved definition for editing. Imported products may be decorated, but do not acquire parametric shape controls automatically.
@@ -185,3 +185,9 @@ Validation starts in Phase 0 and continues in every phase; Phase 5 is the final 
 4. Confirm whether to prioritize parametric closures/shape breadth or advanced artwork finishes after the first working slice.
 
 Deferred by default: exact molded threads/standards, certified capacity/strength/tooling calculations, fluid/flexible-material simulation, arbitrary scan-to-parametric reconstruction, comprehensive shrink-sleeve compensation, printer color management, food contents, and a new SKU/inventory backend. These can be separately scoped after the core modeling and artwork workflow is proven.
+
+## Current next increments
+
+Bottle shoulder/neck/cap controls now provide the first Phase 2 shape increment. Next: physical artwork templates; renderer transmission/IOR/thickness round-trip and hollow-wall spike; then oval/rounded-rectangle bottles and more closures. Keep glass disabled until its renderer/geometry gates pass. Finish remaining Phase 1/2 material/export gates alongside these increments; the phase table is not a claim that earlier gates are all complete.
+
+The requested primitive/Boolean track starts with conversion benchmarking and editable primitives, then non-destructive body modifiers. Keep clear-pack, Primary family breadth and general solid editing as separately testable increments.

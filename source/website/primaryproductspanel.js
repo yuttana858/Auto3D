@@ -1,7 +1,7 @@
 import { PrimaryProductsArtwork } from './primaryproductsartwork.js';
 import { ValidateProductArtwork } from '../../modules/primary-products/src/artwork.js';
 import { PrimaryProductsWorkspace } from './primaryproductsworkspace.js';
-import { DefaultProductDraft, UpdateProductDraft } from '../../modules/primary-products/src/state.js';
+import { DefaultProductDraft, UpdateProductDraft, BottleShape } from '../../modules/primary-products/src/state.js';
 const moduleUrl = new URL ('./primary-products/primary-products.module.js', import.meta.url);
 moduleUrl.search = new URL (import.meta.url).search;
 export class PrimaryProductsPanel
@@ -24,7 +24,7 @@ export class PrimaryProductsPanel
         return this.draft.material === 'glass' ? 'Glass generation is not available yet. Choose opaque plastic.' : '';
     }
     RefreshAvailability () { this.workspace?.SetDisabled (); }
-    Inspect () { return { schemaVersion : 1, units : 'mm', ...this.draft, artwork : this.artwork?.Inspect () || [], draftOnly : false, generationAvailable : this.draft.material !== 'glass', unavailableReason : this.UnavailableReason (), generating : this.products?.active === true }; }
+    Inspect () { const shape = this.draft.family === 'bottle' ? BottleShape (this.draft) : null; return { profile : shape ? { ...shape, bodyHeightMm : this.draft.heightMm - shape.shoulderHeightMm - shape.neckHeightMm - shape.capHeightMm } : null, schemaVersion : 1, units : 'mm', ...this.draft, artwork : this.artwork?.Inspect () || [], draftOnly : false, generationAvailable : this.draft.material !== 'glass', unavailableReason : this.UnavailableReason (), generating : this.products?.active === true }; }
     Configure (changes)
     {
         if (this.Blocked ()) { throw new Error ('Open an editable session before changing the product draft.'); }
