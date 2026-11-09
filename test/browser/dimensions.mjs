@@ -17,7 +17,8 @@ try {
         try { const file = path.resolve (root, '.' + (name === '/' ? '/index.html' : name)); assert.ok (file.startsWith (root + path.sep)); return route.fulfill ({ body : await readFile (file), contentType : types[path.extname (file)] || 'application/octet-stream' }); }
         catch { return route.fulfill ({ status : 404, body : 'Missing fixture asset' }); }
     });
-    await page.goto ('https://auto3d.test/'); await page.getByRole ('button', { name : 'Welcome to Auto3D. Continue to sign in.' }).click ({ timeout : 3000 }).catch (() => {}); // automated browsers skip the welcome screen await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
+    await page.goto ('https://auto3d.test/');
+    await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
     const call = async (id, args = {}) => { const response = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (response.ok, true, JSON.stringify (response)); return response.result; };
     await page.locator ('#open_file').setInputFiles ('test/testfiles/gltf/BoxTextured/glTF-Binary/BoxTextured.glb');
     let ready = false;
@@ -60,7 +61,22 @@ try {
     await page.setViewportSize ({width:390,height:844}); assert.equal (await page.evaluate (()=>document.documentElement.scrollWidth>innerWidth),false); await page.screenshot ({path:'work/dimensions-review/mobile.png'});
     await page.setViewportSize ({width:1500,height:1000}); await call ('object.visibility',{objectId,visible:false});
     const box = await call ('packaging.fefco.generate',{code:'0201',length:400,width:300,height:250,thickness:3,closure:'open'});
+    await call ('view.focus',{objectId:box.objectId});
+    const boxEdges = await call ('dimensions.edges',{objectId:box.objectId,limit:100});
+    const boxIndex = boxEdges.segments.findIndex (v => Math.abs(v.start[0]-v.end[0])<1e-6 && Math.abs(v.start[1]-v.end[1])<1e-6 && v.lengthMm>100);
+    assert.ok(boxIndex>=0); const added = await call ('dimensions.add',{anchor:boxEdges.anchors[boxIndex],offset:40}); const boxDim = added.dimensions.find(d=>d.objectId===box.objectId);
+    assert.equal(boxDim.basis,'OD'); assert.equal(boxDim.lengthMm,406); assert.ok(boxDim.placement);
+    await call ('dimensions.placement',{id:boxDim.id,plane:90,distanceMm:45});
+    const fixed = (await call ('dimensions.inspect')).dimensions.find(d=>d.id===boxDim.id).placement;
+    await call ('camera.fov',{fov:55}); assert.deepEqual((await call ('dimensions.inspect')).dimensions.find(d=>d.id===boxDim.id).placement,fixed);
+    const valueLabel = page.locator(`.dimension_overlay g[data-dimension-id="${boxDim.id}"] rect`);
+    await valueLabel.dblclick(); await page.getByRole('spinbutton',{name:'Dimension value'}).fill('450'); await page.getByRole('button',{name:'Apply',exact:true}).click();
+    await page.getByRole('dialog',{name:'Edit dimension',exact:true}).waitFor({state:'detached'});
+    assert.equal((await call ('dimensions.inspect')).dimensions.find(d=>d.id===boxDim.id).lengthMm,450);
     const flat = await call ('packaging.fefco.unfold',{objectId:box.objectId}); await call ('view.focus',{objectId:flat.objectId}); await page.waitForTimeout (800);
+    const switched = (await call ('dimensions.inspect')).dimensions.find(d=>d.id===boxDim.id); assert.equal(switched.basis,'ID'); assert.equal(switched.objectId,flat.objectId);
+    await call ('dimensions.value',{id:boxDim.id,valueMm:420}); assert.equal((await call ('dimensions.inspect')).dimensions.find(d=>d.id===boxDim.id).lengthMm,420);
+    await call ('dimensions.delete',{id:boxDim.id});
     const cad = await call ('dimensions.edges',{objectId:flat.objectId,limit:100}); assert.ok (cad.anchors.every (a=>a.kind==='cad'));
     const cadBounds = await page.locator ('#viewer').boundingBox (), cadState = await call ('camera.current.inspect');
     const cadCamera = new THREE.PerspectiveCamera (cadState.fov,cadBounds.width/cadBounds.height,0.001,100000); cadCamera.position.fromArray (cadState.eye); cadCamera.up.fromArray (cadState.up); cadCamera.lookAt (...cadState.center); cadCamera.updateMatrixWorld (); cadCamera.updateProjectionMatrix ();

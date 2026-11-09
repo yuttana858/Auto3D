@@ -76,10 +76,10 @@ export class PackagingWorkspace
     {
         this.Editable (); const editor = this.editor; const target = editor.document; const source = objectId ? target.objects.find (item => item.id === objectId) : editor.selected;
         if (source?.packagingProfile?.engineering) {
-            if (source !== editor.selected || source.scale.some (value => Math.abs (value - 1) > 1e-6) || JSON.stringify (this.Design ()) !== JSON.stringify (source.packagingProfile)) { throw new Error ('Select an unscaled box and load its CAD before editing dimensions.'); }
+            if (source.scale.some (value => Math.abs (value - 1) > 1e-6)) { throw new Error ('Select an unscaled box and load its CAD before editing dimensions.'); }
             if (!changes || Object.keys (changes).some (key => !['basis', 'length', 'width', 'height', 'tolerance'].includes (key)) || !['inside', 'outside', 'score'].includes (changes.basis || this.dimensionBasis || 'inside')) { throw new Error ('Use the board selector for caliper and valid box dimension fields.'); }
-            const dimensions = this.EngineeringInspect ().dimensions; const patches = dimensions.filter (dimension => ['length', 'width', 'height'].includes (dimension.id) && (changes[dimension.id] !== undefined || changes.tolerance !== undefined)).map (dimension => ({ id : dimension.id, mode : changes[dimension.id] === undefined ? dimension.mode : dimension.mode === 'parametric' ? 'parametric' : 'manual', ...(changes[dimension.id] !== undefined ? { targetMm : changes[dimension.id], basis : changes.basis || this.dimensionBasis || 'inside' } : {}), ...(changes.tolerance !== undefined ? { toleranceMm : changes.tolerance } : {}) }));
-            await this.UpdateEngineering ({ dimensions : patches }); return { objectId : editor.selected.id, dimensions : this.DimensionsInspect (), state : editor.selected.userData._auto3dPackagingState || 'folded' };
+            const dimensions = EngineeringMeasurements (source.packagingProfile).dimensions; const patches = dimensions.filter (dimension => ['length', 'width', 'height'].includes (dimension.id) && (changes[dimension.id] !== undefined || changes.tolerance !== undefined)).map (dimension => ({ id : dimension.id, mode : changes[dimension.id] === undefined ? dimension.mode : dimension.mode === 'parametric' ? 'parametric' : 'manual', ...(changes[dimension.id] !== undefined ? { targetMm : changes[dimension.id], basis : changes.basis || this.dimensionBasis || 'inside' } : {}), ...(changes.tolerance !== undefined ? { toleranceMm : changes.tolerance } : {}) }));
+            await this.UpdateEngineering ({ dimensions : patches }, source.id); return { objectId : editor.selected.id, dimensions : this.DimensionsInspect (), state : editor.selected.userData._auto3dPackagingState || 'folded' };
         }
         if (!source?.userData?._auto3dFefco || source.scale.some (v => Math.abs (v - 1) > 1e-6)) { throw new Error ('Select an unscaled generated box or its dieline to edit dimensions.'); }
         if (!changes || Object.keys (changes).some (key => !['basis', 'length', 'width', 'height', 'thickness', 'tolerance'].includes (key))) { throw new Error ('Invalid box dimension fields.'); }
@@ -252,20 +252,21 @@ export class PackagingWorkspace
         const module = await LoadPackagingModule (); this.Editable ();
         if (editor.document !== target || !target.objects.includes (source)) { throw new Error ('The selected box changed before unfolding.'); }
         const surfaces = FefcoSurfaces (target.CompactModel ([source], true)); const data = module.UnfoldFefco (parameters, profile); const model = PackagingModel (data, target.model.GetUnit (), surfaces);
-        const index = target.objects.indexOf (source); let flat;
+        const dimensionsBefore = target.dimensions; let dimensionsAfter; const index = target.objects.indexOf (source); let flat;
         editor.busy = true; editor.RefreshButtons?.(); editor.Status ('Unfolding FEFCO ' + parameters.code + '…');
         try {
             await new Promise (resolve => setTimeout (resolve, 20));
             flat = target.AddImported (model, source.name + ' · Dieline'); flat.source = 'FEFCO ' + parameters.code + ' flat dieline'; flat.packagingProfile = profile;
             flat.userData = { ...source.userData, _auto3dPackagingState : 'flat' }; flat.visible = source.visible; flat.position = [...source.position]; flat.castShadow = source.castShadow !== false; flat.receiveShadow = source.receiveShadow !== false;
             target.ApplyTransform (flat); target.Remove (flat); target.Remove (source); target.Restore (flat, index); target.packaging = profile; editor.selected = flat;
+            dimensionsAfter = (dimensionsBefore || []).map (d => d.objectId === source.id ? { ...d, objectId : flat.id } : d); target.dimensions = dimensionsAfter;
             await editor.Render (true);
-            const apply = async forward => { target.Remove (forward ? source : flat); target.Restore (forward ? flat : source, index); target.packaging = forward ? profile : before; editor.selected = forward ? flat : previous; await editor.Render (); this.Refresh (); editor.website.packagingPanel?.Refresh (); };
+            const apply = async forward => { target.dimensions = forward ? dimensionsAfter : dimensionsBefore; target.Remove (forward ? source : flat); target.Restore (forward ? flat : source, index); target.packaging = forward ? profile : before; editor.selected = forward ? flat : previous; await editor.Render (); this.Refresh (); editor.website.packagingPanel?.Refresh (); };
             editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) });
             this.Refresh (); editor.Status ('Unfolded FEFCO ' + parameters.code + ' · kraft dieline · CUT red / SCORE blue');
             return { objectId : flat.id, replacedObjectId : source.id, code : parameters.code, state : 'flat', units : 'mm', thicknessMM : profile.thickness, profilePaths : profile.paths.length, materialPreserved : true };
         } catch (error) {
-            if (flat) { target.Remove (flat); if (!target.objects.includes (source)) { target.Restore (source, index); } target.packaging = before; editor.selected = previous; await editor.Render (); } throw error;
+            target.dimensions = dimensionsBefore; if (flat) { target.Remove (flat); if (!target.objects.includes (source)) { target.Restore (source, index); } target.packaging = before; editor.selected = previous; await editor.Render (); } throw error;
         } finally { editor.busy = false; editor.RefreshButtons?.(); editor.website.packagingPanel?.Refresh (); }
     }
     FefcoInspect () { return { ...ValidateFefco (this.fefco || DefaultFefco), ...(this.generationBoard ? { thickness : this.generationBoard.caliperMm } : {}), units : 'mm', dimensions : this.generationBoard ? 'score' : 'internal', axes : 'W=X, L=Z, H=Y' }; }
@@ -367,15 +368,15 @@ export class PackagingWorkspace
         const profile = ValidatePackaging (this.Design ()); const code = this.EngineeringParameters (profile)?.code || null;
         return EngineeringMeasurements ({ ...profile, engineering : profile.engineering || DefaultEngineering (profile, code) });
     }
-    EngineeringParameters (profile)
+    EngineeringParameters (profile, selected = this.editor.selected)
     {
-        try { const p = this.editor.selected?.userData?._auto3dFefco ? ValidateFefco (JSON.parse (this.editor.selected.userData._auto3dFefco)) : ValidateFefco (this.fefco || DefaultFefco);
+        try { const p = selected?.userData?._auto3dFefco ? ValidateFefco (JSON.parse (selected.userData._auto3dFefco)) : ValidateFefco (this.fefco || DefaultFefco);
             const expected = FefcoProfile (p); return JSON.stringify (expected.paths) === JSON.stringify (profile.paths.map (path => { const copy = { ...path }; delete copy.process; return copy; })) && expected.thickness === profile.thickness ? p : null;
         } catch { return null; }
     }
-    async UpdateEngineering (changes)
+    async UpdateEngineering (changes, objectId = null)
     {
-        this.Editable (); const editor = this.editor; const target = editor.document; const account = editor.website.auth.user.id; const before = ValidatePackaging (this.Design ()); const originalParameters = this.EngineeringParameters (before);
+        this.Editable (); const editor = this.editor; const target = editor.document; const account = editor.website.auth.user.id; const source = objectId ? target.objects.find (o => o.id === objectId) : editor.selected; if (objectId && !source?.packagingProfile) { throw new Error ('Design object unavailable.'); } const savedDesign = target.packaging; const previousSelected = editor.selected; const before = ValidatePackaging (objectId ? source.packagingProfile : this.Design ()); const originalParameters = this.EngineeringParameters (before, source);
         const { engineering, material, driving } = EditEngineering (before, changes, originalParameters?.code);
         let next = { ...before, thickness : material.caliperMm, grade : material.name, engineering }; let parameters = originalParameters;
         if (originalParameters) {
@@ -387,21 +388,21 @@ export class PackagingWorkspace
         next = ValidatePackaging (next);
         const result = EngineeringMeasurements (next);
         if (result.dimensions.some (d => d.mode === 'parametric' && !d.targetMet)) { throw new Error ('Conflicting parametric dimensions. Adjust their targets or switch one to Auto.'); }
-        const source = editor.selected; const matching = source?.packagingProfile && JSON.stringify (ValidatePackaging (source.packagingProfile)) === JSON.stringify (before);
+        const matching = source?.packagingProfile && JSON.stringify (ValidatePackaging (source.packagingProfile)) === JSON.stringify (before);
         if (source && matching && source.scale.some (v => Math.abs (v - 1) > 1e-6)) { throw new Error ('Reset object scaling before editing engineering dimensions.'); }
         if (!matching) { this.Change (next); return this.EngineeringInspect (); }
         // Build before mutation; then atomically replace profile and selected object.
         const module = await LoadPackagingModule (); this.Editable ();
-        if (editor.document !== target || editor.website.auth.user.id !== account || !target.objects.includes (source) || JSON.stringify (this.Design ()) !== JSON.stringify (before)) { throw new Error ('The workspace or account changed during the engineering edit.'); }
+        if (editor.document !== target || editor.website.auth.user.id !== account || !target.objects.includes (source) || JSON.stringify (objectId ? source.packagingProfile : this.Design ()) !== JSON.stringify (before)) { throw new Error ('The workspace or account changed during the engineering edit.'); }
         const flat = source.userData._auto3dPackagingState === 'flat'; const data = !parameters ? module.CreateBoard (next, { textured : true, guides : true }) : flat ? module.UnfoldFefco (parameters, next) : module.CreateFefcoBox (parameters, next); data.profile = next;
         const model = PackagingModel (data, target.model.GetUnit (), FefcoSurfaces (target.CompactModel ([source], true))); const index = target.objects.indexOf (source); let replacement;
         editor.busy = true; editor.RefreshButtons?.();
         try {
             replacement = target.AddImported (model, source.name); Object.assign (replacement, { id : source.id, source : source.source, position : [...source.position], rotation : [...source.rotation], scale : [...source.scale], visible : source.visible, castShadow : source.castShadow !== false, receiveShadow : source.receiveShadow !== false, packagingProfile : next, userData : { ...source.userData, ...(parameters ? { _auto3dFefco : JSON.stringify (parameters) } : {}) } }); target.ApplyTransform (replacement);
             target.Remove (replacement); target.Remove (source); target.Restore (replacement, index); target.packaging = next; editor.selected = replacement; await editor.Render ();
-            const apply = async forward => { target.Remove (forward ? source : replacement); target.Restore (forward ? replacement : source, index); target.packaging = forward ? next : before; editor.selected = forward ? replacement : source; this.fefco = forward ? parameters : originalParameters; await editor.Render (); this.Refresh (); };
+            const apply = async forward => { target.Remove (forward ? source : replacement); target.Restore (forward ? replacement : source, index); target.packaging = forward ? next : savedDesign; editor.selected = forward ? replacement : previousSelected; this.fefco = forward ? parameters : originalParameters; await editor.Render (); this.Refresh (); };
             editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); this.fefco = parameters; this.Refresh (); return result;
-        } catch (error) { if (replacement) { target.Remove (replacement); } if (!target.objects.includes (source)) { target.Restore (source, index); } target.packaging = before; editor.selected = source; await editor.Render (); throw error; }
+        } catch (error) { if (replacement) { target.Remove (replacement); } if (!target.objects.includes (source)) { target.Restore (source, index); } target.packaging = savedDesign; editor.selected = previousSelected; await editor.Render (); throw error; }
         finally { editor.busy = false; editor.RefreshButtons?.(); this.Refresh (); }
     }
     Factor () { return this.editor.website.preferences.units === 'standard' ? 25.4 : 1; }

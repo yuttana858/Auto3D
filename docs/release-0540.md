@@ -1,0 +1,21 @@
+# Auto3D 0.54.0 — planar dimension brackets and editable box dimensions
+
+Packaging remains 1.10.4; Primary Products remains 0.5.0. PR #90, updated with main after merged PR #89. Not deployed.
+
+Dragging a dimension now chooses an adjoining panel plane (0° or 90° for rectangular corners). The pointer is intersected with that plane and the signed offset is saved in object coordinates. Brackets keep their physical placement when orbiting, zooming or changing FOV, and follow object transforms. CAD drawings use their drawing plane. Wires without adjoining faces use an object-axis plane. Existing pixel-offset annotations receive a deterministic object-space fallback when displayed; repositioning saves the new explicit placement. Contrast strokes and opaque labels remain visible over light and dark surfaces.
+
+Generated FEFCO box edges create semantic length, width or height annotations. Folded boxes report **OD** from the packaging dimension/board-calibration service; flat CAD axis references report **ID**. The folded bracket spans the closed OD datum envelope rather than a short selected flap edge. Opening flaps does not turn a box-height dimension into flap-tip height. In CAD, repeated base/top/wall score axes provide ID references on the selected panel; folded-origin references use base-0/base-1/wall-0. Other CAD segments retain their actual segment length. Scaled boxes display a scaled measured edge and require resetting scale before driving the design.
+
+Double-click a bracket value, or expand **Layers → Dimensions** and click its value, to enter a new dimension in the current display units. Apply rebuilds the actual generated box/dieline through the existing Packaging service, using outside basis folded and inside basis flat, with one Undo step. It can target a box whose CAD is not the current draft or selection; Undo restores the previous draft and selection. Generic imported meshes and arbitrary CAD lines remain measured references and cannot have their labels overwritten as if they were driving box parameters.
+
+Semantic annotations survive box geometry rebuilds and follow the dedicated Unfold action's new object identity. Undo/Redo restores both the object and its dimension references. Animation fold/unfold already preserves object identity; intermediate visual poses remain unavailable for canonical dimensions. File and recovery validation/persistence include bounded placements and semantic axes. These remain viewport annotations, outside the canvas-only production render/export pipeline.
+
+New shared agent/MCP commands: `dimensions.placement` (plane and signed distanceMm), `dimensions.value` (completed design rebuild in mm), and `dimensions.edit` (interactive dialog). `dimensions.add` converts its initial pixel offset to saved physical placement. `dimensions.offset` performs the same conversion when repositioning an existing bracket. Both generated catalogs are synchronized.
+
+Validation: 783 application/module tests, lint and website/Pages builds pass. Focused tests cover adjoining face planes, exact world coordinates across camera orbits and object translation, physical placement Undo, bounded persistence, OD/ID driving edits, rebuild/unfold identity, unrelated draft/selection restoration, macros and read-only rejection. Browser validation covers real edge and CAD drags, fixed placement under FOV changes, numeric-dialog application, folded OD, CAD ID, live transforms, units, visibility, contrast, Undo and mobile layout.
+
+## Integration with PR #89
+
+Resolved release metadata conflicts by retaining Auto3D 0.54.0 and both release histories. Preserves main’s combined landing/sign-in page, right-drag sideways pan, closer fold framing and settled final fold view. Regenerates both command catalogs so `auth.continue` and all dimension commands coexist. The dimension browser fixture now explicitly waits for authenticated workspace readiness.
+
+Integration validation: 787 application/module tests, 64 MCP tests, lint, engine/website/Pages builds and browser dimension regression pass after merging #89.

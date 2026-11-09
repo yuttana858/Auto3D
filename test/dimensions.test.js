@@ -10,7 +10,9 @@ import { SceneDocument, SceneHistory } from '../source/website/scenedocument.js'
 import { PackSession, ReadSession, CreateSessionArchive, OpenSessionArchive } from '../source/website/sessionarchive.js';
 import { RecoverySnapshot } from '../source/website/sessionrecovery.js';
 import { PackRecoverySnapshot } from '../source/website/sessionrecoverypack.js';
-import { FeatureEdges, ResolveDimension, ValidateDimensions, ProjectDimension } from '../source/website/dimensioncore.js';
+import { FeatureEdges, ResolveDimension, ValidateDimensions, ProjectDimension, DimensionPlanes, BracketPoints, ProjectPlacedDimension } from '../source/website/dimensioncore.js';
+import { FefcoProfile } from '../modules/packaging/src/fefco.js';
+import { PackagingWorkspace } from '../source/website/packagingworkspace.js';
 import { DimensionTool } from '../source/website/dimensiontool.js';
 import { CreateAgentCommands } from '../source/website/agentcommands.js';
 function Fixture ()
@@ -83,6 +85,30 @@ describe ('Source-linked 3D dimensions', function () {
         const { tool, editor } = Fixture (); tool.canvas.style.cursor = 'grab'; tool.canvas.style.touchAction = 'pan-x';
         tool.SetActive (true); assert.equal (tool.canvas.style.cursor, 'crosshair'); assert.equal (tool.canvas.style.touchAction, 'none');
         tool.SetActive (false); assert.equal (tool.canvas.style.cursor, 'grab'); assert.equal (tool.canvas.style.touchAction, 'pan-x'); assert.equal (editor.history.undo.length, 0);
+    });
+    it ('snaps to adjoining face planes and retains exact world placement across camera orbits', async function () {
+        const { tool, document, object, camera, editor } = Fixture (), anchor = tool.Candidates (object).find (a => ResolveDimension (document,a).length === 100);
+        const r = ResolveDimension (document,anchor), planes = DimensionPlanes (document,anchor,r); assert.equal (planes.length,2); assert.ok (Math.abs (planes[0].dot (planes[1])) < 1e-8);
+        tool.Add (anchor); const id = document.dimensions[0].id; tool.Placement (id,90,25);
+        const record = document.dimensions[0], before = BracketPoints (r,record.placement), screen = ProjectPlacedDimension (r,record.placement,camera,800,600);
+        camera.position.set (-200,150,200); camera.lookAt (50,25,12.5); camera.updateMatrixWorld ();
+        const after = BracketPoints (r,record.placement), changed = ProjectPlacedDimension (r,record.placement,camera,800,600);
+        assert.deepEqual (after.a.toArray (),before.a.toArray ()); assert.notDeepEqual (screen.left.toArray (),changed.left.toArray ()); assert.ok (Math.abs (before.a.distanceTo (r.a)-25)<1e-8);
+        object.position = [10,20,30]; document.ApplyTransform (object); const moved = BracketPoints (ResolveDimension (document,record),record.placement); assert.ok (moved.a.clone ().sub (before.a).distanceTo (new THREE.Vector3 (10,20,30))<1e-8);
+        await editor.history.Undo (); assert.notEqual (document.dimensions[0].placement.plane,90);
+        assert.throws (() => ValidateDimensions ([{ ...record, placement : { ...record.placement,distance : Infinity } }]));
+    });
+    it ('edits real box OD and CAD ID with one Undo, retaining anchors through rebuild and unfold', async function () {
+        this.timeout (15000); const { tool, document, editor, website } = Fixture (); editor.website = website; editor.Render = async () => {}; editor.packaging = new PackagingWorkspace (editor);
+        await editor.packaging.GenerateFefco ({ code : '0201',length : 400,width : 300,height : 250,thickness : 3,closure : 'closed' }); const source = editor.selected;
+        const anchor = tool.Candidates (source).find (a => { const r = ResolveDimension (document,a); return Math.abs (r.a.y-r.b.y)<1e-8 && Math.abs (r.a.x-r.b.x)<1e-8 && r.lengthMm>100; });
+        assert.ok (anchor); tool.Add (anchor); const id = document.dimensions[0].id; assert.equal (tool.Inspect ().dimensions[0].basis,'OD'); assert.equal (tool.Inspect ().dimensions[0].lengthMm,406);
+        const unrelatedDesign = FefcoProfile ({ length : 550 }); document.packaging = unrelatedDesign; editor.selected = document.objects[0]; const steps = editor.history.undo.length; await tool.Value (id,450); assert.equal (editor.history.undo.length,steps+1); assert.equal (tool.Inspect ().dimensions[0].lengthMm,450); assert.equal (tool.Inspect ().dimensions[0].stale,false);
+        await editor.history.Undo (); assert.equal (tool.Inspect ().dimensions[0].lengthMm,406); assert.equal (document.packaging,unrelatedDesign); await editor.history.Redo ();
+        const oldId = document.dimensions[0].objectId; await editor.packaging.UnfoldSelected (oldId); assert.notEqual (document.dimensions[0].objectId,oldId); assert.equal (tool.Inspect ().dimensions[0].basis,'ID');
+        await tool.Value (id,420); assert.equal (tool.Inspect ().dimensions[0].lengthMm,420); await editor.history.Undo (); await editor.history.Undo (); assert.equal (tool.Inspect ().dimensions[0].basis,'OD'); assert.equal (document.dimensions[0].objectId,oldId);
+        const commands = CreateAgentCommands (website); const edited = await commands.RunMacro ({ version : 1,steps : [{ id : 'edit',command : 'dimensions.value',arguments : { id,valueMm : 470 } },{ id : 'read',command : 'dimensions.inspect',arguments : {} }] }); assert.equal (edited.ok,true,JSON.stringify (edited)); assert.equal (edited.completed[1].result.dimensions[0].lengthMm,470);
+        assert.equal ((await commands.Execute ('dimensions.placement',{ id,plane : 45,distanceMm : 20 })).ok,false); editor.readOnly = true; await assert.rejects (() => tool.Value (id,480));
     });
     it ('rejects read-only mutations and invalid saved records before changing data', function () {
         const { tool, editor, object, document } = Fixture (); const anchor = tool.Candidates (object)[0]; editor.readOnly = true; assert.throws (() => tool.Add (anchor)); assert.throws (() => tool.LayerVisible (false)); assert.equal (document.dimensions.length, 0);

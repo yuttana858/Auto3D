@@ -3115,7 +3115,7 @@
       "id": "dimensions.add",
       "title": "Add linked dimension",
       "category": "Dimensions",
-      "description": "Create one undoable annotation from an anchor returned by dimensions.edges. The offset is a bounded screen-space bracket distance in pixels; the measured length always comes from source geometry.",
+      "description": "Create one undoable annotation from an anchor returned by dimensions.edges. The initial pixel offset is converted to fixed 3D placement on an adjoining panel plane. Generated boxes use OD folded and ID in CAD.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -3232,6 +3232,101 @@
       "example": {
         "id": "dimension-id",
         "offset": 60
+      }
+    },
+    {
+      "id": "dimensions.placement",
+      "title": "Place bracket in 3D",
+      "category": "Dimensions",
+      "description": "Place an existing bracket on adjoining plane 0 or 90 with a signed physical offset in millimeters. Saved placement follows the object and remains fixed when orbiting.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "plane": {
+            "type": "integer",
+            "enum": [
+              0,
+              90
+            ]
+          },
+          "distanceMm": {
+            "type": "number",
+            "minimum": -1000000,
+            "maximum": 1000000
+          }
+        },
+        "required": [
+          "id",
+          "plane",
+          "distanceMm"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "dimension-id",
+        "plane": 90,
+        "distanceMm": 40
+      }
+    },
+    {
+      "id": "dimensions.value",
+      "title": "Edit design dimension",
+      "category": "Dimensions",
+      "description": "Rebuild an unscaled generated box using the annotation axis: OD in folded mode, ID in flat CAD. One Undo step; imported mesh reference lengths cannot be overwritten.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "valueMm": {
+            "type": "number",
+            "minimum": 0.000001,
+            "maximum": 10000
+          }
+        },
+        "required": [
+          "id",
+          "valueMm"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "dimension-id",
+        "valueMm": 300
+      }
+    },
+    {
+      "id": "dimensions.edit",
+      "title": "Open dimension editor",
+      "category": "Dimensions",
+      "description": "Open an interactive numeric editor in display units. Use dimensions.value for a completed programmatic edit.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "dimension-id"
       }
     },
     {
