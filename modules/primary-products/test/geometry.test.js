@@ -48,3 +48,30 @@ describe ('Primary Products neutral geometry', function () {
         assert.throws (() => CreatePrimaryProduct (DefaultProductDraft (), { extra : true }));
     });
 });
+
+describe ('Pillow pouch geometry', function () {
+    it ('builds a closed filled envelope with valid normals and stable bounds', function () {
+        for (const [widthMm, heightMm, depthMm] of [[10, 20, 2], [140, 200, 40], [500, 1000, 200]]) {
+            const product = CreatePrimaryProduct ({ ...DefaultProductDraft ('pouch'), widthMm, heightMm, depthMm }); const mesh = product.components[0]; const edges = new Map (); let volume = 0;
+            const vertex = i => mesh.positions.slice (3 * i, 3 * i + 3);
+            const key = i => vertex (i).map (v => Math.round (v * 1e7)).join (',');
+            for (let i = 0; i < mesh.indices.length; i += 3) {
+                const ids = mesh.indices.slice (i, i + 3), [a, b, c] = ids.map (vertex);
+                const ab = b.map ((n, j) => n - a[j]), ac = c.map ((n, j) => n - a[j]);
+                const cross = [ab[1] * ac[2] - ab[2] * ac[1], ab[2] * ac[0] - ab[0] * ac[2], ab[0] * ac[1] - ab[1] * ac[0]];
+                assert.ok (Math.hypot (...cross) > 1e-8); const normal = mesh.normals.slice (ids[0] * 3, ids[0] * 3 + 3);
+                assert.ok (cross.reduce ((sum, n, j) => sum + n * normal[j], 0) > 0);
+                volume += a[0] * (b[1] * c[2] - b[2] * c[1]) + a[1] * (b[2] * c[0] - b[0] * c[2]) + a[2] * (b[0] * c[1] - b[1] * c[0]);
+                for (let j = 0; j < 3; j++) { const e = [key (ids[j]), key (ids[(j + 1) % 3])].sort ().join ('/'); edges.set (e, (edges.get (e) || 0) + 1); }
+            }
+            assert.ok (volume > 0); assert.ok ([...edges.values ()].every (n => n === 2));
+            for (let axis = 0; axis < 3; axis++) { const values = mesh.positions.filter ((_, i) => i % 3 === axis); assert.ok (Math.abs (Math.min (...values) - product.bounds.min[axis]) < 0.01); assert.ok (Math.abs (Math.max (...values) - product.bounds.max[axis]) < 0.01); }
+            assert.deepEqual (product.artworkZones.map (z => z.id), ['front', 'back']); assert.equal (product.quality.simulatedFill, false);
+        }
+    });
+    it ('validates filled dimensions and keeps family switching atomic', function () {
+        const pouch = DefaultProductDraft ('pouch'); assert.throws (() => CreatePrimaryProduct ({ ...pouch, depthMm : 150 }));
+        assert.throws (() => CreatePrimaryProduct ({ ...pouch, material : 'glass' }));
+        assert.throws (() => CreatePrimaryProduct ({ ...pouch, labelZone : 'wrap' }));
+    });
+});

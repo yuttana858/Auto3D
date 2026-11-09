@@ -20,3 +20,19 @@ describe ('Primary Products panel services', () => {
         const adapter = readFileSync (new URL ('../source/website/primaryproductspanel.js', import.meta.url), 'utf8'); assert.match (adapter, /await import/);
     });
 });
+
+describe ('Primary Products readiness lifecycle', function () {
+    it ('re-enables Generate after editor rendering without reopening or changing the draft', async function () {
+        const { SessionEditor } = await import ('../source/website/sessioneditor.js');
+        const { PrimaryProductsPanel : Content } = await import ('../modules/primary-products/src/panel.js');
+        const controls = [{ disabled : false }, { disabled : false }];
+        const editor = { busy : true, readOnly : false, buttons : new Map () };
+        const host = Object.assign (Object.create (PrimaryProductsPanel.prototype), { website : { sessionEditor : editor, auth : { user : { id : 'user' } }, accountReady : true }, draft : DefaultProductDraft () });
+        const content = Object.assign (Object.create (Content.prototype), { host : { inspect : () => host.Inspect (), blocked : () => host.Blocked () }, root : { querySelectorAll : () => controls }, add : controls[0], apply : controls[1], availability : {} });
+        host.workspace = content; editor.website = { primaryProductsPanel : host };
+        SessionEditor.prototype.RefreshButtons.call (editor); assert.equal (content.add.disabled, true); assert.match (content.availability.textContent, /operation/);
+        editor.busy = false; SessionEditor.prototype.RefreshButtons.call (editor); assert.equal (content.add.disabled, false); assert.equal (content.add.textContent, 'Generate'); assert.equal (content.availability.textContent, '');
+        editor.readOnly = true; SessionEditor.prototype.RefreshButtons.call (editor); assert.equal (content.add.disabled, true); assert.match (content.availability.textContent, /editable/);
+        editor.readOnly = false; host.draft.material = 'glass'; SessionEditor.prototype.RefreshButtons.call (editor); assert.equal (content.add.disabled, true); assert.match (content.availability.textContent, /Glass/);
+    });
+});

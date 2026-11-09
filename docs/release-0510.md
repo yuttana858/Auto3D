@@ -1,6 +1,6 @@
-# Auto3D 0.50.0 / Packaging 1.10.3 / Primary Products 0.3.0
+# Auto3D 0.51.0 / Packaging 1.10.3 / Primary Products 0.4.0
 
-Repair release from the 2026-11-06 review. See [repair-plan.md](repair-plan.md) for every issue, its fix and status. Packaging and Primary Products are unchanged.
+Repair release from the 2026-11-06 review, merged onto 0.50.2 (PR #84). See [repair-plan.md](repair-plan.md) for every issue, its fix and status. Packaging and Primary Products are unchanged.
 
 ## MCP live control
 
@@ -12,7 +12,7 @@ Repair release from the 2026-11-06 review. See [repair-plan.md](repair-plan.md) 
 - **Per-command timeouts and cancel.** Inspect commands keep 15 s; ordinary mutations allow 60 s; render, AI, Library, texture, packaging generation and polygon work allow 300 s. A timeout sends `cancel` to the window (typed command sequences and macros stop before their next step) and says the command may still complete.
 - **Large results are shortened, not dropped.** Results above 64 KB trim their largest list and report `truncated : { path, returned, total }`.
 - **Pairing survives reconnects and agent tab changes.** A window that reconnects from the same login session keeps its pairing. `session.tabs.new/switch/close` run by the agent move the pairing to the newly active tab. User tab switches still unpair.
-- **`auto3d.sessions.select` requires an opt-in.** Without the one-time code, an agent can select only windows whose user enabled *Let authorized agents select this window without its code* in Agent access (or `agent.access.connect` with `allowSelect : true`).
+- **`auto3d.sessions.select` targets only explicitly shared windows.** Connecting a window in MCP connections is the user's consent for authorized agents to select it, as in 0.50.1. The broker now enforces that: a window must announce `allowSelect` to be selectable without its code, and `agent.access.connect` with `allowSelect : false` shares a window for code pairing only.
 - Administrator disable now rejects pending requests and clears pairings. Primary Products is listed under the Modules family. Read-only grants are no longer told to use tools they lack.
 
 ## Commands
@@ -39,5 +39,5 @@ Repair release from the 2026-11-06 review. See [repair-plan.md](repair-plan.md) 
 ## Deployment notes
 
 - Optional new environment variables: `AUTO3D_SUPPORT_CONTACT` (recovery contact address) and `AUTO3D_IP_HASH_SECRET` (IP hash key). Changing the IP hash resets existing account-request and recovery throttles once.
-- MCP clients must refresh tool discovery. Windows connected before this release must reconnect to offer `allowSelect`.
+- MCP clients must refresh tool discovery. Windows connected before this release must reconnect before agents can select them.
 - Real-client production verification of MCP remains pending, as in 0.49.2.

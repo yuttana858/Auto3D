@@ -1,6 +1,6 @@
 # Auto3D repair plan (2026-11-06)
 
-Goal: complete every repair from the 2026-11-06 deep review of Auto3D 0.49.2 (main at PR #80). Target release: **Auto3D 0.50.0 / Packaging 1.10.3 / Primary Products 0.3.0**. Each milestone is done only when its items are fixed, covered by tests and `npm run lint`, `npm test`, `npm run test_mcp` pass.
+Goal: complete every repair from the 2026-11-06 deep review of Auto3D 0.49.2 (main at PR #80). Target release: **Auto3D 0.51.0 / Packaging 1.10.3 / Primary Products 0.4.0** (main moved to 0.50.2 during the work). Each milestone is done only when its items are fixed, covered by tests and `npm run lint`, `npm test`, `npm run test_mcp` pass.
 
 Status legend: ☐ open · ☑ done · ⏸ planned for a later release (feature work, not a repair)
 
@@ -43,7 +43,7 @@ Status legend: ☐ open · ☑ done · ⏸ planned for a later release (feature 
 |---|---|---|---|
 | A1 | Results >64 KB discarded. | Browser truncates oversized results to a bounded summary with `truncated : true` and guidance; `scene.inspect`/library lists accept `offset`/`limit`. | ☑ |
 | A2 | Fixed 15 s timeout; long operations keep running unseen; no cancel. | Per-command timeout classes (inspect 15 s, mutation 60 s, render/AI/save 300 s); broker sends `cancel` on timeout, which stops typed command sequences/macros; other commands report that they may still complete. Job handles with progress remain with A5. | ☑ |
-| A3 | `sessions.select` bypasses the single-use window code. | `select` only targets windows whose user enabled "allow agent selection" in Agent access; otherwise a code is required. | ☑ |
+| A3 | `sessions.select` bypasses the single-use window code. | The broker selects only windows that announce `allowSelect`. Following main's code-free dialog (0.50.1), connecting a window is that consent; `agent.access.connect` with `allowSelect : false` requires the code. | ☑ |
 | A4 | Reconnect/tab switch breaks pairing. | Stable per-window `instanceId` survives reconnect within the pairing lifetime; pairing follows the active tab when the window opts in. | ☑ |
 | A5 | No change events, multi-window, MCP batching. | ⏸ Event stream (SSE/`listChanged`), multi-target pairing and server-side batch — planned for 0.51 after real-client verification. | ⏸ |
 
@@ -65,7 +65,7 @@ Status legend: ☐ open · ☑ done · ⏸ planned for a later release (feature 
 |---|---|---|---|
 | D1 | AGENTS.md says main is PR #45 / 0.40.0; no Primary Products boundary. | Update orientation, versions and module boundary. | ☑ |
 | D2 | `agent-project-overview.md`, `mcp-pilot.md` (250 commands), status test counts stale. | Update. | ☑ |
-| D3 | Release alignment. | Bump to 0.50.0 in package.json/AppVersion, `docs/release-0500.md`, project-status entry. | ☑ |
+| D3 | Release alignment. | Bump to 0.51.0 (main reached 0.50.2 during the work) in package.json/AppVersion, `docs/release-0510.md`, project-status entry. | ☑ |
 
 ## Out of scope for this release (roadmap)
 

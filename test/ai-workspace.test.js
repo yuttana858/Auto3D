@@ -68,6 +68,30 @@ describe ('Extended AI workspace services', () => {
   const { workspace } = Workspace (); const previous = globalThis.fetch;
   try { globalThis.fetch = async () => { workspace.website.auth.user.id = 'other'; return new Response ('{"result":"late"}'); }; workspace.RequestJSON = AIWorkspace.prototype.RequestJSON; await assert.rejects (() => workspace.Generate ({ action : 'text3d', prompt : 'x' }), /Account changed/); assert.equal (workspace.recent.length, 1); } finally { globalThis.fetch = previous; }
  });
+ it ('Preserves Meshy 403 details instead of reporting every refusal as a bad key', async () => {
+  const previous = globalThis.fetch; globalThis.fetch = async () => Response.json ({ message : 'Content moderation blocked the input.' }, { status : 403 });
+  try { const c = { data : { user : { id : 'owner' } }, params : { path : ['text-to-3d'] }, env : { MESHY_API_KEY : 'test-server-key', AUTO3D_AI_ALLOW_SHARED_KEY : 'true', AUTO3D_AI_CREDENTIALS_R2 : { async get () { return null; }, async put () { return {}; } } }, request : new Request ('https://auto3d.test/api/ai/text-to-3d', { method : 'POST', body : '{}' }) }; const response = await onRequest (c); assert.equal (response.status, 403); assert.match ((await response.json ()).message, /moderation/); } finally { globalThis.fetch = previous; }
+ });
+ it ('Retries transient polling failures and stops on permanent failures', async () => {
+  const { workspace } = Workspace (); workspace.PollTask = AIWorkspace.prototype.PollTask; const timer = globalThis.setTimeout; let calls = 0;
+  try {
+   globalThis.setTimeout = callback => { callback (); return 0; };
+   workspace.RequestJSON = async () => { calls++; if (calls === 1) { throw Object.assign (new Error ('busy'), { status : 429, retryAfter : '1' }); } return { result : { id : 'model', status : 'SUCCEEDED' }, response : new Response () }; };
+   assert.equal ((await workspace.PollTask ('text-to-3d', 'model')).status, 'SUCCEEDED'); assert.equal (calls, 2);
+   workspace.RequestJSON = async () => { calls++; throw Object.assign (new Error ('unauthorized'), { status : 401 }); };
+   await assert.rejects (() => workspace.PollTask ('text-to-3d', 'model'), /unauthorized/); assert.equal (calls, 3);
+  } finally { globalThis.setTimeout = timer; }
+ });
+ it ('Loads history concurrently and retains successful results when one route fails', async () => {
+  const { workspace } = Workspace (); workspace.RenderRecent = () => {}; let started = 0, release; const gate = new Promise (resolve => { release = resolve; });
+  workspace.RequestJSON = async url => { started++; if (started === 4) { release (); } await gate; if (url.includes ('retexture')) { throw new Error ('unavailable'); } return { result : [{ id : url, status : 'SUCCEEDED' }] }; };
+  await workspace.RefreshRecent (); assert.equal (started, 4); assert.equal (workspace.recent.length, 4); assert.match (workspace.status.textContent, /Some creation history/);
+ });
+ it ('Warns against duplicate paid submissions when the connection drops', async () => {
+  const { workspace } = Workspace (); const previous = globalThis.fetch; workspace.RequestJSON = AIWorkspace.prototype.RequestJSON;
+  try { globalThis.fetch = async () => { throw new TypeError ('network failed'); }; await assert.rejects (() => workspace.Generate ({ action : 'text3d', prompt : 'bottle' }), /Check recent creations before retrying/); }
+  finally { globalThis.fetch = previous; }
+ });
  it ('Preserves the boolean multiplyDiffuseMap in archives instead of treating it as a texture object', () => {
   const doc = new SceneDocument (); const model = new Model (); model.AddMaterial (new PhysicalMaterial ()); const mesh = GenerateCuboid (new GeneratorParams (), 1, 1, 1); mesh.triangles.forEach (t => { t.mat = 0; }); model.root.AddMeshIndex (model.AddMesh (mesh)); FinalizeModel (model, {}); doc.AddImported (model, 'AI texture'); doc.model.materials[0].multiplyDiffuseMap = true;
   const saved = OpenSessionArchive (CreateSessionArchive (PackSession (doc))); assert.equal (saved.document.model.materials[0].multiplyDiffuseMap, true);

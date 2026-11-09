@@ -183,7 +183,13 @@ export class AIWorkspace
 
     async RequestJSON (url, options = {})
     {
-        const owner = this.website.auth?.user?.id; const response = await fetch (url, { credentials : 'same-origin', ...options });
+        const owner = this.website.auth?.user?.id; let response;
+        try { response = await fetch (url, { credentials : 'same-origin', signal : AbortSignal.timeout (35000), ...options }); }
+        catch (error) {
+            if (owner !== this.website.auth?.user?.id) { throw new Error ('Account changed. Reopen AI Generative.'); }
+            const failure = new Error (options.method === 'POST' ? 'Submission response was lost. Check recent creations before retrying; Meshy may have accepted the task.' : 'Could not reach Auto3D. Try again.');
+            failure.transient = true; throw failure;
+        }
         const text = await response.text ();
         let result = null;
         if (text) {
@@ -192,7 +198,7 @@ export class AIWorkspace
         if (owner !== this.website.auth?.user?.id) { throw new Error ('Account changed. Reopen AI Generative.'); }
         if (!response.ok) {
             const message = result?.error || result?.message || result?.task_error?.message || ('Provider request failed (' + response.status + ').');
-            const error = new Error (message); error.code = result?.code; error.status = response.status; throw error;
+            const error = new Error (message); error.code = result?.code; error.status = response.status; error.retryAfter = response.headers.get ('Retry-After'); throw error;
         }
         return { result, response };
     }
@@ -340,13 +346,23 @@ export class AIWorkspace
     }
     async PollTask (route, id, owner = this.website.auth?.user?.id)
     {
+        let failures = 0;
         for (let attempt = 0; attempt < 720; attempt++) {
             if (owner !== this.website.auth?.user?.id) { throw new Error ('Account changed.'); }
-            const { result, response } = await this.RequestJSON (this.settings.baseUrl + '/' + route + '/' + encodeURIComponent (id), { headers : this.Headers () });
+            let result, response;
+            try { ({ result, response } = await this.RequestJSON (this.settings.baseUrl + '/' + route + '/' + encodeURIComponent (id), { headers : this.Headers () })); failures = 0; }
+            catch (error) {
+                if (owner !== this.website.auth?.user?.id) { throw new Error ('Account changed.'); }
+                if (!(error.transient || error.status === 429 || error.status >= 500) || ++failures > 6) { throw error; }
+                const retry = Number (error.retryAfter); if (Number.isFinite (retry) && retry > 3600) { throw new Error ('Meshy requested a longer wait. Refresh creations later.'); }
+                const seconds = Number.isFinite (retry) && retry > 0 ? retry : Math.min (2 ** failures, 30);
+                this.status.textContent = 'Connection interrupted; checking generation again…'; await Delay (seconds * 1000); continue;
+            }
             const existing = this.recent.find (item => item.id === id); const task = this.NormalizeMeshyTask ({ ...result, route, type : existing?.type || result.type, prompt : result.prompt || existing?.name }); this.UpsertTask (task); this.status.textContent = route + ' · ' + (task.progress || 0) + '%';
             if (task.status === 'SUCCEEDED') { this.status.textContent = 'Complete · select Preview to review'; return task; }
             if (['FAILED', 'CANCELED'].includes (task.status)) { throw new Error (result.task_error?.message || 'Generation ' + task.status.toLowerCase ()); }
-            const retry = Number (response.headers.get ('Retry-After')); await Delay (Number.isFinite (retry) && retry > 0 ? Math.min (retry, 60) * 1000 : 4000);
+            const retry = Number (response.headers.get ('Retry-After')); if (Number.isFinite (retry) && retry > 3600) { throw new Error ('Meshy requested a longer wait. Refresh creations later.'); }
+            await Delay (Number.isFinite (retry) && retry > 0 ? retry * 1000 : 4000);
         }
         throw new Error ('Generation polling timed out. Refresh creations to check its status.');
     }
@@ -429,15 +445,16 @@ export class AIWorkspace
                 this.settings.baseUrl + '/text-to-3d?page_size=8&sort_by=-created_at',
                 ...['image-to-3d', 'text-to-image', 'retexture'].map (route => this.settings.baseUrl + '/' + route + '?page_size=4&sort_by=-created_at')
             ];
-            const groups = [];
-            for (const url of urls) {
-                const { result } = await this.RequestJSON (url, { headers : this.Headers () });
-                groups.push (Array.isArray (result) ? result : []);
-            }
+            const owner = this.website.auth?.user?.id;
+            const responses = await Promise.allSettled (urls.map (url => this.RequestJSON (url, { headers : this.Headers () })));
+            if (owner !== this.website.auth?.user?.id) { throw new Error ('Account changed.'); }
+            const successful = responses.filter (item => item.status === 'fulfilled');
+            if (!successful.length) { throw responses[0].reason; }
+            const groups = successful.map (item => Array.isArray (item.value.result) ? item.value.result : []);
             const loaded = groups.flat ().filter ((item) => item && item.id).map ((item) => this.NormalizeMeshyTask (item)).sort ((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice (0, 12);
             for (const task of loaded) { this.UpsertTask (task); }
             this.RenderRecent ();
-            this.status.textContent = this.recent.length ? 'Loaded ' + this.recent.length + ' recent creations.' : 'No recent Meshy 3D creations found.';
+            this.status.textContent = successful.length < responses.length ? 'Some creation history could not be loaded. Try refreshing again.' : this.recent.length ? 'Loaded ' + this.recent.length + ' recent creations.' : 'No recent Meshy 3D creations found.';
         } catch (error) {
             this.status.textContent = error.message; throw error;
         }

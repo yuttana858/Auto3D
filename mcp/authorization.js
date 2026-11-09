@@ -23,7 +23,7 @@ function Page (html, headers = new Headers (), status = 200, validatedRedirectUr
     // no-referrer makes browser form POSTs serialize their Origin as "null".
     // Keep the same-origin Origin check working without leaking OAuth URLs cross-site.
     headers.set ('X-Content-Type-Options', 'nosniff'); headers.set ('Referrer-Policy', 'same-origin');
-    return new Response ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Auto3D agent access</title><link rel="stylesheet" href="/assets/css/mcp-consent.css"></head><body><main class="agent-consent"><header class="agent-brand"><img src="/assets/images/auto3d-mark.svg" alt=""><span>SW Auto3D</span></header><section class="agent-card">' + html + '</section></main></body></html>', { status, headers });
+    return new Response ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connect Auto3D</title><link rel="stylesheet" href="/assets/css/mcp-consent.css"></head><body><main class="agent-consent"><header class="agent-brand"><img src="/assets/images/auto3d-mark.svg" alt=""><span>SW Auto3D</span></header><section class="agent-card">' + html + '</section></main></body></html>', { status, headers });
 }
 async function ConsentKey (env)
 {
@@ -75,11 +75,12 @@ export async function Consent (request, env, provider, identity = BrowserIdentit
         const binding = await Binding (env, consent.handle, user.id, expiresAt);
         const writeWarning = authRequest.scope.includes ('auto3d.write') ? '<p><strong>Write access:</strong> this grant can use the full Auto3D command catalog, including tools that change the app and account or administrator controls. Account and administrator operations remain subject to Auto3D authorization.</p>' : '<p>Without write access, this grant can use only the basic read-only app tools.</p>';
         const captureWarning = authRequest.scope.includes ('auto3d.capture') ? '<p>Screenshot access is also requested. The connected app window must separately allow screenshots.</p>' : '';
-        return Page ('<h1>Connect an agent</h1><p>Account: ' + Escape (user.email || user.id) + '</p><p>Client: ' + Escape (details.clientName) + '</p><p>' + (details.clientDomain ? 'Client domain: ' + Escape (details.clientDomain) : 'The client name is self-reported.') + '</p><p>Redirect host: ' + Escape (details.redirectHost) + '</p>' + (details.redirectIsLoopback ? '<p>A local application will receive this authorization.</p>' : '') + '<p>Permissions: ' + authRequest.scope.map (Escape).join (', ') + '. Read the session you select. You can revoke this agent in Agent access; inactive refresh credentials may expire.</p>' + writeWarning + captureWarning + '<form method="post"><input type="hidden" name="handle" value="' + Escape (consent.handle) + '"><input type="hidden" name="binding" value="' + binding + '"><label>Registration name <input name="name" required maxlength="80" value="' + Escape (String (details.clientName).slice (0, 80)) + '"></label><label>Harness <select name="harness"><option value="chatgpt">ChatGPT</option><option value="claude">Claude</option><option value="desktop">Desktop OAuth client</option><option value="cli">CLI with OAuth and PKCE</option><option value="other-oauth">Other OAuth client</option></select></label><p>After connecting, choose the Auto3D window you want the agent to control.</p><button name="decision" value="approve">Allow connection</button><button name="decision" value="deny" formnovalidate>Deny</button></form>', consent.headers, 200, details.redirectUri);
+        return Page ('<h1>Connect Auto3D</h1><p>Account: ' + Escape (user.email || user.id) + '</p><p>Client: ' + Escape (details.clientName) + '</p><p>' + (details.clientDomain ? 'Client domain: ' + Escape (details.clientDomain) : 'The client name is self-reported.') + '</p><p>Redirect host: ' + Escape (details.redirectHost) + '</p>' + (details.redirectIsLoopback ? '<p>A local application will receive this authorization.</p>' : '') + '<p>Permissions: ' + authRequest.scope.map (Escape).join (', ') + '. Read the session you select. You can revoke this agent in Agent access; inactive refresh credentials may expire.</p>' + writeWarning + captureWarning + '<form method="post"><input type="hidden" name="handle" value="' + Escape (consent.handle) + '"><input type="hidden" name="binding" value="' + binding + '"><button name="decision" value="approve">Allow</button><button name="decision" value="deny" formnovalidate>Deny</button></form>', consent.headers, 200, details.redirectUri);
     }
     if (!/^application\/x-www-form-urlencoded(?:\s*;|$)/i.test (request.headers.get ('Content-Type') || '')) { return Page ('Invalid form.', undefined, 400); }
     const form = new URLSearchParams (new TextDecoder ().decode (await ReadBytes (request, 8192)));
-    const keys = ['handle', 'binding', 'name', 'harness', 'decision'];
+    const standard = !form.has ('name') && !form.has ('harness');
+    const keys = standard ? ['handle', 'binding', 'decision'] : ['handle', 'binding', 'name', 'harness', 'decision'];
     if ([...form.keys ()].some (key => !keys.includes (key) && key !== 'appWindowCode') || keys.some (key => form.getAll (key).length !== 1) || form.getAll ('appWindowCode').length > 1) { return Page ('Invalid form.', undefined, 400); }
     const handle = form.get ('handle'), parts = form.get ('binding').split ('.'), expiresAt = Number (parts[0]);
     if (handle.length > 512 || !Number.isSafeInteger (expiresAt) || expiresAt <= Date.now () || expiresAt > Date.now () + 600000 || !/^[a-f0-9]{64}$/.test (parts[1] || '') || parts.length !== 2) { return Page ('Consent expired.', undefined, 403); }
@@ -88,7 +89,8 @@ export async function Consent (request, env, provider, identity = BrowserIdentit
     if (form.get ('decision') === 'deny') { const denied = await oauth.denyConsent (request, handle); return new Response (null, { status : 302, headers : denied.headers }); }
     const decision = form.get ('decision');
     if (decision !== 'approve') { return Page ('Invalid decision.', undefined, 400); }
-    const name = AgentName (form.get ('name')), harness = form.get ('harness'), appWindowCode = form.get ('appWindowCode') || '';
+    let name = standard ? null : AgentName (form.get ('name'));
+    const harness = standard ? 'other-oauth' : form.get ('harness'), appWindowCode = form.get ('appWindowCode') || '';
     if (appWindowCode && !ValidWindowCode (appWindowCode)) { return Page ('The app window code is invalid. Copy the complete current code from Agent access.', undefined, 400); }
     const broker = env.AUTO3D_AGENT_BROKER.getByName (user.id);
     if (appWindowCode && !await broker.CheckWindowCode ({ accountId : user.id, code : appWindowCode })) {
@@ -96,6 +98,7 @@ export async function Consent (request, env, provider, identity = BrowserIdentit
     }
     const approved = await oauth.approveConsent (request, handle);
     if (!ValidScopes (approved.request.scope)) { return Page ('Invalid scopes.', undefined, 403); }
+    if (standard) { const details = await oauth.describeConsent (approved.request); name = AgentName (String (details.clientName).slice (0, 80)); }
     const registrationId = crypto.randomUUID ();
     const record = await broker.Register ({ accountId : user.id, id : registrationId, name, harness, clientId : approved.request.clientId, scopes : approved.request.scope, expiresAt : Date.now () + 36525 * 86400000 });
     const result = await CompleteAgentConsent ({ broker, oauth, accountId : user.id, registrationId, record, approved, name, harness, decision, appWindowCode });

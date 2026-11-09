@@ -1,6 +1,6 @@
 # Auto3D: agent project overview
 
-Updated 2026-11-06 for 0.50.0 (repair release; see [repair-plan.md](repair-plan.md)). Start with [project-status.md](project-status.md) for the development log, deployed commit, local release, validation and TODO list. This document describes the current application; earlier proposed R2/auth architecture has been superseded by the implemented account routes.
+Updated 2026-11-09 for 0.51.0 (repair release; see [repair-plan.md](repair-plan.md)). Start with [project-status.md](project-status.md) for the development log, deployed commit, local release, validation and TODO list. This document describes the current application; earlier proposed R2/auth architecture has been superseded by the implemented account routes.
 
 ## Product and stack
 

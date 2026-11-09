@@ -5,7 +5,7 @@
       "id": "agent.access.open",
       "title": "Open agent access",
       "category": "Account",
-      "description": "Open the interactive OAuth registration and browser-window connection controls. Does not grant access or connect a client by itself.",
+      "description": "Open MCP browser-window sharing and connection revocation controls. Initial client authorization uses Auto3D sign-in and OAuth consent.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -33,7 +33,7 @@
       "id": "agent.access.connect",
       "title": "Connect this browser window",
       "category": "Account",
-      "description": "Explicitly share this browser window with individually authorized OAuth agents. Returns a short-lived pairing code; paste it into the Auto3D authorization page to pair automatically. Screenshots need a separate opt-in and OAuth scope. allowSelect lets authorized agents pair with auto3d.sessions.select without the code.",
+      "description": "Explicitly share this browser window with this account's authorized MCP agents, which can then select it with auto3d.sessions.select. Also returns a short-lived single-use code for auto3d.sessions.pair_code. Set allowSelect false to require that code. Screenshots need a separate opt-in and OAuth scope.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -50,7 +50,7 @@
       },
       "example": {
         "screenshots": false,
-        "allowSelect": false
+        "allowSelect": true
       }
     },
     {
@@ -6116,7 +6116,7 @@
       "id": "primary.configure",
       "title": "Configure product draft",
       "category": "Primary Products",
-      "description": "Validate and update the session-local bottle/can draft. Does not change scene geometry or upload artwork.",
+      "description": "Validate and update the session-local bottle/can/pouch draft. Does not change scene geometry or upload artwork.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -6125,7 +6125,8 @@
             "type": "string",
             "enum": [
               "bottle",
-              "can"
+              "can",
+              "pouch"
             ]
           },
           "heightMm": {
@@ -6137,6 +6138,16 @@
             "type": "number",
             "minimum": 10,
             "maximum": 500
+          },
+          "widthMm": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 500
+          },
+          "depthMm": {
+            "type": "number",
+            "minimum": 2,
+            "maximum": 200
           },
           "material": {
             "type": "string",
@@ -6160,7 +6171,8 @@
             "type": "string",
             "enum": [
               "front",
-              "wrap"
+              "wrap",
+              "back"
             ]
           }
         },
@@ -6175,9 +6187,9 @@
     },
     {
       "id": "primary.generate",
-      "title": "Add product to session",
+      "title": "Generate product",
       "category": "Primary Products",
-      "description": "Generate the current opaque bottle/can draft as one undoable session object. Glass and artwork are unavailable.",
+      "description": "Generate the current opaque bottle/can/pouch draft as one undoable session object. Glass and artwork are unavailable.",
       "mutates": true,
       "inputSchema": {
         "type": "object",

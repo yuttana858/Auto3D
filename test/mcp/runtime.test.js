@@ -5,6 +5,7 @@ import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 
 // Real workerd/DO/KV and OAuth library; identity is a disposable in-process fixture.
 // These tests make no requests to Supabase, Cloudflare or ChatGPT.
+const releaseVersion = JSON.parse (readFileSync (new URL ('../../package.json', import.meta.url))).version;
 const commandCatalog = JSON.parse (readFileSync (new URL ('../../website/assets/commands.json', import.meta.url)));
 const userA = '11111111-1111-4111-8111-111111111111', userB = '22222222-2222-4222-8222-222222222222';
 const tokenFor = id => 'e30.' + Buffer.from (JSON.stringify ({ sub : id, session_id : id })).toString ('base64url') + '.fixture';
@@ -44,10 +45,11 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         assert.match (response.headers.get ('Content-Security-Policy'), /form-action 'self' https:\/\/client\.example;/);
         const html = await response.text ();
         assert.ok (!html.includes ('<script>evil</script>')); assert.ok (html.includes ('&#60;script&#62;evil&#60;/script&#62;'));
-        assert.ok (!html.includes ('name="appWindowCode"')); assert.ok (html.includes ('value="claude"'));
+        assert.ok (!html.includes ('name="appWindowCode"')); assert.ok (!html.includes ('name="harness"')); assert.ok (!html.includes ('name="name"'));
         if (scope.includes ('auto3d.write')) { assert.match (html, /full Auto3D command catalog, including tools that change the app and account or administrator controls/); }
         assert.ok (!html.includes ('approve-manual')); assert.match (html, /SW Auto3D/); assert.match (html, /mcp-consent\.css/);
         const form = new URLSearchParams ({ handle : html.match (/name="handle" value="([^"]+)"/)[1], binding : html.match (/name="binding" value="([^"]+)"/)[1], name : 'My review agent', harness : 'chatgpt', appWindowCode, decision : 'approve' });
+        if (!appWindowCode) { form.delete ('name'); form.delete ('harness'); }
         const cookies = [cookieFor (id), ...response.headers.getSetCookie ().map (value => value.split (';')[0])].join ('; ');
         return { verifier, form, cookies, fixtureSocket };
     }
@@ -120,7 +122,7 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         socket = upgrade.webSocket; socket.accept (); const ack = message (socket);
         socket.send (JSON.stringify ({ type : 'hello', instanceId : 'window-a', windowLabel : 'Review window', allowSelect : true, sessions : [{ id : 'tab-a', name : 'Test box', active : true }] }));
         const hello = await ack;
-        const initialized = await rpc (token.access_token, 'initialize', { protocolVersion : '2025-03-26', capabilities : {}, clientInfo : { name : 'test client', version : '1' } }); assert.equal (initialized.status, 200); assert.match ((await initialized.json ()).result.serverInfo.version, /^0\.50\.0\+[a-f0-9]{16}$/);
+        const initialized = await rpc (token.access_token, 'initialize', { protocolVersion : '2025-03-26', capabilities : {}, clientInfo : { name : 'test client', version : '1' } }); assert.equal (initialized.status, 200); const serverVersion = (await initialized.json ()).result.serverInfo.version; assert.equal (serverVersion.split ('+')[0], releaseVersion); assert.match (serverVersion.split ('+')[1], /^[a-f0-9]{16}$/);
         const listResponse = await rpc (token.access_token, 'tools/list'); assert.equal (listResponse.headers.get ('Cache-Control'), 'no-store');
         const tools = await listResponse.json (); assert.ok (!tools.result.tools.some (tool => tool.name === 'capture.image' || tool.name === 'auth.sign_out'));
         if (other) { const otherList = await (await rpc (other.access_token, 'tools/call', { name : 'auto3d.sessions.list', arguments : {} })).json (); assert.deepEqual (JSON.parse (otherList.result.content[0].text), []); }

@@ -1,8 +1,23 @@
 # Auto3D development log and handoff
 
-## Repair release — Auto3D 0.50.0 / Packaging 1.10.3 / Primary Products 0.3.0 (2026-11-06)
+## Repair release — Auto3D 0.51.0 / Packaging 1.10.3 / Primary Products 0.4.0 (2026-11-09)
 
-Fixes the 2026-11-06 review findings: MCP account lockout after ~1000 commands, window disconnect on any failed command, generic MCP errors, grant loss during identity outages, stored XSS through model/material names, missing CSP, wrong `mutates` flags, unbounded schemas, shared-key Meshy task visibility, and browser tests stalled at the welcome screen. Adds `macro.cancel`, `session.rename`, `session.recovery.discard` and `object.user_data.delete` (261 commands). See [release-0500.md](release-0500.md) and the [repair plan](repair-plan.md). Real-client MCP production verification remains pending.
+Fixes the 2026-11-06 review findings: MCP account lockout after ~1000 commands, window disconnect on any failed command, generic MCP errors, grant loss during identity outages, stored XSS through model/material names, missing CSP, wrong `mutates` flags, unbounded schemas, shared-key Meshy task visibility, and browser tests stalled at the welcome screen. Adds `macro.cancel`, `session.rename`, `session.recovery.discard` and `object.user_data.delete` (261 commands). See [release-0510.md](release-0510.md) and the [repair plan](repair-plan.md). Real-client MCP production verification remains pending.
+## MCP connection display — Auto3D 0.50.2 candidate
+
+Connection and administrator lists show client labels and status without harness labels. Existing grants remain revocable.
+
+## Standard MCP consent — Auto3D 0.50.1 / Packaging 1.10.3 / Primary Products 0.4.0
+
+PR #82 removes Agent connection instructions, registration/harness inputs and window-code controls from the dialog. OAuth consent derives connection labels from client metadata and asks only for Allow/Deny. Browser sharing, screenshot opt-in and revocation remain available. See [release-0501.md](release-0501.md).
+
+## Generate readiness and pillow pouches — Auto3D 0.50.0 / Primary Products 0.4.0 / Packaging 1.10.3
+
+Renames Add to session to Generate and refreshes module availability when editor operations finish, with visible blocked-state feedback. Adds opaque pillow-pouch geometry, dimensions, front/back zone descriptors and the shared generate/edit/history/archive workflow. See [release-0500.md](release-0500.md). Not deployed.
+
+## Meshy reliability — local candidate
+
+Transient polling failures retry, creation history loads concurrently with partial results, and uncertain submissions warn against duplicate paid tasks. The production connection failure remains undiagnosed and live verification is pending. See [Meshy reliability review](meshy-reliability-review.md).
 
 ## MCP connection before window pairing — Auto3D 0.49.2 / Packaging 1.10.3 / Primary Products 0.3.0
 
