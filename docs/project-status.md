@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Source-linked model dimensions — Auto3D 0.53.0 / Primary Products 0.5.0 / Packaging 1.10.3
+
+Adds the edge-drag dimension tool, live canonical source references and high-contrast brackets. Renames Meshes to Layers and adds a Dimensions visibility/list row, history and file/recovery persistence. See [release-0530.md](release-0530.md). Based on merged #86; not deployed.
+
 ## Primary Products materials and artwork — Auto3D 0.52.0 / Primary Products 0.5.0 / Packaging 1.10.3
 
 Adds the shared H × W × D row, adjacent native color swatch, category PBR presets and local PNG/JPEG/WebP label import with actual surface application. Original embedded pixels and physical label descriptors survive file/recovery and portable image/material export. See [release-0520.md](release-0520.md). Not deployed.

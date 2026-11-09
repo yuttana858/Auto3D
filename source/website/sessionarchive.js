@@ -1,3 +1,4 @@
+import { ValidateDimensions } from './dimensioncore.js';
 import { ValidateProductDefinition } from '../../modules/primary-products/src/definition.js';
 import { ValidateTimelineActions } from './timelineactions.js';
 import { ValidateCameraViews } from './sessioncameras.js';
@@ -180,6 +181,7 @@ export function PackSession (document, view = {}, objects = document.objects, ki
     const model = document.CompactModel (objects);
     if (view.timeline?.actions) { view = { ...view, timeline : { ...view.timeline, actions : ValidateTimelineActions (view.timeline.actions).filter (action => objects.some (object => object.id === action.objectId)) } }; }
     return {
+        dimensions : ValidateDimensions (document.dimensions || []).filter (d => objects.some (o => o.id === d.objectId)), dimensionsVisible : document.dimensionsVisible !== false,
         format : 'SW Auto3D', version : SessionVersion, metadata : { savedAt : new Date ().toISOString () }, kind, name : document.name, view, packaging : kind === 'session' && document.packaging ? ValidatePackaging (document.packaging) : null,
         objects : objects.map ((object) => ({ id : object.id, packagingProfile : object.packagingProfile ? ValidatePackaging (object.packagingProfile) : null, name : object.name, source : object.source, unit : object.unit, visible : object.visible, hiddenParts : object.hiddenParts || [], position : object.position, rotation : object.rotation, scale : object.scale, userData : object.userData || {}, castShadow : object.castShadow !== false, receiveShadow : object.receiveShadow !== false, keyframes : Array.isArray (object.keyframes) ? object.keyframes : [], playback : object.playback, animationAsset : object.animationAsset ? { main : object.animationAsset.main, files : object.animationAsset.files.map ((file) => ({ name : file.name, buffer : EncodeBuffer (file.buffer) })) } : null })),
         model : { unit : model.unit, properties : model.propertyGroups, materials : model.materials.map (PackMaterial), meshes : model.meshes.map (PackMesh), nodes : model.root.childNodes.map (PackNode) }
@@ -192,7 +194,7 @@ export function ReadSession (data)
     if (data.view?.cameraViews !== undefined) { data.view.cameraViews = ValidateCameraViews (data.view.cameraViews); }
     if (!data.model || !Array.isArray (data.model.nodes) || !Array.isArray (data.model.materials) || !Array.isArray (data.model.meshes)) { throw new Error ('Invalid model data.'); }
     if (!Array.isArray (data.objects) || data.objects.length > 1000 || data.objects.length !== data.model.nodes.length) { throw new Error ('Invalid object list.'); }
-    const document = new SceneDocument (); document.packaging = data.packaging ? ValidatePackaging (data.packaging) : null;
+    const document = new SceneDocument (); document.dimensions = ValidateDimensions (data.dimensions); if (data.dimensionsVisible !== undefined && typeof data.dimensionsVisible !== 'boolean') { throw new Error ('Invalid Dimensions layer visibility.'); } document.dimensionsVisible = data.dimensionsVisible !== false; document.packaging = data.packaging ? ValidatePackaging (data.packaging) : null;
     const model = new Model ();
     model.unit = data.model.unit;
     ReadProperties (model, data.model.properties);

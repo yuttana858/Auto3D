@@ -81,13 +81,14 @@ export class NavigatorMeshesPanel extends NavigatorPanel
         this.buttonsDiv = CreateDiv ('ov_navigator_buttons');
         InsertDomElementBefore (this.buttonsDiv, this.treeDiv);
 
+        this.dimensionsLayerDiv = AddDiv (this.panelDiv, 'ov_dimensions_layer'); InsertDomElementBefore (this.dimensionsLayerDiv, this.treeDiv);
         this.popupDiv = AddDiv (this.panelDiv, 'ov_navigator_info_panel');
         this.materialsButton = new NavigatorMaterialsPopupButton (this.popupDiv);
     }
 
     GetName ()
     {
-        return Loc ('Meshes');
+        return Loc ('Layers');
     }
 
     GetIcon ()
@@ -104,7 +105,7 @@ export class NavigatorMeshesPanel extends NavigatorPanel
         }
         let popupHeight = GetDomElementOuterHeight (this.popupDiv);
         let height = this.parentDiv.offsetHeight;
-        SetDomElementHeight (this.treeDiv, height - titleHeight - buttonsHeight - popupHeight);
+        SetDomElementHeight (this.treeDiv, height - titleHeight - buttonsHeight - popupHeight - this.dimensionsLayerDiv.offsetHeight);
     }
 
     Clear ()

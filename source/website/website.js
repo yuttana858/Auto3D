@@ -1,3 +1,4 @@
+import { DimensionTool } from './dimensiontool.js';
 import { RenderQueue } from './renderqueue.js';
 import { ViewModes } from './viewmodes.js';
 import { RenderingPanel } from './renderingpanel.js';
@@ -252,7 +253,7 @@ export class Website
         this.lightingPanel = new LightingPanel (this);
         this.materialPanel = new MaterialPanel (this);
         this.axisIndicator = new AxisIndicator (this.viewer, document.getElementById ('world_axis'));
-        this.sessionEditor = new SessionEditor (this);
+        this.sessionEditor = new SessionEditor (this); this.dimensions = new DimensionTool (this);
         this.cameraPanel = new CameraPanel (this);
         this.viewModes = new ViewModes (this); this.rendering = new RenderQueue (this); this.renderingPanel = new RenderingPanel (this);
         this.preferences = new Preferences (this);
@@ -350,6 +351,7 @@ export class Website
 
     OnModelClicked (button, mouseCoordinates, modifiers = {})
     {
+        if (this.dimensions?.active) { return; }
         if (this.sessionEditor.busy || this.sessionEditor.controls.axis !== null || this.sessionEditor.controls.dragging) { return; }
         if (button !== 1) {
             return;
@@ -855,6 +857,7 @@ export class Website
         let measureToolButton = AddPushButton (this.toolbar, 'measure', Loc ('Measure'), ['only_full_width', 'only_on_model'], (isSelected) => {
             HandleEvent ('measure_tool_activated', isSelected ? 'on' : 'off');
             this.navigator.SetSelection (null);
+            if (isSelected) { this.dimensions?.SetActive (false); }
             this.measureTool.SetActive (isSelected);
         });
         this.measureTool.SetButton (measureToolButton);

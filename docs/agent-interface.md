@@ -121,3 +121,7 @@ Fold presentation adds `packaging.fefco.scrub` (normalized visual pose, optional
 ## Personal Meshy credential management
 
 `ai.connection.open` opens the private interactive dialog; it does not save a key. Credentials must be entered by the user and cannot be supplied in command or macro arguments. `ai.connection.inspect` reports only `saved` and `available` flags. `ai.connection.test` checks the saved/admin connection via Meshy's balance endpoint without generation. `ai.connection.remove` deletes only the current account's saved credential; it does not revoke the key at Meshy. Open/remove respect read-only sessions. The key field is cleared after submission, on close and on account change; captures exclude the entire dialog.
+
+## Live model dimensions
+
+`dimensions.edges` pages source anchors and matching world segments for a chosen object. Pass an exact anchor to `dimensions.add`; offsets are screen pixels and lengths come from canonical geometry. `dimensions.inspect` reports placed and unscaled source lengths (mm), stale references and saved-layer visibility. `dimensions.offset`, `dimensions.delete` and `dimensions.layer.visible` share the UI's undoable services. `dimensions.tool` activates pointer edge dragging. Flat packaging references canonical CAD path/segment IDs; other static objects reference feature edges, not triangulation diagonals. These annotations appear in the viewport and `.auto3d`/recovery data, not baked model/render exports. See [0.53.0](release-0530.md).

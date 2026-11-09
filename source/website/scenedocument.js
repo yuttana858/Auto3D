@@ -49,7 +49,7 @@ export class SceneDocument
     constructor ()
     {
         this.model = new Model ();
-        this.objects = []; this.packaging = null;
+        this.objects = []; this.packaging = null; this.dimensions = []; this.dimensionsVisible = true;
         this.name = 'Untitled session';
     }
 
