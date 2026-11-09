@@ -13,10 +13,16 @@ try {
     const labels = await page.locator ('.scene_tools button').evaluateAll (nodes => nodes.map (node => node.getAttribute ('aria-label'))); for (const text of ['Hide or show', 'Delete object', 'Model library', 'Save or open', 'Export', 'Add model']) { assert.equal (labels.some (label => label.startsWith (text)), false); }
     assert.equal (await page.locator ('.header_library_button').count () > 0, true);
     await call ('packaging.fefco.preset', { code : '0201', length : 100, width : 80, height : 60 }); await call ('object.transform', { position : [60, 20, 0] });
-    const before = await call ('camera.current.inspect'); const focus = await call ('camera.orbit.focus_selected'); assert.equal (focus.focused, true); assert.deepEqual (await call ('camera.current.inspect'), before);
+    // The preset's animated fit may still be moving the camera; wait until two reads agree.
+    let settled = null; for (let retry = 0; retry < 100; retry++) { const next = await call ('camera.current.inspect'); if (settled && JSON.stringify (settled) === JSON.stringify (next)) { break; } settled = next; await page.waitForTimeout (100); }
+    const before = await call ('camera.current.inspect'); const focus = await call ('camera.orbit.focus_selected'); assert.equal (focus.focused, true);
+    // Focus keeps the camera position and aims the orbit center at the selection.
+    const focused = await call ('camera.current.inspect'); assert.deepEqual (focused.eye, before.eye); assert.deepEqual (focused.center, focus.pivot); assert.equal (focused.fov, before.fov);
     const canvas = page.locator ('#main_viewer canvas').first (); const area = await canvas.boundingBox (); const point = { x : area.x + area.width * .6, y : area.y + area.height * .45 };
     await page.mouse.move (point.x, point.y); await page.mouse.down ({ button : 'right' }); await page.mouse.move (point.x + 65, point.y + 25, { steps : 8 }); await page.mouse.up ({ button : 'right' });
-    const after = await call ('camera.current.inspect'); const radius = eye => Math.hypot (...eye.map ((v, i) => v - focus.pivot[i])); assert.ok (Math.abs (radius (before.eye) - radius (after.eye)) < 1e-5); assert.notDeepEqual (before.eye, after.eye); assert.equal (before.fov, after.fov); assert.equal (await page.locator ('.auto3d_context_menu').count (), 0);
+    const after = await call ('camera.current.inspect'); const span = camera => Math.hypot (...camera.eye.map ((v, i) => v - camera.center[i]));
+    // Main viewer: horizontal right-drag pans sideways (the view center moves) and vertical drag tilts; neither changes the viewing distance.
+    assert.notDeepEqual (focused.center, after.center); assert.notDeepEqual (focused.eye, after.eye); assert.ok (Math.abs (span (focused) - span (after)) < 1e-3); assert.equal (before.fov, after.fov); assert.equal (await page.locator ('.auto3d_context_menu').count (), 0);
     const scene = await call ('scene.inspect'); assert.equal (scene.objects.length, 1); assert.deepEqual (scene.objects[0].position, [60, 20, 0]);
     await call ('ui.array'); const dialog = page.getByRole ('dialog', { name : 'Array selected model', exact : true }); await dialog.waitFor ();
     await page.waitForFunction (() => parseFloat (getComputedStyle (document.querySelector ('.array_dialog h2')).fontSize) > 18);
