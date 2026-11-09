@@ -1,6 +1,7 @@
 account-storage
 admin-controls
 animation
+auth
 board-appearance
 board-appearance-controls
 board-array-buffers
@@ -10,10 +11,13 @@ board-toggle-stability
 cad-apply
 command-design
 corrugate-review
+dimensions
 errorlogs-panel
 feedback
 fold-actions
+fold-camera-fit
 format-libraries
+landing-signin
 library-sharing
 lighting-isolation
 lighting-ui
@@ -26,11 +30,11 @@ multiwall-glue
 popup-fonts
 preview-context-lifecycle
 primary-products
-dimensions
 render-workspace
 rendercore-state
 saved-rsc-materials
 scene-presentation
+selected-orbit
 session-cameras
 surface-relief
 viewer-performance

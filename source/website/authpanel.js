@@ -52,7 +52,7 @@ export class AuthPanel
         const submit = document.createElement ('button'); submit.type = 'submit'; submit.textContent = 'Sign in';
         const status = document.createElement ('p'); status.className = 'auth_status'; status.setAttribute ('role', 'status'); status.setAttribute ('aria-live', 'polite');
         const hint = document.createElement ('p'); hint.className = 'auth_hint'; hint.textContent = 'Use the account provided by your administrator. Request an account below.';
-        const signOut = document.createElement ('button'); signOut.type = 'button'; signOut.textContent = 'Sign out';
+        const signOut = document.createElement ('button'); signOut.type = 'button'; signOut.className = 'auth_sign_out'; signOut.textContent = 'Sign out';
         const requestAccount = document.createElement ('button'); requestAccount.type = 'button'; requestAccount.textContent = 'Request an account';
         requestAccount.addEventListener ('click', () => this.admin.OpenRequest ());
         const forgot = document.createElement ('button'); forgot.type = 'button'; forgot.textContent = 'Forgot Password';

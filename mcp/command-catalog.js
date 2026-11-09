@@ -20,6 +20,7 @@ export const CommandIds = Object.freeze ([
     'auth.verify',
     'auth.password_help',
     'auth.recover',
+    'auth.continue',
     'auth.open',
     'auth.request_account',
     'admin.open',

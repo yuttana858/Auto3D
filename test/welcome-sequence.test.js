@@ -1,28 +1,31 @@
 import assert from 'node:assert/strict';
-import { StartWelcomeSequence } from '../source/website/welcome.js';
+import { StartLanding } from '../source/website/welcome.js';
 
-describe ('Startup welcome gate', () => {
+describe ('Combined landing and sign-in page', () => {
     let originalDocument;
     beforeEach (() => { originalDocument = globalThis.document; });
     afterEach (() => { globalThis.document = originalDocument; });
     function setup ()
     {
-        const handlers = {}; const version = {}, identity = { appendChild (node) { this.hint = node; } }, canvas = {};
-        const splash = { style : {}, attributes : {}, querySelector (selector) { return { '.splash_version' : version, '.splash_identity' : identity, canvas }[selector]; }, setAttribute (name, value) { this.attributes[name] = value; }, addEventListener (name, handler) { handlers[name] = handler; }, focus () { this.focused = true; }, remove () { this.removed = true; } };
+        const version = {}, canvas = {}, children = [];
+        const splash = { style : {}, attributes : {}, classes : new Set (), classList : { add (name) { splash.classes.add (name); } }, querySelector (selector) { return { '.splash_version' : version, canvas }[selector]; }, setAttribute (name, value) { this.attributes[name] = value; }, appendChild (node) { children.push (node); }, remove () { this.removed = (this.removed || 0) + 1; } };
         globalThis.document = { getElementById : () => splash, createElement : () => ({}) };
-        let entered = 0, disposed = 0; let resolveFade;
-        const fade = () => new Promise (resolve => { resolveFade = resolve; });
-        StartWelcomeSequence (() => { entered++; }, { createScene : (target, animated) => { assert.equal (target, canvas); assert.equal (animated, true); return () => { disposed++; }; }, fade });
-        return { splash, handlers, identity, entered : () => entered, disposed : () => disposed, finishFade : () => resolveFade () };
+        let disposed = 0, fades = 0; let resolveFade;
+        const landing = StartLanding ({ createScene : (target, animated) => { assert.equal (target, canvas); assert.equal (animated, true); return () => { disposed++; }; }, fade : () => { fades++; return new Promise (resolve => { resolveFade = resolve; }); } });
+        return { landing, splash, version, children, disposed : () => disposed, fades : () => fades, finishFade : () => resolveFade () };
     }
-    it ('waits for a click before opening authentication and disposes the scene once', async () => {
-        const test = setup (); assert.equal (test.entered (), 0); assert.equal (test.splash.attributes.role, 'button'); assert.equal (test.identity.hint.textContent, 'Click anywhere to continue');
-        const first = test.handlers.click ({}); test.handlers.click ({}); assert.equal (test.entered (), 0); test.finishFade (); await first;
-        assert.equal (test.entered (), 1); assert.equal (test.disposed (), 1); assert.equal (test.splash.removed, true);
+    it ('shows the welcome scene with a sign-in host and no click-anywhere bypass', () => {
+        const test = setup ();
+        assert.match (test.version.textContent, /^v\d+\.\d+\.\d+$/); assert.equal (test.splash.attributes.role, 'region'); assert.ok (test.splash.classes.has ('splash_landing'));
+        assert.equal (test.children.length, 1); assert.equal (test.landing.host, test.children[0]); assert.equal (test.landing.host.className, 'splash_signin');
+        assert.equal (test.splash.tabIndex, undefined, 'the landing itself is not a continue button');
     });
-    it ('supports keyboard activation and handles a missing splash', async () => {
-        const test = setup (); let prevented = false; test.handlers.keydown ({ key : ' ', preventDefault () { prevented = true; } }); test.finishFade (); await Promise.resolve (); await Promise.resolve ();
-        assert.equal (prevented, true); assert.equal (test.entered (), 1);
-        globalThis.document = { getElementById : () => null }; let continued = false; StartWelcomeSequence (() => { continued = true; }); assert.equal (continued, true);
+    it ('dismisses once with a fade, disposing the scene and removing the landing', async () => {
+        const test = setup (); const first = test.landing.Dismiss (), second = test.landing.Dismiss ();
+        assert.equal (first, second); assert.equal (test.fades (), 1); assert.equal (test.splash.style.pointerEvents, 'none');
+        test.finishFade (); await first; assert.equal (test.disposed (), 1); assert.equal (test.splash.removed, 1);
+    });
+    it ('returns null when the page has no landing', () => {
+        globalThis.document = { getElementById : () => null }; assert.equal (StartLanding (), null);
     });
 });

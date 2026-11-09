@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Landing sign-in, right-drag sideways pan, closer fold framing — Auto3D 0.53.1 / Packaging 1.10.4 / Primary Products 0.5.0 (2026-11-09)
+
+The welcome scene and sign-in are one landing page that waits for the user to sign in or continue with a saved sign-in (`auth.continue`). Main-viewer right-drag left/right now pans the camera sideways instead of orbiting; vertical right-drag still tilts and the mini viewer keeps full orbit. Fold/unfold auto-fit frames the current pose's visible meshes with a projected crop and re-frames the finished box (closed 0201 box: 18% × 24% of the view → about 53% × 64%). Seven browser tests now wait for sign-in after the welcome screen; `selected-orbit` and `fold-camera-fit` join CI. See [release-0531.md](release-0531.md).
+
 ## Source-linked model dimensions — Auto3D 0.53.0 / Primary Products 0.5.0 / Packaging 1.10.4
 
 Adds the edge-drag dimension tool, live canonical source references and high-contrast brackets. Renames Meshes to Layers and adds a Dimensions visibility/list row, history and file/recovery persistence. See [release-0530.md](release-0530.md). Based on merged #86; not deployed.

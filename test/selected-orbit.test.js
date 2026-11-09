@@ -50,4 +50,15 @@ describe ('Selected-object orbit', () => {
         const nav = Object.create (Navigation.prototype); const calls = []; let click = true; Object.assign (nav, { enabled : true, canvas : {}, mouse : { Move () {}, GetPosition : () => new Coord2D (0, 0), GetMoveDiff : () => new Coord2D (10, 5), IsButtonDown : () => true, GetButton : () => 3 }, clickDetector : { Move () {}, IsClick : () => click }, onOrbitStart : () => calls.push ('focus'), Orbit : () => calls.push ('orbit'), Update () {} });
         nav.OnMouseMove ({}); assert.deepEqual (calls, []); click = false; nav.OnMouseMove ({}); nav.OnMouseMove ({}); assert.deepEqual (calls, ['focus', 'orbit', 'orbit']); assert.equal (nav.suppressContextMenu, true);
     });
+    it ('Pans sideways on horizontal right-drag and keeps vertical tilt when the main viewer enables it', () => {
+        const nav = Object.create (Navigation.prototype); const calls = []; let diff = new Coord2D (10, 0);
+        Object.assign (nav, { enabled : true, canvas : {}, camera : { eye : new Coord3D (0, 0, 1000), center : new Coord3D (0, 0, 0) }, mouse : { Move () {}, GetPosition : () => new Coord2D (0, 0), GetMoveDiff : () => diff, IsButtonDown : () => true, GetButton : () => 3 }, clickDetector : { Move () {}, IsClick : () => false }, onOrbitStart : () => calls.push (['focus']), Orbit : (x, y) => calls.push (['orbit', x, y]), Pan : (x, y) => calls.push (['pan', x, y]), Update () {} });
+        nav.rightDragPansHorizontally = true;
+        nav.OnMouseMove ({}); diff = new Coord2D (0, 4); nav.OnMouseMove ({}); diff = new Coord2D (-6, 2); nav.OnMouseMove ({});
+        assert.deepEqual (calls, [['focus'], ['pan', 10, 0], ['orbit', 0, 2], ['pan', -6, 0], ['orbit', 0, 1]]); assert.equal (nav.suppressContextMenu, true);
+        nav.rightDragPansHorizontally = false; calls.length = 0; diff = new Coord2D (10, 4); nav.OnMouseMove ({});
+        assert.deepEqual (calls, [['orbit', 5, 2]], 'the mini viewer keeps full right-drag orbit');
+        const middle = Object.assign (Object.create (nav), { mouse : { ...nav.mouse, GetButton : () => 2 } }); calls.length = 0; middle.OnMouseMove ({});
+        assert.deepEqual (calls, [['pan', 10, 4]], 'middle-drag pan is unchanged');
+    });
 });
