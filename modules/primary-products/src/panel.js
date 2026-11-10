@@ -30,10 +30,7 @@ function DesignPreview (design)
         shape = `<path d="M${x} ${top+depth}L${x+12} ${top}H${x+w}l-12 ${depth}Z"/><path d="M${x} ${top+depth}v${sh}h${w-12}l12 -${depth}V${top}M${x+w-12} ${top+depth}v${sh}"/>`;
     }
     const size = ProductSize (d), top = d.family === 'clamshell' ? 100 - Math.min (45, h*.45) - Math.min (45, d.depthMm*scale*.5) : y, right = x + w;
-    // The outline is drawn at 82% to leave room for readable callouts; map its edges into the same space.
-    const k = .82, X = value => 4 + value * k, Y = value => 4 + value * k, left = X (x), edge = X (right), base = Y (120);
-    const callouts = Bracket (left, base + 8, edge, base + 8, 'W ' + Format (size.widthMm), 'below', 12) + Bracket (edge + 6, Y (top), edge + 6, base, 'H ' + Format (size.heightMm), 'right', 12) + Bracket (edge - 4, base + 3, edge + 8, base - 8, 'L ' + Format (size.lengthMm), 'oblique', 12);
-    return `<svg class="pp_design_preview" viewBox="0 0 150 140" fill="${d.color}" fill-opacity=".22" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><g transform="translate(4 4) scale(${k})">${shape}</g><g class="pp_callout" fill="currentColor" fill-opacity="1" stroke-width="1">${callouts}</g></svg>`;
+    return `<svg class="pp_design_preview" viewBox="0 0 120 140" fill="${d.color}" fill-opacity=".22" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true">${shape}</svg>`;
 }
 function Format (mm) { return String (Math.round (mm * 10) / 10); }
 // A dimension callout: extension ticks at both ends, a dimension line and its value, drawn in SVG user units.
@@ -60,16 +57,17 @@ export class PrimaryProductsPanel
         const categories = Element ('div', 'pp_categories', undefined, catalog);
         for (const [id, name] of Object.entries (ProductCategories).filter (([id]) => !['bottles', 'cans', 'pouches'].includes (id))) { const button = Element ('button', '', name, categories); button.type = 'button'; button.addEventListener ('click', ()=>this.host.catalog(id, true)); }
         this.drawer = Element ('section', 'pp_design_drawer', undefined, this.root); this.drawer.setAttribute ('aria-label', 'Product designs'); this.drawer.tabIndex = -1;
-        const header = Element ('div', 'pp_drawer_header', undefined, this.drawer); this.drawerTitle=Element('h3', '', 'Designs', header);
+        const header = Element ('div', 'pp_drawer_header', undefined, this.drawer);
         const drawerSize = Element ('div', 'pp_drawer_size', undefined, header); drawerSize.setAttribute ('aria-label', 'Size · W × L × H');
         for (const [key, label] of [['widthMm', 'W'], ['lengthMm', 'L'], ['heightMm', 'H']]) {
             const field = Element ('label', 'pp_field', label, drawerSize), wrap = Element ('span', 'pp_input_wrap', undefined, field), input = Element ('input', '', undefined, wrap), unit = Element ('span', 'pp_unit', '', wrap);
             input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', 'Design ' + { W : 'width', L : 'length', H : 'height' }[label]); this.BindDimension (input, key); this.drawerInputs = this.drawerInputs || new Map (); this.drawerInputs.set (key, { input, unit });
         }
+        this.drawerStatus = Element ('p', 'pp_status pp_drawer_status', '', header); this.drawerStatus.setAttribute ('role', 'status');
+        this.drawerTitle = Element ('h3', '', 'Designs', header);
         const close=Element('button', '', 'Close designs', header); this.drawerClose = close; close.type='button';close.addEventListener('click', ()=>this.host.catalog(this.host.inspect().catalogCategory, false));
         this.drawerGrid=Element('div', 'pp_design_grid', undefined, this.drawer);
         this.drawer.addEventListener ('keydown', event => { if (event.key === 'Escape') { event.stopPropagation (); event.preventDefault (); this.host.catalog (this.host.inspect ().catalogCategory, false); } });
-        this.drawerStatus = Element ('p', 'pp_status', '', this.drawer); this.drawerStatus.setAttribute ('role', 'status');
         const note = Element ('p', 'pp_catalog_note', 'Start with a familiar shape. Refine its dimensions and surface.', catalog);
         note.setAttribute ('aria-hidden', 'true');
         this.stage = Element ('section', 'pp_stage', undefined, this.layout); this.stage.setAttribute ('aria-label', 'Product profile reference');
@@ -133,7 +131,7 @@ export class PrimaryProductsPanel
     }
     async Action (action)
     {
-        try { const result = await action (); this.status.textContent = result?.message || 'Product action completed.'; this.drawerStatus.textContent = this.status.textContent; }
+        try { const result = await action (); this.status.textContent = result?.message || 'Product action completed.'; this.drawerStatus.textContent = result?.message || ''; }
         catch (error) { this.status.textContent = error.message; this.drawerStatus.textContent = error.message; }
         finally { this.Refresh (); }
     }

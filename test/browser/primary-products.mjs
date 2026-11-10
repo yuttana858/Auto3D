@@ -162,7 +162,9 @@ try {
     const cardBoxes = await drawer.locator ('.pp_design_card').evaluateAll (nodes => nodes.map (node => { const r = node.getBoundingClientRect (); return [Math.round (r.width), Math.round (r.height)]; }));
     assert.equal (cardBoxes.length, 7); assert.ok (cardBoxes.every (box => box[0] === cardBoxes[0][0] && box[1] === cardBoxes[0][1]), JSON.stringify (cardBoxes));
     assert.ok ((await drawer.boundingBox ()).height <= 1000 * .315 + 1, 'drawer is at most 31.5% of the viewport');
-    const callouts = await drawer.locator ('.pp_design_card').first ().locator ('.pp_callout text').allTextContents (); assert.deepEqual (callouts.map (text => text.split (' ')[0]), ['W', 'H', 'L']);
+    assert.equal (await drawer.locator ('.pp_design_card .pp_callout').count (), 0); /* thumbnails carry no dimension brackets; the caption keeps W × L × H */
+    const headerBox = await drawer.locator ('.pp_drawer_header').boundingBox (), sizeBox = await drawer.locator ('.pp_drawer_size').boundingBox (), titleBox = await drawer.locator ('.pp_drawer_header h3').boundingBox ();
+    assert.ok (sizeBox.x - headerBox.x < 2, 'W/L/H inputs start at the left of the drawer'); assert.ok (titleBox.x > sizeBox.x + sizeBox.width, 'category name follows the inputs'); assert.ok (headerBox.height <= 40, 'compact one-line header: ' + headerBox.height);
     assert.match (await drawer.locator ('.pp_design_card .pp_design_size').first ().textContent (), /^66 × 66 × 122 mm$/);
     const beforeCan = (await call ('scene.inspect')).objects.length; await drawer.getByRole ('button', { name : 'Generate Standard beverage can' }).click ();
     await objectCountReaches (beforeCan + 1);
