@@ -68,6 +68,8 @@ export const CommandIds = Object.freeze ([
     'packaging.boards.open',
     'packaging.boards.export',
     'packaging.boards.save_csv',
+    'packaging.cad.preview',
+    'packaging.cad.face',
     'packaging.open',
     'packaging.draft.type',
     'packaging.view.snap',

@@ -237,7 +237,7 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         assert.deepEqual (ids.sort (), commandCatalog.commands.map (tool => tool.id).sort ());
         const packaging = await rpc (writer.access_token, 'tools/call', { name : 'auto3d.commands.list', arguments : { category : 'packaging', limit : 5 } });
         const packagingPage = JSON.parse ((await packaging.json ()).result.content[0].text);
-        assert.equal (packagingPage.total, 59); assert.equal (packagingPage.commands.length, 5); assert.equal (packagingPage.commands[0].category, 'Packaging');
+        assert.equal (packagingPage.total, commandCatalog.commands.filter (command => command.category === 'Packaging').length); assert.equal (packagingPage.commands.length, 5); assert.equal (packagingPage.commands[0].category, 'Packaging');
     });
     it ('blocks production data routes, forged origins, account mismatches and non-admin controls', async () => {
         assert.ok ([403, 404].includes ((await post ('/api/personal/items', {})).status));

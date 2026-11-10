@@ -1,12 +1,16 @@
 # Auto3D development log and handoff
 
-## Product design catalog — Auto3D 0.56.0 / Primary Products 0.7.0 / Packaging 1.10.4
+## Product design catalog — Auto3D 0.56.0 / Primary Products 0.7.0 / Packaging 1.10.5
 
-Adds six categories, 24 sourced illustrative presets, the animated bottom design drawer, rounded/tapered closed clamshell cavities and top/bottom artwork. Expands category finish materials and shared agent/MCP commands. See [release-0560.md](release-0560.md) and [research and remaining gates](primary-product-catalog-research.md). Stacked on draft #91; not deployed.
+Adds six categories, 24 sourced illustrative presets, the animated bottom design drawer, rounded/tapered closed clamshell cavities and top/bottom artwork. Expands category finish materials and shared agent/MCP commands. See [release-0560.md](release-0560.md) and [research and remaining gates](primary-product-catalog-research.md). PR #93 is merged into #91. PR #91 incorporates main after merged Packaging #92, retaining both command sets and Packaging 1.10.5. Not deployed.
 
 ## Bottle profile controls — Auto3D 0.55.0 / Primary Products 0.6.0 / Packaging 1.10.4
 
 Adds editable shoulder, neck and cap dimensions with real geometry, preserved optional authoring data and safe artwork fit. See [release-0550.md](release-0550.md). [Primitive/Boolean research](primitive-solid-editing-research.md) defines the proposed next solid-editing track. Based on main after merged #90; not deployed.
+
+## CAD designer updates — Auto3D 0.54.1 / Packaging 1.10.5 / Primary Products 0.5.0
+
+Inside/outside face and measurement views, movable 3D scene preview, flute direction control, multi-line process assignment and 1:1 EPS export. Artwork import and automatic fold-rig reconstruction remain pending. See [release-0541.md](release-0541.md).
 
 ## Planar dimension brackets — Auto3D 0.54.0 / Packaging 1.10.4 / Primary Products 0.5.0
 

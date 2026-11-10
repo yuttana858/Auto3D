@@ -17,7 +17,7 @@ export class PackagingPanel
         let selectedControls = false;
         for (const child of content) { if (child.classList.contains ('board_appearance')) { selectedControls = true; } (child === this.fefcoPanel.dimensionsPanel || selectedControls ? selected : generator).appendChild (child); }
         const cad = Element ('section', this.root, undefined, 'packaging_profile_actions'); const downloads = Element ('div', cad, undefined, 'packaging_download_actions');
-        for (const [title, action] of [['Open packaging designer', () => host.openDesigner ()], ['Download SVG', () => host.download ('svg')], ['Download DXF', () => host.download ('dxf')]]) {
+        for (const [title, action] of [['Open packaging designer', () => host.openDesigner ()], ['Download SVG', () => host.download ('svg')], ['Download EPS', () => host.download ('eps')], ['Download DXF', () => host.download ('dxf')]]) {
             const button = Element ('button', title.startsWith ('Download') ? downloads : cad, title); button.type = 'button'; button.addEventListener ('click', () => host.run (action)); this.actions.push (button);
         }
         cad.appendChild (downloads); this.Refresh ();

@@ -81,7 +81,7 @@ export function ExportPackagingSVG (data)
 {
     const design = ValidatePackaging (data); if (!design.paths.length) { throw new Error ('Draw a path before exporting.'); } const box = PackagingBounds (design); const width = Math.max (box.maxX - box.minX, 0.2); const height = Math.max (box.maxY - box.minY, 0.2);
     const layerOf = path => path.process?.kind && path.process.kind !== 'crease' ? path.process.kind.replaceAll ('-', '_') : path.type;
-    const layers = [...new Set (['cut', 'score', ...design.paths.map (layerOf)])].map ((type) => '<g id="' + type.toUpperCase () + '" fill="none" stroke="' + (type === 'cut' ? '#e34b4b' : '#318cdd') + '" stroke-width="0.2"' + (type === 'score' ? ' stroke-dasharray="3 2"' : '') + '>' + design.paths.filter ((path) => layerOf (path) === type).map ((path) => '<path' + (path.process ? ' data-process="' + path.process.kind + '"' + (path.process.cutMm !== undefined ? ' data-cut-mm="' + path.process.cutMm + '" data-tie-mm="' + path.process.tieMm + '" stroke-dasharray="' + path.process.cutMm + ' ' + path.process.tieMm + '"' : '') : '') + ' d="' + path.points.map ((point, index) => (index ? 'L' : 'M') + point.map (format).join (' ')).join (' ') + (path.closed ? ' Z' : '') + '"/>').join ('') + '</g>').join ('');
+    const layers = [...new Set (['cut', 'score', ...design.paths.map (layerOf)])].map ((type) => '<g id="' + type.toUpperCase () + '" fill="none" stroke="' + (type === 'cut' ? '#e34b4b' : type.includes ('perforation') ? '#39a96b' : '#318cdd') + '" stroke-width="0.2"' + (type === 'score' ? ' stroke-dasharray="3 2"' : '') + '>' + design.paths.filter ((path) => layerOf (path) === type).map ((path) => '<path' + (path.process ? ' data-process="' + path.process.kind + '"' + (path.process.cutMm !== undefined ? ' data-cut-mm="' + path.process.cutMm + '" data-tie-mm="' + path.process.tieMm + '" stroke-dasharray="' + path.process.cutMm + ' ' + path.process.tieMm + '"' : '') : '') + ' d="' + path.points.map ((point, index) => (index ? 'L' : 'M') + point.map (format).join (' ')).join (' ') + (path.closed ? ' Z' : '') + '"/>').join ('') + '</g>').join ('');
     return '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="' + format (width) + 'mm" height="' + format (height) + 'mm" viewBox="' + [box.minX, -box.maxY, width, height].map (format).join (' ') + '"><g transform="scale(1,-1)">' + layers + '</g></svg>\n';
 }
 export function ExportPackagingDXF (data)
@@ -89,8 +89,30 @@ export function ExportPackagingDXF (data)
     const design = ValidatePackaging (data); if (!design.paths.length) { throw new Error ('Draw a path before exporting.'); }
     const pairs = []; const pair = (code, value) => pairs.push (String (code), String (value));
     pair (0, 'SECTION'); pair (2, 'HEADER'); pair (9, '$ACADVER'); pair (1, 'AC1015'); pair (9, '$INSUNITS'); pair (70, 4); pair (9, '$MEASUREMENT'); pair (70, 1); pair (0, 'ENDSEC'); pair (0, 'SECTION'); pair (2, 'TABLES'); pair (0, 'TABLE'); pair (2, 'LAYER'); const layerOf = path => path.process?.kind && path.process.kind !== 'crease' ? path.process.kind.replaceAll ('-', '_').toUpperCase () : path.type.toUpperCase (); const layers = [...new Set (['CUT', 'SCORE', ...design.paths.map (layerOf)])]; pair (70, layers.length);
-    for (const layer of layers) { pair (0, 'LAYER'); pair (2, layer); pair (70, 0); pair (62, layer === 'CUT' ? 1 : 5); pair (6, 'CONTINUOUS'); }
+    for (const layer of layers) { pair (0, 'LAYER'); pair (2, layer); pair (70, 0); pair (62, layer === 'CUT' ? 1 : layer.includes ('PERFORATION') ? 3 : 5); pair (6, 'CONTINUOUS'); }
     pair (0, 'ENDTAB'); pair (0, 'ENDSEC'); pair (0, 'SECTION'); pair (2, 'ENTITIES');
     for (const path of design.paths) { if (path.process?.cutMm !== undefined) { pair (999, 'PERFORATION cut=' + path.process.cutMm + 'mm tie=' + path.process.tieMm + 'mm'); } pair (0, 'LWPOLYLINE'); pair (100, 'AcDbEntity'); pair (8, layerOf (path)); pair (100, 'AcDbPolyline'); pair (90, path.points.length); pair (70, path.closed ? 1 : 0); for (const point of path.points) { pair (10, format (point[0])); pair (20, format (point[1])); } }
     pair (0, 'ENDSEC'); pair (0, 'EOF'); return pairs.join ('\r\n') + '\r\n';
+}
+
+// EPS uses PostScript points (72 per inch), with paths authored in millimetres.
+// DSC comments identify process groups; EPS does not provide portable CAD layers.
+export function ExportPackagingEPS (data)
+{
+    const design = ValidatePackaging (data); if (!design.paths.length) { throw new Error ('Draw a path before exporting.'); }
+    const box = PackagingBounds (design), pointsPerMm = 72 / 25.4, pad = 1;
+    const width = Math.max (box.maxX - box.minX, 0), height = Math.max (box.maxY - box.minY, 0);
+    const layerOf = path => path.process?.kind && path.process.kind !== 'crease' ? path.process.kind.replaceAll ('-', '_').toUpperCase () : path.type.toUpperCase ();
+    const layers = [...new Set (['CUT', 'SCORE', ...design.paths.map (layerOf)])];
+    const output = ['%!PS-Adobe-3.0 EPSF-3.0', '%%BoundingBox: 0 0 ' + Math.ceil (width * pointsPerMm + 2 * pad) + ' ' + Math.ceil (height * pointsPerMm + 2 * pad), '%%HiResBoundingBox: 0 0 ' + format (width * pointsPerMm + 2 * pad) + ' ' + format (height * pointsPerMm + 2 * pad), '%%Creator: Auto3D', '%%EndComments', 'gsave', pad + ' ' + pad + ' translate', '72 25.4 div dup scale', format (-box.minX) + ' ' + format (-box.minY) + ' translate', '0.2 setlinewidth'];
+    for (const layer of layers) {
+        const paths = design.paths.filter (path => layerOf (path) === layer); if (!paths.length) { continue; }
+        output.push ('%%BeginAuto3DProcess: ' + layer, layer === 'CUT' ? '0.89 0.29 0.29 setrgbcolor' : layer.includes ('PERFORATION') ? '0.22 0.66 0.42 setrgbcolor' : '0.19 0.55 0.87 setrgbcolor');
+        for (const path of paths) {
+            output.push (path.process?.cutMm !== undefined ? '[' + format (path.process.cutMm) + ' ' + format (path.process.tieMm) + '] 0 setdash' : path.type === 'score' ? '[3 2] 0 setdash' : '[] 0 setdash', 'newpath');
+            path.points.forEach ((point, i) => output.push (format (point[0]) + ' ' + format (point[1]) + (i ? ' lineto' : ' moveto'))); if (path.closed) { output.push ('closepath'); } output.push ('stroke');
+        }
+        output.push ('%%EndAuto3DProcess');
+    }
+    output.push ('grestore', '%%EOF'); return output.join ('\n') + '\n';
 }

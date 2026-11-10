@@ -144,7 +144,9 @@ try {
     assert.equal ((await call ('primary.inspect')).family, 'clamshell'); await drawer.getByRole ('button', { name : 'Close designs' }).click (); await drawer.waitFor ({ state : 'hidden' });
     const shell = await call ('primary.generate'); assert.deepEqual (shell.components, ['base', 'lid']);
     const shellChooser = page.waitForEvent ('filechooser'); await panel.getByRole ('button', { name : 'Import label image', exact : true }).click (); await (await shellChooser).setFiles ('test/testfiles/obj/texture.png');
-    await page.waitForFunction (async () => (await Auto3D.execute ('primary.inspect')).result.artwork.length === 1);
+    let shellArtReady = false;
+    for (let attempt = 0; attempt < 100; attempt++) { const draft = await call ('primary.inspect'); if (draft.artwork.length === 1 && draft.artwork[0].zone === 'front') { shellArtReady = true; break; } await page.waitForTimeout (100); }
+    assert.equal (shellArtReady, true, 'Clamshell image import must finish before Apply');
     const shellArt = await call ('primary.update'); assert.ok (shellArt.components.includes ('label-front'));
     const noFit = await page.evaluate (() => Auto3D.execute ('primary.configure', { widthMm : 10, depthMm : 10 })); assert.equal (noFit.ok, false);
     await call ('primary.designs.open', { category : 'beverages', open : true }); await page.setViewportSize ({ width : 390, height : 844 });
