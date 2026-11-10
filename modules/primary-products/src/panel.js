@@ -85,6 +85,12 @@ export class PrimaryProductsPanel
         const calloutLabel = Element ('label', 'pp_toggle', undefined, dimensions); this.callouts = Element ('input', '', undefined, calloutLabel); this.callouts.type = 'checkbox'; this.callouts.setAttribute ('aria-label', 'Show W × L × H on model'); Element ('span', '', 'Show W × L × H on model', calloutLabel);
         this.callouts.addEventListener ('change', () => { if (this.host.setCallouts) { this.Action (() => this.host.setCallouts (this.callouts.checked)); } });
         this.shapeSection = Element ('section', 'pp_section', undefined, controls); Element ('h3', '', 'Bottle shape', this.shapeSection); this.shapeInputs = new Map ();
+        const sectionLabel = Element ('label', 'pp_field', 'Cross-section', this.shapeSection); this.sectionSelect = Element ('select', '', undefined, sectionLabel); this.sectionSelect.setAttribute ('aria-label', 'Bottle cross-section');
+        for (const [value, text] of [['round', 'Round'], ['oval', 'Oval'], ['rectangle', 'Rounded rectangle']]) { Element ('option', '', text, this.sectionSelect).value = value; }
+        this.sectionSelect.addEventListener ('change', () => { const draft = this.host.inspect (), shape = this.sectionSelect.value; this.Change ({ bottleSection : shape === 'round' ? null : { shape, depthMm : draft.bottleSection?.depthMm ?? Math.round (draft.diameterMm * .6 * 100) / 100 } }); });
+        this.cornerLabel = Element ('label', 'pp_field', 'Corner radius', this.shapeSection); const cornerWrap = Element ('span', 'pp_input_wrap', undefined, this.cornerLabel); this.cornerInput = Element ('input', '', undefined, cornerWrap); this.cornerUnit = Element ('span', 'pp_unit', '', cornerWrap);
+        this.cornerInput.type = 'number'; this.cornerInput.step = 'any'; this.cornerInput.setAttribute ('aria-label', 'Corner radius');
+        this.cornerInput.addEventListener ('change', () => { const draft = this.host.inspect (); if (draft.bottleSection?.shape === 'rectangle') { this.Change ({ bottleSection : { ...draft.bottleSection, cornerRadiusMm : this.cornerInput.valueAsNumber * this.Factor () } }); } });
         for (const [key, title] of [['neckDiameterMm', 'Neck diameter'], ['shoulderHeightMm', 'Shoulder height'], ['neckHeightMm', 'Neck height'], ['capHeightMm', 'Cap height']]) {
             const label = Element ('label', 'pp_field', title, this.shapeSection), wrap = Element ('span', 'pp_input_wrap', undefined, label), input = Element ('input', '', undefined, wrap), unit = Element ('span', 'pp_unit', '', wrap);
             input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', title); this.shapeInputs.set (key, { input, unit });
@@ -170,11 +176,15 @@ export class PrimaryProductsPanel
             for (const { input, unit : suffix } of [...this.inputs.get (key), this.drawerInputs?.get (key)].filter (Boolean)) {
                 if (document.activeElement !== input) { input.value = String (Math.round (size[key] / factor * 1000) / 1000); }
                 input.disabled = disabled; input.min = String (limits[0] / factor); input.max = String (limits[1] / factor); suffix.textContent = unit;
-                input.title = round && key !== 'heightMm' ? 'Width and length share the round product diameter.' : '';
+                input.title = round && !draft.bottleSection && key !== 'heightMm' ? 'Width and length share the round product diameter.' : '';
             }
         }
         this.callouts.checked = draft.callouts !== false; this.callouts.disabled = disabled || !this.host.setCallouts; this.callouts.parentElement.hidden = !this.host.setCallouts;
         this.shapeSection.hidden = draft.family !== 'bottle';
+        if (draft.family === 'bottle') {
+            this.sectionSelect.value = draft.bottleSection?.shape || 'round'; this.sectionSelect.disabled = disabled; this.cornerLabel.hidden = draft.bottleSection?.shape !== 'rectangle'; this.cornerUnit.textContent = unit;
+            if (draft.bottleSection?.shape === 'rectangle' && document.activeElement !== this.cornerInput) { this.cornerInput.value = String (Number ((draft.bottleSection.cornerRadiusMm / factor).toFixed (6))); }
+        }
         if (draft.family === 'bottle') { const shape = BottleShape (draft); for (const [key, { input, unit : suffix }] of this.shapeInputs) { input.value = String (Number ((shape[key]/factor).toFixed (6))); input.min = String (.5/factor); input.max = String (1000/factor); suffix.textContent = unit; } }
         this.material.replaceChildren ();
         for (const item of ListProductMaterials (draft.family)) { const option = Element ('option', '', item.name, this.material); option.value = item.id; option.disabled = item.id === 'glass'; }
@@ -187,8 +197,8 @@ export class PrimaryProductsPanel
         for (const [zone, button] of this.zones) { button.hidden = ['pouch', 'clamshell'].includes (draft.family) && zone === 'wrap'; button.textContent = draft.family === 'clamshell' ? (zone === 'front' ? 'Top label' : 'Bottom label') : { front : 'Front label', back : 'Back label', wrap : 'Wrap label' }[zone]; button.setAttribute ('aria-pressed', String (draft.labelZone === zone)); button.disabled = disabled; }
         this.Drawer (draft.catalogOpen === true); this.drawerTitle.textContent = ProductCategories[draft.catalogCategory] || 'Designs';
         const catalogKey = draft.catalogCategory + ':' + unit; if (catalogKey !== this.catalogKey) { this.catalogKey = catalogKey; this.drawerGrid.replaceChildren (); for (const design of ListProductDesigns (draft.catalogCategory)) { const button = Element ('button', 'pp_design_card', undefined, this.drawerGrid); button.type='button'; button.innerHTML=DesignPreview(design); Element('strong', '', design.name, button); const size = ProductSize (ProductDesign (design.id)); Element ('small', 'pp_design_size', [size.widthMm, size.lengthMm, size.heightMm].map (v => Number ((v/factor).toFixed (2))).join (' × ') + ' ' + unit, button); button.title=design.description + ' · ' + design.dimensionsAre; button.setAttribute ('aria-label', 'Generate ' + design.name); button.addEventListener('click', ()=>this.Action(()=>this.host.generateDesign ? this.host.generateDesign(design.id) : this.host.selectDesign(design.id))); } }
-        this.profileName.textContent = PrimaryFamilies[draft.family].name;
-        this.size.textContent = ['pouch', 'clamshell'].includes (draft.family) ? [draft.heightMm, draft.widthMm, draft.depthMm].map (n => (n / factor).toFixed (factor === 1 ? 0 : 2)).join (' × ') + ' ' + unit : 'Ø ' + (draft.diameterMm / factor).toFixed (factor === 1 ? 0 : 2) + ' × ' + (draft.heightMm / factor).toFixed (factor === 1 ? 0 : 2) + ' ' + unit;
+        this.profileName.textContent = draft.bottleSection ? { oval : 'Oval bottle', rectangle : 'Rounded-rectangle bottle' }[draft.bottleSection.shape] : PrimaryFamilies[draft.family].name;
+        this.size.textContent = draft.bottleSection ? [size.widthMm, size.lengthMm, size.heightMm].map (n => (n / factor).toFixed (factor === 1 ? 0 : 2)).join (' × ') + ' ' + unit : ['pouch', 'clamshell'].includes (draft.family) ? [draft.heightMm, draft.widthMm, draft.depthMm].map (n => (n / factor).toFixed (factor === 1 ? 0 : 2)).join (' × ') + ' ' + unit : 'Ø ' + (draft.diameterMm / factor).toFixed (factor === 1 ? 0 : 2) + ' × ' + (draft.heightMm / factor).toFixed (factor === 1 ? 0 : 2) + ' ' + unit;
         this.SetDisabled ();
         if (draft.family === 'clamshell') {
             const scale = Math.min (180/draft.widthMm, 250/draft.depthMm), w = draft.widthMm*scale, d = draft.depthMm*scale;

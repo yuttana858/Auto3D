@@ -188,6 +188,6 @@ Deferred by default: exact molded threads/standards, certified capacity/strength
 
 ## Current next increments
 
-Bottle shoulder/neck/cap controls now provide the first Phase 2 shape increment. Next: physical artwork templates; renderer transmission/IOR/thickness round-trip and hollow-wall spike; then oval/rounded-rectangle bottles and more closures. Keep glass disabled until its renderer/geometry gates pass. Finish remaining Phase 1/2 material/export gates alongside these increments; the phase table is not a claim that earlier gates are all complete.
+Bottle shoulder/neck/cap controls and oval/rounded-rectangle sections (0.9.0) provide the Phase 2 shape increments. Next: physical artwork templates; renderer transmission/IOR/thickness round-trip and hollow-wall spike; then more closures and true stand-up pouches. Keep glass disabled until its renderer/geometry gates pass. Finish remaining Phase 1/2 material/export gates alongside these increments; the phase table is not a claim that earlier gates are all complete.
 
 The requested primitive/Boolean track starts with conversion benchmarking and editable primitives, then non-destructive body modifiers. Keep clear-pack, Primary family breadth and general solid editing as separately testable increments.

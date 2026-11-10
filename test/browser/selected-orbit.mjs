@@ -24,11 +24,14 @@ try {
     /* Main viewer: right-drag orbits around the selected model; the view center stays on it and the viewing distance is unchanged. */
     const near = (a, b) => a.every ((v, i) => Math.abs (v - b[i]) < 1e-6);
     assert.ok (near (after.center, focus.pivot), JSON.stringify ([after.center, focus.pivot])); assert.notDeepEqual (focused.eye, after.eye); assert.ok (Math.abs (span (focused) - span (after)) < 1e-3); assert.equal (before.fov, after.fov); assert.equal (await page.locator ('.auto3d_context_menu').count (), 0);
-    /* Pan away with the middle button, then right-drag: the drag re-centers on the selected model before rotating. */
+    /* Pan away with the middle button, then right-drag: it orbits around the selected model without re-aiming, so the framing (offset of the view center from the model) is kept. */
     await page.mouse.move (point.x, point.y); await page.mouse.down ({ button : 'middle' }); await page.mouse.move (point.x - 120, point.y + 40, { steps : 8 }); await page.mouse.up ({ button : 'middle' });
     const panned = await call ('camera.current.inspect'); assert.ok (!near (panned.center, focus.pivot), 'middle-drag moved the view center away');
     await page.mouse.down ({ button : 'right' }); await page.mouse.move (point.x - 40, point.y + 40, { steps : 8 }); await page.mouse.up ({ button : 'right' });
-    const refocused = await call ('camera.current.inspect'); assert.ok (near (refocused.center, focus.pivot), JSON.stringify ([refocused.center, focus.pivot])); assert.notDeepEqual (refocused.eye, panned.eye);
+    const orbited = await call ('camera.current.inspect'), distance = (a, b) => Math.hypot (...a.map ((v, i) => v - b[i]));
+    assert.ok (!near (orbited.center, focus.pivot), 'right-drag must not snap the view onto the model'); assert.notDeepEqual (orbited.eye, panned.eye);
+    assert.ok (Math.abs (distance (orbited.eye, focus.pivot) - distance (panned.eye, focus.pivot)) < 1e-3, 'eye orbits the model at a constant distance');
+    assert.ok (Math.abs (distance (orbited.center, focus.pivot) - distance (panned.center, focus.pivot)) < 1e-3, 'view center keeps its offset from the model'); assert.ok (Math.abs (span (orbited) - span (panned)) < 1e-3);
     const scene = await call ('scene.inspect'); assert.equal (scene.objects.length, 1); assert.deepEqual (scene.objects[0].position, [60, 20, 0]);
     await call ('ui.array'); const dialog = page.getByRole ('dialog', { name : 'Array selected model', exact : true }); await dialog.waitFor ();
     await page.waitForFunction (() => parseFloat (getComputedStyle (document.querySelector ('.array_dialog h2')).fontSize) > 18);

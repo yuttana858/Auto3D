@@ -3,6 +3,7 @@ import { GetArtworkZones } from './zones.js';
 export { GetArtworkZones } from './zones.js';
 import { CreatePillowPouch } from './pouch.js';
 import { DefaultProductDraft, UpdateProductDraft, BottleShape } from './state.js';
+import { BottleSectionOf, SectionOutline } from './section.js';
 
 // Neutral indexed meshes: base-centred, Y-up, millimeters; no engine dependencies.
 function Revolve (id, role, profile, segments)
@@ -26,6 +27,40 @@ function Revolve (id, role, profile, segments)
     return { id, materialRole : role, positions, normals, uvs, indices };
 }
 
+// Lofted body for oval and rounded-rectangle bottles. Each profile row is either the body section scaled by `scale` or a
+// circle of `radius` (the round neck); the shoulder blends between them along each outline point's own direction.
+function Loft (id, role, section, rows, segments)
+{
+    const outline = SectionOutline (section, segments).points, positions = [], normals = [], uvs = [], indices = [];
+    const point = (row, i) => {
+        const p = outline[(i + segments) % segments];
+        if (row.radius !== undefined) { const length = Math.hypot (p.x, p.z) || 1; return [p.x / length * row.radius, row.y, p.z / length * row.radius]; }
+        return [p.x * row.scale, row.y, p.z * row.scale];
+    };
+    for (let r = 0; r < rows.length - 1; r++) {
+        const r0 = rows[r], r1 = rows[r + 1], flat = Math.abs (r1.y - r0.y) < 1e-9, size = row => row.radius ?? row.scale;
+        for (let col = 0; col < segments; col++) {
+            const start = positions.length / 3;
+            for (const [row, i, v] of [[r0, col, 0], [r0, col + 1, 0], [r1, col, 1], [r1, col + 1, 1]]) {
+                const p = point (row, i); let n;
+                if (flat) { n = [0, r0.y === 0 ? -1 : 1, 0]; }
+                else {
+                    // Normal from the outline tangent and the profile direction, oriented away from the axis.
+                    const ahead = point (row, i + 1), behind = point (row, i - 1), du = [ahead[0] - behind[0], 0, ahead[2] - behind[2]];
+                    const a = point (r0, i), b = point (r1, i), dv = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+                    n = [dv[1] * du[2] - dv[2] * du[1], dv[2] * du[0] - dv[0] * du[2], dv[0] * du[1] - dv[1] * du[0]];
+                    if (n[0] * p[0] + n[2] * p[2] < 0) { n = n.map (x => -x); }
+                    const length = Math.hypot (...n) || 1; n = n.map (x => x / length);
+                }
+                positions.push (...p); normals.push (...n); uvs.push (i / segments, (r + v) / (rows.length - 1));
+            }
+            if (size (r0) > 0) { indices.push (start, start + 2, start + 1); }
+            if (size (r1) > 0) { indices.push (start + 1, start + 2, start + 3); }
+        }
+    }
+    return { id, materialRole : role, positions, normals, uvs, indices };
+}
+
 export function CreatePrimaryProduct (input, options = {})
 {
     const definition = UpdateProductDraft (DefaultProductDraft (), input);
@@ -38,8 +73,12 @@ export function CreatePrimaryProduct (input, options = {})
     const cylinder = (id, role, radius, low, high) => Revolve (id, role, [[0, low], [radius, low], [radius, high], [0, high]], segments);
     if (definition.family === 'bottle') {
         const shape = BottleShape (definition), neck = shape.neckDiameterMm / 2, capBottom = h - shape.capHeightMm, neckBottom = capBottom - shape.neckHeightMm, bodyTop = neckBottom - shape.shoulderHeightMm;
-        components.push (Revolve ('body', 'body', [[0, 0], [r, 0], [r, bodyTop], [neck, neckBottom], [neck, capBottom], [0, capBottom]], segments));
+        const section = BottleSectionOf (definition);
+        if (section.shape === 'round') { components.push (Revolve ('body', 'body', [[0, 0], [r, 0], [r, bodyTop], [neck, neckBottom], [neck, capBottom], [0, capBottom]], segments)); }
+        else { components.push (Loft ('body', 'body', section, [{ scale : 0, y : 0 }, { scale : 1, y : 0 }, { scale : 1, y : bodyTop }, { radius : neck, y : neckBottom }, { radius : neck, y : capBottom }, { radius : 0, y : capBottom }], Math.max (segments, 96))); }
         components.push (cylinder ('cap', 'closure', neck * 1.08, capBottom, h));
+        const depth = section.depthMm / 2;
+        return { apiVersion : 1, generatorVersion : 1, units : 'mm', definition, components, bounds : { min : [-r, 0, -depth], max : [r, h, depth] }, artworkZones : GetArtworkZones (definition), quality : { construction : 'closed-solid-presentation', section : section.shape, hollowWalls : false, threads : false, pullTab : false } };
     } else {
         components.push (cylinder ('body', 'body', r, h * 0.025, h * 0.975));
         components.push (cylinder ('bottom', 'end', r, 0, h * 0.025));

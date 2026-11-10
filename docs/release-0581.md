@@ -1,6 +1,6 @@
-# Auto3D 0.57.2 — MCP write scope advertised, closable command bar
+# Auto3D 0.58.1 — MCP write scope advertised, closable command bar
 
-Packaging remains 1.10.7 and Primary Products remains 0.8.1. PR #97, based on main after merged PR #96 (0.57.1). Not deployed.
+Packaging remains 1.10.7 and Primary Products remains 0.9.0. PR #97, based on main after merged PR #98 (0.58.0). Not deployed.
 
 ## Problem
 
