@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Compact design drawer header — Auto3D 0.58.2 / Primary Products 0.9.1 / Packaging 1.10.7 (2026-11-10)
+
+W/L/H inputs move to the left of a one-row drawer header with an inline status (no generic completion text); thumbnails drop their bracket callouts. See [release-0582.md](release-0582.md).
+
 ## MCP write scope advertised — Auto3D 0.58.1 / Primary Products 0.9.0 / Packaging 1.10.7 (2026-11-10)
 
 MCP clients (including Claude) received read-only grants because `/mcp` advertised only `auto3d.read` in its resource metadata and 401 challenge, so the 284-command catalog could be browsed but not run. The resource now advertises `auto3d.read auto3d.write`, and write-gated calls from a read-only grant return an MCP step-up `insufficient_scope` challenge. Existing read-only grants must re-authorize. The viewer command bar now has a × and a Command bar button at the bottom of the tool strip (`ui.command_bar`); MCP connections lists only active registrations and "Connect this window" is renamed Live Control. See [release-0581.md](release-0581.md).
