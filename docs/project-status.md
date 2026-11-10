@@ -2,7 +2,7 @@
 
 ## Parametric product design drawer — Auto3D 0.57.0 / Primary Products 0.8.0 / Packaging 1.10.6 (2026-11-10)
 
-Design cards are equal-size generate buttons (at most ten per row) in a 30% shorter drawer, with W × L × H bracket callouts on thumbnails and the profile drawing. W × L × H fields accept manual input; Enter rebuilds the selected generated product live (one Undo step). New `primary.designs.generate` and `primary.dimensions.set`; catalog grows to 30 designs. See [release-0570.md](release-0570.md).
+Design cards are equal-size generate buttons (at most ten per row) in a 30% shorter drawer, with W × L × H bracket callouts on thumbnails and the profile drawing. W × L × H fields accept manual input; Enter rebuilds the selected generated product live (one Undo step). New `primary.designs.generate` and `primary.dimensions.set`; catalog grows to 30 designs. `ai-extended` joins CI (65 browser tests) after replacing no-op async `waitForFunction` waits in it and eight other tests. See [release-0570.md](release-0570.md).
 
 ## Browser regression suite repaired — Auto3D 0.56.1 / Packaging 1.10.6 / Primary Products 0.7.0 (2026-11-10)
 

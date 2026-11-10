@@ -30,7 +30,7 @@ try {
     await page.screenshot ({ path : 'work/cad-review/before-select.png' }); await clickPath (scores[0].id); await clickPath (scores[1].id, ['Control']); assert.equal ((await call ('packaging.inspect')).selectedPathIds.length, 2);
     await dialog.getByRole ('button', { name : 'Crease and perforation settings', exact : true }).click ();
     await dialog.getByLabel ('Score function', { exact : true }).selectOption ('perforation'); await dialog.getByLabel ('Perforation cut length (mm)', { exact : true }).fill ('3.25'); await dialog.getByLabel ('Perforation gap length (mm)', { exact : true }).fill ('1.5'); await dialog.getByRole ('button', { name : 'Apply score function', exact : true }).click ();
-    await page.waitForFunction (async () => (await Auto3D.execute ('packaging.inspect')).result.paths.filter (p => p.process?.kind === 'perforation').length === 2);
+    await page.evaluate (async () => { /* async predicates make waitForFunction resolve at once, so poll in the page */ const end = Date.now () + 120000; while (!((await Auto3D.execute ('packaging.inspect')).result.paths.filter (p => p.process?.kind === 'perforation').length === 2)) { if (Date.now () > end) { throw new Error ('Timed out waiting for page state'); } await new Promise (resolve => setTimeout (resolve, 100)); } });
     await dialog.getByRole ('button', { name : 'Apply to 3D', exact : true }).click (); await page.waitForFunction (() => document.querySelector ('.packaging_status').textContent.includes ('CAD applied'));
     assert.equal ((await call ('scene.inspect')).selectedObjectId, objectId);
     await page.screenshot ({ path : 'work/cad-review/cad-toolbar.png' });

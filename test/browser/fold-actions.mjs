@@ -24,7 +24,7 @@ try {
     await page.mouse.move (600, 420); await page.mouse.wheel (0, -260); await page.waitForTimeout (1000);
     await page.screenshot ({ path : 'work/rounded-panel-bend-closeup.png', clip : { x : 235, y : 95, width : 820, height : 610 } });
     const cameraManual = await call ('camera.current.inspect'); const slider = panel.getByLabel ('Fold / unfold position'); await slider.evaluate (input => { input.value = '.5'; input.dispatchEvent (new Event ('change', { bubbles : true })); });
-    await page.waitForFunction (async () => (await Auto3D.execute ('packaging.fefco.scrub.inspect')).result.progress === .5); assert.deepEqual (await call ('camera.current.inspect'), cameraManual);
+    await page.evaluate (async () => { /* async predicates make waitForFunction resolve at once, so poll in the page */ const end = Date.now () + 120000; while (!((await Auto3D.execute ('packaging.fefco.scrub.inspect')).result.progress === .5)) { if (Date.now () > end) { throw new Error ('Timed out waiting for page state'); } await new Promise (resolve => setTimeout (resolve, 100)); } }); assert.deepEqual (await call ('camera.current.inspect'), cameraManual);
     await call ('animation.action.add', { time : 1, duration : 2, direction : 'unfold' });
     const cameraBeforeSeek = await call ('camera.current.inspect');
     await call ('animation.timeline.seek', { time : 2 });
