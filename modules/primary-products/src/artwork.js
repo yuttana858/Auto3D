@@ -17,6 +17,7 @@ export function ValidateProductArtwork (draft, entries = [])
 // Surface-conforming label patch: separate dielectric material avoids metallic ink.
 export function CreateLabelMesh (draft, art)
 {
+    if (draft.family === 'clamshell') { const top = art.zone === 'front', w = art.widthMm/2, d = art.heightMm/2, y = top ? draft.heightMm+.15 : -.15; return { id : 'label-'+art.zone, materialRole : 'label', artwork : art, positions : [-w, y, d, w, y, d, w, y, -d, -w, y, -d], normals : [0, top?1:-1, 0, 0, top?1:-1, 0, 0, top?1:-1, 0, 0, top?1:-1, 0], uvs : top ? [0, 0, 1, 0, 1, 1, 0, 1] : [1, 0, 0, 0, 0, 1, 1, 1], indices : top ? [0, 1, 2, 0, 2, 3] : [0, 2, 1, 0, 3, 2] }; }
     if (draft.family === 'pouch') { return PouchLabel (draft, art); }
     const zone = GetArtworkZones (draft).find (z => z.id === art.zone);
     const mesh = { id : 'label-' + art.zone, materialRole : 'label', artwork : art, positions : [], normals : [], uvs : [], indices : [] };

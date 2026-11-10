@@ -42,6 +42,14 @@ describe ('Primary Products neutral geometry', function () {
             assert.deepEqual (draft, original); assert.equal (CreatePrimaryProduct (draft).definition.heightMm, original.heightMm);
         }
     });
+    it ('builds custom shoulder/neck/cap geometry with closed components and safe straight label zones', function () {
+        const draft = { ...DefaultProductDraft (),bottleShape : { neckDiameterMm : 24,shoulderHeightMm : 30,neckHeightMm : 20,capHeightMm : 20 } }, product = CreatePrimaryProduct (draft);
+        const body = product.components[0], cap = product.components[1]; assert.ok (body.positions.some ((v,i) => i%3===1 && Math.abs(v-120)<1e-8));
+        assert.equal (Math.min (...cap.positions.filter ((v,i) => i%3===1)),170); assert.equal (Math.max (...cap.positions.filter ((v,i) => i%3===1)),190);
+        for (const mesh of product.components) { const edges = new Map (), key = id => mesh.positions.slice (id*3,id*3+3).map (v => Math.round(v*1e7)).join(','); for(let i=0;i<mesh.indices.length;i+=3){const ids=mesh.indices.slice(i,i+3);for(let j=0;j<3;j++){const edge=[key(ids[j]),key(ids[(j+1)%3])].sort().join('/');edges.set(edge,(edges.get(edge)||0)+1);}} assert.ok ([...edges.values ()].every (v => v===2)); }
+        assert.ok (product.artworkZones.every (z => z.bottomMm+z.heightMm<=120));
+        const shorter = GetArtworkZones ({ ...draft,bottleShape : { ...draft.bottleShape,shoulderHeightMm : 105 } }); assert.ok (shorter[0].heightMm<product.artworkZones[0].heightMm);
+    });
     it ('rejects malformed definitions and unbounded tessellation', function () {
         for (const segments of [0, 17, 129, Infinity, '64']) { assert.throws (() => CreatePrimaryProduct (DefaultProductDraft (), { segments })); }
         assert.throws (() => CreatePrimaryProduct ({ ...DefaultProductDraft (), heightMm : NaN }));

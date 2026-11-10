@@ -41,6 +41,13 @@ describe ('Primary Products scene integration', function () {
         await editor.history.Redo (); assert.equal (editor.selected, updated);
         panel.draft = module.DefaultProductDraft ('can'); workspace.LoadSelected (); assert.equal (panel.draft.heightMm, 250);
     });
+    it ('persists custom bottle dimensions through rebuild, file/recovery and Undo without changing duplicates', async function () {
+        const { panel,editor,workspace } = Fixture (); await workspace.Generate (); const original=editor.selected, copy=editor.document.Duplicate(original), old=copy.userData[PrimaryProductDataKey];
+        panel.draft=module.UpdateProductDraft(panel.draft,{bottleShape:{neckDiameterMm:24,shoulderHeightMm:30,neckHeightMm:20,capHeightMm:20}}); await workspace.Generate(true); assert.equal(editor.selected.id,original.id); assert.equal(copy.userData[PrimaryProductDataKey],old);
+        const saved=OpenSessionArchive(CreateSessionArchive(PackSession(editor.document))).document; assert.deepEqual(JSON.parse(saved.objects[0].userData[PrimaryProductDataKey]).draft.bottleShape,panel.draft.bottleShape);
+        const recovery=ReadSession(PackRecoverySnapshot(structuredClone(RecoverySnapshot(editor.document,{})))).document; assert.deepEqual(JSON.parse(recovery.objects[0].userData[PrimaryProductDataKey]).draft.bottleShape,panel.draft.bottleShape);
+        await editor.history.Undo(); assert.equal(editor.selected,original); await editor.history.Redo(); workspace.LoadSelected(); assert.equal(panel.draft.bottleShape.neckDiameterMm,24);
+    });
     it ('persists the authoring definition and baked geometry through file/recovery round trips', async function () {
         const { panel, editor, workspace } = Fixture (); panel.draft = module.DefaultProductDraft ('can'); await workspace.Generate ();
         const packed = PackSession (editor.document); const saved = OpenSessionArchive (CreateSessionArchive (packed)).document;
@@ -62,6 +69,17 @@ describe ('Primary Products scene integration', function () {
         assert.equal (definition.draft.widthMm, 180); assert.equal (definition.draft.family, 'pouch');
         await editor.history.Undo (); workspace.LoadSelected (); assert.equal (panel.draft.widthMm, 140);
         assert.equal (module.ValidateProductDefinition (module.ProductDefinition (module.DefaultProductDraft ())).draft.diameterMm, 65);
+    });
+    it ('persists and rebuilds clamshells with material defaults and stable identity', async function () {
+        const { panel, editor, workspace } = Fixture (); panel.draft = module.ProductDesign ('food-fiber'); await workspace.Generate ();
+        const id = editor.selected.id; assert.equal (editor.document.model.meshes.length, 2);
+        assert.equal (panel.draft.color, '#b69b71'); panel.draft.widthMm = 230; await workspace.Generate (true); assert.equal (editor.selected.id, id);
+        const saved = OpenSessionArchive (CreateSessionArchive (PackSession (editor.document))).document;
+        const definition = module.ValidateProductDefinition (JSON.parse (saved.objects[0].userData[PrimaryProductDataKey]));
+        assert.equal (definition.draft.family, 'clamshell'); assert.equal (definition.draft.widthMm, 230); assert.equal (definition.draft.material, 'moldedFiber');
+        const recovery = ReadSession (PackRecoverySnapshot (structuredClone (RecoverySnapshot (editor.document, {})))).document;
+        assert.equal (recovery.objects[0].userData[PrimaryProductDataKey], saved.objects[0].userData[PrimaryProductDataKey]);
+        await editor.history.Undo (); workspace.LoadSelected (); assert.equal (panel.draft.widthMm, 200);
     });
     it ('converts mm geometry into known scene units and rejects unknown units/glass', function () {
         const data = module.CreatePrimaryProduct (module.DefaultProductDraft ('can'));

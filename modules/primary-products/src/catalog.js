@@ -1,0 +1,31 @@
+import { DefaultProductDraft, UpdateProductDraft } from './state.js';
+export const ProductCategories = Object.freeze ({ bottles:'Bottles', cans:'Cans', beverages:'Beverages', pouches:'Pouches', 'clamshell-retail':'Clamshells · retail', 'clamshell-food':'Clamshells · food' });
+const sources = { bottles : 'https://www.berryglobal.com/en/product/bottles-vials', cans : 'https://www.silgancontainers.com/cans/', beverages : 'https://www.ball.com/packaging/beverage-cans', pouches : 'https://www.glenroy.com/flexible-packaging/', 'clamshell-retail' : 'https://www.placon.com/retail/', 'clamshell-food' : 'https://www.placon.com/food/materials/' };
+const designs=[];
+const add=(id, name, category, family, dimensions, material, description)=>designs.push({id, name, category, family, description, source : sources[category], changes:{family, ...dimensions, material}, dimensionsAre:'Illustrative outside dimensions; verify against your supplier drawing.'});
+add('round-care', 'Round personal care', 'bottles', 'bottle', {heightMm:190, diameterMm:65}, 'hdpe', 'General-purpose narrow-neck bottle');
+add('boston-inspired', 'Boston-style shoulder', 'bottles', 'bottle', {heightMm:150, diameterMm:65, bottleShape:{neckDiameterMm:28, shoulderHeightMm:22, neckHeightMm:12, capHeightMm:18}}, 'hdpe', 'Sloping shoulder presentation');
+add('cosmo-inspired', 'Tall cosmetic round', 'bottles', 'bottle', {heightMm:220, diameterMm:48, bottleShape:{neckDiameterMm:23, shoulderHeightMm:35, neckHeightMm:10, capHeightMm:22}}, 'petOpaque', 'Tall round body with a narrow closure');
+add('wide-mouth', 'Wide-mouth round', 'bottles', 'bottle', {heightMm:125, diameterMm:80, bottleShape:{neckDiameterMm:68, shoulderHeightMm:12, neckHeightMm:8, capHeightMm:16}}, 'pp', 'Broad opening for personal-care products');
+add('sample-round', 'Travel sample', 'bottles', 'bottle', {heightMm:90, diameterMm:32}, 'pp', 'Compact round sample container');
+add('household-round', 'Household round', 'bottles', 'bottle', {heightMm:260, diameterMm:95}, 'hdpe', 'Large household-product envelope');
+add('food-can', 'Food can', 'cans', 'can', {heightMm:110, diameterMm:73}, 'steel', 'Straight-wall food container');
+add('low-tin', 'Low round tin', 'cans', 'can', {heightMm:35, diameterMm:85}, 'coatedMetal', 'Short cosmetic or storage tin');
+add('tall-can', 'Tall utility can', 'cans', 'can', {heightMm:190, diameterMm:65}, 'steel', 'Tall straight-wall container');
+add('wide-can', 'Wide food can', 'cans', 'can', {heightMm:120, diameterMm:100}, 'steel', 'Wide cylindrical body');
+add('standard-beverage', 'Standard beverage can', 'beverages', 'can', {heightMm:122, diameterMm:66}, 'aluminum', 'Standard-proportion beverage format');
+add('sleek-beverage', 'Sleek beverage can', 'beverages', 'can', {heightMm:156, diameterMm:58}, 'aluminum', 'Tall, narrower beverage format');
+add('slim-beverage', 'Slim beverage can', 'beverages', 'can', {heightMm:134, diameterMm:53}, 'aluminum', 'Slender beverage format');
+add('tall-beverage', 'Tall beverage can', 'beverages', 'can', {heightMm:168, diameterMm:66}, 'aluminum', 'Large standard-diameter format');
+add('beverage-bottle', 'Beverage bottle', 'beverages', 'bottle', {heightMm:230, diameterMm:66}, 'petOpaque', 'Opaque PET presentation bottle');
+add('pillow-snack', 'Pillow snack pack', 'pouches', 'pouch', {heightMm:200, widthMm:140, depthMm:40}, 'glossFilm', 'Filled pillow presentation');
+add('flat-sachet', 'Flat sachet', 'pouches', 'pouch', {heightMm:120, widthMm:80, depthMm:2}, 'matteFilm', 'Thin sample sachet envelope');
+add('large-pillow', 'Large pillow pack', 'pouches', 'pouch', {heightMm:300, widthMm:220, depthMm:70}, 'foil', 'Large flexible-pack presentation');
+add('retail-compact', 'Compact retail shell', 'clamshell-retail', 'clamshell', {heightMm:35, widthMm:140, depthMm:95}, 'petOpaque', 'Two-piece closed cavity envelope');
+add('retail-deep', 'Deep retail shell', 'clamshell-retail', 'clamshell', {heightMm:85, widthMm:200, depthMm:140}, 'pp', 'Deep cavity for hardware or accessories');
+add('retail-wide', 'Wide retail shell', 'clamshell-retail', 'clamshell', {heightMm:45, widthMm:240, depthMm:160}, 'petOpaque', 'Wide display-pack envelope');
+add('food-deli', 'Deli shell', 'clamshell-food', 'clamshell', {heightMm:65, widthMm:180, depthMm:130}, 'pp', 'Closed food-pack presentation');
+add('food-bakery', 'Bakery shell', 'clamshell-food', 'clamshell', {heightMm:90, widthMm:220, depthMm:180}, 'petOpaque', 'Tall bakery cavity');
+add('food-fiber', 'Fiber takeaway', 'clamshell-food', 'clamshell', {heightMm:70, widthMm:200, depthMm:180}, 'moldedFiber', 'Opaque fiber-look presentation');
+export function ListProductDesigns(category){if(category!==undefined&&!Object.hasOwn(ProductCategories, category)){throw new Error('Unknown product category.');}return designs.filter(d=>!category||d.category===category).map(d=>structuredClone(d));}
+export function ProductDesign(id){const item=designs.find(d=>d.id===id);if(!item){throw new Error('Unknown product design.');}return UpdateProductDraft(DefaultProductDraft(item.family), item.changes);}

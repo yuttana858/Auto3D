@@ -1,6 +1,6 @@
-# Auto3D 0.54.2 — browser regression suite repaired
+# Auto3D 0.56.1 — browser regression suite repaired
 
-Packaging 1.10.6; Primary Products remains 0.5.0. PR #94, based on main after merged PR #92 (0.54.1 / Packaging 1.10.5). Not deployed.
+Packaging 1.10.6; Primary Products remains 0.7.0. PR #94, based on main after merged PRs #92, #93 and #91 (0.56.0 / Packaging 1.10.5 / Primary Products 0.7.0). Not deployed.
 
 All 23 browser tests that were outside CI with stale expectations now pass and are part of the CI `browser` job (`test/browser/ci-suite.txt`, 64 tests). They failed because the app had intentionally changed: the board caliper limit is 15 mm, the Packaging designer starts on the select tool, FEFCO style cards generate directly and asynchronously, new boxes default to the inside dimension basis (which needs converter allowance factors outside FEFCO 0201), selected-box dimensions moved to the selected column, Fold/Unfold is one state-aware control, Details, Lighting and Session sections start collapsed, "Apply scale" was replaced by live fields, array reveal and fold playback make the viewer busy, and Auto pixel ratio briefly lowers after camera updates. Tests read the app and module versions from package metadata instead of hard-coded numbers. No test was skipped or loosened to pass; assertions were updated to the documented behavior, and several were strengthened (for example, engineering-linked inside/outside dimensions are checked through `packaging.dimensions.inspect` and `packaging.measurements.inspect`).
 

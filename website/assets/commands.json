@@ -6513,10 +6513,97 @@
       "example": {}
     },
     {
+      "id": "primary.designs.list",
+      "title": "List product designs",
+      "category": "Primary Products",
+      "description": "Read sourced illustrative designs and starting dimensions by category.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "bottles",
+              "cans",
+              "beverages",
+              "pouches",
+              "clamshell-retail",
+              "clamshell-food"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "category": "beverages"
+      }
+    },
+    {
+      "id": "primary.designs.open",
+      "title": "Open product design drawer",
+      "category": "Primary Products",
+      "description": "Open or close the category design drawer without changing the scene.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "bottles",
+              "cans",
+              "beverages",
+              "pouches",
+              "clamshell-retail",
+              "clamshell-food"
+            ]
+          },
+          "open": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "category",
+          "open"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "category": "bottles",
+        "open": true
+      }
+    },
+    {
+      "id": "primary.designs.select",
+      "title": "Select product design",
+      "category": "Primary Products",
+      "description": "Select a validated draft design. Preserves compatible artwork; rejects incompatible labels before mutation. Generate or Apply commits geometry.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "wide-mouth"
+      }
+    },
+    {
       "id": "primary.configure",
       "title": "Configure product draft",
       "category": "Primary Products",
-      "description": "Validate and update the session-local bottle/can/pouch draft. Does not change scene geometry or upload artwork.",
+      "description": "Validate and update the session-local bottle/can/pouch/clamshell draft. Does not change scene geometry or upload artwork.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -6526,7 +6613,40 @@
             "enum": [
               "bottle",
               "can",
-              "pouch"
+              "pouch",
+              "clamshell"
+            ]
+          },
+          "bottleShape": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "neckDiameterMm": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 1000
+              },
+              "shoulderHeightMm": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 1000
+              },
+              "neckHeightMm": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 1000
+              },
+              "capHeightMm": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 1000
+              }
+            },
+            "required": [
+              "neckDiameterMm",
+              "shoulderHeightMm",
+              "neckHeightMm",
+              "capHeightMm"
             ]
           },
           "heightMm": {
@@ -6552,13 +6672,19 @@
           "material": {
             "type": "string",
             "enum": [
+              "paperboard",
+              "moldedFiber",
+              "kraftFilm",
+              "satinFilm",
+              "lacquer",
+              "softTouch",
               "plastic",
-              "glass",
-              "aluminum",
-              "steel",
               "hdpe",
               "pp",
               "petOpaque",
+              "glass",
+              "aluminum",
+              "steel",
               "coatedMetal",
               "brushedMetal",
               "matteFilm",
@@ -6649,7 +6775,8 @@
             "enum": [
               "bottle",
               "can",
-              "pouch"
+              "pouch",
+              "clamshell"
             ]
           }
         },

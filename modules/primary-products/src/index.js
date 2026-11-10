@@ -5,3 +5,5 @@ export { CreatePrimaryProduct, GetArtworkZones } from './geometry.js';
 export { ProductDefinition, ValidateProductDefinition } from './definition.js';
 export { ProductMaterials, ListProductMaterials } from './materials.js';
 export { ValidateProductArtwork, CreateLabelMesh } from './artwork.js';
+
+export { ProductCategories, ListProductDesigns, ProductDesign } from './catalog.js';

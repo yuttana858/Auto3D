@@ -16,7 +16,7 @@ try {
         try { const file = path.resolve (root, '.' + (name === '/' ? '/index.html' : name)); assert.ok (file.startsWith (root + path.sep)); return route.fulfill ({ body : await readFile (file), contentType : types[path.extname (file)] || 'application/octet-stream' }); }
         catch { return route.fulfill ({ status : 404, body : 'Missing fixture asset' }); }
     });
-    await page.goto ('https://auto3d.test/'); await page.getByRole ('button', { name : 'Welcome to Auto3D. Continue to sign in.' }).click ({ timeout : 3000 }).catch (() => {}); /* automated browsers skip the welcome screen */ await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
+    await page.goto ('https://auto3d.test/'); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
     const call = async (id, args = {}) => { const response = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (response.ok, true, JSON.stringify (response)); return response.result; };
     const group = page.getByRole ('group', { name : 'Generation modules', exact : true });
     assert.deepEqual (await group.getByRole ('button').evaluateAll (nodes => nodes.map (node => node.getAttribute ('aria-label'))), ['AI Generative', 'Packaging design', 'Primary Products']);
@@ -49,7 +49,7 @@ try {
     await page.getByRole ('button', { name : 'Extended Primary Products panel', exact : true }).click ();
     const extended = page.getByRole ('dialog', { name : 'Primary Products extended workspace' }); await extended.waitFor ({ state : 'visible' });
     assert.deepEqual (await extended.evaluate (node => [node.clientWidth, node.clientHeight]), [1500, 1000]);
-    await panel.getByRole ('button', { name : 'Choose can' }).click (); await height.fill ('150'); await height.press ('Tab');
+    await panel.getByRole ('button', { name : 'Choose can' }).click (); await call ('primary.designs.open', { category : 'cans', open : false }); await height.fill ('150'); await height.press ('Tab');
     await page.screenshot ({ path : 'work/primary-products-review/extended.png' });
     await page.getByRole ('button', { name : 'Minimal Primary Products panel', exact : true }).click (); await extended.waitFor ({ state : 'hidden' });
     await page.getByRole ('button', { name : 'Close Primary Products panel', exact : true }).click ();
@@ -74,6 +74,10 @@ try {
     // Real generation and update via the same services used by commands.
     await page.setViewportSize ({ width : 1500, height : 1000 }); await call ('ui.primary_products');
     await call ('primary.configure', { family : 'bottle', heightMm : 190, diameterMm : 65 });
+    for (const [name,value] of [['Neck diameter','24'],['Shoulder height','30'],['Neck height','20'],['Cap height','20']]) { const input=panel.getByRole('spinbutton',{name,exact:true}); await input.fill(value); await input.press('Tab'); }
+    const authoredShape=(await call('primary.inspect')).bottleShape; assert.deepEqual(authoredShape,{neckDiameterMm:24,shoulderHeightMm:30,neckHeightMm:20,capHeightMm:20});
+    await call('preferences.units',{units:'standard'}); assert.ok(Math.abs(Number(await panel.getByRole('spinbutton',{name:'Neck diameter',exact:true}).inputValue())-24/25.4)<.000001); await call('preferences.units',{units:'metric'});
+    await page.screenshot({path:'work/primary-products-review/bottle-shape.png'});
     await panel.getByRole ('button', { name : 'Generate', exact : true }).click ();
     let generated;
     for (let attempt = 0; attempt < 200; attempt++) {
@@ -84,7 +88,7 @@ try {
     assert.ok (generated, 'UI must add the generated bottle');
     // A completed strict read also establishes the editor has left its render lock.
     await call ('primary.selected.load');
-    assert.equal ((await call ('primary.inspect')).heightMm, 190);
+    assert.equal ((await call ('primary.inspect')).heightMm, 190); assert.deepEqual((await call('primary.inspect')).bottleShape,authoredShape);
     await call ('primary.configure', { heightMm : 250, color : '#cc5522', roughness : 0.2 });
     const changed = await call ('primary.update'); assert.equal (changed.objectId, generated.id); assert.equal (changed.updated, true);
     await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 250);
@@ -94,7 +98,7 @@ try {
     assert.equal (await panel.getByRole ('button', { name : 'Generate', exact : true }).isDisabled (), true);
     const rejected = await page.evaluate (() => Auto3D.execute ('primary.generate')); assert.equal (rejected.ok, false);
     assert.equal ((await call ('scene.inspect')).objects.length, 2); assert.deepEqual (errors, []);
-    await panel.getByRole ('button', { name : 'Choose pouch' }).click ();
+    await panel.getByRole ('button', { name : 'Choose pouch' }).click (); await call ('primary.designs.open', { category : 'pouches', open : false });
     assert.equal (await panel.getByRole ('spinbutton', { name : 'Product diameter', exact : true }).isVisible (), false);
     const pouchWidth = panel.getByRole ('spinbutton', { name : 'Product width', exact : true }); await pouchWidth.fill ('180'); await pouchWidth.press ('Tab');
     assert.equal ((await call ('primary.inspect')).widthMm, 180);
@@ -133,6 +137,22 @@ try {
     for (const o of (await call ('scene.inspect')).objects) { if (o.id !== applied.objectId) { await call ('object.visibility', { objectId : o.id, visible : false }); } }
     await call ('object.select', { objectId : applied.objectId }); await call ('object.transform', { objectId : applied.objectId, rotation : [0, 180, 0] }); await call ('view.focus', { objectId : applied.objectId });
     await page.waitForTimeout (800); await page.screenshot ({ path : 'work/primary-products-review/artwork-model.png' });
+    await call ('primary.artwork.remove', { zone : 'back' });
+    await call ('primary.designs.open', { category : 'clamshell-food', open : true });
+    const drawer = page.getByRole ('region', { name : 'Product designs', exact : true }); await drawer.waitFor ({ state : 'visible' });
+    assert.equal (await drawer.locator ('.pp_design_card').count (), 3); await drawer.getByRole ('button', { name : /Deli shell/ }).click ();
+    assert.equal ((await call ('primary.inspect')).family, 'clamshell'); await drawer.getByRole ('button', { name : 'Close designs' }).click (); await drawer.waitFor ({ state : 'hidden' });
+    const shell = await call ('primary.generate'); assert.deepEqual (shell.components, ['base', 'lid']);
+    const shellChooser = page.waitForEvent ('filechooser'); await panel.getByRole ('button', { name : 'Import label image', exact : true }).click (); await (await shellChooser).setFiles ('test/testfiles/obj/texture.png');
+    let shellArtReady = false;
+    for (let attempt = 0; attempt < 100; attempt++) { const draft = await call ('primary.inspect'); if (draft.artwork.length === 1 && draft.artwork[0].zone === 'front') { shellArtReady = true; break; } await page.waitForTimeout (100); }
+    assert.equal (shellArtReady, true, 'Clamshell image import must finish before Apply');
+    const shellArt = await call ('primary.update'); assert.ok (shellArt.components.includes ('label-front'));
+    const noFit = await page.evaluate (() => Auto3D.execute ('primary.configure', { widthMm : 10, depthMm : 10 })); assert.equal (noFit.ok, false);
+    await call ('primary.designs.open', { category : 'beverages', open : true }); await page.setViewportSize ({ width : 390, height : 844 });
+    assert.equal (await page.evaluate (() => document.documentElement.scrollWidth > innerWidth), false); await page.screenshot ({ path : 'work/primary-products-review/design-drawer-mobile.png' });
+    await page.keyboard.press ('Escape'); await drawer.waitFor ({ state : 'hidden' }); assert.deepEqual (errors, []);
+    console.log ('Catalog drawer, food clamshell generation, top artwork and rejected invalid resize passed.');
     console.log ('H × W × D, material swatch, local image import, rendered labels and physical-fit validation passed.');
     console.log ('Generate readiness and pillow-pouch generation/layout passed.');
     console.log ('Primary Products scene flow passed: UI generation, strict update/load, identity, Undo/Redo and glass rejection.');
