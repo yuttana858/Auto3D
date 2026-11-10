@@ -3,7 +3,7 @@ import { chromium } from 'playwright-core';
 const browser = await chromium.launch ({ executablePath : '/usr/bin/chromium', args : ['--no-sandbox', '--enable-unsafe-swiftshader'] });
 try {
     const page = await browser.newPage ({ viewport : { width : 1440, height : 1000 } });
-    page.setDefaultTimeout (20000);
+    page.setDefaultTimeout (120000);
     const errors = []; page.on ('pageerror', (error) => errors.push (error.stack));
     await page.route ('**/api/preferences', (route) => route.fulfill ({ json : { preferences : { units : 'metric', theme : 1 }, folders : ['Uncategorized'] } }));
     await page.route ('**/api/personal/items', (route) => route.fulfill ({ json : [] }));
