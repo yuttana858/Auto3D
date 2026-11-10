@@ -14,6 +14,7 @@ board-panel-visibility
 board-toggle-stability
 cad-apply
 capture
+command-bar
 command-design
 corrugate-review
 dimensions

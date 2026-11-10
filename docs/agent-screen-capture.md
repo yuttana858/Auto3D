@@ -17,7 +17,7 @@ For an agent with an already authorized Playwright page, `tools/agent_capture.mj
 
 ## Pair an MCP chat with an app window
 
-Sign in to Auto3D and approve the OAuth connection. To enable live control, open Preferences → **Agent access**, choose **Connect this window**, and give the generated code to the authorized agent to pair using `auto3d.sessions.pair_code`. Codes are random, expire after 10 minutes, and can be used once. The agent can also use MCP session tools to select an explicitly chosen available session.
+Sign in to Auto3D and approve the OAuth connection. To enable live control, open Preferences → **Agent access**, choose **Live Control**, and give the generated code to the authorized agent to pair using `auto3d.sessions.pair_code`. Codes are random, expire after 10 minutes, and can be used once. The agent can also use MCP session tools to select an explicitly chosen available session.
 
 The same authorization and pairing flow works for OAuth-compatible harnesses such as ChatGPT and Claude; the registration page records which harness is being authorized. The optional `auto3d.write` scope enables the full generated command catalog; screenshot access remains separate. Account and administrator commands still require the appropriate Auto3D permissions. This does not bypass OAuth consent or provide an API key. Keep the temporary code private and reconnect to issue a fresh code if it expires or has already been used.
 

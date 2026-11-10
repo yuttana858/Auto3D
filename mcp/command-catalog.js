@@ -240,6 +240,7 @@ export const CommandIds = Object.freeze ([
     'ui.library',
     'ui.save',
     'commands.text',
+    'ui.command_bar',
     'ui.commands',
     'ui.primary_products',
     'primary.inspect',
