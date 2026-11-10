@@ -1,28 +1,57 @@
+import { ProductCategories, ListProductDesigns, ProductDesign } from './catalog.js';
+import { GetArtworkZones } from './zones.js';
 import { ListProductMaterials } from './materials.js';
-import { PrimaryFamilies, PrimaryProductsVersion } from './state.js';
+import { PrimaryFamilies, PrimaryProductsVersion, BottleShape, DefaultProductDraft } from './state.js';
 function Element (tag, className, text, parent)
 {
     const node = document.createElement (tag); if (className) { node.className = className; } if (text !== undefined) { node.textContent = text; } parent?.appendChild (node); return node;
 }
 const icons = {
+    clamshell : '<path d="M3 6h20v12H3Z M3 11h20"/>',
     pouch : '<path d="M6 3h14l-1 8 1 10H6l1-10Z M6 6h14 M6 18h14"/>',
     bottle : '<path d="M10 2h6v5l3 5v10H7V12l3-5Z M10 5h6 M7 14h12 M7 19h12"/>',
     can : '<path d="M7 4q6-3 12 0v16q-6 3-12 0Z M7 5q6 3 12 0 M7 18q6 3 12 0 M11 3h4"/>'
 };
 function Icon (family) { return '<svg viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true">' + icons[family] + '</svg>'; }
+function DesignPreview (design)
+{
+    const d = ProductDesign (design.id), scale = Math.min (78/(d.diameterMm || d.widthMm), 100/d.heightMm);
+    const w = (d.diameterMm || d.widthMm)*scale, h = d.heightMm*scale, x = 60-w/2, y = 120-h;
+    let shape;
+    if (d.family === 'bottle') {
+        const p = BottleShape (d), neck = p.neckDiameterMm*scale, cap = y+p.capHeightMm*scale, shoulder = cap+p.neckHeightMm*scale, body = shoulder+p.shoulderHeightMm*scale;
+        shape = `<path d="M${60-neck/2} ${y}h${neck}v${shoulder-y}L${x+w} ${body}V120H${x}V${body}L${60-neck/2} ${shoulder}Z"/><path d="M${60-neck/2} ${cap}h${neck}"/>`;
+    } else if (d.family === 'can') {
+        shape = `<path d="M${x} ${y+3}Q60 ${y-3} ${x+w} ${y+3}V117Q60 123 ${x} 117Z"/><path d="M${x} ${y+3}Q60 ${y+9} ${x+w} ${y+3}"/>`;
+    } else if (d.family === 'pouch') {
+        shape = `<path d="M${x} ${y}h${w}l-4 ${h/2}l4 ${h/2}H${x}l4 -${h/2}Z"/><path d="M${x} ${y+5}h${w}M${x} 115h${w}"/>`;
+    } else {
+        const sh = Math.min (45, h*.45), depth = Math.min (45, d.depthMm*scale*.5), top = 100-sh-depth;
+        shape = `<path d="M${x} ${top+depth}L${x+12} ${top}H${x+w}l-12 ${depth}Z"/><path d="M${x} ${top+depth}v${sh}h${w-12}l12 -${depth}V${top}M${x+w-12} ${top+depth}v${sh}"/>`;
+    }
+    return `<svg class="pp_design_preview" viewBox="0 0 120 140" fill="${d.color}" fill-opacity=".22" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true">${shape}</svg>`;
+}
 export class PrimaryProductsPanel
 {
     constructor (host, parent)
     {
         this.host = host; this.root = Element ('div', 'pp_workspace', undefined, parent);
         for (const type of ['keydown', 'keyup']) { this.root.addEventListener (type, event => { if (event.target.closest?.('input, select, textarea, button, [contenteditable]')) { event.stopPropagation (); } }); }
-        const top = Element ('div', 'pp_intro', undefined, this.root); Element ('span', 'pp_kicker', 'BOTTLES · CANS · POUCHES', top); Element ('span', 'pp_version', 'v' + PrimaryProductsVersion, top);
+        const top = Element ('div', 'pp_intro', undefined, this.root); Element ('span', 'pp_kicker', 'PRIMARY PRODUCT DESIGNS', top); Element ('span', 'pp_version', 'v' + PrimaryProductsVersion, top);
         this.layout = Element ('div', 'pp_layout', undefined, this.root);
         const catalog = Element ('section', 'pp_catalog', undefined, this.layout); Element ('h3', '', 'Product', catalog);
         const cards = Element ('div', 'pp_product_cards', undefined, catalog); this.cards = new Map ();
         for (const [family, label] of [['bottle', 'Bottle'], ['can', 'Can'], ['pouch', 'Pouch']]) {
-            const button = Element ('button', 'pp_product_card', undefined, cards); button.type = 'button'; button.setAttribute ('aria-label', 'Choose ' + label.toLowerCase ()); button.innerHTML = Icon (family); Element ('span', '', label, button); Element ('small', '', PrimaryFamilies[family].name, button); button.addEventListener ('click', () => this.Change ({ family })); this.cards.set (family, button);
+            const button = Element ('button', 'pp_product_card', undefined, cards); button.type = 'button'; button.setAttribute ('aria-label', 'Choose ' + label.toLowerCase ()); button.innerHTML = Icon (family); Element ('span', '', label, button); Element ('small', '', PrimaryFamilies[family].name, button); button.addEventListener ('click', () => { this.Change ({ family }); this.host.catalog ({ bottle : 'bottles', can : 'cans', pouch : 'pouches' }[family], true); }); this.cards.set (family, button);
         }
+        const categories = Element ('div', 'pp_categories', undefined, catalog);
+        for (const [id, name] of Object.entries (ProductCategories).filter (([id]) => !['bottles', 'cans', 'pouches'].includes (id))) { const button = Element ('button', '', name, categories); button.type = 'button'; button.addEventListener ('click', ()=>this.host.catalog(id, true)); }
+        this.drawer = Element ('section', 'pp_design_drawer', undefined, this.root); this.drawer.setAttribute ('aria-label', 'Product designs'); this.drawer.tabIndex = -1;
+        const header = Element ('div', 'pp_drawer_header', undefined, this.drawer); this.drawerTitle=Element('h3', '', 'Designs', header);
+        const close=Element('button', '', 'Close designs', header); this.drawerClose = close; close.type='button';close.addEventListener('click', ()=>this.host.catalog(this.host.inspect().catalogCategory, false));
+        this.drawerGrid=Element('div', 'pp_design_grid', undefined, this.drawer);
+        this.drawer.addEventListener ('keydown', event => { if (event.key === 'Escape') { event.stopPropagation (); event.preventDefault (); this.host.catalog (this.host.inspect ().catalogCategory, false); } });
+        this.drawerStatus = Element ('p', 'pp_status', '', this.drawer); this.drawerStatus.setAttribute ('role', 'status');
         const note = Element ('p', 'pp_catalog_note', 'Start with a familiar shape. Refine its dimensions and surface.', catalog);
         note.setAttribute ('aria-hidden', 'true');
         this.stage = Element ('section', 'pp_stage', undefined, this.layout); this.stage.setAttribute ('aria-label', 'Product profile reference');
@@ -32,8 +61,15 @@ export class PrimaryProductsPanel
         const dimensions = Element ('section', 'pp_section', undefined, controls); Element ('h3', '', 'Dimensions · H × W × D', dimensions); const row = Element ('div', 'pp_dimension_row', undefined, dimensions); this.inputs = new Map ();
         for (const [key, label] of [['heightMm', 'Height'], ['widthMm', 'Width'], ['depthMm', 'Depth']]) {
             const field = Element ('label', 'pp_field', label, row); const wrap = Element ('span', 'pp_input_wrap', undefined, field); const input = Element ('input', '', undefined, wrap); input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', 'Product ' + label.toLowerCase ()); this.inputs.set (key, input); const unit = Element ('span', 'pp_unit', '', wrap); this.inputs.set (key + 'Unit', unit);
-            input.addEventListener ('change', () => this.Change ({ [this.host.inspect ().family !== 'pouch' && key !== 'heightMm' ? 'diameterMm' : key] : input.valueAsNumber * this.Factor () }));
+            input.addEventListener ('change', () => this.Change ({ [!['pouch', 'clamshell'].includes (this.host.inspect ().family) && key !== 'heightMm' ? 'diameterMm' : key] : input.valueAsNumber * this.Factor () }));
         }
+        this.shapeSection = Element ('section', 'pp_section', undefined, controls); Element ('h3', '', 'Bottle shape', this.shapeSection); this.shapeInputs = new Map ();
+        for (const [key, title] of [['neckDiameterMm', 'Neck diameter'], ['shoulderHeightMm', 'Shoulder height'], ['neckHeightMm', 'Neck height'], ['capHeightMm', 'Cap height']]) {
+            const label = Element ('label', 'pp_field', title, this.shapeSection), wrap = Element ('span', 'pp_input_wrap', undefined, label), input = Element ('input', '', undefined, wrap), unit = Element ('span', 'pp_unit', '', wrap);
+            input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', title); this.shapeInputs.set (key, { input, unit });
+            input.addEventListener ('change', () => { const draft = this.host.inspect (); this.Change ({ bottleShape : { ...BottleShape (draft), [key] : input.valueAsNumber*this.Factor () } }); });
+        }
+        Element ('p', 'pp_draft_note', 'Overall height includes the cap. The straight body uses the remaining height. Shape edits preserve label size; artwork must still fit.', this.shapeSection);
         const surfaces = Element ('section', 'pp_section', undefined, controls); Element ('h3', '', 'Surface', surfaces);
         const materialRow = Element ('div', 'pp_material_row', undefined, surfaces);
         const materialLabel = Element ('label', 'pp_field', 'Material', materialRow); this.material = Element ('select', '', undefined, materialLabel); this.material.setAttribute ('aria-label', 'Product material'); this.material.addEventListener ('change', () => this.Change ({ material : this.material.value }));
@@ -56,10 +92,22 @@ export class PrimaryProductsPanel
         this.availability = Element ('p', 'pp_draft_note', '', controls); this.availability.setAttribute ('role', 'status');
         this.status = Element ('p', 'pp_status', '', controls); this.status.setAttribute ('role', 'status'); this.Refresh ();
     }
+    Drawer (open)
+    {
+        if (this.drawerOpen === open) { return; }
+        this.drawerAnimation?.cancel (); const before = this.drawerOpen; this.drawerOpen = open;
+        const reduced = typeof matchMedia === 'function' && matchMedia ('(prefers-reduced-motion: reduce)').matches;
+        if (open) { this.drawerReturn = document.activeElement; this.drawer.hidden = false; this.drawer.style.pointerEvents = ''; this.drawer.focus ({ preventScroll : true }); }
+        if (!open && (!before || reduced)) { this.drawer.hidden = true; if (before) { this.drawerReturn?.focus?.(); } return; }
+        if (reduced) { return; }
+        this.drawer.style.pointerEvents = open ? '' : 'none';
+        this.drawerAnimation = this.drawer.animate ([{ transform : open ? 'translateY(100%)' : 'translateY(0)' }, { transform : open ? 'translateY(0)' : 'translateY(100%)' }], { duration : 220, easing : 'ease-out' });
+        this.drawerAnimation.onfinish = () => { if (!this.drawerOpen) { this.drawer.hidden = true; this.drawerReturn?.focus?.(); } };
+    }
     async Action (action)
     {
-        try { await action (); this.status.textContent = 'Product action completed.'; }
-        catch (error) { this.status.textContent = error.message; }
+        try { await action (); this.status.textContent = 'Product action completed.'; this.drawerStatus.textContent = this.status.textContent; }
+        catch (error) { this.status.textContent = error.message; this.drawerStatus.textContent = error.message; }
         finally { this.Refresh (); }
     }
     ReportError (message) { this.status.textContent = message; }
@@ -73,6 +121,7 @@ export class PrimaryProductsPanel
     {
         const draft = this.host.inspect (), disabled = this.host.blocked ();
         for (const input of this.root.querySelectorAll ('input, select, button')) { input.disabled = disabled; }
+        if (this.drawerClose) { this.drawerClose.disabled = false; }
         this.add.disabled = disabled || !draft.generationAvailable; this.apply.disabled = disabled || !draft.generationAvailable;
         this.add.textContent = draft.generating ? 'Generating…' : 'Generate';
         this.add.title = draft.unavailableReason || 'Generate an opaque product in the session.';
@@ -83,11 +132,13 @@ export class PrimaryProductsPanel
         const draft = this.host.inspect (), factor = this.Factor (), unit = factor === 1 ? 'mm' : 'in', disabled = this.host.blocked ();
         for (const [family, button] of this.cards) { button.setAttribute ('aria-pressed', String (draft.family === family)); button.disabled = disabled; }
         for (const key of ['heightMm', 'widthMm', 'depthMm']) {
-            const input = this.inputs.get (key), value = key !== 'heightMm' && draft.family !== 'pouch' ? draft.diameterMm : draft[key];
+            const input = this.inputs.get (key), value = key !== 'heightMm' && !['pouch', 'clamshell'].includes (draft.family) ? draft.diameterMm : draft[key];
             input.value = String (Math.round (value / factor * 1000) / 1000); input.disabled = disabled;
-            input.min = String ((key === 'heightMm' ? 20 : key === 'depthMm' && draft.family === 'pouch' ? 2 : 10) / factor); input.max = String ((key === 'heightMm' ? 1000 : key === 'depthMm' && draft.family === 'pouch' ? 200 : 500) / factor); this.inputs.get (key + 'Unit').textContent = unit;
-            input.title = draft.family === 'pouch' || key === 'heightMm' ? '' : 'Width and depth share the round product diameter.';
+            input.min = String ((key === 'heightMm' ? 20 : key === 'depthMm' && ['pouch', 'clamshell'].includes (draft.family) ? 2 : 10) / factor); input.max = String ((key === 'heightMm' ? 1000 : key === 'depthMm' && ['pouch', 'clamshell'].includes (draft.family) ? 200 : 500) / factor); this.inputs.get (key + 'Unit').textContent = unit;
+            input.title = ['pouch', 'clamshell'].includes (draft.family) || key === 'heightMm' ? '' : 'Width and depth share the round product diameter.';
         }
+        this.shapeSection.hidden = draft.family !== 'bottle';
+        if (draft.family === 'bottle') { const shape = BottleShape (draft); for (const [key, { input, unit : suffix }] of this.shapeInputs) { input.value = String (Number ((shape[key]/factor).toFixed (6))); input.min = String (.5/factor); input.max = String (1000/factor); suffix.textContent = unit; } }
         this.material.replaceChildren ();
         for (const item of ListProductMaterials (draft.family)) { const option = Element ('option', '', item.name, this.material); option.value = item.id; option.disabled = item.id === 'glass'; }
         this.material.value = draft.material; this.material.disabled = disabled; this.color.value = draft.color; this.color.disabled = disabled; this.roughness.value = String (draft.roughness); this.roughness.disabled = disabled; this.reset.disabled = disabled;
@@ -96,13 +147,25 @@ export class PrimaryProductsPanel
         this.artName.textContent = art ? art.name + ' · label size in ' + unit : 'Import a PNG, JPEG or WebP label (up to 4 MiB).';
         this.artDimensions.hidden = !art; this.artRemove.hidden = !art;
         if (art) { for (const [key, input] of this.artInputs) { input.value = String (Math.round (art[key] / factor * 1000) / 1000); } }
-        for (const [zone, button] of this.zones) { button.hidden = draft.family === 'pouch' && zone === 'wrap'; button.setAttribute ('aria-pressed', String (draft.labelZone === zone)); button.disabled = disabled; }
+        for (const [zone, button] of this.zones) { button.hidden = ['pouch', 'clamshell'].includes (draft.family) && zone === 'wrap'; button.textContent = draft.family === 'clamshell' ? (zone === 'front' ? 'Top label' : 'Bottom label') : { front : 'Front label', back : 'Back label', wrap : 'Wrap label' }[zone]; button.setAttribute ('aria-pressed', String (draft.labelZone === zone)); button.disabled = disabled; }
+        this.Drawer (draft.catalogOpen === true); this.drawerTitle.textContent = ProductCategories[draft.catalogCategory] || 'Designs';
+        const catalogKey = draft.catalogCategory + ':' + unit; if (catalogKey !== this.catalogKey) { this.catalogKey = catalogKey; this.drawerGrid.replaceChildren (); for (const design of ListProductDesigns (draft.catalogCategory)) { const button = Element ('button', 'pp_design_card', undefined, this.drawerGrid); button.type='button'; button.innerHTML=DesignPreview(design); Element('strong', '', design.name, button); Element('small', '', design.description, button); const dimensions = design.changes; Element ('small', '', [dimensions.heightMm, dimensions.widthMm || dimensions.diameterMm, dimensions.depthMm || dimensions.diameterMm].map (v => Number ((v/factor).toFixed (2))).join (' × ') + ' ' + unit, button); button.title=design.dimensionsAre; button.addEventListener('click', ()=>this.Action(()=>this.host.selectDesign(design.id))); } }
         this.profileName.textContent = PrimaryFamilies[draft.family].name;
-        this.size.textContent = draft.family === 'pouch' ? [draft.heightMm, draft.widthMm, draft.depthMm].map (n => (n / factor).toFixed (factor === 1 ? 0 : 2)).join (' × ') + ' ' + unit : 'Ø ' + (draft.diameterMm / factor).toFixed (factor === 1 ? 0 : 2) + ' × ' + (draft.heightMm / factor).toFixed (factor === 1 ? 0 : 2) + ' ' + unit;
+        this.size.textContent = ['pouch', 'clamshell'].includes (draft.family) ? [draft.heightMm, draft.widthMm, draft.depthMm].map (n => (n / factor).toFixed (factor === 1 ? 0 : 2)).join (' × ') + ' ' + unit : 'Ø ' + (draft.diameterMm / factor).toFixed (factor === 1 ? 0 : 2) + ' × ' + (draft.heightMm / factor).toFixed (factor === 1 ? 0 : 2) + ' ' + unit;
         this.SetDisabled ();
-        const bottle = draft.family === 'bottle', pouch = draft.family === 'pouch'; const width = Math.max (70, Math.min (160, (draft.diameterMm || draft.widthMm) / draft.heightMm * 280)), x = 120 - width / 2;
-        const body = pouch ? `M${x} 75H${x + width}L${x + width - 8} 180L${x + width} 305H${x}L${x + 8} 180Z` : bottle ? `M102 65H138V90C138 108 ${120 + width / 2} 116 ${120 + width / 2} 143V294Q${120 + width / 2} 305 ${120 + width / 2 - 12} 305H${x + 12}Q${x} 305 ${x} 294V143C${x} 116 102 108 102 90Z` : `M${x} 90Q120 78 ${x + width} 90V294Q120 307 ${x} 294Z`;
+        if (draft.family === 'clamshell') {
+            const scale = Math.min (180/draft.widthMm, 250/draft.depthMm), w = draft.widthMm*scale, d = draft.depthMm*scale;
+            const labelW = (art?.widthMm || draft.widthMm*.55)*scale, labelH = (art?.heightMm || draft.depthMm*.55)*scale;
+            const label = preview ? `<image href="${preview}" x="${120-labelW/2}" y="${175-labelH/2}" width="${labelW}" height="${labelH}" preserveAspectRatio="xMidYMid meet"/>` : `<rect x="${120-labelW/2}" y="${175-labelH/2}" width="${labelW}" height="${labelH}" fill="none" stroke="#458b9b" stroke-dasharray="4 4"/>`;
+            this.drawing.innerHTML = `<svg viewBox="0 0 240 350" role="img" aria-label="Clamshell top reference"><rect x="${120-w/2}" y="${175-d/2}" width="${w}" height="${d}" rx="${Math.min(w, d)*.1}" fill="${draft.color}" stroke="currentColor" stroke-opacity=".35"/>${label}</svg>`;
+            return;
+        }
+        const bottle = draft.family === 'bottle', pouch = ['pouch', 'clamshell'].includes (draft.family); const width = Math.max (70, Math.min (160, (draft.diameterMm || draft.widthMm) / draft.heightMm * 280)), x = 120 - width / 2;
+        const shape = bottle ? BottleShape (draft) : null, sy = value => 305-value/draft.heightMm*250, neckWidth = bottle ? width*shape.neckDiameterMm/draft.diameterMm : 0, capBottom = bottle ? sy (draft.heightMm-shape.capHeightMm) : 0, neckBottom = bottle ? sy (draft.heightMm-shape.capHeightMm-shape.neckHeightMm) : 0, bodyTop = bottle ? sy (draft.heightMm-shape.capHeightMm-shape.neckHeightMm-shape.shoulderHeightMm) : 0;
+        const body = draft.family === 'clamshell' ? `M${x} 75H${x+width}V305H${x}Z` : pouch ? `M${x} 75H${x + width}L${x + width - 8} 180L${x + width} 305H${x}L${x + 8} 180Z` : bottle ? `M${120-neckWidth/2} ${capBottom}H${120+neckWidth/2}V${neckBottom}L${x+width} ${bodyTop}V305H${x}V${bodyTop}L${120-neckWidth/2} ${neckBottom}Z` : `M${x} 90Q120 78 ${x + width} 90V294Q120 307 ${x} 294Z`;
+        const zoneDraft = DefaultProductDraft (draft.family); for (const key of Object.keys (zoneDraft)) { zoneDraft[key] = draft[key]; } if (draft.bottleShape) { zoneDraft.bottleShape = draft.bottleShape; }
+        const zone = GetArtworkZones (zoneDraft).find (z => z.id === draft.labelZone), artHeight = art?.heightMm || zone.heightMm*.7, labelY = sy (zone.bottomMm+(zone.heightMm+artHeight)/2), labelHeight = artHeight/draft.heightMm*250;
         const labelX = draft.labelZone === 'wrap' ? x + 1 : 120 - width * .32, labelW = draft.labelZone === 'wrap' ? width - 2 : width * .64;
-        this.drawing.innerHTML = `<svg viewBox="0 0 240 350" role="img" aria-label="${pouch ? 'Pouch' : bottle ? 'Bottle' : 'Can'} profile reference"><ellipse cx="120" cy="319" rx="75" ry="9" fill="currentColor" opacity=".07"/><path d="${body}" fill="${draft.color}" fill-opacity="${draft.material === 'glass' ? '.3' : '1'}" stroke="currentColor" stroke-opacity=".23" stroke-width="1.5"/>${pouch ? `<path d="M${x} 85h${width}M${x} 295h${width}" stroke="currentColor" stroke-opacity=".3"/>` : bottle ? '<rect x="100" y="46" width="40" height="25" rx="5" fill="#859497"/><path d="M105 51v15m5-15v15m5-15v15m5-15v15m5-15v15m5-15v15m5-15v15" stroke="#b7c2c2" stroke-width="1"/>' : `<ellipse cx="120" cy="90" rx="${width / 2}" ry="6" fill="#cbd3d4" stroke="#7a898b"/><ellipse cx="120" cy="91" rx="12" ry="3" fill="#859497"/>`}${preview ? `<image href="${preview}" x="${labelX}" y="174" width="${labelW}" height="79" preserveAspectRatio="xMidYMid meet"/>` : `<rect x="${labelX}" y="174" width="${labelW}" height="79" fill="none" stroke="#458b9b" stroke-dasharray="4 4"/>`}</svg>`;
+        this.drawing.innerHTML = `<svg viewBox="0 0 240 350" role="img" aria-label="${draft.family === 'clamshell' ? 'Clamshell' : pouch ? 'Pouch' : bottle ? 'Bottle' : 'Can'} profile reference"><ellipse cx="120" cy="319" rx="75" ry="9" fill="currentColor" opacity=".07"/><path d="${body}" fill="${draft.color}" fill-opacity="${draft.material === 'glass' ? '.3' : '1'}" stroke="currentColor" stroke-opacity=".23" stroke-width="1.5"/>${pouch ? `<path d="M${x} 85h${width}M${x} 295h${width}" stroke="currentColor" stroke-opacity=".3"/>` : bottle ? `<rect x="${120-neckWidth*.54}" y="55" width="${neckWidth*1.08}" height="${capBottom-55}" fill="#859497"/>` : `<ellipse cx="120" cy="90" rx="${width / 2}" ry="6" fill="#cbd3d4" stroke="#7a898b"/><ellipse cx="120" cy="91" rx="12" ry="3" fill="#859497"/>`}${preview ? `<image href="${preview}" x="${labelX}" y="${labelY}" width="${labelW}" height="${labelHeight}" preserveAspectRatio="xMidYMid meet"/>` : `<rect x="${labelX}" y="${labelY}" width="${labelW}" height="${labelHeight}" fill="none" stroke="#458b9b" stroke-dasharray="4 4"/>`}</svg>`;
     }
 }
