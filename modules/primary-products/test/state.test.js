@@ -13,6 +13,16 @@ describe ('Primary Products draft state', () => {
         for (const bad of [{}, { depthMm : 3 }, { widthMm : NaN }, null, [1]]) { assert.throws (() => DimensionChanges (pouch, bad), /width, length or height/); }
         assert.deepEqual (ProductSize (UpdateProductDraft (pouch, DimensionChanges (pouch, { lengthMm : 25 }))), { widthMm : 140, lengthMm : 25, heightMm : 200 });
     });
+    it ('validates oval and rounded-rectangle bottle sections and maps L to their depth', () => {
+        const bottle = DefaultProductDraft ('bottle'), oval = UpdateProductDraft (bottle, { diameterMm : 80, bottleSection : { shape : 'oval', depthMm : 45 } });
+        assert.deepEqual (ProductSize (oval), { widthMm : 80, lengthMm : 45, heightMm : 190 }); assert.deepEqual (DimensionChanges (oval, { widthMm : 90, lengthMm : 40 }), { diameterMm : 90, bottleSection : { shape : 'oval', depthMm : 40 } });
+        const rect = UpdateProductDraft (bottle, { diameterMm : 80, bottleSection : { shape : 'rectangle', depthMm : 50 } }); assert.equal (rect.bottleSection.cornerRadiusMm, 8.75);
+        assert.equal (UpdateProductDraft (rect, { bottleSection : { shape : 'round' } }).bottleSection, undefined); assert.equal (UpdateProductDraft (rect, { bottleSection : null }).bottleSection, undefined);
+        for (const bad of [{ shape : 'hexagon', depthMm : 40 }, { shape : 'oval', depthMm : 5 }, { shape : 'oval', depthMm : 40, cornerRadiusMm : 4 }, { shape : 'rectangle', depthMm : 40, cornerRadiusMm : 30 }, { shape : 'oval' }]) { assert.throws (() => UpdateProductDraft (bottle, { bottleSection : bad })); }
+        assert.throws (() => UpdateProductDraft (DefaultProductDraft ('can'), { bottleSection : { shape : 'oval', depthMm : 40 } }), /only to bottles/);
+        assert.throws (() => UpdateProductDraft (bottle, { bottleSection : { shape : 'oval', depthMm : 20 }, bottleShape : { neckDiameterMm : 24, shoulderHeightMm : 30, neckHeightMm : 20, capHeightMm : 20 } }), /fit within the body/);
+        assert.ok (UpdateProductDraft (bottle, { bottleSection : { shape : 'oval', depthMm : 20 } }).bottleSection.depthMm === 20, 'default neck follows the narrower side');
+    });
     it ('switches families atomically and resets incompatible surface defaults', () => {
         const bottle = UpdateProductDraft (DefaultProductDraft (), { material : 'glass', heightMm : 254 });
         const can = UpdateProductDraft (bottle, { family : 'can' }); assert.equal (can.material, 'aluminum'); assert.equal (can.heightMm, 122); assert.equal (bottle.material, 'glass');

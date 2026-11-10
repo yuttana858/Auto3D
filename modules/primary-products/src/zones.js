@@ -1,4 +1,5 @@
 import { DefaultProductDraft, UpdateProductDraft, BottleShape } from './state.js';
+import { BottleSectionOf, SectionPerimeter } from './section.js';
 export function GetArtworkZones (input)
 {
     const d = UpdateProductDraft (DefaultProductDraft (), input);
@@ -6,7 +7,13 @@ export function GetArtworkZones (input)
     if (d.family === 'pouch') { return ['front', 'back'].map (id => ({ id, componentId : 'body', surface : 'pillow', widthMm : d.widthMm * 0.8, heightMm : d.heightMm * 0.8, bottomMm : d.heightMm * 0.1, distortionCompensation : false })); }
     const shape = d.family === 'bottle' ? BottleShape (d) : null, bodyHeight = shape ? d.heightMm - shape.shoulderHeightMm - shape.neckHeightMm - shape.capHeightMm : d.heightMm;
     const bottom = Math.min (d.heightMm * .08, bodyHeight * .2), height = Math.min (d.heightMm * (shape ? .55 : .82), bodyHeight - bottom - d.heightMm * .01);
-    const radius = d.diameterMm / 2;
+    const radius = d.diameterMm / 2, section = d.family === 'bottle' ? BottleSectionOf (d) : null;
+    if (section && section.shape !== 'round') {
+        // Oval/rectangular bodies: labels follow the outline by arc length. Front/back panels span the flat or gently
+        // curved face (the rectangle's straight front, or 30% of the oval perimeter); a wrap uses the whole perimeter.
+        const perimeter = SectionPerimeter (section), face = section.shape === 'rectangle' ? Math.max (2 * (section.widthMm / 2 - section.cornerRadiusMm) + Math.PI * section.cornerRadiusMm * .5, 1) : perimeter * .3;
+        return ['front', 'back', 'wrap'].map (id => ({ id, componentId : 'body', surface : 'section', bottomMm : bottom, widthMm : id === 'wrap' ? perimeter : face, heightMm : height, perimeterMm : perimeter }));
+    }
     return ['front', 'back', 'wrap'].map (id => ({ id, componentId : 'body', surface : 'cylinder', radiusMm : radius,
         bottomMm : bottom, widthMm : id === 'wrap' ? Math.PI * d.diameterMm : Math.PI * d.diameterMm * 0.3,
         heightMm : height, startAngleRad : id === 'back' ? Math.PI : 0, seamAngleRad : Math.PI }));

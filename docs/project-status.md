@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Non-round bottles, fit on generate, framing-preserving orbit — Auto3D 0.58.0 / Primary Products 0.9.0 / Packaging 1.10.7 (2026-11-10)
+
+Oval and rounded-rectangle bottle sections (lofted body, arc-length labels, independent W/L), three new designs (33), new products framed to fit the window, and right-drag orbiting around the selected object without re-aiming the camera. See [release-0580.md](release-0580.md).
+
 ## Right-drag orbit, live new-box dimensions and 3D product callouts — Auto3D 0.57.1 / Packaging 1.10.7 / Primary Products 0.8.1 (2026-11-10)
 
 Main-viewer right-drag rotates around the selected model again (the 0.53.1 sideways pan is reverted; vertical still tilts). Enter on the Packaging Box Dimensions W/L/H fields resizes the selected generated box live in the chosen ID/OD/score basis (one Undo step), or generates the current style when no box is selected. Generated products carry W × L × H callout brackets in 3D (definition-exact, editable by double-click, toggle `primary.callouts.set`). See [release-0571.md](release-0571.md).

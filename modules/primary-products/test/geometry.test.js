@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { CreatePrimaryProduct, GetArtworkZones, DefaultProductDraft } from '../src/index.js';
+import { CreatePrimaryProduct, GetArtworkZones, DefaultProductDraft, UpdateProductDraft } from '../src/index.js';
 
 describe ('Primary Products neutral geometry', function () {
     for (const family of ['bottle', 'can']) {
@@ -81,5 +81,22 @@ describe ('Pillow pouch geometry', function () {
         const pouch = DefaultProductDraft ('pouch'); assert.throws (() => CreatePrimaryProduct ({ ...pouch, depthMm : 150 }));
         assert.throws (() => CreatePrimaryProduct ({ ...pouch, material : 'glass' }));
         assert.throws (() => CreatePrimaryProduct ({ ...pouch, labelZone : 'wrap' }));
+    });
+});
+
+describe ('Non-round bottle sections', () => {
+    it ('lofts oval and rounded-rectangle bottles to exact W × L × H bounds with labels on the outline', async () => {
+        const { BottleSectionOf, SectionPerimeter, SectionOutline } = await import ('../src/section.js');
+        const { CreateLabelMesh } = await import ('../src/artwork.js');
+        for (const section of [{ shape : 'oval', depthMm : 45 }, { shape : 'rectangle', depthMm : 50, cornerRadiusMm : 10 }]) {
+            const draft = UpdateProductDraft (DefaultProductDraft ('bottle'), { diameterMm : 80, bottleSection : section }), product = CreatePrimaryProduct (draft);
+            const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+            for (const c of product.components) { for (let i = 0; i < c.positions.length; i += 3) { for (let k = 0; k < 3; k++) { min[k] = Math.min (min[k], c.positions[i + k]); max[k] = Math.max (max[k], c.positions[i + k]); } } assert.ok (c.normals.every (Number.isFinite)); assert.ok (c.indices.every (i => i < c.positions.length / 3)); }
+            assert.deepEqual ([min, max].map (v => v.map (x => Math.round (x * 1e6) / 1e6)), [[-40, 0, -section.depthMm / 2], [40, 190, section.depthMm / 2]]); assert.equal (product.quality.section, section.shape);
+            const sec = BottleSectionOf (draft), outline = SectionOutline (sec, 400); assert.ok (Math.abs (outline.perimeter - SectionPerimeter (sec)) < 1e-3);
+            const label = CreateLabelMesh (draft, { resourceId : 'a'.repeat (64), name : 'l.png', mime : 'image/png', zone : 'front', widthMm : 30, heightMm : 40 });
+            let length = 0; const n = label.positions.length / 6; for (let c = 1; c < n; c++) { const a = (c - 1) * 3, b = c * 3; length += Math.hypot (label.positions[b] - label.positions[a], label.positions[b + 2] - label.positions[a + 2]); }
+            assert.ok (Math.abs (length - 30) < .2, String (length)); for (let i = 2; i < label.positions.length; i += 3) { assert.ok (label.positions[i] > 0, 'front label faces +Z'); }
+        }
     });
 });

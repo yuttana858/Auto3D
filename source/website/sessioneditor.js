@@ -91,8 +91,9 @@ export class SessionEditor
         viewer.scene.add (this.selectionBox);
         this.controls = new TransformControls (viewer.camera, viewer.renderer.domElement); this.controls.setSize (0.8); this.helper = this.controls.getHelper (); viewer.scene.add (this.helper);
         viewer.renderer.domElement.addEventListener ('pointerdown', event => { this.shiftDragRequested = event.shiftKey && this.mode === 'translate'; }, true);
-        viewer.navigation.onOrbitStart = () => this.OrbitSelected ();
-        // Main viewer: right-drag orbits (left/right rotates, up/down tilts). Each drag starts by re-centering on the selected model.
+        viewer.navigation.onOrbitStart = () => this.OrbitSelected (false);
+        // Main viewer: right-drag orbits around the selected model's center (left/right, with up/down tilt) without first
+        // re-aiming the camera, so the current framing is kept while the view swings around the object.
         viewer.navigation.rightDragPansHorizontally = false;
         let panControlsEnabled = null;
         viewer.navigation.onPanModifier = active => {
@@ -1287,11 +1288,13 @@ export class SessionEditor
         const objects = this.SelectedObjects ().length ? this.SelectedObjects () : [this.selected]; const records = objects.map ((object) => ({ object, before : object.visible })); const after = !this.selected.visible;
         const apply = (restore) => { records.forEach ((item) => { item.object.visible = restore ? item.before : after; item.object.threeObject.visible = item.object.visible; }); this.website.UpdateMeshesVisibility (); this.Select (this.selected, false, true); }; apply (false); this.history.Push ({ undo : () => apply (true), redo : () => apply (false) }); this.RefreshButtons ();
     }
-    OrbitSelected ()
+    // Sets the orbit pivot to the selection's center. `aim` also points the view at it (camera.orbit.focus_selected);
+    // right-drag passes false, so eye and view center orbit together around the object and the framing is kept.
+    OrbitSelected (aim = true)
     {
         const navigation = this.website.viewer.navigation; navigation.StopCameraMovement (); const bounds = this.SelectedViewBounds ();
         const center = bounds?.getCenter (new THREE.Vector3 ()); navigation.orbitCenter = center ? new Coord3D (center.x, center.y, center.z) : null;
-        if (center) { navigation.camera.center = new Coord3D (center.x, center.y, center.z); }
+        if (center && aim) { navigation.camera.center = new Coord3D (center.x, center.y, center.z); }
         return { focused : Boolean (center), objectId : center ? this.selected?.id || null : null, pivot : center ? center.toArray () : null };
     }
     SelectedViewBounds ()

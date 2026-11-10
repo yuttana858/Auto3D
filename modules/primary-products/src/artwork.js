@@ -1,5 +1,6 @@
 import { CreatePillowPouch } from './pouch.js';
 import { GetArtworkZones } from './zones.js';
+import { BottleSectionOf, SectionAt } from './section.js';
 export function ValidateProductArtwork (draft, entries = [])
 {
     if (!Array.isArray (entries) || entries.length > 2) { throw new Error ('Use up to two front/back labels or one wrap.'); }
@@ -21,14 +22,20 @@ export function CreateLabelMesh (draft, art)
     if (draft.family === 'pouch') { return PouchLabel (draft, art); }
     const zone = GetArtworkZones (draft).find (z => z.id === art.zone);
     const mesh = { id : 'label-' + art.zone, materialRole : 'label', artwork : art, positions : [], normals : [], uvs : [], indices : [] };
-    const n = 48, rows = draft.family === 'pouch' ? 24 : 1;
+    const n = zone.surface === 'section' ? 96 : 48, rows = draft.family === 'pouch' ? 24 : 1, section = zone.surface === 'section' ? BottleSectionOf (draft) : null;
     const y0 = zone.bottomMm + (zone.heightMm - art.heightMm) / 2;
     for (let row = 0; row <= rows; row++) { for (let col = 0; col <= n; col++) {
         const u = col / n, v = row / rows, y = y0 + art.heightMm * v;
         let p, normal;
-        const radius = draft.diameterMm / 2, center = art.zone === 'back' ? -Math.PI / 2 : Math.PI / 2;
-        const angle = center + (0.5 - u) * art.widthMm / radius;
-        normal = [Math.cos (angle), 0, Math.sin (angle)]; p = [normal[0] * (radius + 0.15), y, normal[2] * (radius + 0.15)];
+        if (zone.surface === 'section') {
+            // Arc length from +X counter-clockwise: the front centre is a quarter of the perimeter, the back three quarters.
+            const at = SectionAt (section, zone.perimeterMm * (art.zone === 'back' ? .75 : .25) + (0.5 - u) * art.widthMm);
+            normal = [at.nx, 0, at.nz]; p = [at.x + at.nx * 0.15, y, at.z + at.nz * 0.15];
+        } else {
+            const radius = draft.diameterMm / 2, center = art.zone === 'back' ? -Math.PI / 2 : Math.PI / 2;
+            const angle = center + (0.5 - u) * art.widthMm / radius;
+            normal = [Math.cos (angle), 0, Math.sin (angle)]; p = [normal[0] * (radius + 0.15), y, normal[2] * (radius + 0.15)];
+        }
         mesh.positions.push (...p); mesh.normals.push (...normal); mesh.uvs.push (u, v);
     } }
     for (let row = 0; row < rows; row++) { for (let col = 0; col < n; col++) { const a = row * (n + 1) + col, b = a + n + 1; mesh.indices.push (a, a + 1, b, a + 1, b + 1, b); } }

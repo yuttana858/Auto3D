@@ -160,7 +160,7 @@ try {
     await page.setViewportSize ({ width : 2400, height : 1000 }); await call ('primary.designs.open', { category : 'beverages', open : true }); await drawer.waitFor ({ state : 'visible' });
     const grid = drawer.locator ('.pp_design_grid'); assert.equal (await grid.evaluate (node => getComputedStyle (node).gridTemplateColumns.split (' ').length), 10);
     const cardBoxes = await drawer.locator ('.pp_design_card').evaluateAll (nodes => nodes.map (node => { const r = node.getBoundingClientRect (); return [Math.round (r.width), Math.round (r.height)]; }));
-    assert.equal (cardBoxes.length, 6); assert.ok (cardBoxes.every (box => box[0] === cardBoxes[0][0] && box[1] === cardBoxes[0][1]), JSON.stringify (cardBoxes));
+    assert.equal (cardBoxes.length, 7); assert.ok (cardBoxes.every (box => box[0] === cardBoxes[0][0] && box[1] === cardBoxes[0][1]), JSON.stringify (cardBoxes));
     assert.ok ((await drawer.boundingBox ()).height <= 1000 * .315 + 1, 'drawer is at most 31.5% of the viewport');
     const callouts = await drawer.locator ('.pp_design_card').first ().locator ('.pp_callout text').allTextContents (); assert.deepEqual (callouts.map (text => text.split (' ')[0]), ['W', 'H', 'L']);
     assert.match (await drawer.locator ('.pp_design_card .pp_design_size').first ().textContent (), /^66 × 66 × 122 mm$/);
@@ -168,7 +168,10 @@ try {
     await objectCountReaches (beforeCan + 1);
     const can = (await call ('scene.inspect')).objects.at (-1); assert.equal ((await call ('primary.selected.load')).family, 'can'); assert.equal ((await call ('primary.inspect')).heightMm, 122);
     /* The generated can carries W × L × H callout brackets on the 3D model. */
-    const calloutsFor = async id => (await call ('dimensions.inspect')).dimensions.filter (d => d.objectId === id);
+    const calloutsFor = async id => { for (const end = Date.now () + 120000; ; await page.waitForTimeout (100)) { const r = await page.evaluate (() => Auto3D.execute ('dimensions.inspect')); if (r.ok) { return r.result.dimensions.filter (d => d.objectId === id); } assert.ok (/busy/.test (r.error?.message) && Date.now () < end, JSON.stringify (r)); } }; /* the viewer reports busy while a product rebuilds */
+    /* A newly generated product is framed to fit the window: the camera centers on its envelope (0, H/2, 0) once the fit animation settles. */
+    const halfHeight = (await calloutsFor (can.id)).find (d => d.axis === 'height').length / 2; /* in model units, which may be meters */
+    for (const end = Date.now () + 120000; ; await page.waitForTimeout (100)) { const r = await page.evaluate (() => Auto3D.execute ('camera.current.inspect')); if (r.ok && Math.hypot (r.result.center[0] - can.position[0], r.result.center[1] - (can.position[1] + halfHeight), r.result.center[2] - can.position[2]) < halfHeight * .01) { break; } assert.ok (Date.now () < end, 'camera did not frame the new product: ' + JSON.stringify (r.result?.center)); }
     assert.equal ((await calloutsFor (can.id)).length, 3); await page.waitForFunction (() => ['W · 66 mm', 'L · 66 mm', 'H · 122 mm'].every (label => [...document.querySelectorAll ('[data-dimension-id] text')].some (node => node.textContent === label)), null, { timeout : 120000 });
     const designHeight = drawer.getByRole ('spinbutton', { name : 'Design height', exact : true }); assert.equal (await designHeight.inputValue (), '122');
     await designHeight.fill ('150'); await designHeight.press ('Enter');
@@ -188,6 +191,18 @@ try {
     const draftOnly = await call ('primary.dimensions.set', { heightMm : 160, apply : false }); assert.equal (draftOnly.updated, false); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 140);
     const mismatch = await page.evaluate (() => Auto3D.execute ('primary.dimensions.set', { widthMm : 58, lengthMm : 70 })); assert.equal (mismatch.ok, false); assert.match (mismatch.error.message, /one diameter/);
     const generatedDesign = await call ('primary.designs.generate', { id : 'mini-beverage' }); assert.equal (generatedDesign.design, 'mini-beverage'); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 92);
+    /* Non-round bottles: choose a rounded-rectangle section, generate, then Enter on Length resizes the depth live. */
+    await call ('primary.designs.open', { category : 'beverages', open : false }); await drawer.waitFor ({ state : 'hidden' }); await page.setViewportSize ({ width : 1500, height : 1000 });
+    await call ('primary.configure', { family : 'bottle', heightMm : 220, diameterMm : 80 }); await panel.getByRole ('combobox', { name : 'Bottle cross-section', exact : true }).selectOption ('rectangle');
+    let rect = await call ('primary.inspect'); assert.equal (rect.bottleSection.shape, 'rectangle'); assert.equal (rect.bottleSection.depthMm, 48); assert.equal (await panel.getByRole ('spinbutton', { name : 'Product length', exact : true }).inputValue (), '48');
+    const corner = panel.getByRole ('spinbutton', { name : 'Corner radius', exact : true }); await corner.fill ('6'); await corner.press ('Tab'); assert.equal ((await call ('primary.inspect')).bottleSection.cornerRadiusMm, 6);
+    const rectangular = await call ('primary.generate'); assert.equal ((await calloutsFor (rectangular.objectId)).find (d => d.axis === 'length').lengthMm, 48);
+    const productLength = panel.getByRole ('spinbutton', { name : 'Product length', exact : true }); await productLength.fill ('55'); await productLength.press ('Enter');
+    for (const end = Date.now () + 120000; (await calloutsFor (rectangular.objectId)).find (d => d.axis === 'length').lengthMm !== 55; await page.waitForTimeout (100)) { assert.ok (Date.now () < end, 'depth did not update live'); }
+    await call ('primary.selected.load'); assert.deepEqual ((await call ('primary.inspect')).bottleSection, { shape : 'rectangle', depthMm : 55, cornerRadiusMm : 6 }); assert.equal ((await call ('primary.inspect')).diameterMm, 80);
+    const ovalDesign = await call ('primary.designs.generate', { id : 'oval-shampoo' }); assert.equal ((await calloutsFor (ovalDesign.objectId)).find (d => d.axis === 'length').lengthMm, 42);
+    await call ('view.focus', { objectId : rectangular.objectId }); await page.waitForTimeout (800); await page.screenshot ({ path : 'work/primary-products-review/rectangular-bottle.png' });
+    await call ('primary.designs.open', { category : 'beverages', open : true }); await drawer.waitFor ({ state : 'visible' });
     await page.screenshot ({ path : 'work/primary-products-review/design-drawer-wide.png' });
     await call ('primary.designs.open', { category : 'beverages', open : false }); await drawer.waitFor ({ state : 'hidden' }); assert.deepEqual (errors, []);
     console.log ('Design drawer: ten-column equal cards, 30% shorter, W/L/H callouts, card generation, Enter live resize with Undo, Tab draft-only and primary.dimensions.set passed.');
