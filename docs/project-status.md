@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Product design catalog — Auto3D 0.56.0 / Primary Products 0.7.0 / Packaging 1.10.4
+
+Adds six categories, 24 sourced illustrative presets, the animated bottom design drawer, rounded/tapered closed clamshell cavities and top/bottom artwork. Expands category finish materials and shared agent/MCP commands. See [release-0560.md](release-0560.md) and [research and remaining gates](primary-product-catalog-research.md). Stacked on draft #91; not deployed.
+
 ## Bottle profile controls — Auto3D 0.55.0 / Primary Products 0.6.0 / Packaging 1.10.4
 
 Adds editable shoulder, neck and cap dimensions with real geometry, preserved optional authoring data and safe artwork fit. See [release-0550.md](release-0550.md). [Primitive/Boolean research](primitive-solid-editing-research.md) defines the proposed next solid-editing track. Based on main after merged #90; not deployed.

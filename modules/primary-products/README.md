@@ -1,12 +1,12 @@
-# Primary Products 0.6.0
+# Primary Products 0.7.0
 
-Independent bottle/can/pillow-pouch UI and neutral geometry package, API 1. No Auto3D engine, account or Packaging imports. Auto3D integrates its lazy module bundle through separate host adapter/workspace services.
+Independent bottle/can/pillow-pouch/closed-clamshell UI and neutral geometry package, API 1. No Auto3D engine, account or Packaging imports. Auto3D integrates its lazy module bundle through separate host adapter/workspace services.
 
 `CreatePrimaryProduct(draft, {segments: 64})` returns indexed component meshes (flat position/normal/UV/index arrays), canonical-mm bounds and physical front/back/wrap zones. Tessellation is bounded to multiples of four from 16–128. Bottle components: body/cap. Can components: body/top/bottom. Base-centered origin, Y-up; outside height includes the closure. `GetArtworkZones(draft)` describes cylindrical zones on the straight body. Body UVs are profile coordinates; separate label patches supply the artwork UVs.
 
 `ProductDefinition(draft)` and `ValidateProductDefinition(value)` provide strict versioned authoring metadata. File/recovery validation can import this lightweight file without loading geometry or UI.
 
-Shapes are closed presentation solids without hollow walls, threads, detailed seams or pull tabs. Not for capacity or engineering claims. The Auto3D host enables opaque scene generation and atomic update/Undo; glass generation remains blocked pending transmission/hollow-wall work. The profile drawing is illustrative. Local label artwork now maps onto generated surfaces through the host; the independent 3D draft preview remains future work.
+Bottles, cans and pouches are closed presentation solids without hollow walls, threads, detailed seams or pull tabs. Clamshells have rounded, tapered base/lid cavities with physical walls; articulation and hinges remain future work. Not for capacity or engineering claims. The Auto3D host enables opaque scene generation and atomic update/Undo; glass generation remains blocked pending transmission/hollow-wall work. The profile drawing is illustrative. Local label artwork now maps onto generated surfaces through the host; the independent 3D draft preview remains future work.
 
 The module-owned panel receives inspect/configure/reset/generate/update/loadSelected/units/blocked functions from a neutral host. Applying changes rebuilds component surfaces from draft settings; the UI explains this. Drafts survive panel changes within the account, and reset when accounts change.
 
@@ -19,3 +19,5 @@ Pouches use `DefaultProductDraft("pouch")`, with widthMm, heightMm and depthMm (
 Category material presets expose real PBR defaults through `ListProductMaterials`. `ValidateProductArtwork` validates physical zones; `CreateLabelMesh` creates conforming patches. Authoring definitions may include up to two bounded image descriptors. Original bytes remain in embedded material maps supplied by the host. The panel receives artworkOpen/artworkMapping/artworkRemove/artworkPreview callbacks. Dimensions use one H × W × D row, with linked round W/D and a native material color swatch. See [0.52.0](../../docs/release-0520.md).
 
 Optional `bottleShape` contains all four canonical-mm fields: `neckDiameterMm`, `shoulderHeightMm`, `neckHeightMm`, `capHeightMm`. Missing shape data retains the original proportional profile. Explicit profiles keep a straight body of at least 20% overall height and a cap within the body diameter. Labels are bounded to the remaining straight body; incompatible existing labels block draft mutation. See [0.55.0](../../docs/release-0550.md).
+
+Six categories and 24 original illustrative designs are exposed through `ProductCategories`, `ListProductDesigns` and `ProductDesign`. The panel accepts catalog/selectDesign callbacks and opens an animated bottom drawer. Clamshells use the rectangular envelope fields and top/bottom art, stored as front/back zone IDs. See [catalog research](../../docs/primary-product-catalog-research.md) for sources, design limits and material presets.

@@ -61,3 +61,15 @@
 .pp_art_image { display: block; max-width: 100%; max-height: 140px; margin: 10px auto; object-fit: contain; }
 .pp_art_dimensions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
 .pp_art_import { width: 100%; padding: 9px; color: inherit; background: transparent; border: 1px solid var(--pp-accent); border-radius: 5px; cursor: pointer; }
+.pp_categories { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
+.pp_categories button { color: inherit; background: transparent; border: 1px solid var(--pp-accent); border-radius: 5px; padding: 7px; cursor: pointer; }
+.pp_design_drawer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 30; max-height: 45dvh; overflow: auto; padding: 16px 22px; background: var(--ov_background_color, #292d30); color: var(--ov_foreground_color, #eee); border-top: 2px solid var(--pp-accent); box-shadow: 0 -8px 30px #0004; }
+.pp_drawer_header { display: flex; justify-content: space-between; align-items: center; }
+.pp_design_grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.pp_design_card { display: grid; gap: 7px; padding: 12px; border: 1px solid #8887; border-radius: 8px; color: inherit; background: transparent; text-align: left; cursor: pointer; }
+.pp_design_card svg { width: 100%; height: 100px; }
+.pp_drawer_header button { border: 1px solid var(--ov_border_color, #8887); border-radius: 5px; background: transparent; color: inherit; padding: 7px 12px; cursor: pointer; }
+.pp_design_card small { font-size: var(--workspace-help-font-size, 11px); line-height: 1.4; }
+.pp_design_card:hover, .pp_design_card:focus-visible { border-color: var(--pp-accent); background: #8882; }
+@keyframes pp_drawer_enter { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@media(prefers-reduced-motion: reduce) { .pp_design_drawer { animation: none; } }

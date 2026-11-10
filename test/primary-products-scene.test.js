@@ -70,6 +70,17 @@ describe ('Primary Products scene integration', function () {
         await editor.history.Undo (); workspace.LoadSelected (); assert.equal (panel.draft.widthMm, 140);
         assert.equal (module.ValidateProductDefinition (module.ProductDefinition (module.DefaultProductDraft ())).draft.diameterMm, 65);
     });
+    it ('persists and rebuilds clamshells with material defaults and stable identity', async function () {
+        const { panel, editor, workspace } = Fixture (); panel.draft = module.ProductDesign ('food-fiber'); await workspace.Generate ();
+        const id = editor.selected.id; assert.equal (editor.document.model.meshes.length, 2);
+        assert.equal (panel.draft.color, '#b69b71'); panel.draft.widthMm = 230; await workspace.Generate (true); assert.equal (editor.selected.id, id);
+        const saved = OpenSessionArchive (CreateSessionArchive (PackSession (editor.document))).document;
+        const definition = module.ValidateProductDefinition (JSON.parse (saved.objects[0].userData[PrimaryProductDataKey]));
+        assert.equal (definition.draft.family, 'clamshell'); assert.equal (definition.draft.widthMm, 230); assert.equal (definition.draft.material, 'moldedFiber');
+        const recovery = ReadSession (PackRecoverySnapshot (structuredClone (RecoverySnapshot (editor.document, {})))).document;
+        assert.equal (recovery.objects[0].userData[PrimaryProductDataKey], saved.objects[0].userData[PrimaryProductDataKey]);
+        await editor.history.Undo (); workspace.LoadSelected (); assert.equal (panel.draft.widthMm, 200);
+    });
     it ('converts mm geometry into known scene units and rejects unknown units/glass', function () {
         const data = module.CreatePrimaryProduct (module.DefaultProductDraft ('can'));
         for (const [unit, factor] of [[Unit.Millimeter, 1], [Unit.Meter, 1000], [Unit.Inch, 25.4]]) {
