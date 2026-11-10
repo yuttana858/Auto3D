@@ -2,6 +2,7 @@ account-storage
 accounts
 admin-controls
 ai-credentials
+ai-extended
 animation
 array-spacing
 auth

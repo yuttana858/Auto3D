@@ -27,7 +27,7 @@ describe ('Primary Products panel services', () => {
         const entries = [{ resourceId : 'a'.repeat (64), name : 'Label', mime : 'image/png', zone : 'front', widthMm : 30, heightMm : 50 }];
         const panel = Object.assign (Object.create (PrimaryProductsPanel.prototype), { website : { auth : { user : { id : 'test' } }, sessionEditor : {} }, draft : DefaultProductDraft (), artwork : { entries, Inspect : () => entries }, Refresh () {} });
         const commands = CreateAgentCommands ({ sessionEditor : {}, primaryProductsPanel : panel });
-        assert.equal ((await commands.Execute ('primary.designs.list', { category : 'clamshell-food' })).result.length, 3);
+        assert.equal ((await commands.Execute ('primary.designs.list', { category : 'clamshell-food' })).result.length, 4);
         assert.equal ((await commands.Execute ('primary.designs.list', { category : 'unknown' })).ok, false);
         const macro = await commands.RunMacro ({ version : 1, steps : [{ id : 'choose', command : 'primary.designs.select', arguments : { id : 'household-round' } }, { id : 'read', command : 'primary.inspect', arguments : {} }] });
         assert.equal (macro.ok, true); assert.deepEqual (macro.completed[1].result.artwork, entries);

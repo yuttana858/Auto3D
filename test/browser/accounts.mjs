@@ -36,7 +36,7 @@ try {
     await call ('auth.open');
     const login = page.getByRole ('dialog', { name : 'Auto3D account', exact : true }); await login.getByLabel ('Email', { exact : true }).fill (user.email); await login.getByLabel ('Password', { exact : true }).fill ('browser-test-only');
     await login.getByRole ('button', { name : 'Sign in', exact : true }).click ();
-    await page.waitForFunction (async () => (await Auto3D.execute ('auth.inspect')).result?.signedIn);
+    await page.evaluate (async () => { /* async predicates make waitForFunction resolve at once, so poll in the page */ const end = Date.now () + 120000; while (!((await Auto3D.execute ('auth.inspect')).result?.signedIn)) { if (Date.now () > end) { throw new Error ('Timed out waiting for page state'); } await new Promise (resolve => setTimeout (resolve, 100)); } });
     await page.waitForFunction (() => !document.body.classList.contains ('auth_locked'));
     console.log ('Signed in');
     await page.keyboard.press ('Escape'); await page.getByRole ('button', { name : 'Preferences', exact : true }).click ();

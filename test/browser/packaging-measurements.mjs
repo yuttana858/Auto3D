@@ -20,7 +20,7 @@ try {
     await call ('packaging.measurements.open'); await page.getByRole ('region', { name : 'Measurement layer' }).waitFor ();
     assert.equal (await page.locator ('#MEASUREMENT').getAttribute ('data-source'), 'canonical-cad');
     await page.getByLabel ('Measured board caliper (mm)', { exact : true }).fill ('5'); await page.getByRole ('button', { name : 'Apply material specifications' }).click ();
-    await page.waitForFunction (async () => (await Auto3D.execute ('packaging.measurements.inspect')).result.material.caliperMm === 5);
+    await page.evaluate (async () => { /* async predicates make waitForFunction resolve at once, so poll in the page */ const end = Date.now () + 120000; while (!((await Auto3D.execute ('packaging.measurements.inspect')).result.material.caliperMm === 5)) { if (Date.now () > end) { throw new Error ('Timed out waiting for page state'); } await new Promise (resolve => setTimeout (resolve, 100)); } });
     report = await call ('packaging.measurements.inspect'); assert.equal (report.dimensions[0].valueMm, 400.125); assert.equal (report.dimensions[2].valueMm, 250); assert.equal (report.dimensions[1].scoreMm, 304); assert.equal (report.dimensions[1].valueMm, 299);
     await page.screenshot ({ path : output + '/packaging-measurement-layer.png' });
     await page.locator ('.packaging_engineering details > summary').click (); await page.locator ('[data-dimension="length"]').scrollIntoViewIfNeeded ();

@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Parametric product design drawer — Auto3D 0.57.0 / Primary Products 0.8.0 / Packaging 1.10.6 (2026-11-10)
+
+Design cards are equal-size generate buttons (at most ten per row) in a 30% shorter drawer, with W × L × H bracket callouts on thumbnails and the profile drawing. W × L × H fields accept manual input; Enter rebuilds the selected generated product live (one Undo step). New `primary.designs.generate` and `primary.dimensions.set`; catalog grows to 30 designs. `ai-extended` joins CI (65 browser tests) after replacing no-op async `waitForFunction` waits in it and eight other tests. See [release-0570.md](release-0570.md).
+
 ## Browser regression suite repaired — Auto3D 0.56.1 / Packaging 1.10.6 / Primary Products 0.7.0 (2026-11-10)
 
 The 23 stale browser tests now pass against current behavior and joined the CI `browser` job (64 tests). Fixes the standalone Packaging preview's fold/unfold completion error, rejects an explicitly requested 0202 overlap that does not fit instead of replacing it, and reports successful engineering-linked dimension edits. `ai-extended` and `mcp-access` remain outside the job. See [release-0561.md](release-0561.md).

@@ -19,7 +19,7 @@ try {
         assert.equal ((await inspect ()).mode, 'fast'); assert.equal ((await inspect ()).pixelRatio, 1);
         await page.getByRole ('button', { name : 'Preferences', exact : true }).click ();
         await page.getByLabel ('Viewport quality', { exact : true }).selectOption ('quality');
-        await page.waitForFunction (async () => (await Auto3D.execute ('preferences.viewport.quality.inspect')).result?.mode === 'quality');
+        await page.evaluate (async () => { /* async predicates make waitForFunction resolve at once, so poll in the page */ const end = Date.now () + 120000; while (!((await Auto3D.execute ('preferences.viewport.quality.inspect')).result?.mode === 'quality')) { if (Date.now () > end) { throw new Error ('Timed out waiting for page state'); } await new Promise (resolve => setTimeout (resolve, 100)); } });
         for (let i = 0; i < 30 && profiles[account].viewportQuality !== 'quality'; i++) { await page.waitForTimeout (50); }
         assert.equal (profiles[account].viewportQuality, 'quality');
         await page.reload (); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));

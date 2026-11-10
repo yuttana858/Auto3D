@@ -39,7 +39,7 @@ try {
     const dims = await panel.locator ('.pp_dimension_row input').evaluateAll (nodes => nodes.map (n => ({ y : n.getBoundingClientRect ().y, label : n.getAttribute ('aria-label') })));
     assert.equal (dims.length, 3); assert.ok (dims.every (d => Math.abs (d.y - dims[0].y) < 1));
     const width = panel.getByRole ('spinbutton', { name : 'Product width', exact : true }); await width.fill ('70'); await width.press ('Tab');
-    assert.equal (await panel.getByRole ('spinbutton', { name : 'Product depth', exact : true }).inputValue (), '70');
+    assert.equal (await panel.getByRole ('spinbutton', { name : 'Product length', exact : true }).inputValue (), '70'); /* round products share one diameter for W and L */
     await call ('primary.configure', { diameterMm : 65 });
     const height = panel.getByRole ('spinbutton', { name : 'Product height', exact : true }); await height.fill ('220'); await height.press ('Tab'); assert.equal ((await call ('primary.inspect')).heightMm, 220);
     await panel.getByRole ('slider', { name : 'Product roughness', exact : true }).focus (); await page.keyboard.press ('Delete'); assert.deepEqual (await call ('scene.inspect'), before);
@@ -140,7 +140,9 @@ try {
     await call ('primary.artwork.remove', { zone : 'back' });
     await call ('primary.designs.open', { category : 'clamshell-food', open : true });
     const drawer = page.getByRole ('region', { name : 'Product designs', exact : true }); await drawer.waitFor ({ state : 'visible' });
-    assert.equal (await drawer.locator ('.pp_design_card').count (), 3); await drawer.getByRole ('button', { name : /Deli shell/ }).click ();
+    const objectCountReaches = async count => { for (const end = Date.now () + 120000; Date.now () < end; await page.waitForTimeout (100)) { const r = await page.evaluate (() => Auto3D.execute ('scene.inspect')); if (r.ok && r.result.objects.length === count) { return; } } throw new Error ('Scene never reached ' + count + ' objects: ' + await drawer.locator ('.pp_status').textContent ()); };
+    assert.equal (await drawer.locator ('.pp_design_card').count (), 4); const beforeCard = (await call ('scene.inspect')).objects.length; await drawer.getByRole ('button', { name : 'Generate Deli shell' }).click ();
+    await objectCountReaches (beforeCard + 1); /* design cards generate their product */
     assert.equal ((await call ('primary.inspect')).family, 'clamshell'); await drawer.getByRole ('button', { name : 'Close designs' }).click (); await drawer.waitFor ({ state : 'hidden' });
     const shell = await call ('primary.generate'); assert.deepEqual (shell.components, ['base', 'lid']);
     const shellChooser = page.waitForEvent ('filechooser'); await panel.getByRole ('button', { name : 'Import label image', exact : true }).click (); await (await shellChooser).setFiles ('test/testfiles/obj/texture.png');
@@ -153,7 +155,33 @@ try {
     assert.equal (await page.evaluate (() => document.documentElement.scrollWidth > innerWidth), false); await page.screenshot ({ path : 'work/primary-products-review/design-drawer-mobile.png' });
     await page.keyboard.press ('Escape'); await drawer.waitFor ({ state : 'hidden' }); assert.deepEqual (errors, []);
     console.log ('Catalog drawer, food clamshell generation, top artwork and rejected invalid resize passed.');
-    console.log ('H × W × D, material swatch, local image import, rendered labels and physical-fit validation passed.');
+    /* Design drawer: equal cards, at most ten per row, 30% shorter, W/L/H callouts, card click generates, Enter resizes live. */
+    await call ('primary.artwork.remove', { zone : 'front' }); /* a clamshell top label cannot fit a can, so cards would correctly refuse to switch */
+    await page.setViewportSize ({ width : 2400, height : 1000 }); await call ('primary.designs.open', { category : 'beverages', open : true }); await drawer.waitFor ({ state : 'visible' });
+    const grid = drawer.locator ('.pp_design_grid'); assert.equal (await grid.evaluate (node => getComputedStyle (node).gridTemplateColumns.split (' ').length), 10);
+    const cardBoxes = await drawer.locator ('.pp_design_card').evaluateAll (nodes => nodes.map (node => { const r = node.getBoundingClientRect (); return [Math.round (r.width), Math.round (r.height)]; }));
+    assert.equal (cardBoxes.length, 6); assert.ok (cardBoxes.every (box => box[0] === cardBoxes[0][0] && box[1] === cardBoxes[0][1]), JSON.stringify (cardBoxes));
+    assert.ok ((await drawer.boundingBox ()).height <= 1000 * .315 + 1, 'drawer is at most 31.5% of the viewport');
+    const callouts = await drawer.locator ('.pp_design_card').first ().locator ('.pp_callout text').allTextContents (); assert.deepEqual (callouts.map (text => text.split (' ')[0]), ['W', 'H', 'L']);
+    assert.match (await drawer.locator ('.pp_design_card .pp_design_size').first ().textContent (), /^66 × 66 × 122 mm$/);
+    const beforeCan = (await call ('scene.inspect')).objects.length; await drawer.getByRole ('button', { name : 'Generate Standard beverage can' }).click ();
+    await objectCountReaches (beforeCan + 1);
+    const can = (await call ('scene.inspect')).objects.at (-1); assert.equal ((await call ('primary.selected.load')).family, 'can'); assert.equal ((await call ('primary.inspect')).heightMm, 122);
+    const designHeight = drawer.getByRole ('spinbutton', { name : 'Design height', exact : true }); assert.equal (await designHeight.inputValue (), '122');
+    await designHeight.fill ('150'); await designHeight.press ('Enter');
+    await page.waitForFunction (() => document.querySelector ('.pp_design_drawer .pp_status')?.textContent.startsWith ('Resized selected product to 66 × 66 × 150 mm'), null, { timeout : 120000 });
+    assert.equal ((await call ('scene.inspect')).objects.at (-1).id, can.id); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 150);
+    await call ('history.undo'); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 122); await call ('history.redo');
+    const productWidth = panel.getByRole ('spinbutton', { name : 'Product width', exact : true }); await productWidth.fill ('60'); await productWidth.press ('Tab');
+    assert.equal ((await call ('primary.inspect')).diameterMm, 60); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).diameterMm, 66); /* Tab changes only the draft */
+    const resized = await call ('primary.dimensions.set', { widthMm : 58, heightMm : 140 }); assert.equal (resized.updated, true); assert.equal (resized.objectId, can.id); assert.deepEqual ([resized.widthMm, resized.lengthMm, resized.heightMm], [58, 58, 140]);
+    const draftOnly = await call ('primary.dimensions.set', { heightMm : 160, apply : false }); assert.equal (draftOnly.updated, false); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 140);
+    const mismatch = await page.evaluate (() => Auto3D.execute ('primary.dimensions.set', { widthMm : 58, lengthMm : 70 })); assert.equal (mismatch.ok, false); assert.match (mismatch.error.message, /one diameter/);
+    const generatedDesign = await call ('primary.designs.generate', { id : 'mini-beverage' }); assert.equal (generatedDesign.design, 'mini-beverage'); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 92);
+    await page.screenshot ({ path : 'work/primary-products-review/design-drawer-wide.png' });
+    await call ('primary.designs.open', { category : 'beverages', open : false }); await drawer.waitFor ({ state : 'hidden' }); assert.deepEqual (errors, []);
+    console.log ('Design drawer: ten-column equal cards, 30% shorter, W/L/H callouts, card generation, Enter live resize with Undo, Tab draft-only and primary.dimensions.set passed.');
+    console.log ('W × L × H, material swatch, local image import, rendered labels and physical-fit validation passed.');
     console.log ('Generate readiness and pillow-pouch generation/layout passed.');
     console.log ('Primary Products scene flow passed: UI generation, strict update/load, identity, Undo/Redo and glass rejection.');
     console.log ('Primary Products desktop/mobile passed: module order/outline, lazy loading, draft controls, minimal/extended/close motion, rapid transitions, reduced motion, unit conversion and unchanged scene/camera.');
