@@ -34,11 +34,11 @@ try {
         }
         const response = await route.fetch ({ url : 'http://127.0.0.1:' + server.address ().port + url.pathname + url.search }); await route.fulfill ({ response });
     });
-    let wire;
+    let wire, helloSeen; const hello = new Promise (resolve => { helloSeen = resolve; });
     await page.routeWebSocket (origin.replace ('https:', 'wss:') + '/api/agent/connect', ws => {
         wire = ws; ws.onMessage (text => {
             const message = JSON.parse (text);
-            if (message.type === 'hello') { ws.send (JSON.stringify ({ type : 'hello_ack', connectionId : 'connection-a', expiresAt : Date.now () + 300000 })); }
+            if (message.type === 'hello') { ws.send (JSON.stringify ({ type : 'hello_ack', connectionId : 'connection-a', expiresAt : Date.now () + 300000 })); helloSeen (); }
             if (message.type === 'result') { results.push (message); nextResult?.(); }
         });
     });
@@ -50,6 +50,7 @@ try {
     assert.equal (await dialog.getByLabel ('App window code').count (), 0);
     assert.equal (await dialog.getByRole ('button', { name : 'Copy', exact : true }).count (), 0);
     await dialog.getByRole ('button', { name : 'Connect this window' }).click (); await dialog.getByRole ('status').filter ({ hasText : 'Connected' }).waitFor ();
+    await hello; /* the status can update before Playwright runs the WebSocket route handler */
     const tab = await call ('session.tabs.inspect');
     const received = new Promise (resolve => { nextResult = resolve; });
     wire.send (JSON.stringify ({ type : 'request', requestId : 'inspect-a', command : 'scene.inspect', sessionId : tab.activeId, arguments : {} }));
