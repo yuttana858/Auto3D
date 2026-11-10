@@ -80,3 +80,5 @@
 .pp_design_card:hover, .pp_design_card:focus-visible { border-color: var(--pp-accent); background: #8882; }
 @keyframes pp_drawer_enter { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 @media(prefers-reduced-motion: reduce) { .pp_design_drawer { animation: none; } }
+.pp_toggle { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: var(--workspace-menu-font-size, 12px); cursor: pointer; }
+.pp_toggle input { accent-color: var(--pp-accent); }

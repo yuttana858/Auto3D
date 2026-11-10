@@ -137,15 +137,21 @@ export class DimensionTool
     {
         this.Editable (); const doc = this.Doc (), d = doc.dimensions.find (item => item.id === id); if (!d) { throw new Error ('Dimension not found.'); }
         const r = ResolveDimension (doc, d, this.topology);
-        if (r.stale || !r.axis || !r.editable) { throw new Error ('Direct value editing requires an unscaled generated box dimension. Other edges remain measured references.'); }
+        if (r.stale || !r.axis || !r.editable) { throw new Error ('Direct value editing requires an unscaled generated box or product dimension. Other edges remain measured references.'); }
         if (!Number.isFinite (valueMm) || valueMm <= 0 || valueMm > 10000) { throw new Error ('Enter a dimension greater than zero, up to 10000 mm.'); }
+        if (r.product) {
+            // Products resize through the Primary Products live path: load this product's definition, then rebuild it.
+            const editor = this.website.sessionEditor, panel = this.website.primaryProductsPanel; editor.Select (r.object);
+            panel.products.LoadSelected (); await panel.SetDimensions ({ [r.axis + 'Mm'] : valueMm });
+            this.Draw (this.website.viewer.camera); return this.Inspect ();
+        }
         await this.website.sessionEditor.packaging.UpdateDimensions ({ basis : r.basis === 'OD' ? 'outside' : 'inside', [r.axis] : valueMm }, d.objectId);
         this.Draw (this.website.viewer.camera); return this.Inspect ();
     }
     EditDialog (id)
     {
         this.Editable (); const doc = this.Doc (), owner = this.website.auth.user.id, d = doc.dimensions.find (item => item.id === id), r = d && ResolveDimension (doc, d);
-        if (!r || r.stale || !r.editable) { throw new Error ('Value editing is available on unscaled generated box dimensions.'); }
+        if (!r || r.stale || !r.editable) { throw new Error ('Value editing is available on unscaled generated box and product dimensions.'); }
         const dialog = WorkspaceDialog ('Edit dimension'), label = document.createElement ('label'), input = document.createElement ('input'), status = document.createElement ('p'), apply = document.createElement ('button'), factor = this.website.preferences?.units === 'standard' ? 25.4 : 1;
         label.textContent = r.basis + ' · ' + r.axis + (factor === 1 ? ' (mm)' : ' (in)'); input.type = 'number'; input.step = 'any'; input.min = '0'; input.value = String (Number ((r.lengthMm/factor).toFixed (6))); input.setAttribute ('aria-label', 'Dimension value'); label.appendChild (input); apply.type = 'button'; apply.textContent = 'Apply'; dialog.append (label, status, apply);
         apply.onclick = async () => { apply.disabled = true; try { if (this.Doc () !== doc || this.website.auth.user?.id !== owner) { throw new Error ('The session or account changed.'); } await this.Value (id, Number (input.value)*factor); dialog.close (); } catch (error) { status.textContent = error.message; apply.disabled = false; } }; input.focus (); input.select (); return { opened : true };
@@ -216,7 +222,7 @@ export class DimensionTool
         const items = shown.map (d => { const r = ResolveDimension (doc, d, this.topology, instances); if (r.stale || r.hidden) { return null; } const p = ProjectPlacedDimension (r, d.placement || LegacyPlacement (doc, d, r), camera, rect.width, rect.height, d.offset); if (!p) { return null; } return { d, r, p, label : LengthLabel (r, this.website.preferences?.units || 'metric') }; }).filter (Boolean);
         const signature = JSON.stringify ([this.active, items.map (i => [i.d.id, i.label, i.p.start, i.p.end, i.p.left, i.p.right, i.d.offset])]); if (signature === this.signature) { return; } this.signature = signature; this.svg.replaceChildren ();
         for (const { d, r, p, label } of items) {
-            const g = Svg ('g', { 'data-dimension-id' : d.id }, this.svg), title = Svg ('title', {}, g); title.textContent = (d.kind === 'cad' ? 'Linked CAD path: ' + d.pathId : 'Linked canonical model edge') + ' · source ' + (r.sourceLengthMm === null ? 'unknown units' : r.sourceLengthMm.toFixed (3) + ' mm');
+            const g = Svg ('g', { 'data-dimension-id' : d.id }, this.svg), title = Svg ('title', {}, g); title.textContent = (d.kind === 'cad' ? 'Linked CAD path: ' + d.pathId : r.product ? 'Product ' + { width : 'width (W)', length : 'length (L)', height : 'height (H)' }[d.axis] + ' · double-click to edit' : 'Linked canonical model edge') + ' · source ' + (r.sourceLengthMm === null ? 'unknown units' : r.sourceLengthMm.toFixed (3) + ' mm');
             const bracket = p.right.clone ().sub (p.left).normalize (), tick = new THREE.Vector2 (-bracket.y, bracket.x).multiplyScalar (5), extend = p.left.clone ().sub (p.start).normalize ().multiplyScalar (7);
             const path = `M${p.start.x},${p.start.y} L${p.left.x + extend.x},${p.left.y + extend.y} M${p.end.x},${p.end.y} L${p.right.x + extend.x},${p.right.y + extend.y} M${p.left.x},${p.left.y} L${p.right.x},${p.right.y} M${p.left.x - tick.x},${p.left.y - tick.y} L${p.left.x + tick.x},${p.left.y + tick.y} M${p.right.x - tick.x},${p.right.y - tick.y} L${p.right.x + tick.x},${p.right.y + tick.y}`;
             Svg ('path', { d : path, fill : 'none', stroke : '#111', 'stroke-width' : 5, 'stroke-linecap' : 'round' }, g); Svg ('path', { d : path, fill : 'none', stroke : '#fff', 'stroke-width' : 1.8 }, g);

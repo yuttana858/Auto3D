@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { FefcoDimensions } from '../../modules/packaging/src/dimensions.js';
 import { EngineeringMeasurements } from '../../modules/packaging/src/engineering.js';
 import { Unit } from '../engine/model/unit.js';
+import { ProductSize } from '../../modules/primary-products/src/state.js';
 function UnitFactor (unit) { return { [Unit.Millimeter] : 1, [Unit.Centimeter] : 10, [Unit.Meter] : 1000, [Unit.Inch] : 25.4, [Unit.Foot] : 304.8 }[unit] || null; }
 
 export function ValidateDimensions (input = [])
@@ -23,6 +24,8 @@ export function ValidateDimensions (input = [])
         } else if (d.kind === 'edge') {
             if (Object.keys (d).some (k => !['id', 'objectId', 'kind', 'mesh', 'meshName', 'topology', 'a', 'b', 'offset', 'visible', 'placement', 'axis', 'corner'].includes (k))) { throw new Error ('Invalid edge reference fields.'); }
             if (!Number.isInteger (d.mesh) || d.mesh < 0 || d.mesh > 200000 || typeof d.meshName !== 'string' || d.meshName.length > 1000 || !/^[a-f0-9]{8}$/.test (d.topology) || !Number.isInteger (d.a) || !Number.isInteger (d.b) || d.a < 0 || d.b < 0 || d.a === d.b || d.a > 10000000 || d.b > 10000000) { throw new Error ('Invalid mesh edge reference.'); }
+        } else if (d.kind === 'design') {
+            if (Object.keys (d).some (k => !['id', 'objectId', 'kind', 'offset', 'visible', 'placement', 'axis', 'corner'].includes (k)) || d.axis === undefined) { throw new Error ('Invalid design dimension reference.'); }
         } else { throw new Error ('Choose a CAD segment or model edge.'); }
         return { ...d, ...(d.corner ? { corner : [...d.corner] } : {}), ...(d.placement ? { placement : { ...d.placement, direction : d.placement.direction.map (v => v || 0) } } : {}) };
     });
@@ -83,6 +86,10 @@ export function ResolveDimension (document, d, cache = null, instances = null)
     const object = document.objects.find (o => o.id === d.objectId); if (!object) { return { stale : true, reason : 'Source object removed.' }; }
     if (object.animationAsset || (object.userData?._auto3dFoldPreview !== undefined && Number (object.userData._auto3dFoldPreview) !== 1)) { return { stale : true, reason : 'Use static geometry or the flat CAD drawing; animated visual poses are not dimensioned.' }; }
     let a, b, sourceLengthMm = null;
+    if (d.axis && object.userData?._auto3dPrimaryProduct) {
+        try { return ResolveProductDimension (document, object, d); } catch { return { stale : true, reason : 'Source product definition unavailable.' }; }
+    }
+    if (d.kind === 'design') { return { stale : true, reason : 'Source product unavailable.' }; }
     if (d.axis) {
         if (!object.userData?._auto3dFefco) { return { stale : true, reason : 'Source design unavailable.' }; }
         try { return ResolveDesignDimension (document, object, d); } catch { return { stale : true, reason : 'Source design parameters unavailable.' }; }
@@ -197,6 +204,30 @@ function ResolveDesignDimension (document, object, d)
     const matrix = ObjectMatrix (object); a.applyMatrix4 (matrix); b.applyMatrix4 (matrix);
     const unscaled = object.scale.every (v => Math.abs (v-1) < 1e-6);
     return { a, b, object, length : a.distanceTo (b), lengthMm : unscaled ? value : a.distanceTo (b)*factor, sourceLengthMm : value, basis : unscaled ? (flat ? 'ID' : 'OD') : 'scaled edge', axis : d.axis, editable : unscaled, hidden : object.visible === false };
+}
+
+// Primary Products W × L × H: the generator places products with X = width, Y = height from 0 and Z = depth (length),
+// so the bracket box comes from the definition, not from tessellated (round) geometry.
+function ResolveProductDimension (document, object, d)
+{
+    const factor = UnitFactor (document.model.GetUnit ()); if (!factor) { return { stale : true, reason : 'Set model units before dimensioning this product.' }; }
+    const size = ProductSize (JSON.parse (object.userData._auto3dPrimaryProduct).draft), value = size[d.axis + 'Mm'];
+    if (!Number.isFinite (value)) { return { stale : true, reason : 'Product dimension unavailable.' }; }
+    const box = new THREE.Box3 (new THREE.Vector3 (-size.widthMm/2/factor, 0, -size.lengthMm/2/factor), new THREE.Vector3 (size.widthMm/2/factor, size.heightMm/factor, size.lengthMm/2/factor));
+    const index = { width : 0, height : 1, length : 2 }[d.axis], a = new THREE.Vector3 (...d.corner.map ((side, i) => (side ? box.max : box.min).getComponent (i))), b = a.clone ();
+    a.setComponent (index, box.min.getComponent (index)); b.setComponent (index, box.max.getComponent (index));
+    const matrix = ObjectMatrix (object); a.applyMatrix4 (matrix); b.applyMatrix4 (matrix);
+    const unscaled = object.scale.every (v => Math.abs (v-1) < 1e-6);
+    return { a, b, object, length : a.distanceTo (b), lengthMm : unscaled ? value : a.distanceTo (b)*factor, sourceLengthMm : value, basis : { width : 'W', length : 'L', height : 'H' }[d.axis], axis : d.axis, product : true, editable : unscaled, hidden : object.visible === false };
+}
+// Three persistent W/L/H callouts on the bounding envelope: width along the front-bottom edge pushed forward, length along the
+// right-bottom edge pushed right, height on the front-right vertical edge pushed diagonally out. Distances are in model units.
+export function ProductCalloutRecords (document, object)
+{
+    const factor = UnitFactor (document.model.GetUnit ()); if (!factor || !object?.userData?._auto3dPrimaryProduct) { return []; }
+    const size = ProductSize (JSON.parse (object.userData._auto3dPrimaryProduct).draft), distance = Math.max (8, Math.max (size.widthMm, size.lengthMm, size.heightMm) * .12) / factor;
+    const callouts = [['width', [0, 0, 1], [0, 0, 1]], ['length', [1, 0, 0], [1, 0, 0]], ['height', [1, 0, 1], [Math.SQRT1_2, 0, Math.SQRT1_2]]];
+    return callouts.map (([axis, corner, direction]) => ({ id : crypto.randomUUID (), objectId : object.id, kind : 'design', axis, corner, offset : 0, visible : true, placement : { direction, distance, plane : 0 } }));
 }
 
 export function LegacyPlacement (document, anchor, resolved)

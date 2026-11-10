@@ -1,8 +1,8 @@
 # Auto3D development log and handoff
 
-## Right-drag orbit and live new-box dimensions — Auto3D 0.57.1 / Packaging 1.10.7 / Primary Products 0.8.0 (2026-11-10)
+## Right-drag orbit, live new-box dimensions and 3D product callouts — Auto3D 0.57.1 / Packaging 1.10.7 / Primary Products 0.8.1 (2026-11-10)
 
-Main-viewer right-drag rotates around the selected model again (the 0.53.1 sideways pan is reverted; vertical still tilts). Enter on the Packaging Box Dimensions W/L/H fields resizes the selected generated box live in the chosen ID/OD/score basis (one Undo step), or generates the current style when no box is selected. See [release-0571.md](release-0571.md).
+Main-viewer right-drag rotates around the selected model again (the 0.53.1 sideways pan is reverted; vertical still tilts). Enter on the Packaging Box Dimensions W/L/H fields resizes the selected generated box live in the chosen ID/OD/score basis (one Undo step), or generates the current style when no box is selected. Generated products carry W × L × H callout brackets in 3D (definition-exact, editable by double-click, toggle `primary.callouts.set`). See [release-0571.md](release-0571.md).
 
 ## Parametric product design drawer — Auto3D 0.57.0 / Primary Products 0.8.0 / Packaging 1.10.6 (2026-11-10)
 

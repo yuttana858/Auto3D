@@ -2,6 +2,7 @@ import { ProductCategories, ListProductDesigns, ProductDesign } from '../../modu
 import { PrimaryProductsArtwork } from './primaryproductsartwork.js';
 import { ValidateProductArtwork } from '../../modules/primary-products/src/artwork.js';
 import { PrimaryProductsWorkspace } from './primaryproductsworkspace.js';
+import { ProductCalloutRecords } from './dimensioncore.js';
 import { DefaultProductDraft, UpdateProductDraft, BottleShape, ProductSize, DimensionChanges } from '../../modules/primary-products/src/state.js';
 const moduleUrl = new URL ('./primary-products/primary-products.module.js', import.meta.url);
 moduleUrl.search = new URL (import.meta.url).search;
@@ -9,7 +10,7 @@ export class PrimaryProductsPanel
 {
     constructor (website)
     {
-        this.website = website; this.artwork = new PrimaryProductsArtwork (this); this.products = new PrimaryProductsWorkspace (this, async () => { await this.Ensure (); return this.module; }); this.draft = DefaultProductDraft (); this.owner = website.auth?.user?.id || null;
+        this.website = website; this.artwork = new PrimaryProductsArtwork (this); this.products = new PrimaryProductsWorkspace (this, async () => { await this.Ensure (); return this.module; }); this.draft = DefaultProductDraft (); this.callouts = true; this.owner = website.auth?.user?.id || null;
         this.panel = document.createElement ('section'); this.panel.id = 'primary_products_module_panel'; this.panel.className = 'primary_products_module_panel'; this.panel.hidden = true; this.panel.setAttribute ('aria-label', 'Primary Products'); website.parameters.rightContainerDiv.appendChild (this.panel);
         website.modulePanels.Register ('primary-products', { title : 'Primary Products', body : this.panel, animated : true, onOpen : () => this.Ensure (), onMode : () => this.Refresh () });
         website.auth?.Subscribe?.(user => { const owner = user?.id || null; if (owner !== this.owner) { this.owner = owner; this.catalogOpen = false; this.artwork.Clear (); this.draft = DefaultProductDraft (); this.Refresh (); } });
@@ -25,7 +26,7 @@ export class PrimaryProductsPanel
         return this.draft.material === 'glass' ? 'Glass generation is not available yet. Choose opaque plastic.' : '';
     }
     RefreshAvailability () { this.workspace?.SetDisabled (); }
-    Inspect () { const shape = this.draft.family === 'bottle' ? BottleShape (this.draft) : null; return { catalogCategory : this.catalogCategory || 'bottles', catalogOpen : this.catalogOpen === true, profile : shape ? { ...shape, bodyHeightMm : this.draft.heightMm - shape.shoulderHeightMm - shape.neckHeightMm - shape.capHeightMm } : null, schemaVersion : 1, units : 'mm', ...this.draft, artwork : this.artwork?.Inspect () || [], draftOnly : false, generationAvailable : this.draft.material !== 'glass', unavailableReason : this.UnavailableReason (), generating : this.products?.active === true }; }
+    Inspect () { const shape = this.draft.family === 'bottle' ? BottleShape (this.draft) : null; return { catalogCategory : this.catalogCategory || 'bottles', catalogOpen : this.catalogOpen === true, profile : shape ? { ...shape, bodyHeightMm : this.draft.heightMm - shape.shoulderHeightMm - shape.neckHeightMm - shape.capHeightMm } : null, schemaVersion : 1, units : 'mm', ...this.draft, artwork : this.artwork?.Inspect () || [], draftOnly : false, generationAvailable : this.draft.material !== 'glass', callouts : this.callouts, unavailableReason : this.UnavailableReason (), generating : this.products?.active === true }; }
     Configure (changes)
     {
         if (this.Blocked ()) { throw new Error ('Open an editable session before changing the product draft.'); }
@@ -56,6 +57,21 @@ export class PrimaryProductsPanel
         const size = ProductSize (this.draft), text = [size.widthMm, size.lengthMm, size.heightMm].map (v => Math.round (v * 100) / 100).join (' × ') + ' mm';
         return { ...size, units : 'mm', updated : Boolean (result), objectId : result?.objectId || null, message : result ? 'Resized selected product to ' + text + '.' : 'Draft set to ' + text + '. Select a generated ' + this.draft.family + ' to resize it live, or Generate.' };
     }
+    // W × L × H callouts on the 3D model: the setting applies to newly generated products, and to the selected generated
+    // product immediately (one Undo step through the Dimensions layer).
+    SetCallouts (visible)
+    {
+        if (typeof visible !== 'boolean') { throw new Error ('Choose whether to show W × L × H callouts.'); }
+        if (this.Blocked ()) { throw new Error ('Open an editable idle session before changing callouts.'); }
+        this.callouts = visible; let object = null; try { object = this.products.Selected ().object; } catch { object = null; }
+        let changed = false;
+        if (object) {
+            const doc = this.website.sessionEditor.document, current = doc.dimensions || [], own = current.filter (d => d.objectId === object.id && d.kind === 'design');
+            if (visible && !own.length) { this.website.dimensions.Change ([...current, ...ProductCalloutRecords (doc, object)], true); changed = true; }
+            if (!visible && own.length) { this.website.dimensions.Change (current.filter (d => !own.includes (d))); changed = true; }
+        }
+        this.Refresh (); return { callouts : visible, objectId : object?.id || null, changed, message : (visible ? 'W × L × H callouts on' : 'W × L × H callouts off') + (object ? ' for the selected product.' : ' for new products.') };
+    }
     LiveTarget ()
     {
         try { return this.products.Selected ().definition.draft.family === this.draft.family; } catch { return false; }
@@ -82,7 +98,7 @@ export class PrimaryProductsPanel
                 }
                 const url = new URL (moduleUrl); if (this.attempts) { url.searchParams.set ('retry', String (this.attempts)); } this.attempts = (this.attempts || 0) + 1;
                 const module = await import (url.href); if (module.PrimaryProductsAPIVersion !== 1) { throw new Error ('Unsupported Primary Products module.'); } this.module = module; this.panel.replaceChildren ();
-                this.workspace = new module.PrimaryProductsPanel ({ catalog : (category, open) => this.Catalog (category, open), selectDesign : id => this.SelectDesign (id), generateDesign : id => this.GenerateDesign (id), setDimensions : dimensions => this.SetDimensions (dimensions), inspect : () => this.Inspect (), configure : changes => this.Configure (changes), reset : () => this.Reset (), generate : () => this.products.Generate (), update : () => this.products.Generate (true), loadSelected : () => this.products.LoadSelected (), artworkOpen : () => this.artwork.Open (), artworkRemove : zone => this.artwork.Remove ({ zone }), artworkMapping : args => this.artwork.Mapping (args), artworkPreview : zone => { if (this.previewUrl) { URL.revokeObjectURL (this.previewUrl); this.previewUrl = null; } const a = this.artwork.entries.find (a => a.zone === zone), r = a && this.artwork.resources.get (a.resourceId); if (r) { this.previewUrl = URL.createObjectURL (new Blob ([r.buffer], { type : a.mime })); } return this.previewUrl; }, units : () => this.website.preferences.units, blocked : () => this.Blocked () }, this.panel);
+                this.workspace = new module.PrimaryProductsPanel ({ catalog : (category, open) => this.Catalog (category, open), selectDesign : id => this.SelectDesign (id), generateDesign : id => this.GenerateDesign (id), setCallouts : visible => this.SetCallouts (visible), setDimensions : dimensions => this.SetDimensions (dimensions), inspect : () => this.Inspect (), configure : changes => this.Configure (changes), reset : () => this.Reset (), generate : () => this.products.Generate (), update : () => this.products.Generate (true), loadSelected : () => this.products.LoadSelected (), artworkOpen : () => this.artwork.Open (), artworkRemove : zone => this.artwork.Remove ({ zone }), artworkMapping : args => this.artwork.Mapping (args), artworkPreview : zone => { if (this.previewUrl) { URL.revokeObjectURL (this.previewUrl); this.previewUrl = null; } const a = this.artwork.entries.find (a => a.zone === zone), r = a && this.artwork.resources.get (a.resourceId); if (r) { this.previewUrl = URL.createObjectURL (new Blob ([r.buffer], { type : a.mime })); } return this.previewUrl; }, units : () => this.website.preferences.units, blocked : () => this.Blocked () }, this.panel);
             })().catch (error => { this.loading = null; this.panel.textContent = error.message; throw error; });
         }
         await this.loading; this.Refresh ();
