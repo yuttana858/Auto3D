@@ -62,6 +62,7 @@ export class PrimaryProductsWorkspace
             };
             editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) });
             editor.Status?.(source ? 'Updated Primary Products object.' : 'Added Primary Products object.');
+            if (!source) { editor.Select?.(object); editor.Focus?.(); } /* frame a newly generated product in the window; live resizes keep the view */
             return { objectId : object.id, updated : Boolean (source), units : 'mm', definition, components : model.meshes.map (mesh => mesh.GetName ()), callouts : calloutsAdded };
         } catch (error) {
             restoreDimensions?.();

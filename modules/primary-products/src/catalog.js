@@ -32,6 +32,9 @@ add('mini-beverage', 'Mini beverage can', 'beverages', 'can', {heightMm:92, diam
 add('coffee-pillow', 'Coffee pillow pack', 'pouches', 'pouch', {heightMm:240, widthMm:130, depthMm:55}, 'foil', 'Tall filled pack presentation');
 add('bar-wrapper', 'Bar wrapper', 'pouches', 'pouch', {heightMm:140, widthMm:45, depthMm:15}, 'glossFilm', 'Narrow flow-wrap envelope');
 add('retail-slim', 'Slim retail shell', 'clamshell-retail', 'clamshell', {heightMm:28, widthMm:120, depthMm:70}, 'petOpaque', 'Low-profile accessory cavity');
+add('oval-shampoo', 'Oval shampoo', 'bottles', 'bottle', {heightMm:200, diameterMm:70, bottleSection:{shape:'oval', depthMm:42}}, 'hdpe', 'Flattened oval personal-care body');
+add('rect-cleaner', 'Rectangular cleaner', 'bottles', 'bottle', {heightMm:240, diameterMm:90, bottleSection:{shape:'rectangle', depthMm:55, cornerRadiusMm:12}}, 'hdpe', 'Rounded-rectangle household body');
+add('square-juice', 'Square juice bottle', 'beverages', 'bottle', {heightMm:210, diameterMm:62, bottleSection:{shape:'rectangle', depthMm:62, cornerRadiusMm:10}}, 'petOpaque', 'Square-shouldered beverage body');
 add('food-punnet', 'Produce shell', 'clamshell-food', 'clamshell', {heightMm:75, widthMm:120, depthMm:100}, 'petOpaque', 'Compact produce cavity');
 export function ListProductDesigns(category){if(category!==undefined&&!Object.hasOwn(ProductCategories, category)){throw new Error('Unknown product category.');}return designs.filter(d=>!category||d.category===category).map(d=>structuredClone(d));}
 export function ProductDesign(id){const item=designs.find(d=>d.id===id);if(!item){throw new Error('Unknown product design.');}return UpdateProductDraft(DefaultProductDraft(item.family), item.changes);}

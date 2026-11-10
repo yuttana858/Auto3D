@@ -4897,7 +4897,7 @@
       "id": "camera.orbit.focus_selected",
       "title": "Orbit selected object",
       "category": "Camera",
-      "description": "Use the combined center of the selected visible objects as the orbit target without changing the camera position; right-drag uses the same method after the drag threshold.",
+      "description": "Use the combined center of the selected visible objects as the orbit target and aim the view at it without changing the camera position. Right-drag uses the same pivot after the drag threshold but keeps the current framing (eye and view center orbit together).",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -6685,7 +6685,7 @@
       "id": "primary.configure",
       "title": "Configure product draft",
       "category": "Primary Products",
-      "description": "Validate and update the session-local bottle/can/pouch/clamshell draft. Does not change scene geometry or upload artwork.",
+      "description": "Validate and update the session-local bottle/can/pouch/clamshell draft. Bottles accept bottleSection { shape round|oval|rectangle, depthMm, cornerRadiusMm } with diameterMm as the width. Does not change scene geometry or upload artwork.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -6697,6 +6697,33 @@
               "can",
               "pouch",
               "clamshell"
+            ]
+          },
+          "bottleSection": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "shape": {
+                "type": "string",
+                "enum": [
+                  "round",
+                  "oval",
+                  "rectangle"
+                ]
+              },
+              "depthMm": {
+                "type": "number",
+                "minimum": 10,
+                "maximum": 500
+              },
+              "cornerRadiusMm": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 250
+              }
+            },
+            "required": [
+              "shape"
             ]
           },
           "bottleShape": {
