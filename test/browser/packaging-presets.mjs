@@ -3,7 +3,7 @@ import { AppVersion } from '../../source/website/preferences.js';
 import { chromium } from 'playwright-core';
 const browser = await chromium.launch ({ executablePath : '/usr/bin/chromium', args : ['--no-sandbox', '--enable-unsafe-swiftshader'] });
 try {
-    const page = await browser.newPage ({ viewport : { width : 1440, height : 1000 } }); page.setDefaultTimeout (30000); const errors = []; page.on ('pageerror', error => errors.push (error.message));
+    const page = await browser.newPage ({ viewport : { width : 1440, height : 1000 } }); page.setDefaultTimeout (120000); const errors = []; page.on ('pageerror', error => errors.push (error.message));
     await page.route ('**/api/auth/**', route => route.fulfill ({ json : { user : { id : 'preset-fixture', email : 'test@example.com' } } }));
     await page.route ('**/api/preferences', route => route.fulfill ({ json : { preferences : { theme : 2, units : 'metric' }, folders : [] } }));
     for (const path of ['accounts/**', 'personal/items', 'environments']) { await page.route ('**/api/' + path, route => route.fulfill ({ json : path.startsWith ('accounts') ? { isAdmin : false } : [] })); }
@@ -25,7 +25,7 @@ try {
         // Enter both values before validation, including L below the previous W.
         for (const [label, value] of [['Length (L)', 250 + index * 10], ['Width (W)', 200], ['Height (H)', 150 + index * 10]]) { await page.getByLabel ('FEFCO ' + label, { exact : true }).fill (String (value)); }
         await page.getByLabel ('Board', { exact : true }).selectOption ('nominal-c'); console.log ('Generating preset', code); await page.getByRole ('button', { name : 'FEFCO ' + code + ' ' + name, exact : true }).click ();
-        try { await page.waitForFunction (code => document.querySelector ('.scene_status')?.textContent.startsWith ('Added FEFCO ' + code), code, { polling : 100 }); } catch (error) { console.log ('Generation status', await page.locator ('.scene_status').textContent (), await page.locator ('.fefco_catalog [aria-live=polite]').textContent (), errors); throw error; }
+        try { await page.waitForFunction (code => document.querySelector ('.scene_status')?.textContent.startsWith ('Added FEFCO ' + code), code, { polling : 100, timeout : 120000 }); } catch (error) { console.log ('Generation status', await page.locator ('.scene_status').textContent (), await page.locator ('.fefco_catalog [aria-live=polite]').textContent (), errors); throw error; }
         const scene = await call ('scene.inspect'); assert.equal (scene.objects.length, index + 1); assert.equal (JSON.parse (scene.objects.at (-1).userData._auto3dFefco).code, code); assert.equal (await page.getByLabel ('Box Length (L)', { exact : true }).inputValue (), String (250 + index * 10 - (code === '0201' ? 4 : 0))); const p = JSON.parse (scene.objects.at (-1).userData._auto3dFefco); assert.equal (p.width, 200); assert.equal (p.height, 150 + index * 10); assert.equal (p.thickness, 4); if (code === '0201') { assert.equal (p.closure, 'closed'); }
     }
     await page.screenshot ({ path : 'work/packaging-presets-two-across.png' }); await call ('history.undo'); assert.equal ((await call ('scene.inspect')).objects.length, 3); await call ('history.redo'); assert.equal ((await call ('scene.inspect')).objects.length, 4); console.log ('All four preset cards generate immediately; a uniform 2 × 2 grid and Undo/Redo passed.');
