@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { Registrations } from '../../mcp/registrations.js';
 import { BrokerCore } from '../../mcp/broker-core.js';
-import { PilotConfig } from '../../mcp/common.js';
+import { ErrorCode, PilotConfig } from '../../mcp/common.js';
 import { PilotService } from '../../mcp/service.js';
 import { Validate } from '../../source/website/commandregistry.js';
 
@@ -103,6 +103,8 @@ describe ('MCP registration and isolation boundary', () => {
         const broker = { AssertRegistration : async () => ({}) }, actor = { userId : owner, props : { registrationId : 'grant-a' }, scope : ['auto3d.read'], expiresAt : Date.now () / 1000 + 60 };
         const service = new PilotService (broker, [{ id : 'auth.sign_out', mutates : true }, { id : 'capture.image', mutates : false }]);
         assert.equal (service.Tools (actor).length, 9); await assert.rejects (service.Call (actor, 'auth.sign_out', {}));
+        // Write-gated tools name the missing scope so the transport can issue a step-up challenge.
+        await assert.rejects (service.Call (actor, 'auto3d.commands.invoke', { command : 'auth.sign_out', arguments : {} }), error => error.requiredScope === 'auto3d.write' && ErrorCode (error) === 'permission_required');
         const tools = service.Tools ({ ...actor, scope : ['auto3d.read', 'auto3d.write'] }).map (tool => tool.id);
         for (const id of ['auto3d.design', 'auto3d.commands', 'auto3d.capture', 'auto3d.modules', 'auto3d.sessions', 'auto3d.settings', 'auto3d.commands.invoke']) { assert.ok (tools.includes (id)); }
         assert.throws (() => Validate ('abc', { type : 'string', maxLength : 2 })); assert.throws (() => Validate ('bad!', { type : 'string', pattern : '^[a-z]+$' }));

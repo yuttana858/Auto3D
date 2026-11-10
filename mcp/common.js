@@ -1,5 +1,10 @@
 export const ReadTools = Object.freeze (['scene.inspect', 'camera.current.inspect', 'packaging.measurements.inspect', 'render.queue.inspect', 'session.tabs.inspect', 'capture.image']);
 export const Scopes = Object.freeze (['auto3d.read', 'auto3d.write', 'auto3d.capture', 'offline_access']);
+// Scopes the MCP resource advertises in its metadata and 401 challenge. MCP clients request
+// exactly these, so advertising only auto3d.read left every client on a read-only grant.
+// Read-only tokens remain valid (PilotService.Assert only requires auto3d.read); screenshot
+// access stays an explicit opt-in requested through a step-up challenge.
+export const ResourceScopes = Object.freeze (['auto3d.read', 'auto3d.write']);
 export function LiveMcpPath (pathname)
 {
     return pathname === '/mcp' || pathname.startsWith ('/oauth/') || ['/.well-known/oauth-protected-resource/mcp', '/.well-known/oauth-authorization-server/oauth', '/api/agent/config', '/api/agent/connect', '/api/agent/renew', '/api/agent/registrations', '/api/agent/admin'].includes (pathname);
@@ -91,6 +96,12 @@ export function AgentError (code, message = AgentErrorCodes[code])
 {
     if (!Object.hasOwn (AgentErrorCodes, code)) { code = 'unavailable'; }
     return new Error ('[' + code + '] ' + SafeText (message || AgentErrorCodes[code]));
+}
+// A permission_required error that names the OAuth scope a step-up authorization must add.
+export function MissingScopeError (scope, message)
+{
+    if (!Scopes.includes (scope)) { throw new TypeError ('Unknown scope.'); }
+    const error = AgentError ('permission_required', message); error.requiredScope = scope; return error;
 }
 export function SafeText (value, limit = 300)
 {

@@ -1,5 +1,5 @@
 import { Validate } from '../source/website/commandregistry.js';
-import { AgentError, ErrorCode, Identifier, ReadTools } from './common.js';
+import { AgentError, ErrorCode, Identifier, MissingScopeError, ReadTools } from './common.js';
 
 const CatalogTools = Object.freeze ([
     { id : 'auto3d.commands.categories', title : 'List command categories', description : 'List command catalog categories and command counts. Requires auto3d.write.', mutates : false, inputSchema : { type : 'object', properties : {}, additionalProperties : false } },
@@ -33,6 +33,10 @@ const HeadlessTools = [
     { id : 'auto3d.headless.projects', title : 'Manage headless CAD projects', description : 'List or read account-owned headless CAD projects; explicitly save the current draft or delete a project with its expected revision. Save/delete require auto3d.write. Projects are independent of Library and live sessions.', mutates : true, inputSchema : { type : 'object', properties : { action : { type : 'string', enum : ['list', 'get', 'save', 'delete'] }, name : { type : 'string', minLength : 1, maxLength : 80 }, projectId : { type : 'string', pattern : '^[A-Za-z0-9_-]{1,128}$' }, expectedRevision : { type : 'integer', minimum : 1 } }, required : ['action'], additionalProperties : false } }
 ];
 
+function RequireWrite (actor)
+{
+    if (!actor.scope.includes ('auto3d.write')) { throw MissingScopeError ('auto3d.write', 'Write permission required. Authorize again with auto3d.write.'); }
+}
 function ValidateInvocation (value)
 {
     if (!value || typeof value !== 'object' || Array.isArray (value) || Object.keys (value).some (key => !['command', 'arguments'].includes (key)) || typeof value.command !== 'string' || !/^[A-Za-z0-9._-]{1,128}$/.test (value.command) || !value.arguments || typeof value.arguments !== 'object' || Array.isArray (value.arguments)) { throw AgentError ('invalid_arguments', 'Invalid command invocation. Use a command ID and object arguments from the catalog.'); }
@@ -107,7 +111,7 @@ export class PilotService
         } else if (name === 'auto3d.headless.inspect') {
             Check (args, HeadlessTools[1].inputSchema); result = await this.broker.HeadlessInspect ({ accountId : actor.userId, grantId : actor.props.registrationId });
         } else if (name === 'auto3d.headless.fefco') {
-            if (!actor.scope.includes ('auto3d.write')) { throw AgentError ('permission_required', 'Write permission required. Authorize again with auto3d.write.'); }
+            RequireWrite (actor);
             Check (args, HeadlessTools[2].inputSchema); result = await this.broker.HeadlessGenerate ({ accountId : actor.userId, grantId : actor.props.registrationId, parameters : args });
         } else if (name === 'auto3d.headless.projects') {
             Check (args, HeadlessTools[3].inputSchema);
@@ -115,10 +119,10 @@ export class PilotService
             if (args.action === 'list' && keys.length === 1) { result = await this.broker.HeadlessProjects (base); }
             else if (args.action === 'get' && keys.length === 2 && args.projectId) { result = await this.broker.HeadlessProjectGet ({ ...base, projectId : args.projectId }); }
             else if (args.action === 'save' && args.name && keys.every (key => ['action', 'name', 'projectId', 'expectedRevision'].includes (key))) {
-                if (!actor.scope.includes ('auto3d.write')) { throw AgentError ('permission_required', 'Write permission required. Authorize again with auto3d.write.'); }
+                RequireWrite (actor);
                 result = await this.broker.HeadlessProjectSave ({ ...base, name : args.name, projectId : args.projectId || null, expectedRevision : args.expectedRevision ?? null });
             } else if (args.action === 'delete' && keys.length === 3 && args.projectId && args.expectedRevision) {
-                if (!actor.scope.includes ('auto3d.write')) { throw AgentError ('permission_required', 'Write permission required. Authorize again with auto3d.write.'); }
+                RequireWrite (actor);
                 result = await this.broker.HeadlessProjectDelete ({ ...base, projectId : args.projectId, expectedRevision : args.expectedRevision });
             } else { throw AgentError ('invalid_arguments', 'Invalid project action arguments.'); }
         } else if (FamilyTools.some (tool => tool.id === name)) {
@@ -131,13 +135,13 @@ export class PilotService
                 } catch { result.running = null; result.hint = 'Connect an active window to list its modules; categories remain available.'; }
             }
         } else if (name === 'auto3d.commands.categories') {
-            if (!actor.scope.includes ('auto3d.write')) { throw AgentError ('permission_required', 'Write permission required. Authorize again with auto3d.write.'); }
+            RequireWrite (actor);
             Check (args, CatalogTools[0].inputSchema); result = this.Categories ();
         } else if (name === 'auto3d.commands.list') {
-            if (!actor.scope.includes ('auto3d.write')) { throw AgentError ('permission_required', 'Write permission required. Authorize again with auto3d.write.'); }
+            RequireWrite (actor);
             result = this.ListCommands (args);
         } else if (name === 'auto3d.commands.invoke') {
-            if (!actor.scope.includes ('auto3d.write')) { throw AgentError ('permission_required', 'Write permission required. Authorize again with auto3d.write.'); }
+            RequireWrite (actor);
             ValidateInvocation (args);
             const tool = this.tools.find (item => item.id === args.command); if (!tool) { throw AgentError ('unknown_command', 'Unknown command. List the command catalog to find an available ID.'); }
             Check (args.arguments, tool.inputSchema);

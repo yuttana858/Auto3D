@@ -95,8 +95,11 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
 
     it ('publishes OAuth/resource discovery and challenges unauthenticated MCP requests', async () => {
         const discovery = await fetch ('/.well-known/oauth-authorization-server/oauth'); assert.equal (discovery.status, 200); assert.equal ((await discovery.json ()).issuer, origin + '/oauth');
-        const metadata = await fetch ('/.well-known/oauth-protected-resource/mcp'); assert.equal ((await metadata.json ()).resource, origin + '/mcp');
+        const metadata = await (await fetch ('/.well-known/oauth-protected-resource/mcp')).json (); assert.equal (metadata.resource, origin + '/mcp');
+        // MCP clients request the advertised scopes, so write must be advertised or every grant is read-only.
+        assert.deepEqual (metadata.scopes_supported, ['auto3d.read', 'auto3d.write']);
         const response = await fetch ('/mcp'); assert.equal (response.status, 401); assert.match (response.headers.get ('WWW-Authenticate'), /oauth-protected-resource/);
+        assert.match (response.headers.get ('WWW-Authenticate'), /scope="auto3d\.read auto3d\.write"/);
     });
     it ('binds consent to its original browser and account', async () => {
         const unsigned = await fetch ('/oauth/authorize?client_id=' + encodeURIComponent (clientId));
@@ -208,9 +211,15 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         assert.equal (inspected.result.structuredContent.result.draft.basis, 'score-to-score');
         const saved = await (await rpc (writer.access_token, 'tools/call', { name : 'auto3d.headless.projects', arguments : { action : 'save', name : 'Test box' } })).json ();
         const project = saved.result.structuredContent.result.project; assert.equal (project.revision, 1);
-        const reader = await grant (); const denied = await (await rpc (reader.access_token, 'tools/call', { name : 'auto3d.headless.fefco', arguments : parameters })).json (); assert.equal (denied.result.isError, true);
+        const reader = await grant (); const denied = await rpc (reader.access_token, 'tools/call', { name : 'auto3d.headless.fefco', arguments : parameters });
+        // A read-only grant gets an MCP step-up challenge naming the complete scope set it needs.
+        assert.equal (denied.status, 403); assert.equal ((await denied.json ()).error, 'insufficient_scope');
+        const challenge = denied.headers.get ('WWW-Authenticate'); assert.match (challenge, /error="insufficient_scope"/); assert.match (challenge, /oauth-protected-resource\/mcp/);
+        assert.deepEqual (challenge.match (/scope="([^"]+)"/)[1].split (' ').sort (), ['auto3d.read', 'auto3d.write', 'offline_access']);
+        const readerTools = (await (await rpc (reader.access_token, 'tools/list')).json ()).result.tools.map (tool => tool.name); assert.ok (readerTools.includes ('scene.inspect')); assert.ok (!readerTools.includes ('auto3d.commands.invoke'));
         const listed = await (await rpc (reader.access_token, 'tools/call', { name : 'auto3d.headless.projects', arguments : { action : 'list' } })).json (); assert.ok (listed.result.structuredContent.result.projects.some (item => item.id === project.id));
-        const deleteDenied = await (await rpc (reader.access_token, 'tools/call', { name : 'auto3d.headless.projects', arguments : { action : 'delete', projectId : project.id, expectedRevision : 1 } })).json (); assert.equal (deleteDenied.result.isError, true);
+        const deleteDenied = await rpc (reader.access_token, 'tools/call', { name : 'auto3d.headless.projects', arguments : { action : 'delete', projectId : project.id, expectedRevision : 1 } }); assert.equal (deleteDenied.status, 403);
+        const kept = await (await rpc (writer.access_token, 'tools/call', { name : 'auto3d.headless.projects', arguments : { action : 'get', projectId : project.id } })).json (); assert.equal (kept.result.structuredContent.result.project.revision, 1);
     });
     it ('exposes the generated full command catalog only with write consent', async () => {
         const reader = await grant (), readerList = await (await rpc (reader.access_token, 'tools/list')).json ();

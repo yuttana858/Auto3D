@@ -1,3 +1,4 @@
+import { insufficientScope } from '@cloudflare/workers-oauth-provider';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -20,6 +21,7 @@ export async function HandleMcp (request, service, actor)
         { name : 'auto3d.sessions.pair_code', description : 'Pair this authenticated agent with the active Auto3D window using the one-time code the user explicitly supplied. The code belongs to the signed-in account; it is single-use and expires. Does not edit the scene.', inputSchema : { type : 'object', properties : { code : { type : 'string', pattern : '^(?:[A-HJ-NP-Za-hj-np-z2-9]{4}-){3}[A-HJ-NP-Za-hj-np-z2-9]{4}$' } }, required : ['code'], additionalProperties : false }, annotations : { readOnlyHint : false, destructiveHint : false, idempotentHint : false } },
         ...service.Tools (actor).map (tool => ({ name : tool.id, title : tool.title, description : tool.description, inputSchema : tool.inputSchema, annotations : { readOnlyHint : !tool.mutates, ...(tool.id === 'auto3d.commands.invoke' ? { destructiveHint : true, idempotentHint : false } : {}) } }))
     ];
+    let stepUp = null;
     const server = new Server ({ name : 'Auto3D', version : await DiscoveryVersion (packageMetadata.version, { tools, catalog : service.tools }) }, { capabilities : { tools : {} } });
     server.setRequestHandler (ListToolsRequestSchema, async () => { await service.Assert (actor); return { tools }; });
     server.setRequestHandler (CallToolRequestSchema, async ({ params }) => {
@@ -28,6 +30,7 @@ export async function HandleMcp (request, service, actor)
             if (params.name === 'capture.image' || params.name === 'auto3d.commands.invoke' && params.arguments?.command === 'capture.image') { return { content : CaptureContent (result) }; }
             return { content : [{ type : 'text', text : JSON.stringify (result) }], structuredContent : { result } };
         } catch (error) {
+            if (ErrorCode (error) === 'permission_required' && error.requiredScope) { stepUp = error.requiredScope; }
             const failure = PublicError (error);
             return { isError : true, content : [{ type : 'text', text : failure.code + ': ' + failure.message }], structuredContent : { error : failure } };
         }
@@ -37,6 +40,10 @@ export async function HandleMcp (request, service, actor)
     await server.connect (transport);
     try {
         const response = await transport.handleRequest (request);
+        // MCP step-up authorization: a valid grant lacking a scope gets a 403 insufficient_scope
+        // challenge naming every scope it needs, so the client can re-authorize instead of
+        // reporting a dead end. JSON responses are complete here, so the handler has run.
+        if (stepUp) { return insufficientScope (actor, [...new Set ([...actor.scope, stepUp])], 'Authorize again with ' + stepUp + '.'); }
         const headers = new Headers (response.headers); headers.set ('Cache-Control', 'no-store');
         return new Response (response.body, { status : response.status, statusText : response.statusText, headers });
     } finally { await server.close (); }

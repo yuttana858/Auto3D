@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## MCP write scope advertised — Auto3D 0.57.1 / Primary Products 0.8.0 / Packaging 1.10.6 (2026-11-10)
+
+MCP clients (including Claude) received read-only grants because `/mcp` advertised only `auto3d.read` in its resource metadata and 401 challenge, so the 283-command catalog could be browsed but not run. The resource now advertises `auto3d.read auto3d.write`, and write-gated calls from a read-only grant return an MCP step-up `insufficient_scope` challenge. Existing read-only grants must re-authorize. See [release-0571.md](release-0571.md).
+
 ## Parametric product design drawer — Auto3D 0.57.0 / Primary Products 0.8.0 / Packaging 1.10.6 (2026-11-10)
 
 Design cards are equal-size generate buttons (at most ten per row) in a 30% shorter drawer, with W × L × H bracket callouts on thumbnails and the profile drawing. W × L × H fields accept manual input; Enter rebuilds the selected generated product live (one Undo step). New `primary.designs.generate` and `primary.dimensions.set`; catalog grows to 30 designs. `ai-extended` joins CI (65 browser tests) after replacing no-op async `waitForFunction` waits in it and eight other tests. See [release-0570.md](release-0570.md).
