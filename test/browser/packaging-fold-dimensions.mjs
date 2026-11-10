@@ -37,6 +37,11 @@ try {
     await page.getByLabel ('Box Tolerance ±', { exact : true }).fill ('1'); await dimensionsReach ('tolerance', 1); size = await call ('packaging.dimensions.inspect'); assert.equal (size.outside.length, 450);
     const lengthMeasure = (await call ('packaging.measurements.inspect')).dimensions.find (d => d.id === 'length'); assert.equal (lengthMeasure.basis, 'outside'); assert.equal (lengthMeasure.minimumMm, 449); assert.equal (lengthMeasure.maximumMm, 451); await page.screenshot ({ path : 'work/packaging-editable-dimensions.png' });
     await call ('history.undo'); assert.equal ((await call ('packaging.dimensions.inspect')).tolerance, 0); await call ('history.redo'); assert.equal ((await call ('packaging.dimensions.inspect')).tolerance, 1);
+    /* Enter on a new-box ID field resizes the selected generated box live in that basis, keeps its identity and is one Undo step. */
+    await page.getByLabel ('New box dimension basis').selectOption ('inside'); const insideBefore = (await call ('packaging.dimensions.inspect')).inside.height;
+    const draftHeight = page.getByLabel ('FEFCO Height (H)', { exact : true }); await draftHeight.fill (String (insideBefore + 20)); await draftHeight.press ('Enter'); await dimensionsReach ('inside.height', insideBefore + 20);
+    assert.equal ((await call ('packaging.dimensions.inspect')).objectId, generated.objectId); assert.equal ((await call ('scene.inspect')).objects.length, 1);
+    await call ('history.undo'); await dimensionsReach ('inside.height', insideBefore); await call ('history.redo'); await dimensionsReach ('inside.height', insideBefore + 20); await call ('history.undo'); await dimensionsReach ('inside.height', insideBefore);
     await call ('packaging.fefco.unfold'); const flat = (await call ('scene.inspect')).objects[0]; const animate = page.locator ('.fefco_animate').first ();
     await animate.click ();
     /* A Playwright click can land after a short fold has finished on a slow runner, so pause in the page as soon as playback is seen playing; the fold button must then offer Resume. */

@@ -21,8 +21,14 @@ try {
     const canvas = page.locator ('#main_viewer canvas').first (); const area = await canvas.boundingBox (); const point = { x : area.x + area.width * .6, y : area.y + area.height * .45 };
     await page.mouse.move (point.x, point.y); await page.mouse.down ({ button : 'right' }); await page.mouse.move (point.x + 65, point.y + 25, { steps : 8 }); await page.mouse.up ({ button : 'right' });
     const after = await call ('camera.current.inspect'); const span = camera => Math.hypot (...camera.eye.map ((v, i) => v - camera.center[i]));
-    // Main viewer: horizontal right-drag pans sideways (the view center moves) and vertical drag tilts; neither changes the viewing distance.
-    assert.notDeepEqual (focused.center, after.center); assert.notDeepEqual (focused.eye, after.eye); assert.ok (Math.abs (span (focused) - span (after)) < 1e-3); assert.equal (before.fov, after.fov); assert.equal (await page.locator ('.auto3d_context_menu').count (), 0);
+    /* Main viewer: right-drag orbits around the selected model; the view center stays on it and the viewing distance is unchanged. */
+    const near = (a, b) => a.every ((v, i) => Math.abs (v - b[i]) < 1e-6);
+    assert.ok (near (after.center, focus.pivot), JSON.stringify ([after.center, focus.pivot])); assert.notDeepEqual (focused.eye, after.eye); assert.ok (Math.abs (span (focused) - span (after)) < 1e-3); assert.equal (before.fov, after.fov); assert.equal (await page.locator ('.auto3d_context_menu').count (), 0);
+    /* Pan away with the middle button, then right-drag: the drag re-centers on the selected model before rotating. */
+    await page.mouse.move (point.x, point.y); await page.mouse.down ({ button : 'middle' }); await page.mouse.move (point.x - 120, point.y + 40, { steps : 8 }); await page.mouse.up ({ button : 'middle' });
+    const panned = await call ('camera.current.inspect'); assert.ok (!near (panned.center, focus.pivot), 'middle-drag moved the view center away');
+    await page.mouse.down ({ button : 'right' }); await page.mouse.move (point.x - 40, point.y + 40, { steps : 8 }); await page.mouse.up ({ button : 'right' });
+    const refocused = await call ('camera.current.inspect'); assert.ok (near (refocused.center, focus.pivot), JSON.stringify ([refocused.center, focus.pivot])); assert.notDeepEqual (refocused.eye, panned.eye);
     const scene = await call ('scene.inspect'); assert.equal (scene.objects.length, 1); assert.deepEqual (scene.objects[0].position, [60, 20, 0]);
     await call ('ui.array'); const dialog = page.getByRole ('dialog', { name : 'Array selected model', exact : true }); await dialog.waitFor ();
     await page.waitForFunction (() => parseFloat (getComputedStyle (document.querySelector ('.array_dialog h2')).fontSize) > 18);
