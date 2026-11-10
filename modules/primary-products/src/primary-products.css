@@ -84,3 +84,9 @@
 @media(prefers-reduced-motion: reduce) { .pp_design_drawer { animation: none; } }
 .pp_toggle { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: var(--workspace-menu-font-size, 12px); cursor: pointer; }
 .pp_toggle input { accent-color: var(--pp-accent); }
+
+.pp_design_preview, .pp_product_card svg { color: var(--pp-accent); }
+.pp_design_preview { fill: var(--pp-accent); }
+.primary_artwork_mount { grid-column: span 2; min-width: 0; }
+.pp_artwork_editor { min-width: 0; padding: 10px; border: 1px solid var(--ov_border_color); border-radius: 6px; }
+.pp_artwork_editor .pp_art_image { max-height: 70px; }

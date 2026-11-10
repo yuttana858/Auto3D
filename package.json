@@ -1,6 +1,6 @@
 {
 	"name": "online-3d-viewer",
-	"version": "0.58.2",
+	"version": "0.59.0",
 	"description": "Auto3D browser-based 3D model viewer",
 	"license": "MIT",
 	"type": "module",

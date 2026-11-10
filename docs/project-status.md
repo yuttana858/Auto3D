@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Clamshell catalog, advanced labels and clear surfaces — Auto3D 0.59.0 / Primary Products 0.10.0 / Packaging 1.10.7
+
+Adds the fourth Clamshell product card, combined food/retail drawer, cyan drawings and artwork in the advanced material editor. Clear glass/PET adds a physical-material pipeline and closed bottle cavities. See [release-0590.md](release-0590.md) for rendering and geometry limits. Not deployed.
+
 ## Compact design drawer header — Auto3D 0.58.2 / Primary Products 0.9.1 / Packaging 1.10.7 (2026-11-10)
 
 W/L/H inputs move to the left of a one-row drawer header with an inline status (no generic completion text); thumbnails drop their bracket callouts. See [release-0582.md](release-0582.md).

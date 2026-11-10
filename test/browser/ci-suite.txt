@@ -49,6 +49,7 @@ popup-fonts
 preferences-recovery
 preview-context-lifecycle
 primary-products
+primary-materials
 render-workspace
 rendercore-state
 rendering

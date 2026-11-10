@@ -95,14 +95,22 @@ describe ('Primary Products scene integration', function () {
         assert.equal (recovery.objects[0].userData[PrimaryProductDataKey], saved.objects[0].userData[PrimaryProductDataKey]);
         await editor.history.Undo (); workspace.LoadSelected (); assert.equal (panel.draft.widthMm, 200);
     });
-    it ('converts mm geometry into known scene units and rejects unknown units/glass', function () {
+    it ('applies artwork without resetting advanced surface edits and restores the prior object on Undo', async function () {
+        const { panel, editor, workspace } = Fixture (); panel.draft = module.ProductDesign ('food-deli'); await workspace.Generate ();
+        const previous = editor.selected; editor.document.model.materials[0].roughness = .91; editor.document.model.materials[0].ior = 1.62; editor.document.model.materials[0].transmission = .8;
+        await workspace.Generate (true, true);
+        const material = editor.document.CompactModel ([editor.selected], true).materials[0];
+        assert.equal (material.roughness, .91); assert.equal (material.ior, 1.62); assert.equal (material.transmission, .8); assert.equal (editor.selected.id, previous.id);
+        await editor.history.Undo (); assert.equal (editor.selected, previous);
+    });
+    it ('converts mm geometry into known scene units and rejects unknown units', function () {
         const data = module.CreatePrimaryProduct (module.DefaultProductDraft ('can'));
         for (const [unit, factor] of [[Unit.Millimeter, 1], [Unit.Meter, 1000], [Unit.Inch, 25.4]]) {
             const model = PrimaryProductModel (data, unit); const max = Math.max (...model.meshes.flatMap (mesh => mesh.vertices.map (v => v.y))); assert.ok (Math.abs (max * factor - 122) < 1e-8);
             assert.equal (model.materials[0].metalness, 1);
         }
         assert.throws (() => PrimaryProductModel (data, 'unknown'));
-        assert.throws (() => PrimaryProductModel (module.CreatePrimaryProduct ({ ...module.DefaultProductDraft (), material : 'glass' }), Unit.Millimeter));
+        assert.equal (PrimaryProductModel (module.CreatePrimaryProduct ({ ...module.DefaultProductDraft (), material : 'glass' }), Unit.Millimeter).materials[0].transmission, 1);
     });
     it ('exports portable GLB geometry with the edited opaque physical surface', async function () {
         const draft = { ...module.DefaultProductDraft ('can'), roughness : 0.23, color : '#cc5522' };
@@ -114,9 +122,8 @@ describe ('Primary Products scene integration', function () {
         assert.equal (json.meshes.length, 3); const pbr = json.materials[0].pbrMetallicRoughness;
         assert.equal (pbr.metallicFactor, 1); assert.equal (pbr.roughnessFactor, 0.23); assert.ok (pbr.baseColorFactor[0] > pbr.baseColorFactor[1]);
     });
-    it ('rejects read-only, glass, invalid selections and concurrent requests before committing', async function () {
+    it ('rejects read-only, invalid selections and concurrent requests before committing', async function () {
         const { panel, editor, workspace } = Fixture (); editor.readOnly = true; await assert.rejects (workspace.Generate ()); editor.readOnly = false;
-        panel.draft.material = 'glass'; await assert.rejects (workspace.Generate (), /Glass/); panel.draft.material = 'plastic';
         await assert.rejects (workspace.Generate (true), /Select/); assert.equal (editor.document.objects.length, 0);
         let resolve; const f = Fixture (() => new Promise (r => { resolve = r; })); const pending = f.workspace.Generate ();
         await assert.rejects (f.workspace.Generate ()); f.panel.website.auth.user = { id : 'other' }; resolve (module); await assert.rejects (pending, /changed/);

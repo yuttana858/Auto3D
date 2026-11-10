@@ -1,3 +1,4 @@
+import { CloneSurface } from './scenedocument.js';
 import { Unit } from '../engine/model/unit.js';
 import { ProductDefinition, ValidateProductDefinition } from '../../modules/primary-products/src/definition.js';
 import { PrimaryProductModel } from './primaryproductsadapter.js';
@@ -19,12 +20,11 @@ export class PrimaryProductsWorkspace
         if (this.panel.Blocked ()) { throw new Error ('Open an editable, idle session.'); }
         const { object, definition } = this.Selected (); this.panel.artwork?.Load (definition, this.panel.website.sessionEditor.document.CompactModel ([object], true)); this.panel.draft = definition.draft; this.panel.Refresh (); return this.panel.Inspect ();
     }
-    async Generate (update = false)
+    async Generate (update = false, preserveMaterials = false)
     {
         const panel = this.panel; const editor = panel.website.sessionEditor;
         if (this.active || panel.Blocked ()) { throw new Error ('Open an editable, idle session.'); }
         const definition = ProductDefinition (panel.draft, panel.artwork?.Inspect () || []);
-        if (definition.draft.material === 'glass') { throw new Error ('Glass generation needs transmission and hollow-wall support. Choose opaque plastic.'); }
         const target = editor.document; const owner = panel.website.auth.user.id; const source = update ? this.Selected ().object : null;
         if (source?.hiddenParts?.length || source?.animationAsset || source?.keyframes?.length) { throw new Error ('Remove hidden parts and animation before rebuilding this product.'); }
         if (!source && target.objects.length >= 1000) { throw new Error ('Session has reached the 1000 object limit.'); }
@@ -38,6 +38,14 @@ export class PrimaryProductsWorkspace
             const module = await this.load (); unchanged ();
             const unit = target.objects.length ? previousUnit : Unit.Millimeter;
             const model = PrimaryProductModel (module.CreatePrimaryProduct (definition.draft), unit, definition.artwork || [], panel.artwork?.resources);
+            if (source && preserveMaterials) {
+                const previousModel = target.CompactModel ([source], true);
+                for (const mesh of model.meshes) {
+                    if (mesh.GetName ().startsWith ('label-')) { continue; }
+                    const previousMesh = previousModel.meshes.find (m => m.GetName () === mesh.GetName ());
+                    if (previousMesh?.TriangleCount () && mesh.TriangleCount ()) { model.materials[mesh.GetTriangle (0).mat] = CloneSurface (previousModel.materials[previousMesh.GetTriangle (0).mat]); }
+                }
+            }
             object = target.AddImported (model, source?.name || module.PrimaryFamilies[definition.draft.family].name);
             if (source) {
                 for (const key of ['id', 'name', 'source', 'visible', 'castShadow', 'receiveShadow']) { object[key] = source[key]; }

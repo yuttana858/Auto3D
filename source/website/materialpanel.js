@@ -159,7 +159,7 @@ export class MaterialPanel
                 transparent : material.transparent,
                 roughness : material.roughness,
                 metalness : material.metalness,
-                specularIntensity : material.specularIntensity,
+                specularIntensity : material.specularIntensity, transmission : material.transmission, ior : material.ior, thickness : material.thickness,
                 specular : material.specular?.getHexString?.() || null,
                 shininess : material.shininess,
                 bumpScale : material.bumpScale,
@@ -176,7 +176,7 @@ export class MaterialPanel
                 transparent : original.transparent,
                 roughness : original.roughness,
                 metalness : original.metalness,
-                specularIntensity : original.specularIntensity,
+                specularIntensity : original.specularIntensity, transmission : original.transmission, ior : original.ior, thickness : original.thickness,
                 specular : original.specular ? { r : original.specular.r, g : original.specular.g, b : original.specular.b } : null,
                 shininess : original.shininess,
                 bumpScale : original.bumpScale,
@@ -197,7 +197,7 @@ export class MaterialPanel
         const m = state.material;
         if (m.color !== null && material.color) { material.color.set ('#' + m.color); }
         if (m.emissive !== null && material.emissive) { material.emissive.set ('#' + m.emissive); }
-        for (const key of ['emissiveIntensity', 'opacity', 'roughness', 'metalness', 'specularIntensity', 'shininess', 'bumpScale', 'aoMapIntensity', 'displacementScale', 'side']) {
+        for (const key of ['emissiveIntensity', 'opacity', 'roughness', 'metalness', 'specularIntensity', 'transmission', 'ior', 'thickness', 'shininess', 'bumpScale', 'aoMapIntensity', 'displacementScale', 'side']) {
             if (m[key] !== undefined) { material[key] = m[key]; }
         }
         if (m.specular !== null && material.specular) { material.specular.set ('#' + m.specular); }
@@ -205,7 +205,7 @@ export class MaterialPanel
         material.transparent = m.transparent;
         const original = state.original;
         if (original.color && entry.original.color) { Object.assign (entry.original.color, original.color); }
-        for (const key of ['emissiveIntensity', 'opacity', 'transparent', 'roughness', 'metalness', 'specularIntensity', 'shininess', 'bumpScale', 'normalScale', 'reliefMode', 'aoIntensity', 'displacementScale', 'doubleSided', 'multiplyDiffuseMap']) {
+        for (const key of ['emissiveIntensity', 'opacity', 'transparent', 'roughness', 'metalness', 'specularIntensity', 'transmission', 'ior', 'thickness', 'shininess', 'bumpScale', 'normalScale', 'reliefMode', 'aoIntensity', 'displacementScale', 'doubleSided', 'multiplyDiffuseMap']) {
             if (original[key] !== undefined) { entry.original[key] = original[key]; }
         }
         if (original.specular && entry.original.specular) { Object.assign (entry.original.specular, original.specular); }
@@ -391,6 +391,14 @@ export class MaterialPanel
                 material.metalness = Number (value); entry.original.metalness = material.metalness;
             });
         }
+        if (physical) {
+            for (const [key, title, min, max, step] of [['transmission', 'Transmission', 0, 1, .01], ['ior', 'Index of refraction', 1, 3, .01], ['thickness', 'Optical thickness (scene units)', 0, 1e6, .01]]) {
+                this.Control (properties, title, key === 'transmission' ? 'range' : 'number', material[key], { min, max, step }, value => {
+                    const n = Number (value); if (!Number.isFinite (n) || n < min || n > max) { return; }
+                    material[key] = n; entry.original[key] = n; material.needsUpdate = true;
+                });
+            }
+        }
         this.Control (properties, 'Reflective', 'range', physical ? material.specularIntensity : Math.max (material.specular.r, material.specular.g, material.specular.b), { min : 0, max : 1, step : 0.01 }, (value) => {
             const strength = Number (value);
             SetMaterialReflectionStrength (material, strength);
@@ -418,6 +426,10 @@ export class MaterialPanel
             material.side = value ? THREE.DoubleSide : THREE.FrontSide; entry.original.doubleSided = value;
         });
         this.ShowSurfaceMapCards (content, entry, properties);
+        if (this.website.primaryProductsPanel) {
+            const artwork = document.createElement ('div'); artwork.className = 'primary_artwork_mount'; content.querySelector ('.surface_map_cards').prepend (artwork);
+            this.website.primaryProductsPanel.MountArtwork (artwork).then (mounted => { if (!mounted) { artwork.remove (); } }).catch (error => { if (artwork.isConnected) { artwork.textContent = error.message; } });
+        }
         return;
     }
 
@@ -604,7 +616,7 @@ export class MaterialPanel
     ShowSurfaceMapCards (parent, entry, properties)
     {
         const cards = document.createElement ('div'); cards.className = 'surface_map_cards'; parent.appendChild (cards);
-        const assignments = { map : ['Base color', 'Opacity'], roughnessMap : ['Glossy', 'Roughness'], specularMap : ['Reflective'], metalnessMap : ['Metalness'], bumpMap : ['Bump'], normalMap : ['Normal strength'], aoMap : ['AO intensity'], displacementMap : ['Displacement'], emissiveMap : ['Emission'] };
+        const assignments = { map : ['Base color', 'Opacity'], roughnessMap : ['Glossy', 'Roughness'], specularMap : ['Reflective', 'Transmission', 'Index of refraction', 'Optical thickness (scene units)'], metalnessMap : ['Metalness'], bumpMap : ['Bump'], normalMap : ['Normal strength'], aoMap : ['AO intensity'], displacementMap : ['Displacement'], emissiveMap : ['Emission'] };
         for (const [key, title] of TextureSlots) {
             if (key === 'displacementMap') { continue; }
             if (key === 'emissiveMap' && !TextureForSlot (entry, key)) { continue; }

@@ -9,7 +9,8 @@ export const ProductMaterials = Object.freeze ({
     hdpe : { name : 'HDPE · matte', families : ['bottle'], metalness : 0, roughness : 0.62 },
     pp : { name : 'Polypropylene · satin', families : ['bottle', 'clamshell'], metalness : 0, roughness : 0.32 },
     petOpaque : { name : 'PET · opaque gloss', families : ['bottle', 'clamshell'], metalness : 0, roughness : 0.12 },
-    glass : { name : 'Glass · unavailable', families : ['bottle'], metalness : 0, roughness : 0.1 },
+    glass : { name : 'Clear glass', color : '#ffffff', families : ['bottle'], metalness : 0, roughness : .08, transmission : 1, ior : 1.5, wallMm : 1.2 },
+    petClear : { name : 'PET · clear', color : '#ffffff', families : ['bottle', 'clamshell'], metalness : 0, roughness : .06, transmission : 1, ior : 1.575, wallMm : .6 },
     aluminum : { name : 'Aluminum', families : ['can'], metalness : 1, roughness : 0.3 },
     steel : { name : 'Steel', families : ['can'], metalness : 1, roughness : 0.38 },
     coatedMetal : { name : 'Painted metal', families : ['can'], metalness : 0, roughness : 0.26 },
@@ -18,4 +19,4 @@ export const ProductMaterials = Object.freeze ({
     glossFilm : { name : 'Gloss film', families : ['pouch'], metalness : 0, roughness : 0.14 },
     foil : { name : 'Metallic laminate', families : ['pouch'], metalness : 1, roughness : 0.28 }
 });
-export function ListProductMaterials (family) { return Object.entries (ProductMaterials).filter (([, m]) => m.families.includes (family)).map (([id, m]) => ({ id, name : m.name, metalness : m.metalness, roughness : m.roughness, ...(m.color ? { color : m.color } : {}), available : id !== 'glass' })); }
+export function ListProductMaterials (family) { return Object.entries (ProductMaterials).filter (([, m]) => m.families.includes (family)).map (([id, m]) => ({ id, name : m.name, metalness : m.metalness, roughness : m.roughness, ...(m.color ? { color : m.color } : {}), available : true, transmission : m.transmission || 0, ior : m.ior || 1.5 })); }
