@@ -13,6 +13,13 @@ describe ('Independent folding and physical dimensions', () => {
         assert.throws (() => FefcoAnimationPlan ({}, 'unknown'));
     });
     it ('Preserves preset dimensions while fixing OSC overlap and rejects unsupported presets', () => { const data = { code : '0200', length : 520, width : 350, overlap : 0 }; const preset = FefcoPreset (data, '0202'); assert.equal (preset.length, 520); assert.equal (preset.overlap, 25); assert.equal (data.overlap, 0); assert.throws (() => FefcoPreset (data, '0000')); assert.throws (() => FefcoPreset (null, '0201')); assert.throws (() => FefcoPreset ([], '0201')); assert.equal (FefcoPreset ({ code : '0202', width : 20, thickness : 1, overlap : 25 }, '0201').code, '0201'); });
+    it ('Rejects an explicitly requested 0202 overlap that does not fit instead of replacing it', () => {
+        const carried = { code : '0201', length : 400, width : 300, overlap : 1000 };
+        assert.equal (FefcoPreset (carried, '0202').overlap, 25); assert.equal (FefcoPreset (carried, '0202', { length : 400 }).overlap, 25);
+        assert.throws (() => FefcoPreset (carried, '0202', { overlap : 1000 }), /overlap must be greater than zero and less than the width/);
+        assert.throws (() => FefcoPreset ({ ...carried, overlap : 0 }, '0202', { overlap : 0 }), /overlap must/);
+        assert.equal (FefcoPreset ({ ...carried, overlap : 40 }, '0202', { overlap : 40 }).overlap, 40); assert.equal (FefcoPreset (carried, '0201', { overlap : 1000 }).code, '0201');
+    });
     it ('Uses the original dieline and preserves rigid panel dimensions at every fold stage', () => {
         for (const code of ['0200', '0201', '0202', '0203']) {
             const rig = CreateFefcoFoldRig ({ code }); const flat = FefcoFoldFrame (rig, 0); assert.deepEqual (flat.meshes.map (m => m.vertices), rig.meshes.map (m => m.vertices));

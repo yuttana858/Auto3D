@@ -2,7 +2,7 @@
 
 ## Browser regression suite repaired — Auto3D 0.54.2 / Packaging 1.10.6 / Primary Products 0.5.0 (2026-11-10)
 
-The 23 stale browser tests now pass against current behavior and joined the CI `browser` job (64 tests). Fixes the standalone Packaging preview's fold/unfold completion error. `ai-extended` and `mcp-access` remain outside the job. See [release-0542.md](release-0542.md).
+The 23 stale browser tests now pass against current behavior and joined the CI `browser` job (64 tests). Fixes the standalone Packaging preview's fold/unfold completion error, rejects an explicitly requested 0202 overlap that does not fit instead of replacing it, and reports successful engineering-linked dimension edits. `ai-extended` and `mcp-access` remain outside the job. See [release-0542.md](release-0542.md).
 
 ## CAD designer updates — Auto3D 0.54.1 / Packaging 1.10.5 / Primary Products 0.5.0
 

@@ -50,8 +50,10 @@ export class FefcoPanel
             Element ('strong', button, style.code + ' · ' + style.acronym); Element ('span', button, style.name);
             button.addEventListener ('click', () => this.RunGeneration (async () => {
                 const changes = this.DraftParameters ();
+                // The overlap field is hidden unless the current box is 0202; only a visible or edited overlap is a request.
+                if (this.fields.get ('overlap').label.hidden && !this.draftDirty.has ('overlap')) { delete changes.overlap; }
                 let result;
-                if (workspace.preset) { result = await workspace.preset (style.code, changes); } else { const { basis, ...fields } = changes; if (basis !== 'score') { throw new Error ('This host requires a dimensional preset service to generate ID/OD targets. Select score or update the host.'); } await workspace.configure (FefcoPreset (fields, style.code)); result = await workspace.generate (); }
+                if (workspace.preset) { result = await workspace.preset (style.code, changes); } else { const { basis, ...fields } = changes; if (basis !== 'score') { throw new Error ('This host requires a dimensional preset service to generate ID/OD targets. Select score or update the host.'); } await workspace.configure (FefcoPreset (fields, style.code, fields)); result = await workspace.generate (); }
                 this.Refresh (); return result;
             })); this.cards.set (style.code, button); this.controls.push (button);
         }

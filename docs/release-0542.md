@@ -10,6 +10,11 @@ The full serial run also exposed three timing races, now fixed in the tests: `ac
 
 Because software-GPU tests run two to three times slower on hosted runners, the CI `browser` job is split into three parallel shards, each test may take up to 600 s, and the slow Packaging tests (`packaging-presets`, `packaging-fold-dimensions`) wait up to 120 s for each step instead of 30 s. Assertions are unchanged. CI also starts the standalone Packaging preview (port 8082) for `packaging-module`, and waits for it before the run. `ai-extended` (timing-sensitive) and `mcp-access` (covered by the MCP workflow) stay outside the browser job.
 
-Known UX notes, not changed here: `FefcoPreset` silently replaces an invalid 0202 overlap with the default (`packaging.fefco.configure` still rejects it), and an engineering-linked dimension edit sets no status, so an earlier "Enter a converter allowance factor…" message can remain after a later edit succeeds.
+UX fixes:
 
-Validation: 787 app/module tests, 64 MCP tests and application lint pass; the full 64-test browser suite was run serially against fresh dev, website, Pages and MCP builds.
+- **0202 overlap is no longer replaced silently.** `FefcoPreset` takes the fields the caller explicitly requested. An overlap carried over from another style still gets a fitting default when switching to 0202, but an overlap the user typed in the visible field, or passed to `packaging.fefco.preset`, is rejected with "0202 overlap must be greater than zero and less than the width." and nothing is generated. The hidden overlap field is not treated as a request.
+- **Engineering-linked dimension edits report success.** `UpdateDimensions` sets "Updated box dimensions · <basis>" (with tolerance when changed), and every successful `UpdateEngineering` sets "Updated CAD measurements.", so an earlier "Enter a converter allowance factor…" error no longer remains after a later edit succeeds.
+
+After merging PR #92, the SVG/EPS/DXF export buttons wrap onto two rows; the browser tests now check their reading order instead of SVG and DXF sharing a row.
+
+Validation: 792 app/module tests, 64 MCP tests and application lint pass. The full 64-test browser suite passed serially before the PR #92 merge and in three CI shards; after the merge and UX fixes, fefco, packaging-fold-dimensions, packaging-presets, packaging-cleanup, packaging-thumbnail-generation, packaging-module, packaging-measurements and cad-apply pass locally.

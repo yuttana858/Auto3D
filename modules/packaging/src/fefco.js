@@ -2,11 +2,14 @@ import { FefcoStyles } from './catalog.js';
 import { ValidatePackaging } from './profile.js';
 
 export const DefaultFefco = { code : '0201', length : 400, width : 300, height : 250, thickness : 3, overlap : 25, closure : 'closed' };
-export function FefcoPreset (input, code)
+// `requested` names the fields the caller explicitly chose. An overlap carried over from another style is replaced by a default
+// when it does not fit 0202, but an explicitly requested overlap is validated and rejected instead of being replaced silently.
+export function FefcoPreset (input, code, requested = {})
 {
     if (!input || typeof input !== 'object' || Array.isArray (input)) { throw new Error ('Invalid FEFCO parameters.'); }
     const data = { ...DefaultFefco, ...input }; const changes = { code };
-    if (code === '0202' && (data.overlap <= 0 || data.overlap >= data.width)) { changes.overlap = Math.min (25, data.width / 4); }
+    const explicitOverlap = requested && Object.prototype.hasOwnProperty.call (requested, 'overlap');
+    if (code === '0202' && !explicitOverlap && (data.overlap <= 0 || data.overlap >= data.width)) { changes.overlap = Math.min (25, data.width / 4); }
     return ValidateFefco ({ ...data, ...changes });
 }
 export function FefcoAnimationPlan (input, state = 'folded')
