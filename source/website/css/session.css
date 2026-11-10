@@ -687,7 +687,13 @@ div.main_viewer
 .ov_sidebar_content[hidden] { display: none; }
 
 .scene_command_bar { position: absolute; bottom: 12px; left: 50%; width: min(50%, 1000px); transform: translateX(-50%); z-index: 3; padding: 8px 10px; border: 1px solid var(--ov_border_color); border-radius: 7px; background: var(--ov_background_color); color: var(--ov_foreground_color); box-sizing: border-box; }
-.scene_command_bar .scene_status { position: static; padding: 0; margin-bottom: 5px; pointer-events: auto; background: transparent; font-size: 12px; }
+.scene_command_bar[hidden] { display: none; }
+.scene_command_header { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 5px; }
+.scene_command_header .scene_status { flex: 1 1 auto; min-width: 0; }
+.scene_command_close { flex: 0 0 auto; width: 22px; height: 22px; margin: -3px -4px 0 0; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--ov_foreground_color); font-size: 18px; line-height: 1; cursor: pointer; }
+.scene_command_close:hover { background: var(--ov_hover_color); }
+.scene_tool_commands { margin-top: auto; }
+.scene_command_bar .scene_status { position: static; padding: 0; margin-bottom: 0; pointer-events: auto; background: transparent; font-size: 12px; }
 .scene_command_form { display: flex; gap: 6px; flex-wrap: wrap; }
 .scene_command_form textarea { flex: 1 1 180px; min-width: 0; box-sizing: border-box; resize: none; max-height: 180px; overflow-y: auto; line-height: 1.3; }
 .scene_command_form textarea, .scene_command_form button { background: var(--ov_background_color); color: var(--ov_foreground_color); border: 1px solid var(--ov_border_color); border-radius: 4px; padding: 7px; font: inherit; font-size: 12px; }

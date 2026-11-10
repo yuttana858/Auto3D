@@ -191,14 +191,17 @@ export class AgentAccess
         const form = document.createElement ('div'); form.className = 'workspace_save_form';
         const captureLabel = document.createElement ('label'), capture = document.createElement ('input'); capture.type = 'checkbox'; captureLabel.append (capture, 'Allow screenshots from this window');
         const status = document.createElement ('p'); status.setAttribute ('role', 'status'); status.textContent = this.status; this.statusElement = status;
-        const connect = document.createElement ('button'); connect.textContent = 'Connect this window'; connect.onclick = () => { this.Connect ({ screenshots : capture.checked }).then (() => { status.textContent = 'Connected'; }).catch (error => { this.Disconnect (); status.textContent = error.message; }); };
+        const connect = document.createElement ('button'); connect.textContent = 'Live Control'; connect.onclick = () => { this.Connect ({ screenshots : capture.checked }).then (() => { status.textContent = 'Connected'; }).catch (error => { this.Disconnect (); status.textContent = error.message; }); };
         const disconnect = document.createElement ('button'); disconnect.textContent = 'Disconnect'; disconnect.onclick = () => { this.Disconnect (); status.textContent = this.status; };
         const list = document.createElement ('div');
         const refresh = async () => {
             const result = await this.Request ('registrations'); list.replaceChildren ();
-            for (const record of result.registrations) {
-                const row = document.createElement ('p'); row.textContent = record.name + ' · ' + (record.revokedAt !== null ? 'Revoked' : record.expiresAt <= Date.now () ? 'Expired' : 'Active');
-                if (record.revokedAt === null && record.expiresAt > Date.now ()) { const revoke = document.createElement ('button'); revoke.textContent = 'Revoke'; revoke.onclick = () => { this.Request ('registrations', { action : 'revoke', id : record.id }).then (refresh).catch (error => { status.textContent = error.message; }); }; row.appendChild (revoke); } list.appendChild (row);
+            // Only active connections are listed; revoked and expired ones cannot be used again.
+            const active = result.registrations.filter (record => record.revokedAt === null && record.expiresAt > Date.now ());
+            if (!active.length) { const empty = document.createElement ('p'); empty.textContent = 'No active connections.'; list.appendChild (empty); }
+            for (const record of active) {
+                const row = document.createElement ('p'); row.textContent = record.name + ' · Active';
+                { const revoke = document.createElement ('button'); revoke.textContent = 'Revoke'; revoke.onclick = () => { this.Request ('registrations', { action : 'revoke', id : record.id }).then (refresh).catch (error => { status.textContent = error.message; }); }; row.appendChild (revoke); } list.appendChild (row);
             }
         };
         form.append (captureLabel, connect, disconnect, status, list); dialog.appendChild (form); await refresh (); return { opened : true };

@@ -2,7 +2,7 @@
 
 ## MCP write scope advertised — Auto3D 0.57.2 / Primary Products 0.8.1 / Packaging 1.10.7 (2026-11-10)
 
-MCP clients (including Claude) received read-only grants because `/mcp` advertised only `auto3d.read` in its resource metadata and 401 challenge, so the 284-command catalog could be browsed but not run. The resource now advertises `auto3d.read auto3d.write`, and write-gated calls from a read-only grant return an MCP step-up `insufficient_scope` challenge. Existing read-only grants must re-authorize. See [release-0572.md](release-0572.md).
+MCP clients (including Claude) received read-only grants because `/mcp` advertised only `auto3d.read` in its resource metadata and 401 challenge, so the 284-command catalog could be browsed but not run. The resource now advertises `auto3d.read auto3d.write`, and write-gated calls from a read-only grant return an MCP step-up `insufficient_scope` challenge. Existing read-only grants must re-authorize. The viewer command bar now has a × and a Command bar button at the bottom of the tool strip (`ui.command_bar`); MCP connections lists only active registrations and "Connect this window" is renamed Live Control. See [release-0572.md](release-0572.md).
 
 ## Right-drag orbit, live new-box dimensions and 3D product callouts — Auto3D 0.57.1 / Packaging 1.10.7 / Primary Products 0.8.1 (2026-11-10)
 

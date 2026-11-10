@@ -49,7 +49,7 @@ try {
     assert.equal (await dialog.locator ('input[type=checkbox]').isChecked (), false);
     assert.equal (await dialog.getByLabel ('App window code').count (), 0);
     assert.equal (await dialog.getByRole ('button', { name : 'Copy', exact : true }).count (), 0);
-    await dialog.getByRole ('button', { name : 'Connect this window' }).click (); await dialog.getByRole ('status').filter ({ hasText : 'Connected' }).waitFor ();
+    await dialog.getByRole ('button', { name : 'Live Control' }).click (); await dialog.getByRole ('status').filter ({ hasText : 'Connected' }).waitFor ();
     await hello; /* the status can update before Playwright runs the WebSocket route handler */
     const tab = await call ('session.tabs.inspect');
     const received = new Promise (resolve => { nextResult = resolve; });

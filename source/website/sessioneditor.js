@@ -63,6 +63,7 @@ const Icons = {
     visible : '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>', remove : '<path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/>',
     focus : '<path d="M3 9V3h6m6 0h6v6M3 15v6h6m6 0h6v-6"/><circle cx="12" cy="12" r="3"/>', undo : '<path d="M3 9h12a6 6 0 0 1 0 12M3 9l5-5M3 9l5 5"/>', redo : '<path d="M21 9H9a6 6 0 0 0 0 12m12-12-5-5m5 5-5 5"/>',
     fit : '<path d="M3 9V3h6m6 0h6v6M3 15v6h6m6 0h6v-6"/>',
+    commands : '<rect x="2" y="4" width="22" height="16" rx="2"/><path d="m6 9 3 3-3 3M12 15h7"/>',
     array : '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>',
     floor : '<path d="M3 20h18M12 3v12m-4-4 4 4 4-4"/>',
     add : '<path d="M12 3v18M3 12h18"/>', save : '<path d="M4 3h13l4 4v14H3V3h1Zm3 0v7h10V3M7 21v-7h10v7"/>', export : '<path d="M12 16V2m-4 4 4-4 4 4M4 12v9h16v-9"/>', library : '<path d="M3 4h5v17H3Zm7 0h5v17h-5Zm7 1 4-1 3 16-4 1Z"/>', ai : '<path d="M12 2l1.7 5.1L19 9l-5.3 1.9L12 16l-1.7-5.1L5 9l5.3-1.9L12 2Z"/><path d="M19 14l.9 2.6L22.5 18l-2.6.9L19 21.5l-.9-2.6-2.6-.9 2.6-1.4L19 14Z"/>', update : '<path d="M20 7a9 9 0 1 0 1 9M20 2v6h-6"/>'
@@ -279,6 +280,12 @@ export class SessionEditor
         const space = Element ('select', null, undefined, this.transformPanel); space.setAttribute ('aria-label', 'Transform space'); space.add (new Option ('World', 'world')); space.add (new Option ('Local', 'local')); space.addEventListener ('change', () => this.controls.setSpace (space.value));
         this.transformHint = Element ('p', 'section_hint', 'Position uses source coordinates. Size follows the global unit preference.', this.transformPanel);
         this.commandBar = new CommandBar (this.website, this.website.parameters.viewerDiv); this.status = this.commandBar.status;
+        // The Commands button sits at the bottom of the tool strip and reopens the command bar after it is closed.
+        const commandsButton = Element ('button', 'scene_tool scene_tool_commands', undefined, this.strip); commandsButton.title = 'Command bar'; commandsButton.setAttribute ('aria-label', 'Command bar');
+        commandsButton.innerHTML = '<svg viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">' + Icons.commands + '</svg>';
+        const syncCommands = visible => commandsButton.setAttribute ('aria-pressed', String (visible)); syncCommands (this.commandBar.visible);
+        this.commandBar.onVisibilityChange = syncCommands;
+        commandsButton.addEventListener ('click', () => this.commandBar.SetVisible (!this.commandBar.visible));
         const section = Element ('details', 'workspace_section'); section.open = false; section.id = 'session_objects'; Element ('summary', null, 'Session objects', section);
         const content = Element ('div', 'section_content', undefined, section); const actions = Element ('div', 'mode_buttons', undefined, content);
         const add = Element ('button', null, 'Add model', actions); add.addEventListener ('click', () => this.AddModel ()); const library = Element ('button', null, 'Library', actions); library.addEventListener ('click', () => this.library.Open ());
