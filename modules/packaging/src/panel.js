@@ -22,6 +22,8 @@ export class FefcoPanel
             input.addEventListener ('blur', () => { if (!this.dimensionTimer) { this.RefreshDimensions (); } });
         }
         this.selectedBoardSelect = this.CreateBoardSelector (dimensionsPanel, 'Selected board', 'selected');
+        const directionLabel = Element ('label', dimensionsPanel, 'Board flute direction (° from sheet X)', 'fefco_field'); this.boardDirection = Element ('input', directionLabel); this.boardDirection.type = 'number'; this.boardDirection.min = '-360'; this.boardDirection.max = '360'; this.boardDirection.step = 'any'; this.boardDirection.setAttribute ('aria-label', 'Board flute direction in degrees from sheet X');
+        this.boardDirection.addEventListener ('change', () => { const degrees = this.boardDirection.valueAsNumber; this.host.run (async () => { try { await this.host.updateBoardDirection (degrees); } finally { this.RefreshDimensions (); } }); });
         Element ('strong', root, 'FEFCO catalog');
         const family = Element ('label', root, 'Box family', 'fefco_field'); const select = Element ('select', family); select.setAttribute ('aria-label', 'FEFCO box family');
         for (const item of FefcoFamilies) { const option = new Option (item.id + ' · ' + item.name + (item.available ? '' : ' · coming later'), item.id); option.disabled = !item.available; select.add (option); } select.value = '02';
@@ -119,6 +121,7 @@ export class FefcoPanel
         this.dimensionMode.value = data?.basis || 'inside';
         this.RefreshBoardSelector (this.selectedBoardSelect, data?.materialId, data?.thickness, data?.material); this.selectedBoardSelect.disabled = !data || data.editable === false || this.host.dimensionsBlocked ();
         for (const [key, input] of this.dimensionFields) { input.disabled = !data || data.editable === false || this.host.dimensionsBlocked (); if (changed || document.activeElement !== input) { const value = data ? data[data.basis][key] ?? data[key] : null; input.value = value === null || value === undefined ? '' : String (Number ((value / factor).toFixed (6))); if (key === 'tolerance') { input.placeholder = data?.tolerance === null ? 'Mixed · edit per axis' : ''; input.title = 'Set the same score tolerance for every axis; Measurement layer shows total material/process uncertainty.'; } } }
+        this.boardDirection.disabled = !data?.material || data.editable === false || this.host.dimensionsBlocked () || !this.host.updateBoardDirection; if (document.activeElement !== this.boardDirection) { this.boardDirection.value = data?.material?.fluteDirectionDegrees ?? ''; }
         this.dimensionMode.disabled = !data || this.host.dimensionsBlocked ();
     }
     RefreshAppearance () { const state = this.host.appearance?.(); for (const [key, input] of this.appearanceControls || []) { input.disabled = this.generating || this.host.blocked () || !state?.available || !this.host.updateAppearance; if (key === 'enabled') { input.checked = state?.settings.enabled ?? true; } else { input.value = String (state?.settings[key] ?? 0); } } }
