@@ -1755,6 +1755,54 @@
       }
     },
     {
+      "id": "packaging.cad.preview",
+      "title": "Show or hide CAD 3D preview",
+      "category": "Packaging",
+      "description": "Show or hide the movable preview of the current main 3D scene. The CAD workspace must already be open.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "visible": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "visible"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "visible": true
+      }
+    },
+    {
+      "id": "packaging.cad.face",
+      "title": "Choose CAD face",
+      "category": "Packaging",
+      "description": "Choose inside or mirrored outside CAD display and matching dimension basis without changing canonical paths or the 3D model.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "face": {
+            "type": "string",
+            "enum": [
+              "inside",
+              "outside"
+            ]
+          }
+        },
+        "required": [
+          "face"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "face": "outside"
+      }
+    },
+    {
       "id": "packaging.open",
       "title": "Open packaging design",
       "category": "Packaging",
@@ -2224,7 +2272,7 @@
       "id": "packaging.export",
       "title": "Export packaging vectors",
       "category": "Packaging",
-      "description": "Return SVG or DXF contents in millimeters with separate CUT and SCORE layers. Does not download or publish.",
+      "description": "Return SVG, EPS or DXF at physical scale. SVG and DXF have separate cut, score and perforation layers; EPS uses color-coded process groups.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -2233,6 +2281,7 @@
             "type": "string",
             "enum": [
               "svg",
+              "eps",
               "dxf"
             ]
           }
@@ -2250,7 +2299,7 @@
       "id": "packaging.download",
       "title": "Download packaging vectors",
       "category": "Packaging",
-      "description": "Download a local SVG or DXF file at physical millimeter scale. No remote publication.",
+      "description": "Download a local SVG, EPS or DXF dieline at physical scale. No remote publication.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -2259,6 +2308,7 @@
             "type": "string",
             "enum": [
               "svg",
+              "eps",
               "dxf"
             ]
           }

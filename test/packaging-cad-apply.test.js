@@ -30,6 +30,29 @@ describe ('CAD Apply and manufacturing line tools', function () {
         assert.equal ((await r.Execute ('packaging.crease.configure', { kind : 'perforation', cutMm : 0, tieMm : 1 })).ok, false); assert.equal ((await r.Execute ('packaging.crease.configure', { kind : 'perforation', cutMm : 3 })).ok, false);
         assert.equal ((await r.Execute ('packaging.tool', { tool : 'pen' })).ok, true); p.AddDraftPoint ([1, 2], 'mm'); assert.equal ((await r.Execute ('packaging.tool', { tool : 'select' })).ok, false);
     });
+    it ('Preserves independently chosen perforation cut and gap lengths in CAD exports and undo', async () => {
+        const e = Editor (), p = e.packaging;
+        const a = p.AddPath ([[0, 0], [50, 0]], 'score', false, 'mm').pathId;
+        const b = p.AddPath ([[0, 10], [50, 10]], 'score', false, 'mm').pathId;
+        p.SelectPath (a); p.SelectPath (b, true);
+        const process = { kind : 'perforation', cutMm : 25.4 / 16, tieMm : 25.4 / 32 };
+        p.SetCreaseProcess (process);
+        for (const path of e.document.packaging.paths) { assert.deepEqual (path.process, process); }
+        assert.match (p.Export ('svg').text, /data-cut-mm="1\.5875" data-tie-mm="0\.79375"/);
+        assert.match (p.Export ('dxf').text, /cut=1\.5875mm tie=0\.79375mm/);
+        await e.history.Undo (); assert.ok (e.document.packaging.paths.every (path => !path.process));
+    });
+    it ('Switches and mirrors the CAD face without mutating canonical geometry', async () => {
+        const e = Editor (), p = e.packaging, registry = CreateAgentCommands (e.website); p.AddPath ([[10, 0], [30, 0]], 'score', false, 'mm'); const original = structuredClone (e.document.packaging); const initialView = { ...p.view };
+        const result = await registry.Execute ('packaging.cad.face', { face : 'outside' }); assert.equal (result.ok, true); assert.equal (p.Inspect ().cadFace, 'outside'); assert.equal (p.view.x, -initialView.x - initialView.width); assert.deepEqual (e.document.packaging, original);
+        p.SetCADFace ('inside'); assert.deepEqual (p.view, initialView); assert.throws (() => p.SetCADFace ('invalid'), /inside or outside/); assert.deepEqual (e.document.packaging, original);
+    });
+    it ('Rebuilds the selected model for flute direction and rejects unapplied CAD edits', async () => {
+        const e = Editor (), p = e.packaging; await p.GenerateFefco ({ length : 100, width : 80, height : 60 }); const source = e.selected; const id = source.id;
+        await p.UpdateBoardDirection (0); assert.equal (e.selected.id, id); assert.notEqual (e.selected, source); assert.equal (p.EngineeringInspect ().material.fluteDirectionDegrees, 0); assert.equal (e.selected.packagingProfile.engineering.materials.find (m => m.id === e.selected.packagingProfile.engineering.activeMaterialId).fluteDirectionDegrees, 0);
+        await e.history.Undo (); assert.equal (e.selected, source); assert.equal (p.EngineeringInspect ().material.fluteDirectionDegrees, 90); await e.history.Redo ();
+        p.SetName ('unapplied edit'); const current = e.selected; await assert.rejects (() => p.UpdateBoardDirection (45), /pending edits/); assert.equal (e.selected, current);
+    });
     it ('Does not restore stale selection into a different session during asynchronous generation', async () => {
         const e = Editor (); await e.packaging.GenerateFefco ({ length : 100, width : 80, height : 60 }); e.packaging.SetName ('changed'); const old = e.document; const pending = e.packaging.ApplyCAD (); e.document = new SceneDocument (); e.selected = null; await assert.rejects (() => pending, /workspace or account changed/); assert.equal (e.selected, null); assert.equal (e.document.objects.length, 0); assert.equal (old.objects.length, 1); assert.equal (e.busy, false);
     });

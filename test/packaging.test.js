@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { NewPackagingDesign, ValidatePackaging, PackagingContours, ExportPackagingSVG, ExportPackagingDXF } from '../source/website/packagingcore.js';
+import { NewPackagingDesign, ValidatePackaging, PackagingContours, ExportPackagingSVG, ExportPackagingDXF, ExportPackagingEPS } from '../source/website/packagingcore.js';
 import { CreatePackagingModel } from '../source/website/packagingadapter.js';
 import { PackagingWorkspace } from '../source/website/packagingworkspace.js';
 import { SceneDocument, SceneHistory } from '../source/website/scenedocument.js';
@@ -35,6 +35,11 @@ describe ('Packaging profiles', async () => {
     it ('Exports physical millimeter vectors in separate cut/score layers with closure preserved', async () => {
         const svg = ExportPackagingSVG (design ()); assert.match (svg, /width="100mm" height="60mm"/); assert.match (svg, /id="CUT"/); assert.match (svg, /id="SCORE"/); assert.match (svg, /stroke-dasharray/); assert.match (svg, /L0 60 Z/);
         const dxf = ExportPackagingDXF (design ()); assert.match (dxf, /\$INSUNITS\r\n70\r\n4/); assert.match (dxf, /8\r\nCUT/); assert.match (dxf, /8\r\nSCORE/); assert.match (dxf, /90\r\n4\r\n70\r\n1/); assert.match (dxf, /90\r\n2\r\n70\r\n0/);
+    });
+    it ('Exports 1:1 EPS and distinct cut, score, and perforation process colors', () => {
+        const profile = design (); profile.paths.push ({ id : 'perf', type : 'score', closed : false, points : [[10, 20], [50, 20]], process : { kind : 'perforation', cutMm : 1.5875, tieMm : 0.79375 } });
+        const eps = ExportPackagingEPS (profile); assert.match (eps, /^%!PS-Adobe-3\.0 EPSF-3\.0/); assert.match (eps, /72 25\.4 div dup scale/); assert.match (eps, /100 60 lineto/); assert.match (eps, /%%BeginAuto3DProcess: PERFORATION/); assert.match (eps, /\[1\.5875 0\.79375\] 0 setdash/);
+        assert.match (ExportPackagingSVG (profile), /id="PERFORATION" fill="none" stroke="#39a96b"/); assert.match (ExportPackagingDXF (profile), /2\r\nPERFORATION\r\n70\r\n0\r\n62\r\n3/);
     });
     it ('Round-trips editable design and board profile through session, model and worker archives', async () => {
         const doc = new SceneDocument (); doc.packaging = design (); const board = doc.AddImported (await CreatePackagingModel (doc.packaging), 'Board'); board.packagingProfile = doc.packaging;

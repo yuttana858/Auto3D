@@ -1,8 +1,12 @@
 # Auto3D development log and handoff
 
-## Browser regression suite repaired — Auto3D 0.54.1 / Packaging 1.10.5 / Primary Products 0.5.0 (2026-11-09)
+## Browser regression suite repaired — Auto3D 0.54.2 / Packaging 1.10.6 / Primary Products 0.5.0 (2026-11-10)
 
-The 23 stale browser tests now pass against current behavior and joined the CI `browser` job (64 tests). Fixes the standalone Packaging preview's fold/unfold completion error. `ai-extended` and `mcp-access` remain outside the job. See [release-0541.md](release-0541.md).
+The 23 stale browser tests now pass against current behavior and joined the CI `browser` job (64 tests). Fixes the standalone Packaging preview's fold/unfold completion error. `ai-extended` and `mcp-access` remain outside the job. See [release-0542.md](release-0542.md).
+
+## CAD designer updates — Auto3D 0.54.1 / Packaging 1.10.5 / Primary Products 0.5.0
+
+Inside/outside face and measurement views, movable 3D scene preview, flute direction control, multi-line process assignment and 1:1 EPS export. Artwork import and automatic fold-rig reconstruction remain pending. See [release-0541.md](release-0541.md).
 
 ## Planar dimension brackets — Auto3D 0.54.0 / Packaging 1.10.4 / Primary Products 0.5.0
 
