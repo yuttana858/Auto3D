@@ -23,6 +23,15 @@ export function ValidScopes (scopes)
 {
     return Array.isArray (scopes) && scopes.includes ('auto3d.read') && scopes.length <= Scopes.length && new Set (scopes).size === scopes.length && scopes.every (scope => Scopes.includes (scope));
 }
+// Scopes the user approves on the consent form. The form offers full access (write) and
+// screenshots whatever the client requested, so a client that only asks for auto3d.read can
+// still be granted every tool. Forms without the permissions marker keep the requested scopes.
+export function GrantedScopes (requested, form)
+{
+    if (!form.has ('permissions')) { return [...requested]; }
+    const chosen = { 'auto3d.write' : form.get ('write') === '1', 'auto3d.capture' : form.get ('capture') === '1' };
+    return Scopes.filter (scope => Object.hasOwn (chosen, scope) ? chosen[scope] : requested.includes (scope));
+}
 export function Json (data, status = 200)
 {
     return Response.json (data, { status, headers : { 'Cache-Control' : 'no-store', 'X-Content-Type-Options' : 'nosniff' } });

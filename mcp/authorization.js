@@ -1,6 +1,6 @@
 import { OAuthAuthorizationServer, OAuthError } from '@cloudflare/workers-oauth-provider';
 import { RequireAdmin } from '../functions/_lib/accounts.js';
-import { AgentName, ErrorCode, Identifier, Json, PilotConfig, ReadBytes, ReadJson, Scopes, ValidScopes } from './common.js';
+import { AgentName, ErrorCode, GrantedScopes, Identifier, Json, PilotConfig, ReadBytes, ReadJson, Scopes, ValidScopes } from './common.js';
 import { ActiveRegistration, BrowserIdentity } from './identity.js';
 import { CompleteAgentConsent } from './consent-completion.js';
 
@@ -73,15 +73,21 @@ export async function Consent (request, env, provider, identity = BrowserIdentit
         if (!ValidScopes (authRequest.scope)) { return Page ('Only pilot read, write and optional screenshot access are supported.', undefined, 400); }
         const consent = await oauth.beginConsent (authRequest), expiresAt = Date.now () + 600000;
         const binding = await Binding (env, consent.handle, user.id, expiresAt);
-        const writeWarning = authRequest.scope.includes ('auto3d.write') ? '<p><strong>Write access:</strong> this grant can use the full Auto3D command catalog, including tools that change the app and account or administrator controls. Account and administrator operations remain subject to Auto3D authorization.</p>' : '<p>Without write access, this grant can use only the basic read-only app tools.</p>';
-        const captureWarning = authRequest.scope.includes ('auto3d.capture') ? '<p>Screenshot access is also requested. The connected app window must separately allow screenshots.</p>' : '';
-        return Page ('<h1>Connect Auto3D</h1><p>Account: ' + Escape (user.email || user.id) + '</p><p>Client: ' + Escape (details.clientName) + '</p><p>' + (details.clientDomain ? 'Client domain: ' + Escape (details.clientDomain) : 'The client name is self-reported.') + '</p><p>Redirect host: ' + Escape (details.redirectHost) + '</p>' + (details.redirectIsLoopback ? '<p>A local application will receive this authorization.</p>' : '') + '<p>Permissions: ' + authRequest.scope.map (Escape).join (', ') + '. Read the session you select. You can revoke this agent in Agent access; inactive refresh credentials may expire.</p>' + writeWarning + captureWarning + '<form method="post"><input type="hidden" name="handle" value="' + Escape (consent.handle) + '"><input type="hidden" name="binding" value="' + binding + '"><button name="decision" value="approve">Allow</button><button name="decision" value="deny" formnovalidate>Deny</button></form>', consent.headers, 200, details.redirectUri);
+        const requestedWrite = authRequest.scope.includes ('auto3d.write'), requestedCapture = authRequest.scope.includes ('auto3d.capture');
+        // Full access and screenshots are offered (and preselected) even when the client asked only for read access.
+        const access = '<fieldset class="consent_access"><legend>Access for this agent</legend><input type="hidden" name="permissions" value="1">'
+            + '<label><input type="checkbox" name="write" value="1" checked><span><strong>Full access:</strong> read and write with every Auto3D tool</span></label>'
+            + '<p>Full access can use the full Auto3D command catalog, including tools that change the app and account or administrator controls. Account and administrator operations remain subject to Auto3D authorization. Untick it to allow only the basic read-only app tools.' + (requestedWrite ? '' : ' The client requested read-only access.') + '</p>'
+            + '<label><input type="checkbox" name="capture" value="1" checked><span><strong>Screenshots</strong></span></label>'
+            + '<p>The connected app window must separately allow screenshots.' + (requestedCapture ? '' : ' The client did not request screenshots.') + '</p></fieldset>';
+        return Page ('<h1>Connect Auto3D</h1><p>Account: ' + Escape (user.email || user.id) + '</p><p>Client: ' + Escape (details.clientName) + '</p><p>' + (details.clientDomain ? 'Client domain: ' + Escape (details.clientDomain) : 'The client name is self-reported.') + '</p><p>Redirect host: ' + Escape (details.redirectHost) + '</p>' + (details.redirectIsLoopback ? '<p>A local application will receive this authorization.</p>' : '') + '<p>Requested permissions: ' + authRequest.scope.map (Escape).join (', ') + '. Read the session you select. You can revoke this agent in Agent access; inactive refresh credentials may expire.</p><form method="post">' + access + '<input type="hidden" name="handle" value="' + Escape (consent.handle) + '"><input type="hidden" name="binding" value="' + binding + '"><button name="decision" value="approve">Allow</button><button name="decision" value="deny" formnovalidate>Deny</button></form>', consent.headers, 200, details.redirectUri);
     }
     if (!/^application\/x-www-form-urlencoded(?:\s*;|$)/i.test (request.headers.get ('Content-Type') || '')) { return Page ('Invalid form.', undefined, 400); }
     const form = new URLSearchParams (new TextDecoder ().decode (await ReadBytes (request, 8192)));
     const standard = !form.has ('name') && !form.has ('harness');
     const keys = standard ? ['handle', 'binding', 'decision'] : ['handle', 'binding', 'name', 'harness', 'decision'];
-    if ([...form.keys ()].some (key => !keys.includes (key) && key !== 'appWindowCode') || keys.some (key => form.getAll (key).length !== 1) || form.getAll ('appWindowCode').length > 1) { return Page ('Invalid form.', undefined, 400); }
+    const optional = ['appWindowCode', 'permissions', 'write', 'capture'];
+    if ([...form.keys ()].some (key => !keys.includes (key) && !optional.includes (key)) || keys.some (key => form.getAll (key).length !== 1) || optional.some (key => form.getAll (key).length > 1) || ['permissions', 'write', 'capture'].some (key => form.has (key) && form.get (key) !== '1')) { return Page ('Invalid form.', undefined, 400); }
     const handle = form.get ('handle'), parts = form.get ('binding').split ('.'), expiresAt = Number (parts[0]);
     if (handle.length > 512 || !Number.isSafeInteger (expiresAt) || expiresAt <= Date.now () || expiresAt > Date.now () + 600000 || !/^[a-f0-9]{64}$/.test (parts[1] || '') || parts.length !== 2) { return Page ('Consent expired.', undefined, 403); }
     const signature = Uint8Array.from (parts[1].match (/../g), byte => parseInt (byte, 16));
@@ -96,7 +102,9 @@ export async function Consent (request, env, provider, identity = BrowserIdentit
     if (appWindowCode && !await broker.CheckWindowCode ({ accountId : user.id, code : appWindowCode })) {
         return Page ('That window code is unavailable. In Auto3D, reconnect the app window and copy its new code. Use your browser Back button to return to the permission form and enter it.', undefined, 400);
     }
-    const approved = await oauth.approveConsent (request, handle);
+    const consented = await oauth.approveConsent (request, handle);
+    if (!ValidScopes (consented.request.scope)) { return Page ('Invalid scopes.', undefined, 403); }
+    const approved = { ...consented, request : { ...consented.request, scope : GrantedScopes (consented.request.scope, form) } };
     if (!ValidScopes (approved.request.scope)) { return Page ('Invalid scopes.', undefined, 403); }
     if (standard) { const details = await oauth.describeConsent (approved.request); name = AgentName (String (details.clientName).slice (0, 80)); }
     const registrationId = crypto.randomUUID ();
