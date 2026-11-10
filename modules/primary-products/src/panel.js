@@ -82,6 +82,8 @@ export class PrimaryProductsPanel
             this.BindDimension (input, key); this.inputs.set (key, [{ input, unit }]);
         }
         Element ('p', 'pp_draft_note', 'Press Enter to resize the selected generated product live; Tab updates only the draft.', dimensions);
+        const calloutLabel = Element ('label', 'pp_toggle', undefined, dimensions); this.callouts = Element ('input', '', undefined, calloutLabel); this.callouts.type = 'checkbox'; this.callouts.setAttribute ('aria-label', 'Show W × L × H on model'); Element ('span', '', 'Show W × L × H on model', calloutLabel);
+        this.callouts.addEventListener ('change', () => { if (this.host.setCallouts) { this.Action (() => this.host.setCallouts (this.callouts.checked)); } });
         this.shapeSection = Element ('section', 'pp_section', undefined, controls); Element ('h3', '', 'Bottle shape', this.shapeSection); this.shapeInputs = new Map ();
         for (const [key, title] of [['neckDiameterMm', 'Neck diameter'], ['shoulderHeightMm', 'Shoulder height'], ['neckHeightMm', 'Neck height'], ['capHeightMm', 'Cap height']]) {
             const label = Element ('label', 'pp_field', title, this.shapeSection), wrap = Element ('span', 'pp_input_wrap', undefined, label), input = Element ('input', '', undefined, wrap), unit = Element ('span', 'pp_unit', '', wrap);
@@ -171,6 +173,7 @@ export class PrimaryProductsPanel
                 input.title = round && key !== 'heightMm' ? 'Width and length share the round product diameter.' : '';
             }
         }
+        this.callouts.checked = draft.callouts !== false; this.callouts.disabled = disabled || !this.host.setCallouts; this.callouts.parentElement.hidden = !this.host.setCallouts;
         this.shapeSection.hidden = draft.family !== 'bottle';
         if (draft.family === 'bottle') { const shape = BottleShape (draft); for (const [key, { input, unit : suffix }] of this.shapeInputs) { input.value = String (Number ((shape[key]/factor).toFixed (6))); input.min = String (.5/factor); input.max = String (1000/factor); suffix.textContent = unit; } }
         this.material.replaceChildren ();

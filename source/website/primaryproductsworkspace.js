@@ -1,6 +1,7 @@
 import { Unit } from '../engine/model/unit.js';
 import { ProductDefinition, ValidateProductDefinition } from '../../modules/primary-products/src/definition.js';
 import { PrimaryProductModel } from './primaryproductsadapter.js';
+import { ProductCalloutRecords, ValidateDimensions } from './dimensioncore.js';
 
 export const PrimaryProductDataKey = '_auto3dPrimaryProduct';
 export class PrimaryProductsWorkspace
@@ -32,7 +33,7 @@ export class PrimaryProductsWorkspace
             if (editor.document !== target || panel.website.auth?.user?.id !== owner || editor.readOnly || panel.website.accountReady === false || source && (!target.objects.includes (source) || editor.selected !== source)) { throw new Error ('The account, selection or session changed during generation.'); }
         };
         this.active = true; editor.busy = true; panel.Refresh (); editor.RefreshButtons?.();
-        let object;
+        let object, calloutsAdded = false, restoreDimensions = null;
         try {
             const module = await this.load (); unchanged ();
             const unit = target.objects.length ? previousUnit : Unit.Millimeter;
@@ -45,19 +46,25 @@ export class PrimaryProductsWorkspace
                 target.Remove (object); target.Remove (source); target.Restore (object, index);
             }
             object.userData[PrimaryProductDataKey] = JSON.stringify (definition); editor.selected = object;
+            // New products get W × L × H callout brackets in the same Undo step; rebuilt products keep their existing callouts.
+            const dimensionsBefore = target.dimensions || [], visibleBefore = target.dimensionsVisible !== false; let dimensionsAfter = dimensionsBefore;
+            if (!source && panel.callouts !== false) { try { dimensionsAfter = ValidateDimensions ([...dimensionsBefore, ...ProductCalloutRecords (target, object)]); } catch { dimensionsAfter = dimensionsBefore; } }
+            const showDimensions = forward => { target.dimensions = forward ? dimensionsAfter : dimensionsBefore; target.dimensionsVisible = forward && dimensionsAfter !== dimensionsBefore ? true : visibleBefore; panel.website.dimensions?.Draw?.(panel.website.viewer?.camera); };
+            calloutsAdded = dimensionsAfter !== dimensionsBefore; restoreDimensions = () => showDimensions (false); showDimensions (true);
             await editor.Render ();
             if (editor.document !== target || panel.website.auth?.user?.id !== owner || editor.readOnly || panel.website.accountReady === false) { throw new Error ('The account or session changed before generation completed.'); }
             const apply = async forward => {
                 if (editor.document !== target) { throw new Error ('This product belongs to another session.'); }
-                target.Remove (forward ? source : object);
+                target.Remove (forward ? source : object); showDimensions (forward);
                 if (forward) { target.Restore (object, index); } else if (source) { target.Restore (source, index); }
                 editor.selected = forward ? object : previous && target.objects.includes (previous) ? previous : null;
                 await editor.Render (); panel.Refresh ();
             };
             editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) });
             editor.Status?.(source ? 'Updated Primary Products object.' : 'Added Primary Products object.');
-            return { objectId : object.id, updated : Boolean (source), units : 'mm', definition, components : model.meshes.map (mesh => mesh.GetName ()) };
+            return { objectId : object.id, updated : Boolean (source), units : 'mm', definition, components : model.meshes.map (mesh => mesh.GetName ()), callouts : calloutsAdded };
         } catch (error) {
+            restoreDimensions?.();
             if (object) { target.Remove (object); if (source && !target.objects.includes (source)) { target.Restore (source, index); } if (!target.objects.length) { target.model.SetUnit (previousUnit); } }
             if (editor.document === target && panel.website.auth?.user?.id === owner) { editor.selected = previous && target.objects.includes (previous) ? previous : null; if (object) { await editor.Render (); } }
             throw error;

@@ -6660,6 +6660,28 @@
       }
     },
     {
+      "id": "primary.callouts.set",
+      "title": "Show product W × L × H callouts",
+      "category": "Primary Products",
+      "description": "Show or hide W × L × H callout brackets on the 3D model. Applies to newly generated products and immediately to the selected generated product (one Undo step on the Dimensions layer). Callouts follow live resizes.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "visible": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "visible"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "visible": true
+      }
+    },
+    {
       "id": "primary.configure",
       "title": "Configure product draft",
       "category": "Primary Products",
