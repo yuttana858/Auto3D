@@ -1,9 +1,18 @@
 import { readFileSync } from 'node:fs';
 import { PrimaryProductsVersion } from '../src/state.js';
 import assert from 'node:assert/strict';
-import { DefaultProductDraft, UpdateProductDraft } from '../src/state.js';
+import { DefaultProductDraft, UpdateProductDraft, ProductSize, DimensionChanges } from '../src/state.js';
 describe ('Primary Products draft state', () => {
     it ('keeps the module and package versions aligned', () => { assert.equal (PrimaryProductsVersion, JSON.parse (readFileSync (new URL ('../package.json', import.meta.url))).version); });
+    it ('maps W × L × H to round diameters and pack width/depth', () => {
+        const bottle = DefaultProductDraft ('bottle'), pouch = DefaultProductDraft ('pouch');
+        assert.deepEqual (ProductSize (bottle), { widthMm : 65, lengthMm : 65, heightMm : 190 }); assert.deepEqual (ProductSize (pouch), { widthMm : 140, lengthMm : 40, heightMm : 200 });
+        assert.deepEqual (DimensionChanges (bottle, { lengthMm : 70, heightMm : 210 }), { diameterMm : 70, heightMm : 210 }); assert.deepEqual (DimensionChanges (bottle, { widthMm : 72, lengthMm : 72 }), { diameterMm : 72 });
+        assert.throws (() => DimensionChanges (bottle, { widthMm : 70, lengthMm : 80 }), /one diameter/);
+        assert.deepEqual (DimensionChanges (pouch, { widthMm : 150, lengthMm : 30 }), { widthMm : 150, depthMm : 30 });
+        for (const bad of [{}, { depthMm : 3 }, { widthMm : NaN }, null, [1]]) { assert.throws (() => DimensionChanges (pouch, bad), /width, length or height/); }
+        assert.deepEqual (ProductSize (UpdateProductDraft (pouch, DimensionChanges (pouch, { lengthMm : 25 }))), { widthMm : 140, lengthMm : 25, heightMm : 200 });
+    });
     it ('switches families atomically and resets incompatible surface defaults', () => {
         const bottle = UpdateProductDraft (DefaultProductDraft (), { material : 'glass', heightMm : 254 });
         const can = UpdateProductDraft (bottle, { family : 'can' }); assert.equal (can.material, 'aluminum'); assert.equal (can.heightMm, 122); assert.equal (bottle.material, 'glass');

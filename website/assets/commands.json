@@ -6600,6 +6600,66 @@
       }
     },
     {
+      "id": "primary.designs.generate",
+      "title": "Generate product design",
+      "category": "Primary Products",
+      "description": "Select a catalog design and generate it as one undoable session object, the same action as clicking its design card. Opaque materials only.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "food-can"
+      }
+    },
+    {
+      "id": "primary.dimensions.set",
+      "title": "Set product dimensions",
+      "category": "Primary Products",
+      "description": "Set W × L × H in canonical mm (round products: width and length are the diameter). When apply is true (default) and a generated product of the same family is selected, it is rebuilt live in one Undo step, keeping identity and placement; otherwise only the draft changes.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "widthMm": {
+            "type": "number",
+            "minimum": 2,
+            "maximum": 500
+          },
+          "lengthMm": {
+            "type": "number",
+            "minimum": 2,
+            "maximum": 500
+          },
+          "heightMm": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 1000
+          },
+          "apply": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "widthMm": 70,
+        "heightMm": 200
+      }
+    },
+    {
       "id": "primary.configure",
       "title": "Configure product draft",
       "category": "Primary Products",

@@ -1,7 +1,7 @@
 import { ProductCategories, ListProductDesigns, ProductDesign } from './catalog.js';
 import { GetArtworkZones } from './zones.js';
 import { ListProductMaterials } from './materials.js';
-import { PrimaryFamilies, PrimaryProductsVersion, BottleShape, DefaultProductDraft } from './state.js';
+import { PrimaryFamilies, PrimaryProductsVersion, BottleShape, DefaultProductDraft, ProductSize, DimensionChanges } from './state.js';
 function Element (tag, className, text, parent)
 {
     const node = document.createElement (tag); if (className) { node.className = className; } if (text !== undefined) { node.textContent = text; } parent?.appendChild (node); return node;
@@ -29,7 +29,20 @@ function DesignPreview (design)
         const sh = Math.min (45, h*.45), depth = Math.min (45, d.depthMm*scale*.5), top = 100-sh-depth;
         shape = `<path d="M${x} ${top+depth}L${x+12} ${top}H${x+w}l-12 ${depth}Z"/><path d="M${x} ${top+depth}v${sh}h${w-12}l12 -${depth}V${top}M${x+w-12} ${top+depth}v${sh}"/>`;
     }
-    return `<svg class="pp_design_preview" viewBox="0 0 120 140" fill="${d.color}" fill-opacity=".22" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true">${shape}</svg>`;
+    const size = ProductSize (d), top = d.family === 'clamshell' ? 100 - Math.min (45, h*.45) - Math.min (45, d.depthMm*scale*.5) : y, right = x + w;
+    // The outline is drawn at 82% to leave room for readable callouts; map its edges into the same space.
+    const k = .82, X = value => 4 + value * k, Y = value => 4 + value * k, left = X (x), edge = X (right), base = Y (120);
+    const callouts = Bracket (left, base + 8, edge, base + 8, 'W ' + Format (size.widthMm), 'below', 12) + Bracket (edge + 6, Y (top), edge + 6, base, 'H ' + Format (size.heightMm), 'right', 12) + Bracket (edge - 4, base + 3, edge + 8, base - 8, 'L ' + Format (size.lengthMm), 'oblique', 12);
+    return `<svg class="pp_design_preview" viewBox="0 0 150 140" fill="${d.color}" fill-opacity=".22" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><g transform="translate(4 4) scale(${k})">${shape}</g><g class="pp_callout" fill="currentColor" fill-opacity="1" stroke-width="1">${callouts}</g></svg>`;
+}
+function Format (mm) { return String (Math.round (mm * 10) / 10); }
+// A dimension callout: extension ticks at both ends, a dimension line and its value, drawn in SVG user units.
+function Bracket (x1, y1, x2, y2, text, side, size = 8)
+{
+    const dx = x2 - x1, dy = y2 - y1, length = Math.hypot (dx, dy) || 1, nx = -dy / length * 3, ny = dx / length * 3;
+    const tick = (x, y) => `M${x - nx} ${y - ny}L${x + nx} ${y + ny}`;
+    const label = side === 'below' ? `<text x="${(x1 + x2) / 2}" y="${y1 + size + 1}" text-anchor="middle">${text}</text>` : side === 'right' ? `<text x="${x1 + 4}" y="${(y1 + y2) / 2 + size / 3}">${text}</text>` : `<text x="${x2 + 2}" y="${y2 - 1}">${text}</text>`;
+    return `<path d="M${x1} ${y1}L${x2} ${y2}${tick (x1, y1)}${tick (x2, y2)}" fill="none"/>${label.replace ('<text', '<text stroke="none" font-size="' + size + '"')}`;
 }
 export class PrimaryProductsPanel
 {
@@ -48,6 +61,11 @@ export class PrimaryProductsPanel
         for (const [id, name] of Object.entries (ProductCategories).filter (([id]) => !['bottles', 'cans', 'pouches'].includes (id))) { const button = Element ('button', '', name, categories); button.type = 'button'; button.addEventListener ('click', ()=>this.host.catalog(id, true)); }
         this.drawer = Element ('section', 'pp_design_drawer', undefined, this.root); this.drawer.setAttribute ('aria-label', 'Product designs'); this.drawer.tabIndex = -1;
         const header = Element ('div', 'pp_drawer_header', undefined, this.drawer); this.drawerTitle=Element('h3', '', 'Designs', header);
+        const drawerSize = Element ('div', 'pp_drawer_size', undefined, header); drawerSize.setAttribute ('aria-label', 'Size · W × L × H');
+        for (const [key, label] of [['widthMm', 'W'], ['lengthMm', 'L'], ['heightMm', 'H']]) {
+            const field = Element ('label', 'pp_field', label, drawerSize), wrap = Element ('span', 'pp_input_wrap', undefined, field), input = Element ('input', '', undefined, wrap), unit = Element ('span', 'pp_unit', '', wrap);
+            input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', 'Design ' + { W : 'width', L : 'length', H : 'height' }[label]); this.BindDimension (input, key); this.drawerInputs = this.drawerInputs || new Map (); this.drawerInputs.set (key, { input, unit });
+        }
         const close=Element('button', '', 'Close designs', header); this.drawerClose = close; close.type='button';close.addEventListener('click', ()=>this.host.catalog(this.host.inspect().catalogCategory, false));
         this.drawerGrid=Element('div', 'pp_design_grid', undefined, this.drawer);
         this.drawer.addEventListener ('keydown', event => { if (event.key === 'Escape') { event.stopPropagation (); event.preventDefault (); this.host.catalog (this.host.inspect ().catalogCategory, false); } });
@@ -58,11 +76,12 @@ export class PrimaryProductsPanel
         this.profileName = Element ('span', 'pp_profile_name', '', this.stage); this.drawing = Element ('div', 'pp_drawing', undefined, this.stage);
         this.size = Element ('div', 'pp_size', '', this.stage); Element ('span', 'pp_profile_note', 'Illustrative profile', this.stage);
         const controls = Element ('div', 'pp_controls', undefined, this.layout);
-        const dimensions = Element ('section', 'pp_section', undefined, controls); Element ('h3', '', 'Dimensions · H × W × D', dimensions); const row = Element ('div', 'pp_dimension_row', undefined, dimensions); this.inputs = new Map ();
-        for (const [key, label] of [['heightMm', 'Height'], ['widthMm', 'Width'], ['depthMm', 'Depth']]) {
-            const field = Element ('label', 'pp_field', label, row); const wrap = Element ('span', 'pp_input_wrap', undefined, field); const input = Element ('input', '', undefined, wrap); input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', 'Product ' + label.toLowerCase ()); this.inputs.set (key, input); const unit = Element ('span', 'pp_unit', '', wrap); this.inputs.set (key + 'Unit', unit);
-            input.addEventListener ('change', () => this.Change ({ [!['pouch', 'clamshell'].includes (this.host.inspect ().family) && key !== 'heightMm' ? 'diameterMm' : key] : input.valueAsNumber * this.Factor () }));
+        const dimensions = Element ('section', 'pp_section', undefined, controls); Element ('h3', '', 'Dimensions · W × L × H', dimensions); const row = Element ('div', 'pp_dimension_row', undefined, dimensions); this.inputs = new Map ();
+        for (const [key, label] of [['widthMm', 'Width'], ['lengthMm', 'Length'], ['heightMm', 'Height']]) {
+            const field = Element ('label', 'pp_field', label, row); const wrap = Element ('span', 'pp_input_wrap', undefined, field); const input = Element ('input', '', undefined, wrap); input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', 'Product ' + label.toLowerCase ()); const unit = Element ('span', 'pp_unit', '', wrap);
+            this.BindDimension (input, key); this.inputs.set (key, [{ input, unit }]);
         }
+        Element ('p', 'pp_draft_note', 'Press Enter to resize the selected generated product live; Tab updates only the draft.', dimensions);
         this.shapeSection = Element ('section', 'pp_section', undefined, controls); Element ('h3', '', 'Bottle shape', this.shapeSection); this.shapeInputs = new Map ();
         for (const [key, title] of [['neckDiameterMm', 'Neck diameter'], ['shoulderHeightMm', 'Shoulder height'], ['neckHeightMm', 'Neck height'], ['capHeightMm', 'Cap height']]) {
             const label = Element ('label', 'pp_field', title, this.shapeSection), wrap = Element ('span', 'pp_input_wrap', undefined, label), input = Element ('input', '', undefined, wrap), unit = Element ('span', 'pp_unit', '', wrap);
@@ -106,11 +125,23 @@ export class PrimaryProductsPanel
     }
     async Action (action)
     {
-        try { await action (); this.status.textContent = 'Product action completed.'; this.drawerStatus.textContent = this.status.textContent; }
+        try { const result = await action (); this.status.textContent = result?.message || 'Product action completed.'; this.drawerStatus.textContent = this.status.textContent; }
         catch (error) { this.status.textContent = error.message; this.drawerStatus.textContent = error.message; }
         finally { this.Refresh (); }
     }
     ReportError (message) { this.status.textContent = message; }
+    // Enter applies the dimension and rebuilds the selected generated product; Tab or blur only updates the draft.
+    BindDimension (input, key)
+    {
+        input.addEventListener ('keydown', event => { if (event.key !== 'Enter') { return; } event.preventDefault (); event.stopPropagation (); this.enterInput = input; this.SetDimension (key, input.valueAsNumber * this.Factor (), true); });
+        input.addEventListener ('change', () => { if (this.enterInput === input) { this.enterInput = null; return; } this.SetDimension (key, input.valueAsNumber * this.Factor (), false); });
+        input.addEventListener ('blur', () => { if (this.enterInput === input) { this.enterInput = null; } });
+    }
+    SetDimension (key, mm, live)
+    {
+        if (live && this.host.setDimensions) { return this.Action (() => this.host.setDimensions ({ [key] : mm })); }
+        try { this.Change (DimensionChanges (this.host.inspect (), { [key] : mm })); } catch (error) { this.status.textContent = error.message; this.Refresh (); }
+    }
     Factor () { return this.host.units () === 'standard' ? 25.4 : 1; }
     Change (changes)
     {
@@ -131,11 +162,14 @@ export class PrimaryProductsPanel
     {
         const draft = this.host.inspect (), factor = this.Factor (), unit = factor === 1 ? 'mm' : 'in', disabled = this.host.blocked ();
         for (const [family, button] of this.cards) { button.setAttribute ('aria-pressed', String (draft.family === family)); button.disabled = disabled; }
-        for (const key of ['heightMm', 'widthMm', 'depthMm']) {
-            const input = this.inputs.get (key), value = key !== 'heightMm' && !['pouch', 'clamshell'].includes (draft.family) ? draft.diameterMm : draft[key];
-            input.value = String (Math.round (value / factor * 1000) / 1000); input.disabled = disabled;
-            input.min = String ((key === 'heightMm' ? 20 : key === 'depthMm' && ['pouch', 'clamshell'].includes (draft.family) ? 2 : 10) / factor); input.max = String ((key === 'heightMm' ? 1000 : key === 'depthMm' && ['pouch', 'clamshell'].includes (draft.family) ? 200 : 500) / factor); this.inputs.get (key + 'Unit').textContent = unit;
-            input.title = ['pouch', 'clamshell'].includes (draft.family) || key === 'heightMm' ? '' : 'Width and depth share the round product diameter.';
+        const size = ProductSize (draft), round = !['pouch', 'clamshell'].includes (draft.family);
+        for (const key of ['widthMm', 'lengthMm', 'heightMm']) {
+            const limits = key === 'heightMm' ? [20, 1000] : key === 'lengthMm' && !round ? [2, 200] : [10, 500];
+            for (const { input, unit : suffix } of [...this.inputs.get (key), this.drawerInputs?.get (key)].filter (Boolean)) {
+                if (document.activeElement !== input) { input.value = String (Math.round (size[key] / factor * 1000) / 1000); }
+                input.disabled = disabled; input.min = String (limits[0] / factor); input.max = String (limits[1] / factor); suffix.textContent = unit;
+                input.title = round && key !== 'heightMm' ? 'Width and length share the round product diameter.' : '';
+            }
         }
         this.shapeSection.hidden = draft.family !== 'bottle';
         if (draft.family === 'bottle') { const shape = BottleShape (draft); for (const [key, { input, unit : suffix }] of this.shapeInputs) { input.value = String (Number ((shape[key]/factor).toFixed (6))); input.min = String (.5/factor); input.max = String (1000/factor); suffix.textContent = unit; } }
@@ -149,7 +183,7 @@ export class PrimaryProductsPanel
         if (art) { for (const [key, input] of this.artInputs) { input.value = String (Math.round (art[key] / factor * 1000) / 1000); } }
         for (const [zone, button] of this.zones) { button.hidden = ['pouch', 'clamshell'].includes (draft.family) && zone === 'wrap'; button.textContent = draft.family === 'clamshell' ? (zone === 'front' ? 'Top label' : 'Bottom label') : { front : 'Front label', back : 'Back label', wrap : 'Wrap label' }[zone]; button.setAttribute ('aria-pressed', String (draft.labelZone === zone)); button.disabled = disabled; }
         this.Drawer (draft.catalogOpen === true); this.drawerTitle.textContent = ProductCategories[draft.catalogCategory] || 'Designs';
-        const catalogKey = draft.catalogCategory + ':' + unit; if (catalogKey !== this.catalogKey) { this.catalogKey = catalogKey; this.drawerGrid.replaceChildren (); for (const design of ListProductDesigns (draft.catalogCategory)) { const button = Element ('button', 'pp_design_card', undefined, this.drawerGrid); button.type='button'; button.innerHTML=DesignPreview(design); Element('strong', '', design.name, button); Element('small', '', design.description, button); const dimensions = design.changes; Element ('small', '', [dimensions.heightMm, dimensions.widthMm || dimensions.diameterMm, dimensions.depthMm || dimensions.diameterMm].map (v => Number ((v/factor).toFixed (2))).join (' × ') + ' ' + unit, button); button.title=design.dimensionsAre; button.addEventListener('click', ()=>this.Action(()=>this.host.selectDesign(design.id))); } }
+        const catalogKey = draft.catalogCategory + ':' + unit; if (catalogKey !== this.catalogKey) { this.catalogKey = catalogKey; this.drawerGrid.replaceChildren (); for (const design of ListProductDesigns (draft.catalogCategory)) { const button = Element ('button', 'pp_design_card', undefined, this.drawerGrid); button.type='button'; button.innerHTML=DesignPreview(design); Element('strong', '', design.name, button); const size = ProductSize (ProductDesign (design.id)); Element ('small', 'pp_design_size', [size.widthMm, size.lengthMm, size.heightMm].map (v => Number ((v/factor).toFixed (2))).join (' × ') + ' ' + unit, button); button.title=design.description + ' · ' + design.dimensionsAre; button.setAttribute ('aria-label', 'Generate ' + design.name); button.addEventListener('click', ()=>this.Action(()=>this.host.generateDesign ? this.host.generateDesign(design.id) : this.host.selectDesign(design.id))); } }
         this.profileName.textContent = PrimaryFamilies[draft.family].name;
         this.size.textContent = ['pouch', 'clamshell'].includes (draft.family) ? [draft.heightMm, draft.widthMm, draft.depthMm].map (n => (n / factor).toFixed (factor === 1 ? 0 : 2)).join (' × ') + ' ' + unit : 'Ø ' + (draft.diameterMm / factor).toFixed (factor === 1 ? 0 : 2) + ' × ' + (draft.heightMm / factor).toFixed (factor === 1 ? 0 : 2) + ' ' + unit;
         this.SetDisabled ();
@@ -157,7 +191,8 @@ export class PrimaryProductsPanel
             const scale = Math.min (180/draft.widthMm, 250/draft.depthMm), w = draft.widthMm*scale, d = draft.depthMm*scale;
             const labelW = (art?.widthMm || draft.widthMm*.55)*scale, labelH = (art?.heightMm || draft.depthMm*.55)*scale;
             const label = preview ? `<image href="${preview}" x="${120-labelW/2}" y="${175-labelH/2}" width="${labelW}" height="${labelH}" preserveAspectRatio="xMidYMid meet"/>` : `<rect x="${120-labelW/2}" y="${175-labelH/2}" width="${labelW}" height="${labelH}" fill="none" stroke="#458b9b" stroke-dasharray="4 4"/>`;
-            this.drawing.innerHTML = `<svg viewBox="0 0 240 350" role="img" aria-label="Clamshell top reference"><rect x="${120-w/2}" y="${175-d/2}" width="${w}" height="${d}" rx="${Math.min(w, d)*.1}" fill="${draft.color}" stroke="currentColor" stroke-opacity=".35"/>${label}</svg>`;
+            const callouts = Bracket (120-w/2, 175+d/2+14, 120+w/2, 175+d/2+14, 'W ' + Format (size.widthMm / factor) + ' ' + unit, 'below', 11) + Bracket (120+w/2+10, 175-d/2, 120+w/2+10, 175+d/2, 'L ' + Format (size.lengthMm / factor), 'right', 11);
+            this.drawing.innerHTML = `<svg viewBox="0 0 240 350" role="img" aria-label="Clamshell top reference"><rect x="${120-w/2}" y="${175-d/2}" width="${w}" height="${d}" rx="${Math.min(w, d)*.1}" fill="${draft.color}" stroke="currentColor" stroke-opacity=".35"/>${label}<g class="pp_callout" fill="currentColor" stroke="currentColor" stroke-width=".8">${callouts}<text x="120" y="${175-d/2-10}" text-anchor="middle" stroke="none" font-size="11">H ${Format (size.heightMm / factor)} ${unit}</text></g></svg>`;
             return;
         }
         const bottle = draft.family === 'bottle', pouch = ['pouch', 'clamshell'].includes (draft.family); const width = Math.max (70, Math.min (160, (draft.diameterMm || draft.widthMm) / draft.heightMm * 280)), x = 120 - width / 2;
@@ -166,6 +201,6 @@ export class PrimaryProductsPanel
         const zoneDraft = DefaultProductDraft (draft.family); for (const key of Object.keys (zoneDraft)) { zoneDraft[key] = draft[key]; } if (draft.bottleShape) { zoneDraft.bottleShape = draft.bottleShape; }
         const zone = GetArtworkZones (zoneDraft).find (z => z.id === draft.labelZone), artHeight = art?.heightMm || zone.heightMm*.7, labelY = sy (zone.bottomMm+(zone.heightMm+artHeight)/2), labelHeight = artHeight/draft.heightMm*250;
         const labelX = draft.labelZone === 'wrap' ? x + 1 : 120 - width * .32, labelW = draft.labelZone === 'wrap' ? width - 2 : width * .64;
-        this.drawing.innerHTML = `<svg viewBox="0 0 240 350" role="img" aria-label="${draft.family === 'clamshell' ? 'Clamshell' : pouch ? 'Pouch' : bottle ? 'Bottle' : 'Can'} profile reference"><ellipse cx="120" cy="319" rx="75" ry="9" fill="currentColor" opacity=".07"/><path d="${body}" fill="${draft.color}" fill-opacity="${draft.material === 'glass' ? '.3' : '1'}" stroke="currentColor" stroke-opacity=".23" stroke-width="1.5"/>${pouch ? `<path d="M${x} 85h${width}M${x} 295h${width}" stroke="currentColor" stroke-opacity=".3"/>` : bottle ? `<rect x="${120-neckWidth*.54}" y="55" width="${neckWidth*1.08}" height="${capBottom-55}" fill="#859497"/>` : `<ellipse cx="120" cy="90" rx="${width / 2}" ry="6" fill="#cbd3d4" stroke="#7a898b"/><ellipse cx="120" cy="91" rx="12" ry="3" fill="#859497"/>`}${preview ? `<image href="${preview}" x="${labelX}" y="${labelY}" width="${labelW}" height="${labelHeight}" preserveAspectRatio="xMidYMid meet"/>` : `<rect x="${labelX}" y="${labelY}" width="${labelW}" height="${labelHeight}" fill="none" stroke="#458b9b" stroke-dasharray="4 4"/>`}</svg>`;
+        this.drawing.innerHTML = `<svg viewBox="0 0 240 350" role="img" aria-label="${draft.family === 'clamshell' ? 'Clamshell' : pouch ? 'Pouch' : bottle ? 'Bottle' : 'Can'} profile reference"><ellipse cx="120" cy="319" rx="75" ry="9" fill="currentColor" opacity=".07"/><path d="${body}" fill="${draft.color}" fill-opacity="${draft.material === 'glass' ? '.3' : '1'}" stroke="currentColor" stroke-opacity=".23" stroke-width="1.5"/>${pouch ? `<path d="M${x} 85h${width}M${x} 295h${width}" stroke="currentColor" stroke-opacity=".3"/>` : bottle ? `<rect x="${120-neckWidth*.54}" y="55" width="${neckWidth*1.08}" height="${capBottom-55}" fill="#859497"/>` : `<ellipse cx="120" cy="90" rx="${width / 2}" ry="6" fill="#cbd3d4" stroke="#7a898b"/><ellipse cx="120" cy="91" rx="12" ry="3" fill="#859497"/>`}${preview ? `<image href="${preview}" x="${labelX}" y="${labelY}" width="${labelW}" height="${labelHeight}" preserveAspectRatio="xMidYMid meet"/>` : `<rect x="${labelX}" y="${labelY}" width="${labelW}" height="${labelHeight}" fill="none" stroke="#458b9b" stroke-dasharray="4 4"/>`}<g class="pp_callout" fill="currentColor" stroke="currentColor" stroke-width=".8">${Bracket (x, 336, x + width, 336, 'W ' + Format (size.widthMm / factor) + ' ' + unit, 'below', 11)}${Bracket (x + width + 10, bottle ? 55 : pouch ? 75 : 84, x + width + 10, 305, 'H ' + Format (size.heightMm / factor), 'right', 11)}<text x="${x + width + 4}" y="322" stroke="none" font-size="11">L ${Format (size.lengthMm / factor)}</text></g></svg>`;
     }
 }

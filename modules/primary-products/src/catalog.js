@@ -27,5 +27,11 @@ add('retail-wide', 'Wide retail shell', 'clamshell-retail', 'clamshell', {height
 add('food-deli', 'Deli shell', 'clamshell-food', 'clamshell', {heightMm:65, widthMm:180, depthMm:130}, 'pp', 'Closed food-pack presentation');
 add('food-bakery', 'Bakery shell', 'clamshell-food', 'clamshell', {heightMm:90, widthMm:220, depthMm:180}, 'petOpaque', 'Tall bakery cavity');
 add('food-fiber', 'Fiber takeaway', 'clamshell-food', 'clamshell', {heightMm:70, widthMm:200, depthMm:180}, 'moldedFiber', 'Opaque fiber-look presentation');
+add('pint-can', 'Pint utility can', 'cans', 'can', {heightMm:100, diameterMm:85}, 'steel', 'Squat straight-wall container');
+add('mini-beverage', 'Mini beverage can', 'beverages', 'can', {heightMm:92, diameterMm:58}, 'aluminum', 'Small-portion beverage format');
+add('coffee-pillow', 'Coffee pillow pack', 'pouches', 'pouch', {heightMm:240, widthMm:130, depthMm:55}, 'foil', 'Tall filled pack presentation');
+add('bar-wrapper', 'Bar wrapper', 'pouches', 'pouch', {heightMm:140, widthMm:45, depthMm:15}, 'glossFilm', 'Narrow flow-wrap envelope');
+add('retail-slim', 'Slim retail shell', 'clamshell-retail', 'clamshell', {heightMm:28, widthMm:120, depthMm:70}, 'petOpaque', 'Low-profile accessory cavity');
+add('food-punnet', 'Produce shell', 'clamshell-food', 'clamshell', {heightMm:75, widthMm:120, depthMm:100}, 'petOpaque', 'Compact produce cavity');
 export function ListProductDesigns(category){if(category!==undefined&&!Object.hasOwn(ProductCategories, category)){throw new Error('Unknown product category.');}return designs.filter(d=>!category||d.category===category).map(d=>structuredClone(d));}
 export function ProductDesign(id){const item=designs.find(d=>d.id===id);if(!item){throw new Error('Unknown product design.');}return UpdateProductDraft(DefaultProductDraft(item.family), item.changes);}
