@@ -167,11 +167,21 @@ try {
     const beforeCan = (await call ('scene.inspect')).objects.length; await drawer.getByRole ('button', { name : 'Generate Standard beverage can' }).click ();
     await objectCountReaches (beforeCan + 1);
     const can = (await call ('scene.inspect')).objects.at (-1); assert.equal ((await call ('primary.selected.load')).family, 'can'); assert.equal ((await call ('primary.inspect')).heightMm, 122);
+    /* The generated can carries W × L × H callout brackets on the 3D model. */
+    const calloutsFor = async id => (await call ('dimensions.inspect')).dimensions.filter (d => d.objectId === id);
+    assert.equal ((await calloutsFor (can.id)).length, 3); await page.waitForFunction (() => ['W · 66 mm', 'L · 66 mm', 'H · 122 mm'].every (label => [...document.querySelectorAll ('[data-dimension-id] text')].some (node => node.textContent === label)), null, { timeout : 120000 });
     const designHeight = drawer.getByRole ('spinbutton', { name : 'Design height', exact : true }); assert.equal (await designHeight.inputValue (), '122');
     await designHeight.fill ('150'); await designHeight.press ('Enter');
     await page.waitForFunction (() => document.querySelector ('.pp_design_drawer .pp_status')?.textContent.startsWith ('Resized selected product to 66 × 66 × 150 mm'), null, { timeout : 120000 });
     assert.equal ((await call ('scene.inspect')).objects.at (-1).id, can.id); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 150);
+    await page.waitForFunction (() => [...document.querySelectorAll ('[data-dimension-id] text')].some (node => node.textContent === 'H · 150 mm'), null, { timeout : 120000 }); /* callouts follow the live resize */
     await call ('history.undo'); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 122); await call ('history.redo');
+    const heightCallout = (await calloutsFor (can.id)).find (d => d.axis === 'height'); await call ('dimensions.value', { id : heightCallout.id, valueMm : 160 }); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 160);
+    await call ('history.undo'); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 150);
+    const toggle = panel.getByRole ('checkbox', { name : 'Show W × L × H on model', exact : true }); assert.equal (await toggle.isChecked (), true); await toggle.uncheck ();
+    for (const end = Date.now () + 120000; (await calloutsFor (can.id)).length; await page.waitForTimeout (100)) { assert.ok (Date.now () < end, 'callouts were not removed'); } /* other products keep theirs */
+    assert.ok ((await call ('dimensions.inspect')).dimensions.some (d => d.objectId !== can.id));
+    const restored = await call ('primary.callouts.set', { visible : true }); assert.equal (restored.changed, true); assert.equal ((await calloutsFor (can.id)).length, 3);
     const productWidth = panel.getByRole ('spinbutton', { name : 'Product width', exact : true }); await productWidth.fill ('60'); await productWidth.press ('Tab');
     assert.equal ((await call ('primary.inspect')).diameterMm, 60); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).diameterMm, 66); /* Tab changes only the draft */
     const resized = await call ('primary.dimensions.set', { widthMm : 58, heightMm : 140 }); assert.equal (resized.updated, true); assert.equal (resized.objectId, can.id); assert.deepEqual ([resized.widthMm, resized.lengthMm, resized.heightMm], [58, 58, 140]);

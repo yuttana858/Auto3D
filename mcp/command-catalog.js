@@ -248,6 +248,7 @@ export const CommandIds = Object.freeze ([
     'primary.designs.select',
     'primary.designs.generate',
     'primary.dimensions.set',
+    'primary.callouts.set',
     'primary.configure',
     'primary.generate',
     'primary.selected.load',

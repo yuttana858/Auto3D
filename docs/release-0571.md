@@ -1,24 +1,19 @@
-# Auto3D 0.57.1 — MCP write scope advertised
+# Auto3D 0.57.1 — right-drag orbit, live new-box dimensions and 3D product callouts
 
-Primary Products remains 0.8.0 and Packaging remains 1.10.6. Based on main after merged PR #95 (0.57.0). Not deployed.
+Packaging 1.10.7; Primary Products 0.8.1. PR #96. Based on main after merged PR #95 (0.57.0). Not deployed.
 
-## Problem
+**Right-drag rotates again.** In the main viewer, right-drag left/right now rotates the camera around the view center instead of panning sideways; up/down still tilts. This reverses the 0.53.1 sideways pan. Each right-drag first re-centers the orbit on the selected model, so the camera turns to face it and rotates around it without moving the eye or changing zoom. With nothing selected, it orbits the current view center. Middle-drag still pans, and the mini viewer is unchanged. The engine keeps the `rightDragPansHorizontally` option, but the main viewer no longer enables it.
 
-An MCP client connected through OAuth could browse all six catalog families (283 commands in 25 categories) but could not run any of them. Every grant was read-only, so `auto3d.commands.invoke` was never listed.
+**New-box ID/OD dimensions update live.** In the Packaging panel's Box Dimensions section, pressing Enter in the Width (W), Length (L) or Height (H) field now updates the model.
+- **A generated box is selected:** that dimension is applied to it in the chosen basis (Inside/ID, Outside/OD or Score/CAD). This uses the same service as the selected-box fields and the `packaging.dimensions.update` path, keeps the object identity and adds one Undo step. Inside/outside targets still need applicable converter allowance factors, and a missing factor is reported in the panel.
+- **No box is selected:** Enter generates the current style from the draft, the same as clicking its catalog card.
+- Typing without Enter still only edits the draft. The card click handler is now a shared `GenerateStyle` method.
 
-The cause was in `mcp/resource-handler.js`. The resource server was configured with `requiredScopes : ['auto3d.read']`. The Cloudflare OAuth library publishes that list as the protected-resource `scopes_supported` and as the `scope` of the unauthenticated 401 `WWW-Authenticate` challenge. MCP clients choose the scopes to request from those two sources before the authorization server's full `scopes_supported`, so they requested only `auto3d.read`. The consent page then showed the read-only wording. Write-gated calls returned an ordinary `permission_required` tool error, which gives clients no standard signal to re-authorize. The existing tests did not catch this because they hand-pick `auto3d.write`, as does `docs/diagnose_mcp_discovery.mjs`.
+**W × L × H callouts on 3D products.** Generated Primary Products now carry three bracket callouts in the viewport, labelled `W · …`, `L · …` and `H · …`:
+- **W** sits along the front-bottom edge, **L** along the right-bottom edge and **H** on the front-right vertical edge, each offset outward from the product's envelope.
+- They are a new `design` kind on the existing Dimensions layer. Their lengths come from the product definition in mm, not from the tessellated mesh, so they are exact for round bottles and cans too. They follow live resizes, object moves and rotations, and are listed, hidden and deleted like other dimensions.
+- For new products they are added in the same Undo step as the generation.
+- Double-clicking a callout (or `dimensions.value`) edits that dimension and rebuilds the product live through `primary.dimensions.set`'s path.
+- The panel's **Show W × L × H on model** checkbox (`primary.callouts.set`) sets this for new products and adds or removes the callouts on the selected product (one Undo step). On a scaled object, the label reports the measured scaled length and value editing is disabled, the same as for boxes.
 
-## Change
-
-- `ResourceScopes` (`mcp/common.js`) is `['auto3d.read', 'auto3d.write']`. The resource metadata and the 401 challenge now advertise both, so clients request write access and the consent page shows the existing full-access warning. The library only publishes these scopes; it does not require them on tokens. Read-only grants keep working, and `PilotService.Assert` still requires only `auto3d.read`.
-- `auto3d.capture` is not advertised. Screenshot access stays an explicit opt-in that also needs the window's screenshot setting.
-- Write-gated tools (`auto3d.commands.categories`, `.list`, `.invoke`, `auto3d.headless.fefco`, and the save and delete actions of `auto3d.headless.projects`) throw `MissingScopeError ('auto3d.write')`. When a call from a read-only grant hits one, `/mcp` answers HTTP 403 `insufficient_scope`. Its `WWW-Authenticate` challenge names the grant's current scopes plus `auto3d.write` and links the resource metadata (MCP step-up authorization). The broker still enforces the write scope on its own.
-- `docs/mcp-pilot.md` records the advertised scopes and corrects the catalog count from 261 to 283.
-
-## Upgrade note
-
-Existing read-only grants are unchanged. Revoke such a grant in Preferences → Agent access, or let the client re-authorize through the step-up challenge, and approve the write-access consent.
-
-## Validation
-
-`npm run test_mcp`: 64 passing. The new assertions check the advertised `scopes_supported` and the 401 challenge scope, check the 403 step-up challenge and its complete scope list for a read-only `auto3d.headless.fefco` call, check that a read-only delete is refused while the project remains, check that the read-only tools are still listed, and check that the service error names `auto3d.write`. Without the source change, 5 of these assertions fail.
+Validation: application lint, 803 app/module tests (new: callouts in the generation Undo step, live resize, toggle off and design-kind validation), 64 MCP tests, and the `selected-orbit`, `packaging-fold-dimensions`, `fefco`, `packaging-presets`, `packaging-thumbnail-generation`, `packaging-cleanup` and `packaging-module`, `primary-products` (new: 3D callout labels, resize following, `dimensions.value` edit with Undo, checkbox off and `primary.callouts.set`), `dimensions` and `packaging-measurements` browser tests pass. `selected-orbit` now asserts that right-drag keeps the view center on the selected model, including after a middle-drag pan moved it away. `packaging-fold-dimensions` asserts that Enter on the ID height resizes the selected box live with Undo/Redo.

@@ -92,8 +92,8 @@ export class SessionEditor
         this.controls = new TransformControls (viewer.camera, viewer.renderer.domElement); this.controls.setSize (0.8); this.helper = this.controls.getHelper (); viewer.scene.add (this.helper);
         viewer.renderer.domElement.addEventListener ('pointerdown', event => { this.shiftDragRequested = event.shiftKey && this.mode === 'translate'; }, true);
         viewer.navigation.onOrbitStart = () => this.OrbitSelected ();
-        // Main viewer: right-drag left/right moves the camera sideways; up/down still tilts around the selection.
-        viewer.navigation.rightDragPansHorizontally = true;
+        // Main viewer: right-drag orbits (left/right rotates, up/down tilts). Each drag starts by re-centering on the selected model.
+        viewer.navigation.rightDragPansHorizontally = false;
         let panControlsEnabled = null;
         viewer.navigation.onPanModifier = active => {
             if (active && panControlsEnabled === null) { panControlsEnabled = this.controls.enabled; this.controls.enabled = false; }

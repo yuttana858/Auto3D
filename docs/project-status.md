@@ -1,8 +1,12 @@
 # Auto3D development log and handoff
 
-## MCP write scope advertised — Auto3D 0.57.1 / Primary Products 0.8.0 / Packaging 1.10.6 (2026-11-10)
+## MCP write scope advertised — Auto3D 0.57.2 / Primary Products 0.8.1 / Packaging 1.10.7 (2026-11-10)
 
-MCP clients (including Claude) received read-only grants because `/mcp` advertised only `auto3d.read` in its resource metadata and 401 challenge, so the 283-command catalog could be browsed but not run. The resource now advertises `auto3d.read auto3d.write`, and write-gated calls from a read-only grant return an MCP step-up `insufficient_scope` challenge. Existing read-only grants must re-authorize. See [release-0571.md](release-0571.md).
+MCP clients (including Claude) received read-only grants because `/mcp` advertised only `auto3d.read` in its resource metadata and 401 challenge, so the 284-command catalog could be browsed but not run. The resource now advertises `auto3d.read auto3d.write`, and write-gated calls from a read-only grant return an MCP step-up `insufficient_scope` challenge. Existing read-only grants must re-authorize. See [release-0572.md](release-0572.md).
+
+## Right-drag orbit, live new-box dimensions and 3D product callouts — Auto3D 0.57.1 / Packaging 1.10.7 / Primary Products 0.8.1 (2026-11-10)
+
+Main-viewer right-drag rotates around the selected model again (the 0.53.1 sideways pan is reverted; vertical still tilts). Enter on the Packaging Box Dimensions W/L/H fields resizes the selected generated box live in the chosen ID/OD/score basis (one Undo step), or generates the current style when no box is selected. Generated products carry W × L × H callout brackets in 3D (definition-exact, editable by double-click, toggle `primary.callouts.set`). See [release-0571.md](release-0571.md).
 
 ## Parametric product design drawer — Auto3D 0.57.0 / Primary Products 0.8.0 / Packaging 1.10.6 (2026-11-10)
 

@@ -11,6 +11,7 @@ import { RecoverySnapshot } from '../source/website/sessionrecovery.js';
 import { PackRecoverySnapshot } from '../source/website/sessionrecoverypack.js';
 import { Unit } from '../source/engine/model/unit.js';
 import { CreateAgentCommands } from '../source/website/agentcommands.js';
+import { ResolveDimension, ValidateDimensions } from '../source/website/dimensioncore.js';
 
 function Fixture (load = async () => module)
 {
@@ -27,6 +28,19 @@ describe ('Primary Products scene integration', function () {
         const model = editor.document.model; assert.equal (model.materials[0].metalness, 0); assert.equal (model.materials[0].roughness, panel.draft.roughness);
         await editor.history.Undo (); assert.equal (editor.document.objects.length, 0);
         await editor.history.Redo (); assert.equal (editor.selected.id, r.result.objectId); assert.equal (editor.document.objects.length, 1);
+    });
+    it ('adds W × L × H callouts with the generation step and keeps them on live resizes', async function () {
+        this.timeout (20000); const { panel, editor, workspace } = Fixture (); panel.draft = module.UpdateProductDraft (module.DefaultProductDraft ('pouch'), { widthMm : 150, depthMm : 30, heightMm : 210 });
+        const made = await workspace.Generate (); assert.equal (made.callouts, true); const dims = editor.document.dimensions; assert.equal (dims.length, 3);
+        assert.deepEqual (dims.map (d => [d.kind, d.axis, d.objectId]), [['design', 'width', made.objectId], ['design', 'length', made.objectId], ['design', 'height', made.objectId]]);
+        const lengths = () => editor.document.dimensions.map (d => { const r = ResolveDimension (editor.document, d); assert.equal (r.stale, undefined, r.reason); return [r.basis, Math.round (r.lengthMm * 1000) / 1000, Math.round (r.length * 1000) / 1000]; });
+        assert.deepEqual (lengths (), [['W', 150, 150], ['L', 30, 30], ['H', 210, 210]]); assert.equal (editor.document.dimensionsVisible, true);
+        await editor.history.Undo (); assert.equal (editor.document.objects.length, 0); assert.deepEqual (editor.document.dimensions, []);
+        await editor.history.Redo (); assert.equal (editor.document.dimensions.length, 3);
+        panel.draft = module.UpdateProductDraft (panel.draft, { heightMm : 260 }); await workspace.Generate (true); assert.equal (editor.document.dimensions.length, 3); assert.deepEqual (lengths ()[2], ['H', 260, 260]);
+        panel.callouts = false; panel.draft = module.DefaultProductDraft ('can'); editor.selected = null; const plain = await workspace.Generate (); assert.equal (plain.callouts, false); assert.equal (editor.document.dimensions.length, 3);
+        assert.throws (() => ValidateDimensions ([{ id : 'x', objectId : 'o', kind : 'design', offset : 0, visible : true }]), /design/);
+        assert.throws (() => ValidateDimensions ([{ id : 'x', objectId : 'o', kind : 'design', axis : 'width', corner : [0, 0, 1], offset : 0, visible : true, mesh : 1 }]), /design dimension/);
     });
     it ('updates identity, transform, ordering and metadata without altering duplicates; undo restores original surfaces', async function () {
         const { panel, editor, workspace } = Fixture (); await workspace.Generate ();

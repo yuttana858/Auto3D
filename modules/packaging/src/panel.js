@@ -39,6 +39,7 @@ export class FefcoPanel
         for (const [key, text, value] of [['width', 'Width (W)', '300'], ['length', 'Length (L)', '400'], ['height', 'Height (H)', '250'], ['overlap', 'Flap overlap', '25']]) {
             const label = Element ('label', key === 'overlap' ? root : dimensions, text, 'fefco_field'); const input = Element ('input', label); input.type = 'number'; input.step = 'any'; input.value = String (Number ((Number (value) / workspace.factor ()).toFixed (6))); input.required = true; input.setAttribute ('aria-label', 'FEFCO ' + text); this.fields.set (key, { label, input }); this.controls.push (input);
             input.addEventListener ('input', () => this.draftDirty.add (key));
+            if (key !== 'overlap') { input.addEventListener ('keydown', event => { if (event.key !== 'Enter') { return; } event.preventDefault (); event.stopPropagation (); this.ApplyDraftDimension (key, input); }); }
         }
         this.newBoardSelect = this.CreateBoardSelector (root, 'Board', 'generation');
         this.closureLabel = Element ('label', root, undefined, 'fefco_field'); this.closure = Element ('select', this.closureLabel); this.closure.setAttribute ('aria-label', 'FEFCO top flaps'); this.closure.add (new Option ('Open · show inside', 'open')); this.closure.add (new Option ('Closed · shipping box', 'closed')); this.controls.push (this.closure);
@@ -48,14 +49,8 @@ export class FefcoPanel
             const button = Element ('button', grid, undefined, 'fefco_card'); button.type = 'button'; button.setAttribute ('aria-label', 'FEFCO ' + style.code + ' ' + style.acronym); button.title = style.description;
             const image = Element ('img', button); image.alt = ''; image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent (FefcoThumbnail (style.code)); image.width = 176; image.height = 140;
             Element ('strong', button, style.code + ' · ' + style.acronym); Element ('span', button, style.name);
-            button.addEventListener ('click', () => this.RunGeneration (async () => {
-                const changes = this.DraftParameters ();
-                // The overlap field is hidden unless the current box is 0202; only a visible or edited overlap is a request.
-                if (this.fields.get ('overlap').label.hidden && !this.draftDirty.has ('overlap')) { delete changes.overlap; }
-                let result;
-                if (workspace.preset) { result = await workspace.preset (style.code, changes); } else { const { basis, ...fields } = changes; if (basis !== 'score') { throw new Error ('This host requires a dimensional preset service to generate ID/OD targets. Select score or update the host.'); } await workspace.configure (FefcoPreset (fields, style.code, fields)); result = await workspace.generate (); }
-                this.Refresh (); return result;
-            })); this.cards.set (style.code, button); this.controls.push (button);
+            button.addEventListener ('click', () => this.GenerateStyle (style.code));
+            this.cards.set (style.code, button); this.controls.push (button);
         }
         this.generationStatus = Element ('p', root, '', 'section_hint'); this.generationStatus.setAttribute ('role', 'status'); this.generationStatus.setAttribute ('aria-live', 'polite');
         this.appearanceControls = new Map ();
@@ -91,6 +86,31 @@ export class FefcoPanel
         if (!active) { const current = new Option ('Current board · ' + (thickness ?? this.host.inspect ().thickness) + ' mm', '__current__'); select.add (current); }
         for (const flute of BoardFlutes) { const group = document.createElement ('optgroup'); group.label = flute + ' flute'; for (const record of records.filter (item => item.flute === flute)) { group.appendChild (new Option (record.name + ' · ' + record.caliperMm + ' mm', record.id)); } select.appendChild (group); }
         select.value = active?.id || '__current__';
+    }
+    GenerateStyle (code)
+    {
+        return this.RunGeneration (async () => {
+            const changes = this.DraftParameters ();
+            // The overlap field is hidden unless the current box is 0202; only a visible or edited overlap is a request.
+            if (this.fields.get ('overlap').label.hidden && !this.draftDirty.has ('overlap')) { delete changes.overlap; }
+            let result;
+            if (this.host.preset) { result = await this.host.preset (code, changes); } else { const { basis, ...fields } = changes; if (basis !== 'score') { throw new Error ('This host requires a dimensional preset service to generate ID/OD targets. Select score or update the host.'); } await this.host.configure (FefcoPreset (fields, code, fields)); result = await this.host.generate (); }
+            this.Refresh (); return result;
+        });
+    }
+    // Enter on a new-box W/L/H field resizes the selected generated box live in the chosen basis (one Undo step through the
+    // same service as the selected-box fields); with no box selected it generates the current style from the draft.
+    ApplyDraftDimension (key, input)
+    {
+        const value = input.valueAsNumber;
+        if (!Number.isFinite (value) || value <= 0) { this.generationStatus.textContent = 'Enter a positive ' + key + '.'; return; }
+        const selected = this.host.dimensions?.();
+        if (!selected?.objectId || selected.editable === false || !this.host.updateDimensions) { return this.GenerateStyle (this.host.inspect ().code); }
+        const basis = this.generationBasis.value, changes = { basis, [key] : value * this.host.factor () };
+        return this.host.run (async () => {
+            try { await this.host.updateDimensions (changes); this.draftDirty.delete (key); this.generationStatus.textContent = 'Updated selected box ' + key + ' · ' + { inside : 'ID', outside : 'OD', score : 'score' }[basis] + '.'; }
+            catch (error) { this.generationStatus.textContent = 'Cannot update box: ' + error.message; throw error; }
+        });
     }
     async RunGeneration (action)
     {
