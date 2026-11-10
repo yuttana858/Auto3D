@@ -23,13 +23,25 @@ try {
     };
     const waitIdle = () => page.waitForFunction (() => !document.querySelector ('input[aria-label="Enable board surface"]').disabled);
     const checkbox = page.getByLabel ('Enable board surface', { exact : true }); await checkbox.waitFor ();
+    /* Since Packaging 1.10.4 a change made while the scene is still busy is rejected with a wait message and the control is restored, so retry until the toggle is accepted. */
+    const rejection = 'Wait for the current operation to finish, then change the board surface again.';
+    const toggle = async enabled => {
+        for (let attempt = 0; attempt < 20; attempt++) {
+            await waitIdle (); if (await checkbox.isChecked () === enabled) { return; }
+            await page.evaluate (message => { for (const node of document.querySelectorAll ('p, div, span')) { if (node.childElementCount === 0 && node.textContent === message) { node.textContent = ''; } } }, rejection);
+            await checkbox.click (); await page.waitForTimeout (300); await waitIdle ();
+            const rejected = await page.evaluate (message => document.body.textContent.includes (message), rejection);
+            if (!rejected && await checkbox.isChecked () === enabled) { return; }
+        }
+        throw new Error ('Board surface toggle was never accepted');
+    };
     await pixels ('initial');
-    for (const enabled of [false, true]) { await checkbox.setChecked (enabled); await waitIdle (); await pixels ('enable ' + enabled); }
+    for (const enabled of [false, true]) { await toggle (enabled); await pixels ('enable ' + enabled); }
     for (const [label, value] of [['Panel bow', '1'], ['Fold softness', '2'], ['Cut compression', '1'], ['Paper grain', '.7']]) {
         await page.getByLabel (label, { exact : true }).evaluate ((input, value) => { input.value = value; input.dispatchEvent (new Event ('change', { bubbles : true })); }, value); await waitIdle (); await pixels (label);
     }
     await call ('packaging.fefco.camera', { autoFit : false }); await call ('packaging.fefco.scrub', { progress : .23 });
-    for (const enabled of [false, true]) { await checkbox.setChecked (enabled); await waitIdle (); await pixels ('folded enable ' + enabled); }
+    for (const enabled of [false, true]) { await toggle (enabled); await pixels ('folded enable ' + enabled); }
     await page.screenshot ({ path : 'work/board-panel-white-repro.png' });
     const rendering = await call ('lighting.shadow.inspect'); assert.equal (rendering.contextLost, false); assert.deepEqual (rendering.shaderErrors, []); assert.equal (rendering.rootVisible, true);
     await call ('diagnostics.shadow'); const log = await call ('diagnostics.list', { level : 'all' }); console.log ('Diagnostics', JSON.stringify (log)); console.log ('Console errors', JSON.stringify (messages)); assert.deepEqual (errors, []); assert.deepEqual (messages, []);

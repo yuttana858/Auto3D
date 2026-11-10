@@ -16,6 +16,7 @@ try {
     await page.route ('**/api/accounts/**', async (route) => {
         const action = route.request ().url ().split ('/').pop ();
         if (action === 'request') { submissions.push (route.request ().postDataJSON ()); await route.fulfill ({ status : 202, json : { message : 'Request received. An administrator will review it.' } }); return; }
+        if (action.startsWith ('users')) { await route.fulfill ({ json : { users : [{ ...user, name : 'Administrator', isAdmin : true, disabled : false }], hasMore : false } }); return; }
         if (action === 'review') { reviews.push (route.request ().postDataJSON ()); request.status = 'approved'; await route.fulfill ({ json : { request, message : 'Account created.' } }); return; }
         await route.fulfill ({ status : signedIn ? 200 : 401, json : signedIn ? { isAdmin : true, requests : [request] } : { error : 'Sign in.' } });
     });
@@ -41,7 +42,9 @@ try {
     await page.keyboard.press ('Escape'); await page.getByRole ('button', { name : 'Preferences', exact : true }).click ();
     await page.getByRole ('link', { name : 'Account administration — requests and approvals' }).click ();
     const admin = page.getByRole ('dialog', { name : 'Account administration', exact : true });
+    await admin.getByRole ('link', { name : 'Supabase user administration' }).waitFor (); /* the dialog opens after the account refresh */
     assert.equal (await admin.getByRole ('link', { name : 'Supabase user administration' }).count (), 1);
+    await admin.getByText ('Administrator · ' + user.email).waitFor ();
     await admin.getByLabel ('Initial password', { exact : true }).fill ('browser-temporary-password');
     await admin.getByRole ('button', { name : 'Approve account', exact : true }).click ();
     await page.waitForFunction (() => document.body.textContent.includes ('Status: approved'));

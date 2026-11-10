@@ -6,6 +6,8 @@ All 23 browser tests that were outside CI with stale expectations now pass and a
 
 Product fix (Packaging 1.10.5): the standalone Packaging preview failed at the end of every animated fold or unfold with "Cannot read properties of undefined (reading 'role')". The fold rig carries only liner and edge materials, so restoring inner and closed materials wrote `undefined` into the material list. The preview now falls back to the original box's materials. The Auto3D host path was not affected.
 
+The full serial run also exposed three timing races, now fixed in the tests: `accounts` counted the administration link before the dialog finished its account refresh and did not mock the user list the dialog now loads; `board-panel-visibility` (already in CI) clicked the board-surface toggle while the previous rebuild was still busy, which Packaging 1.10.4 deliberately rejects, so it now retries until the change is accepted; and `packaging-fold-dimensions` waited without a limit for the narrow `open box` stage (progress 0.68–0.76), which a slow frame can skip, so it now pauses at the first sample in or after that stage.
+
 CI also starts the standalone Packaging preview (port 8082) for `packaging-module`, and waits for it before the run. `ai-extended` (timing-sensitive) and `mcp-access` (covered by the MCP workflow) stay outside the browser job.
 
 Known UX notes, not changed here: `FefcoPreset` silently replaces an invalid 0202 overlap with the default (`packaging.fefco.configure` still rejects it), and an engineering-linked dimension edit sets no status, so an earlier "Enter a converter allowance factor…" message can remain after a later edit succeeds.
