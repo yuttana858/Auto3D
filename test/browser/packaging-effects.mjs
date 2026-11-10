@@ -14,6 +14,8 @@ try {
     const call = async (id, args = {}) => { const result = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (result.ok, true, JSON.stringify (result)); return result.result; };
     await call ('ui.ai.packaging'); await page.getByRole ('button', { name : 'Open packaging designer', exact : true }).click (); const dialog = page.getByRole ('dialog', { name : 'Packaging', exact : true }); await dialog.waitFor ();
     // Start with real canvas clicks and finish through the UI.
+    // The designer opens with the selection arrow; drawing uses the Pen tool.
+    await dialog.getByRole ('button', { name : 'Pen', exact : true }).click ();
     const canvas = dialog.getByLabel ('Packaging point-to-point drawing'); const bounds = await canvas.boundingBox ();
     for (const [x, y] of [[0.3, 0.3], [0.7, 0.3], [0.7, 0.7], [0.3, 0.7]]) { await page.mouse.click (bounds.x + bounds.width * x, bounds.y + bounds.height * y); }
     await dialog.getByRole ('button', { name : 'Close outline', exact : true }).click (); let design = await call ('packaging.inspect'); assert.equal (design.paths.length, 1); assert.equal (design.paths[0].closed, true);
@@ -35,7 +37,7 @@ try {
     await call ('history.undo'); assert.equal ((await call ('scene.inspect')).objects.length, 0); await call ('history.redo'); assert.equal ((await call ('scene.inspect')).objects.length, 1);
     await call ('packaging.open'); await call ('packaging.load_selected'); assert.equal ((await call ('packaging.inspect')).paths.length, 2); await page.getByRole ('button', { name : 'Close Packaging', exact : true }).click (); console.log ('Packaging canvas, precise entry, score assignment, editable caliper, units, downloads, extrusion and Undo/Redo passed.');
     // Raise a volumetric board so the shadow floor and reflection can be checked.
-    await call ('packaging.board', { thickness : 50, units : 'mm' }); await call ('packaging.extrude'); await call ('object.array', { width : 2, length : 1, height : 1, autoGroup : true }); assert.equal ((await call ('scene.inspect')).objects.length, 3); await call ('view.fit');
+    await call ('packaging.board', { thickness : 15, units : 'mm' }); /* the board model allows up to 15 mm caliper */ await call ('packaging.extrude'); await call ('object.array', { width : 2, length : 1, height : 1, autoGroup : true }); assert.equal ((await call ('scene.inspect')).objects.length, 3); await call ('view.fit');
     const pixels = async () => {
         const png = await page.locator ('#main_viewer canvas').first ().screenshot ();
         return page.evaluate (async (base64) => { const source = new Image (); source.src = 'data:image/png;base64,' + base64; await source.decode (); const image = document.createElement ('canvas'); image.width = source.width; image.height = source.height; const context = image.getContext ('2d'); context.drawImage (source, 0, 0); const bytes = context.getImageData (0, 0, image.width, image.height).data; let board = 0; for (let i = 0; i < bytes.length; i += 4) { if (bytes[i] > 40 && bytes[i] > bytes[i + 1] * 1.08 && bytes[i + 1] > bytes[i + 2] * 1.1) { board++; } } return board; }, png.toString ('base64'));

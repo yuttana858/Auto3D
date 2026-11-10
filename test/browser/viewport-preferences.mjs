@@ -13,7 +13,7 @@ try {
             if (route.request ().method () === 'PUT') { profiles[account] = route.request ().postDataJSON ().preferences; }
             await route.fulfill ({ json : { preferences : profiles[account], folders : ['Uncategorized'] } });
         });
-        const url = process.env.AUTO3D_TEST_URL || 'http://127.0.0.1:8082/';
+        const url = process.env.AUTO3D_TEST_URL || 'http://127.0.0.1:8080/website/index.html';
         await page.goto (url); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
         const inspect = () => page.evaluate (async () => (await Auto3D.execute ('preferences.viewport.quality.inspect')).result);
         assert.equal ((await inspect ()).mode, 'fast'); assert.equal ((await inspect ()).pixelRatio, 1);
@@ -25,7 +25,9 @@ try {
         await page.reload (); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
         assert.equal ((await inspect ()).mode, 'quality'); assert.equal ((await inspect ()).pixelRatio, 3);
         account = 'quality-user-b'; await page.reload (); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
-        assert.equal ((await inspect ()).mode, 'auto'); assert.equal ((await inspect ()).pixelRatio, 2);
+        /* Auto drops to 1x for 250 ms after camera movement (startup camera restore counts); check the settled ratio. */
+        let auto = await inspect (); for (let i = 0; i < 40 && auto.interacting; i++) { await page.waitForTimeout (50); auto = await inspect (); }
+        assert.equal (auto.mode, 'auto'); assert.equal (auto.interacting, false); assert.equal (auto.pixelRatio, 2);
         assert.deepEqual (errors, []); await page.close ();
     }
     console.log ('Desktop/mobile Preferences selector, account persistence, reload and account-isolated Auto default passed.');

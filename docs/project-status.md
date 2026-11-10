@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Browser regression suite repaired — Auto3D 0.56.1 / Packaging 1.10.6 / Primary Products 0.7.0 (2026-11-10)
+
+The 23 stale browser tests now pass against current behavior and joined the CI `browser` job (64 tests). Fixes the standalone Packaging preview's fold/unfold completion error, rejects an explicitly requested 0202 overlap that does not fit instead of replacing it, and reports successful engineering-linked dimension edits. `ai-extended` and `mcp-access` remain outside the job. See [release-0561.md](release-0561.md).
+
 ## Product design catalog — Auto3D 0.56.0 / Primary Products 0.7.0 / Packaging 1.10.5
 
 Adds six categories, 24 sourced illustrative presets, the animated bottom design drawer, rounded/tapered closed clamshell cavities and top/bottom artwork. Expands category finish materials and shared agent/MCP commands. See [release-0560.md](release-0560.md) and [research and remaining gates](primary-product-catalog-research.md). PR #93 is merged into #91. PR #91 incorporates main after merged Packaging #92, retaining both command sets and Packaging 1.10.5. Not deployed.

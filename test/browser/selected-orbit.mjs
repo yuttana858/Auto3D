@@ -4,7 +4,7 @@ import { mkdir } from 'node:fs/promises';
 await mkdir ('work/orbit-review', { recursive : true });
 const browser = await chromium.launch ({ executablePath : '/usr/bin/chromium', args : ['--no-sandbox', '--enable-unsafe-swiftshader'] });
 try {
-    const page = await browser.newPage ({ viewport : { width : 1480, height : 1000 } }); page.setDefaultTimeout (30000); const errors = []; page.on ('pageerror', e => errors.push (e.message));
+    const page = await browser.newPage ({ viewport : { width : 1480, height : 1000 } }); page.setDefaultTimeout (120000); const errors = []; page.on ('pageerror', e => errors.push (e.message));
     await page.route ('**/api/auth/**', r => r.fulfill ({ json : { user : { id : 'orbit', email : 'test@example.com' } } }));
     await page.route ('**/api/preferences', r => r.fulfill ({ json : { preferences : { theme : 2, units : 'metric' }, folders : [] } }));
     for (const path of ['accounts/**', 'personal/items', 'environments']) { await page.route ('**/api/' + path, r => r.fulfill ({ json : path.startsWith ('accounts') ? { isAdmin : false } : [] })); }

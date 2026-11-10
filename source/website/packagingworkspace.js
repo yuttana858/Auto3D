@@ -79,7 +79,7 @@ export class PackagingWorkspace
             if (source.scale.some (value => Math.abs (value - 1) > 1e-6)) { throw new Error ('Select an unscaled box and load its CAD before editing dimensions.'); }
             if (!changes || Object.keys (changes).some (key => !['basis', 'length', 'width', 'height', 'tolerance'].includes (key)) || !['inside', 'outside', 'score'].includes (changes.basis || this.dimensionBasis || 'inside')) { throw new Error ('Use the board selector for caliper and valid box dimension fields.'); }
             const dimensions = EngineeringMeasurements (source.packagingProfile).dimensions; const patches = dimensions.filter (dimension => ['length', 'width', 'height'].includes (dimension.id) && (changes[dimension.id] !== undefined || changes.tolerance !== undefined)).map (dimension => ({ id : dimension.id, mode : changes[dimension.id] === undefined ? dimension.mode : dimension.mode === 'parametric' ? 'parametric' : 'manual', ...(changes[dimension.id] !== undefined ? { targetMm : changes[dimension.id], basis : changes.basis || this.dimensionBasis || 'inside' } : {}), ...(changes.tolerance !== undefined ? { toleranceMm : changes.tolerance } : {}) }));
-            await this.UpdateEngineering ({ dimensions : patches }, source.id); return { objectId : editor.selected.id, dimensions : this.DimensionsInspect (), state : editor.selected.userData._auto3dPackagingState || 'folded' };
+            await this.UpdateEngineering ({ dimensions : patches }, source.id); const basis = changes.basis || this.dimensionBasis || 'inside'; editor.Status ('Updated box dimensions · ' + basis + (changes.tolerance !== undefined ? ' · tolerance ±' + changes.tolerance + ' mm' : '')); return { objectId : editor.selected.id, dimensions : this.DimensionsInspect (), state : editor.selected.userData._auto3dPackagingState || 'folded' };
         }
         if (!source?.userData?._auto3dFefco || source.scale.some (v => Math.abs (v - 1) > 1e-6)) { throw new Error ('Select an unscaled generated box or its dieline to edit dimensions.'); }
         if (!changes || Object.keys (changes).some (key => !['basis', 'length', 'width', 'height', 'thickness', 'tolerance'].includes (key))) { throw new Error ('Invalid box dimension fields.'); }
@@ -327,7 +327,7 @@ export class PackagingWorkspace
     GeneratePreset (code, changes = {})
     {
         this.Editable (); const { basis, ...fields } = changes;
-        const input = FefcoPreset ({ ...(this.fefco || DefaultFefco), ...(this.generationBoard ? { thickness : this.generationBoard.caliperMm } : {}), ...fields }, code);
+        const input = FefcoPreset ({ ...(this.fefco || DefaultFefco), ...(this.generationBoard ? { thickness : this.generationBoard.caliperMm } : {}), ...fields }, code, fields);
         if (basis === undefined || basis === 'score') { return this.GenerateFefco (input); }
         if (!['inside', 'outside'].includes (basis)) { throw new Error ('Choose inside, outside or score dimensions.'); }
         const material = this.GenerationMaterial (input, code);
@@ -407,7 +407,7 @@ export class PackagingWorkspace
             replacement = target.AddImported (model, source.name); Object.assign (replacement, { id : source.id, source : source.source, position : [...source.position], rotation : [...source.rotation], scale : [...source.scale], visible : source.visible, castShadow : source.castShadow !== false, receiveShadow : source.receiveShadow !== false, keyframes : structuredClone (source.keyframes || []), packagingProfile : next, userData : { ...source.userData, ...(parameters ? { _auto3dFefco : JSON.stringify (parameters) } : {}) } }); target.ApplyTransform (replacement);
             target.Remove (replacement); target.Remove (source); target.Restore (replacement, index); target.packaging = next; editor.selected = replacement; await editor.Render ();
             const apply = async forward => { target.Remove (forward ? source : replacement); target.Restore (forward ? replacement : source, index); target.packaging = forward ? next : savedDesign; editor.selected = forward ? replacement : previousSelected; this.fefco = forward ? parameters : originalParameters; await editor.Render (); this.Refresh (); };
-            editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); this.fefco = parameters; this.Refresh (); return result;
+            editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); this.fefco = parameters; editor.Status ('Updated CAD measurements.'); this.Refresh (); return result;
         } catch (error) { if (replacement) { target.Remove (replacement); } if (!target.objects.includes (source)) { target.Restore (source, index); } target.packaging = savedDesign; editor.selected = previousSelected; await editor.Render (); throw error; }
         finally { editor.busy = false; editor.RefreshButtons?.(); this.Refresh (); }
     }
