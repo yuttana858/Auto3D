@@ -23,3 +23,7 @@ To give an existing read-only grant full access, revoke it in Agent access and r
 ## Validation
 
 `npm run test_mcp`: 66 passing. A new test checks that the form defaults are ticked, that a read-only request plus Full access and Screenshots returns a token and registration with `auto3d.write` and `auto3d.capture` and lists `auto3d.commands.invoke` and `capture.image`, that unticking narrows a write request to read-only, and that an invalid checkbox value is rejected. Without the source change, 2 tests fail. The `mcp-consent` browser test now checks in Chromium that both boxes are ticked and that the exchanged token has the full scope set.
+
+## CI fix carried from 0.58.1
+
+The Command bar button that 0.58.1 (PR #97) added to the tool strip was missing from the right-click context menu. That broke the `workspace-commands` browser rule that every tool strip action is also in the context menu. **Command bar** is now the last context-menu item. Like the other items it is disabled while the app is busy, and it stays available to read-only viewers. `workspace-editing` lists the new item, and `commandtext` unit tests still check that every menu item is disabled while busy.
