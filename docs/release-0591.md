@@ -1,6 +1,6 @@
 # Auto3D 0.59.1 — full access chosen on the consent page
 
-Packaging remains 1.10.7 and Primary Products remains 0.10.0. Based on main after merged PR #100 (0.59.0). Not deployed.
+Packaging remains 1.10.7 and Primary Products remains 0.10.0. PR #101, based on main after merged PR #100 (0.59.0). Not deployed.
 
 ## Problem
 
