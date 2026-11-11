@@ -255,6 +255,8 @@ export const CommandIds = Object.freeze ([
     'primary.selected.load',
     'primary.update',
     'primary.materials.list',
+    'primary.materials.open',
+    'primary.artwork.apply',
     'primary.artwork.open',
     'primary.artwork.mapping',
     'primary.artwork.remove',

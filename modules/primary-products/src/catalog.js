@@ -1,8 +1,9 @@
 import { DefaultProductDraft, UpdateProductDraft } from './state.js';
-export const ProductCategories = Object.freeze ({ bottles:'Bottles', cans:'Cans', beverages:'Beverages', pouches:'Pouches', 'clamshell-retail':'Clamshells · retail', 'clamshell-food':'Clamshells · food' });
+export const ProductCategories = Object.freeze ({ bottles:'Bottles', cans:'Cans', beverages:'Beverages', pouches:'Pouches', clamshells:'Clamshells' });
+export const ProductCategoryFilters = Object.freeze ({ ...ProductCategories, 'clamshell-retail' : 'Retail clamshells', 'clamshell-food' : 'Food clamshells' });
 const sources = { bottles : 'https://www.berryglobal.com/en/product/bottles-vials', cans : 'https://www.silgancontainers.com/cans/', beverages : 'https://www.ball.com/packaging/beverage-cans', pouches : 'https://www.glenroy.com/flexible-packaging/', 'clamshell-retail' : 'https://www.placon.com/retail/', 'clamshell-food' : 'https://www.placon.com/food/materials/' };
 const designs=[];
-const add=(id, name, category, family, dimensions, material, description)=>designs.push({id, name, category, family, description, source : sources[category], changes:{family, ...dimensions, material}, dimensionsAre:'Illustrative outside dimensions; verify against your supplier drawing.'});
+const add=(id, name, category, family, dimensions, material, description)=>designs.push({id, name, category : family === 'clamshell' ? 'clamshells' : category, ...(family === 'clamshell' ? { subcategory : category } : {}), family, description, source : sources[category], changes:{family, ...dimensions, material}, dimensionsAre:'Illustrative outside dimensions; verify against your supplier drawing.'});
 add('round-care', 'Round personal care', 'bottles', 'bottle', {heightMm:190, diameterMm:65}, 'hdpe', 'General-purpose narrow-neck bottle');
 add('boston-inspired', 'Boston-style shoulder', 'bottles', 'bottle', {heightMm:150, diameterMm:65, bottleShape:{neckDiameterMm:28, shoulderHeightMm:22, neckHeightMm:12, capHeightMm:18}}, 'hdpe', 'Sloping shoulder presentation');
 add('cosmo-inspired', 'Tall cosmetic round', 'bottles', 'bottle', {heightMm:220, diameterMm:48, bottleShape:{neckDiameterMm:23, shoulderHeightMm:35, neckHeightMm:10, capHeightMm:22}}, 'petOpaque', 'Tall round body with a narrow closure');
@@ -36,5 +37,5 @@ add('oval-shampoo', 'Oval shampoo', 'bottles', 'bottle', {heightMm:200, diameter
 add('rect-cleaner', 'Rectangular cleaner', 'bottles', 'bottle', {heightMm:240, diameterMm:90, bottleSection:{shape:'rectangle', depthMm:55, cornerRadiusMm:12}}, 'hdpe', 'Rounded-rectangle household body');
 add('square-juice', 'Square juice bottle', 'beverages', 'bottle', {heightMm:210, diameterMm:62, bottleSection:{shape:'rectangle', depthMm:62, cornerRadiusMm:10}}, 'petOpaque', 'Square-shouldered beverage body');
 add('food-punnet', 'Produce shell', 'clamshell-food', 'clamshell', {heightMm:75, widthMm:120, depthMm:100}, 'petOpaque', 'Compact produce cavity');
-export function ListProductDesigns(category){if(category!==undefined&&!Object.hasOwn(ProductCategories, category)){throw new Error('Unknown product category.');}return designs.filter(d=>!category||d.category===category).map(d=>structuredClone(d));}
+export function ListProductDesigns(category){if(category!==undefined&&!Object.hasOwn(ProductCategoryFilters, category)){throw new Error('Unknown product category.');}return designs.filter(d=>!category || d.category === category || d.subcategory === category).map(d=>structuredClone(d));}
 export function ProductDesign(id){const item=designs.find(d=>d.id===id);if(!item){throw new Error('Unknown product design.');}return UpdateProductDraft(DefaultProductDraft(item.family), item.changes);}

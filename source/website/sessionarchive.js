@@ -77,6 +77,7 @@ function ReadMaterial (data)
             if (!value || ![value.r, value.g, value.b].every ((component) => Number.isFinite (component) && component >= 0 && component <= 255)) { throw new Error ('Invalid material color.'); }
             material[key] = new RGBColor (value.r, value.g, value.b);
         }
+        else if (['transmission', 'ior', 'thickness'].includes (key) && (!Number.isFinite (value) || value < (key === 'ior' ? 1 : 0) || value > (key === 'transmission' ? 1 : key === 'ior' ? 3 : 1e6))) { throw new Error ('Invalid optical material value.'); }
         else if (typeof material[key] === 'number' && !Number.isFinite (value)) { throw new Error ('Invalid material value.'); }
         else if (typeof material[key] !== 'object' || value === null) { material[key] = value; }
     }

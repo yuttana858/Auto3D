@@ -3730,6 +3730,9 @@
               "roughness",
               "metalness",
               "specularIntensity",
+              "transmission",
+              "ior",
+              "thickness",
               "bumpScale",
               "normalScale",
               "aoIntensity",
@@ -6548,6 +6551,7 @@
               "cans",
               "beverages",
               "pouches",
+              "clamshells",
               "clamshell-retail",
               "clamshell-food"
             ]
@@ -6576,6 +6580,7 @@
               "cans",
               "beverages",
               "pouches",
+              "clamshells",
               "clamshell-retail",
               "clamshell-food"
             ]
@@ -6812,6 +6817,7 @@
               "pp",
               "petOpaque",
               "glass",
+              "petClear",
               "aluminum",
               "steel",
               "coatedMetal",
@@ -6852,7 +6858,7 @@
       "id": "primary.generate",
       "title": "Generate product",
       "category": "Primary Products",
-      "description": "Generate the current opaque bottle/can/pouch draft as one undoable session object. Clear glass is unavailable. Imported local labels render on the generated model.",
+      "description": "Generate the current product draft as one undoable session object, including clear glass/PET. Imported local labels render on the generated model.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -6917,6 +6923,34 @@
       "example": {
         "family": "bottle"
       }
+    },
+    {
+      "id": "primary.materials.open",
+      "title": "Open product material editor",
+      "category": "Primary Products",
+      "description": "Load the selected product and open its advanced material and label editor.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "primary.artwork.apply",
+      "title": "Apply label artwork",
+      "category": "Primary Products",
+      "description": "Apply the selected product label draft in one Undo step, preserving edited body materials.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
     },
     {
       "id": "primary.artwork.open",

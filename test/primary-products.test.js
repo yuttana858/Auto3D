@@ -53,6 +53,6 @@ describe ('Primary Products readiness lifecycle', function () {
         SessionEditor.prototype.RefreshButtons.call (editor); assert.equal (content.add.disabled, true); assert.match (content.availability.textContent, /operation/);
         editor.busy = false; SessionEditor.prototype.RefreshButtons.call (editor); assert.equal (content.add.disabled, false); assert.equal (content.add.textContent, 'Generate'); assert.equal (content.availability.textContent, '');
         editor.readOnly = true; SessionEditor.prototype.RefreshButtons.call (editor); assert.equal (content.add.disabled, true); assert.match (content.availability.textContent, /editable/);
-        editor.readOnly = false; host.draft.material = 'glass'; SessionEditor.prototype.RefreshButtons.call (editor); assert.equal (content.add.disabled, true); assert.match (content.availability.textContent, /Glass/);
+        editor.readOnly = false; host.draft.material = 'glass'; SessionEditor.prototype.RefreshButtons.call (editor); assert.equal (content.add.disabled, false); assert.equal (content.availability.textContent, '');
     });
 });

@@ -5,7 +5,7 @@ import {CreateLabelMesh,ValidateProductArtwork} from '../src/artwork.js';
 import {ListProductMaterials} from '../src/materials.js';
 describe('Product design catalog and shells',()=>{
  it('builds every catalog design with finite geometry, supported materials and accurate closed bounds',()=>{
-  assert.equal(Object.keys(ProductCategories).length,6); assert.equal(ListProductDesigns().length,33);
+  assert.equal(Object.keys(ProductCategories).length,5); assert.equal(ListProductDesigns().length,33); assert.equal(ListProductDesigns('clamshells').length,8);
   for(const item of ListProductDesigns()){const d=ProductDesign(item.id),p=CreatePrimaryProduct(d),bounds=[[Infinity,Infinity,Infinity],[-Infinity,-Infinity,-Infinity]];assert.ok(item.source.startsWith('https://'));assert.ok(ListProductMaterials(d.family).some(m=>m.id===d.material));for(const m of p.components){for(let i=0;i<m.positions.length;i++){const v=m.positions[i];assert.ok(Number.isFinite(v));bounds[0][i%3]=Math.min(bounds[0][i%3],v);bounds[1][i%3]=Math.max(bounds[1][i%3],v);}}for(let i=0;i<3;i++){assert.ok(Math.abs(bounds[0][i]-p.bounds.min[i])<1e-6);assert.ok(Math.abs(bounds[1][i]-p.bounds.max[i])<1e-6);}}
  });
  it('creates closed shell components with positive volume and planar top/bottom artwork',()=>{
