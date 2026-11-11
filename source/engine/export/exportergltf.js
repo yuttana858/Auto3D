@@ -558,6 +558,16 @@ export class ExporterGltf extends ExporterBase
                     if (!mainJson.extensionsUsed.includes ('KHR_materials_specular')) { mainJson.extensionsUsed.push ('KHR_materials_specular'); }
                     jsonMaterial.extensions = { KHR_materials_specular : { specularFactor : material.specularIntensity } };
                 }
+                for (const [name, values] of [
+                    ['KHR_materials_transmission', material.transmission > 0 ? { transmissionFactor : material.transmission } : null],
+                    ['KHR_materials_ior', material.ior !== 1.5 ? { ior : material.ior } : null],
+                    ['KHR_materials_volume', material.transmission > 0 && material.thickness > 0 ? { thicknessFactor : material.thickness } : null]
+                ]) {
+                    if (!values) { continue; }
+                    mainJson.extensionsUsed ||= []; if (!mainJson.extensionsUsed.includes (name)) { mainJson.extensionsUsed.push (name); }
+                    jsonMaterial.extensions ||= {}; jsonMaterial.extensions[name] = values;
+                }
+
             }
             let normalTexture = GetTextureParams (mainJson, material.normalMap, addTexture);
             if (normalTexture !== null) {

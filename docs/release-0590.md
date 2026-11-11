@@ -1,0 +1,13 @@
+# Auto3D 0.59.0 — unified clamshells, advanced labels and clear materials
+
+Primary Products 0.10.0 / Packaging 1.10.7. Not deployed.
+
+The fourth Product card is Clamshell, opening all eight retail/food designs in one drawer. Existing retail/food category command filters remain compatible. Design drawings and product icons use the module cyan. Labels move out of the product panel into the existing advanced material editor, with front/back/wrap or top/bottom selection, local image import, physical size and an explicit Apply label artwork action. Open the editor for a generated product to edit labels. Applying labels retains the selected object's custom body materials and creates one Undo step; changing the product draft first requires applying that change separately.
+
+The next build item adds clear glass and PET presets. Transmission, IOR and optical thickness pass through the engine material, Three.js renderer, material editor history, session/recovery serialization and GLB/glTF KHR transmission/IOR/volume extensions. Labels remain separate dielectric surfaces. Clear bottles have closed internal cavities with outward outer faces and inward cavity faces; caps remain opaque. Existing clamshell cavities support clear PET. Opacity remains 1: transmission controls the optical effect.
+
+These are presentation models. Bottle cavities use a scaled internal envelope, so shoulder/neck wall thickness varies; the closed neck beneath the cap is not an engineering finish or a capacity model. Presets use approximate optical values. Absorption tint, transmission/volume texture maps, articulated hinges and gusseted/spouted pouch construction remain future work. Optical thickness in the advanced editor is in scene units, with presets converted from canonical millimeters.
+
+Shared commands: `primary.materials.open`, `primary.artwork.apply`, combined `clamshells` category, and `material.set`/`material.list` transmission, IOR and thickness. Existing artwork commands remain available. Both generated catalogs are synchronized.
+
+Validation: 808 application/module tests and 64 MCP tests passed, followed by focused catalog/command and optical-geometry checks after final refinements. Lint, website/Pages build and the standalone Primary Products build passed. The full Primary Products browser regression passed, including resize, callouts and Undo/Redo. The new primary-materials browser regression passed against the final build, covering the unified cyan catalog, advanced label import/application, material preservation, clear PET/glass and desktop/mobile layout; it is included in the browser CI suite. Browser checks used isolated local Chromium with test authentication; production has not been deployed or tested by this change.

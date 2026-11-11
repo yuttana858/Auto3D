@@ -17,7 +17,7 @@ The source relationship is a category reference, not endorsement or product equi
 
 The library separates substrate-inspired visual presets from geometry: HDPE, PP, opaque PET, aluminum, steel, coated and matte metals, matte/gloss/satin film, metallic laminate, soft-touch/lacquer, kraft-look laminate, paperboard and molded-fiber-look surfaces. New finishes drive actual base color (where specified), roughness and metalness in the existing physical-material pipeline. They are editable artistic presets, not measured optical datasets. Label ink stays on separate dielectric label meshes; metallic substrates do not turn the ink metallic.
 
-Clear glass remains disabled until transmission/IOR/volume fields and hollow-wall rendering pass viewer/archive/GLB gates. Clear supplier PET is represented only by an explicitly opaque PET option in this increment. Paper and fiber presets approximate finish and color; no fiber microgeometry, measured BRDF, or barrier-performance simulation is claimed.
+The original catalog release kept clear glass/PET disabled. Auto3D 0.59.0 adds transmission/IOR/thickness, closed bottle cavities and clear PET clamshells, with renderer/archive/GLB checks; see [the current limits](release-0590.md). Paper and fiber presets approximate finish and color; no fiber microgeometry, measured BRDF, or barrier-performance simulation is claimed.
 
 ## Interaction and preservation
 
@@ -27,4 +27,4 @@ Closed clamshell meshes contain separate base/lid cavities with physical shell w
 
 ## Remaining build-plan gates
 
-This catalog increment does not complete the entire Primary Products plan. Remaining: clear-pack optical pipeline and hollow bottle walls; oval/rounded-rectangle bottles and advanced closures; true stand-up/flat-bottom/spouted pouch construction; articulated clamshell hinges and tooling details; physical artwork templates, advanced placement/finishes and independent 3D draft preview. Add designs only when their geometry and label behavior are implemented; do not relabel the pillow generator as a stand-up pouch. The primitive/Boolean track remains separately planned in [primitive-solid-editing-research.md](primitive-solid-editing-research.md).
+This catalog increment does not complete the entire Primary Products plan. Remaining: absorption tint and optical texture maps; advanced closures; true stand-up/flat-bottom/spouted pouch construction; articulated clamshell hinges and tooling details; physical artwork templates, advanced placement/finishes and independent 3D draft preview. Add designs only when their geometry and label behavior are implemented; do not relabel the pillow generator as a stand-up pouch. The primitive/Boolean track remains separately planned in [primitive-solid-editing-research.md](primitive-solid-editing-research.md).

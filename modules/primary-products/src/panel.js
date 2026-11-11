@@ -30,10 +30,7 @@ function DesignPreview (design)
         shape = `<path d="M${x} ${top+depth}L${x+12} ${top}H${x+w}l-12 ${depth}Z"/><path d="M${x} ${top+depth}v${sh}h${w-12}l12 -${depth}V${top}M${x+w-12} ${top+depth}v${sh}"/>`;
     }
     const size = ProductSize (d), top = d.family === 'clamshell' ? 100 - Math.min (45, h*.45) - Math.min (45, d.depthMm*scale*.5) : y, right = x + w;
-    // The outline is drawn at 82% to leave room for readable callouts; map its edges into the same space.
-    const k = .82, X = value => 4 + value * k, Y = value => 4 + value * k, left = X (x), edge = X (right), base = Y (120);
-    const callouts = Bracket (left, base + 8, edge, base + 8, 'W ' + Format (size.widthMm), 'below', 12) + Bracket (edge + 6, Y (top), edge + 6, base, 'H ' + Format (size.heightMm), 'right', 12) + Bracket (edge - 4, base + 3, edge + 8, base - 8, 'L ' + Format (size.lengthMm), 'oblique', 12);
-    return `<svg class="pp_design_preview" viewBox="0 0 150 140" fill="${d.color}" fill-opacity=".22" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><g transform="translate(4 4) scale(${k})">${shape}</g><g class="pp_callout" fill="currentColor" fill-opacity="1" stroke-width="1">${callouts}</g></svg>`;
+    return `<svg class="pp_design_preview" viewBox="0 0 120 140" fill="${d.color}" fill-opacity=".22" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true">${shape}</svg>`;
 }
 function Format (mm) { return String (Math.round (mm * 10) / 10); }
 // A dimension callout: extension ticks at both ends, a dimension line and its value, drawn in SVG user units.
@@ -54,22 +51,23 @@ export class PrimaryProductsPanel
         this.layout = Element ('div', 'pp_layout', undefined, this.root);
         const catalog = Element ('section', 'pp_catalog', undefined, this.layout); Element ('h3', '', 'Product', catalog);
         const cards = Element ('div', 'pp_product_cards', undefined, catalog); this.cards = new Map ();
-        for (const [family, label] of [['bottle', 'Bottle'], ['can', 'Can'], ['pouch', 'Pouch']]) {
-            const button = Element ('button', 'pp_product_card', undefined, cards); button.type = 'button'; button.setAttribute ('aria-label', 'Choose ' + label.toLowerCase ()); button.innerHTML = Icon (family); Element ('span', '', label, button); Element ('small', '', PrimaryFamilies[family].name, button); button.addEventListener ('click', () => { this.Change ({ family }); this.host.catalog ({ bottle : 'bottles', can : 'cans', pouch : 'pouches' }[family], true); }); this.cards.set (family, button);
+        for (const [family, label] of [['bottle', 'Bottle'], ['can', 'Can'], ['pouch', 'Pouch'], ['clamshell', 'Clamshell']]) {
+            const button = Element ('button', 'pp_product_card', undefined, cards); button.type = 'button'; button.setAttribute ('aria-label', 'Choose ' + label.toLowerCase ()); button.innerHTML = Icon (family); Element ('span', '', label, button); Element ('small', '', PrimaryFamilies[family].name, button); button.addEventListener ('click', () => { this.Change ({ family }); this.host.catalog ({ bottle : 'bottles', can : 'cans', pouch : 'pouches', clamshell : 'clamshells' }[family], true); }); this.cards.set (family, button);
         }
         const categories = Element ('div', 'pp_categories', undefined, catalog);
-        for (const [id, name] of Object.entries (ProductCategories).filter (([id]) => !['bottles', 'cans', 'pouches'].includes (id))) { const button = Element ('button', '', name, categories); button.type = 'button'; button.addEventListener ('click', ()=>this.host.catalog(id, true)); }
+        for (const [id, name] of Object.entries (ProductCategories).filter (([id]) => id === 'beverages')) { const button = Element ('button', '', name, categories); button.type = 'button'; button.addEventListener ('click', ()=>this.host.catalog(id, true)); }
         this.drawer = Element ('section', 'pp_design_drawer', undefined, this.root); this.drawer.setAttribute ('aria-label', 'Product designs'); this.drawer.tabIndex = -1;
-        const header = Element ('div', 'pp_drawer_header', undefined, this.drawer); this.drawerTitle=Element('h3', '', 'Designs', header);
+        const header = Element ('div', 'pp_drawer_header', undefined, this.drawer);
         const drawerSize = Element ('div', 'pp_drawer_size', undefined, header); drawerSize.setAttribute ('aria-label', 'Size · W × L × H');
         for (const [key, label] of [['widthMm', 'W'], ['lengthMm', 'L'], ['heightMm', 'H']]) {
             const field = Element ('label', 'pp_field', label, drawerSize), wrap = Element ('span', 'pp_input_wrap', undefined, field), input = Element ('input', '', undefined, wrap), unit = Element ('span', 'pp_unit', '', wrap);
             input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', 'Design ' + { W : 'width', L : 'length', H : 'height' }[label]); this.BindDimension (input, key); this.drawerInputs = this.drawerInputs || new Map (); this.drawerInputs.set (key, { input, unit });
         }
+        this.drawerStatus = Element ('p', 'pp_status pp_drawer_status', '', header); this.drawerStatus.setAttribute ('role', 'status');
+        this.drawerTitle = Element ('h3', '', 'Designs', header);
         const close=Element('button', '', 'Close designs', header); this.drawerClose = close; close.type='button';close.addEventListener('click', ()=>this.host.catalog(this.host.inspect().catalogCategory, false));
         this.drawerGrid=Element('div', 'pp_design_grid', undefined, this.drawer);
         this.drawer.addEventListener ('keydown', event => { if (event.key === 'Escape') { event.stopPropagation (); event.preventDefault (); this.host.catalog (this.host.inspect ().catalogCategory, false); } });
-        this.drawerStatus = Element ('p', 'pp_status', '', this.drawer); this.drawerStatus.setAttribute ('role', 'status');
         const note = Element ('p', 'pp_catalog_note', 'Start with a familiar shape. Refine its dimensions and surface.', catalog);
         note.setAttribute ('aria-hidden', 'true');
         this.stage = Element ('section', 'pp_stage', undefined, this.layout); this.stage.setAttribute ('aria-label', 'Product profile reference');
@@ -103,7 +101,9 @@ export class PrimaryProductsPanel
         const colorLabel = Element ('label', 'pp_field pp_swatch_field', 'Color', materialRow); this.color = Element ('input', 'pp_color', undefined, colorLabel); this.color.type = 'color'; this.color.title = 'Choose material color'; this.color.setAttribute ('aria-label', 'Product surface color'); this.color.addEventListener ('input', () => this.Change ({ color : this.color.value }));
         const finish = Element ('div', 'pp_surface_row', undefined, surfaces);
         const roughLabel = Element ('label', 'pp_field', 'Roughness', finish); this.roughness = Element ('input', '', undefined, roughLabel); this.roughness.type = 'range'; this.roughness.min = '0'; this.roughness.max = '1'; this.roughness.step = '.01'; this.roughness.setAttribute ('aria-label', 'Product roughness'); this.roughness.addEventListener ('input', () => this.Change ({ roughness : this.roughness.valueAsNumber }));
-        const artwork = Element ('section', 'pp_section', undefined, controls); Element ('h3', '', 'Label art', artwork); const zones = Element ('div', 'pp_zone_buttons', undefined, artwork); this.zones = new Map ();
+        const advanced = Element ('button', 'pp_art_import', 'Advanced material editor', surfaces); Element ('p', 'pp_draft_note', 'Select a generated product to edit its materials and label artwork.', surfaces); advanced.type = 'button'; advanced.addEventListener ('click', () => this.Action (() => host.openMaterials ()));
+        const artwork = Element ('section', 'pp_workspace pp_section pp_artwork_editor'); this.artworkRoot = artwork; artwork.setAttribute ('aria-label', 'Product label artwork');
+        for (const type of ['keydown', 'keyup']) { artwork.addEventListener (type, event => event.stopPropagation ()); } Element ('h3', '', 'Label art', artwork); const zones = Element ('div', 'pp_zone_buttons', undefined, artwork); this.zones = new Map ();
         for (const [zone, label] of [['front', 'Front label'], ['wrap', 'Wrap label'], ['back', 'Back label']]) { const button = Element ('button', '', label, zones); button.type = 'button'; button.addEventListener ('click', () => this.Change ({ labelZone : zone })); this.zones.set (zone, button); }
         this.artImage = Element ('img', 'pp_art_image', undefined, artwork); this.artImage.alt = 'Imported label artwork'; this.artImage.hidden = true;
         this.artName = Element ('p', 'pp_draft_note', 'Import a PNG, JPEG or WebP label (up to 4 MiB).', artwork);
@@ -111,10 +111,12 @@ export class PrimaryProductsPanel
         this.artDimensions = Element ('div', 'pp_art_dimensions', undefined, artwork); this.artInputs = new Map ();
         for (const [key, label] of [['widthMm', 'Label width'], ['heightMm', 'Label height']]) { const field = Element ('label', 'pp_field', label, this.artDimensions), input = Element ('input', '', undefined, field); input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', label); input.addEventListener ('change', () => { const current = this.host.inspect ().artwork.find (a => a.zone === this.host.inspect ().labelZone); if (current) { this.Action (() => host.artworkMapping ({ zone : current.zone, widthMm : current.widthMm, heightMm : current.heightMm, [key] : input.valueAsNumber * this.Factor () })); } }); this.artInputs.set (key, input); }
         this.artRemove = Element ('button', 'pp_reset', 'Remove label image', artwork); this.artRemove.type = 'button'; this.artRemove.addEventListener ('click', () => this.Action (() => host.artworkRemove (this.host.inspect ().labelZone)));
+        this.artApply = Element ('button', 'pp_art_import', 'Apply label artwork', artwork); this.artApply.type = 'button'; this.artApply.addEventListener ('click', () => this.Action (() => host.applyArtwork ()));
+        this.artStatus = Element ('p', 'pp_status', '', artwork); this.artStatus.setAttribute ('role', 'status');
         const footer = Element ('div', 'pp_footer', undefined, controls); this.add = Element ('button', 'pp_add', 'Generate', footer); this.add.type = 'button'; this.add.addEventListener ('click', () => this.Action (() => host.generate ()));
         this.load = Element ('button', 'pp_reset', 'Load selected product', footer); this.load.type = 'button'; this.load.addEventListener ('click', () => this.Action (() => host.loadSelected ()));
         this.apply = Element ('button', 'pp_reset', 'Apply to selected product', footer); this.apply.type = 'button'; this.apply.addEventListener ('click', () => this.Action (() => host.update ()));
-        Element ('p', 'pp_draft_note', 'Opaque presentation models · clear glass coming next. Generate or Apply to update the model. Applying rebuilds component surfaces from this draft.', footer);
+        Element ('p', 'pp_draft_note', 'Presentation models with editable physical surfaces. Generate or Apply to update the model. Applying rebuilds component surfaces from this draft.', footer);
         const reset = Element ('button', 'pp_reset', 'Reset draft', footer); reset.type = 'button'; reset.addEventListener ('click', () => { try { host.reset (); this.Refresh (); } catch (error) { this.status.textContent = error.message; } }); this.reset = reset;
         this.availability = Element ('p', 'pp_draft_note', '', controls); this.availability.setAttribute ('role', 'status');
         this.status = Element ('p', 'pp_status', '', controls); this.status.setAttribute ('role', 'status'); this.Refresh ();
@@ -133,11 +135,11 @@ export class PrimaryProductsPanel
     }
     async Action (action)
     {
-        try { const result = await action (); this.status.textContent = result?.message || 'Product action completed.'; this.drawerStatus.textContent = this.status.textContent; }
+        try { const result = await action (); this.status.textContent = result?.message || 'Product action completed.'; this.drawerStatus.textContent = result?.message || ''; }
         catch (error) { this.status.textContent = error.message; this.drawerStatus.textContent = error.message; }
-        finally { this.Refresh (); }
+        finally { this.artStatus.textContent = this.status.textContent; this.Refresh (); }
     }
-    ReportError (message) { this.status.textContent = message; }
+    ReportError (message) { this.status.textContent = message; this.artStatus.textContent = message; }
     // Enter applies the dimension and rebuilds the selected generated product; Tab or blur only updates the draft.
     BindDimension (input, key)
     {
@@ -159,11 +161,11 @@ export class PrimaryProductsPanel
     SetDisabled ()
     {
         const draft = this.host.inspect (), disabled = this.host.blocked ();
-        for (const input of this.root.querySelectorAll ('input, select, button')) { input.disabled = disabled; }
+        for (const input of [...this.root.querySelectorAll ('input, select, button'), ...(this.artworkRoot?.querySelectorAll ('input, select, button') || [])]) { input.disabled = disabled; }
         if (this.drawerClose) { this.drawerClose.disabled = false; }
         this.add.disabled = disabled || !draft.generationAvailable; this.apply.disabled = disabled || !draft.generationAvailable;
         this.add.textContent = draft.generating ? 'Generating…' : 'Generate';
-        this.add.title = draft.unavailableReason || 'Generate an opaque product in the session.';
+        this.add.title = draft.unavailableReason || 'Generate a product in the session.';
         this.availability.textContent = draft.unavailableReason || '';
     }
     Refresh ()
@@ -187,7 +189,7 @@ export class PrimaryProductsPanel
         }
         if (draft.family === 'bottle') { const shape = BottleShape (draft); for (const [key, { input, unit : suffix }] of this.shapeInputs) { input.value = String (Number ((shape[key]/factor).toFixed (6))); input.min = String (.5/factor); input.max = String (1000/factor); suffix.textContent = unit; } }
         this.material.replaceChildren ();
-        for (const item of ListProductMaterials (draft.family)) { const option = Element ('option', '', item.name, this.material); option.value = item.id; option.disabled = item.id === 'glass'; }
+        for (const item of ListProductMaterials (draft.family)) { const option = Element ('option', '', item.name, this.material); option.value = item.id; option.disabled = !item.available; }
         this.material.value = draft.material; this.material.disabled = disabled; this.color.value = draft.color; this.color.disabled = disabled; this.roughness.value = String (draft.roughness); this.roughness.disabled = disabled; this.reset.disabled = disabled;
         const art = draft.artwork?.find (a => a.zone === draft.labelZone), preview = this.host.artworkPreview?.(draft.labelZone);
         this.artImage.hidden = !preview; if (preview) { this.artImage.src = preview; } else { this.artImage.removeAttribute ('src'); }

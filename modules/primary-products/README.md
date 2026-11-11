@@ -1,4 +1,4 @@
-# Primary Products 0.7.0
+# Primary Products 0.10.0
 
 Independent bottle/can/pillow-pouch/closed-clamshell UI and neutral geometry package, API 1. No Auto3D engine, account or Packaging imports. Auto3D integrates its lazy module bundle through separate host adapter/workspace services.
 
@@ -6,7 +6,7 @@ Independent bottle/can/pillow-pouch/closed-clamshell UI and neutral geometry pac
 
 `ProductDefinition(draft)` and `ValidateProductDefinition(value)` provide strict versioned authoring metadata. File/recovery validation can import this lightweight file without loading geometry or UI.
 
-Bottles, cans and pouches are closed presentation solids without hollow walls, threads, detailed seams or pull tabs. Clamshells have rounded, tapered base/lid cavities with physical walls; articulation and hinges remain future work. Not for capacity or engineering claims. The Auto3D host enables opaque scene generation and atomic update/Undo; glass generation remains blocked pending transmission/hollow-wall work. The profile drawing is illustrative. Local label artwork now maps onto generated surfaces through the host; the independent 3D draft preview remains future work.
+Bottles, cans and pouches are closed presentation solids without hollow walls, threads, detailed seams or pull tabs. Clamshells have rounded, tapered base/lid cavities with physical walls; articulation and hinges remain future work. Not for capacity or engineering claims. The Auto3D host enables scene generation and atomic update/Undo; clear glass/PET use physical transmission with closed presentation cavities. The profile drawing is illustrative. Local label artwork now maps onto generated surfaces through the host; the independent 3D draft preview remains future work.
 
 The module-owned panel receives inspect/configure/reset/generate/update/loadSelected/units/blocked functions from a neutral host. Applying changes rebuilds component surfaces from draft settings; the UI explains this. Drafts survive panel changes within the account, and reset when accounts change.
 
@@ -21,3 +21,5 @@ Category material presets expose real PBR defaults through `ListProductMaterials
 Optional `bottleShape` contains all four canonical-mm fields: `neckDiameterMm`, `shoulderHeightMm`, `neckHeightMm`, `capHeightMm`. Missing shape data retains the original proportional profile. Explicit profiles keep a straight body of at least 20% overall height and a cap within the body diameter. Labels are bounded to the remaining straight body; incompatible existing labels block draft mutation. See [0.55.0](../../docs/release-0550.md).
 
 Six categories and 24 original illustrative designs are exposed through `ProductCategories`, `ListProductDesigns` and `ProductDesign`. The panel accepts catalog/selectDesign callbacks and opens an animated bottom drawer. Clamshells use the rectangular envelope fields and top/bottom art, stored as front/back zone IDs. See [catalog research](../../docs/primary-product-catalog-research.md) for sources, design limits and material presets.
+
+Clamshell browsing is unified under the fourth Product card (`clamshells`), with legacy food/retail command filters retained. Label controls mount inside the host advanced material editor; `Apply label artwork` preserves custom body surfaces. Glass/PET presets use a closed inner bottle envelope with varying shoulder/neck thickness, not an engineering finish. The host persists transmission/IOR/thickness through rendering, archives and GLB/glTF. See [0.59.0](../../docs/release-0590.md).

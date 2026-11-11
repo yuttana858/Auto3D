@@ -1,3 +1,4 @@
+import { ProductMaterials } from './materials.js';
 import { CreateClamshell } from './clamshell.js';
 import { GetArtworkZones } from './zones.js';
 export { GetArtworkZones } from './zones.js';
@@ -61,6 +62,23 @@ function Loft (id, role, section, rows, segments)
     return { id, materialRole : role, positions, normals, uvs, indices };
 }
 
+// A closed inner cavity keeps the assembled bottle hollow while retaining the
+// existing outside envelope and closed closure. Wall thickness varies at shoulders.
+function HollowBottle (mesh, width, depth, height, wall, neckHeight)
+{
+    const t = Math.min (wall, width*.025, depth*.025, height*.025, neckHeight*.25);
+    const scale = [(width-2*t)/width, 1, (depth-2*t)/depth];
+    const count = mesh.positions.length/3, original = [...mesh.positions], normals = [...mesh.normals], indices = [...mesh.indices];
+    for (let i = 0; i < original.length; i += 3) {
+        mesh.positions.push (original[i]*scale[0], Math.max (t, Math.min (height-t, original[i+1])), original[i+2]*scale[2]);
+        const n = normals.slice (i, i+3).map ((v, axis) => -v/scale[axis]), length = Math.hypot (...n);
+        mesh.normals.push (...n.map (v => v/length));
+    }
+    mesh.uvs.push (...mesh.uvs.slice ());
+    for (let i = 0; i < indices.length; i += 3) { mesh.indices.push (count+indices[i], count+indices[i+2], count+indices[i+1]); }
+    return t;
+}
+
 export function CreatePrimaryProduct (input, options = {})
 {
     const definition = UpdateProductDraft (DefaultProductDraft (), input);
@@ -76,9 +94,11 @@ export function CreatePrimaryProduct (input, options = {})
         const section = BottleSectionOf (definition);
         if (section.shape === 'round') { components.push (Revolve ('body', 'body', [[0, 0], [r, 0], [r, bodyTop], [neck, neckBottom], [neck, capBottom], [0, capBottom]], segments)); }
         else { components.push (Loft ('body', 'body', section, [{ scale : 0, y : 0 }, { scale : 1, y : 0 }, { scale : 1, y : bodyTop }, { radius : neck, y : neckBottom }, { radius : neck, y : capBottom }, { radius : 0, y : capBottom }], Math.max (segments, 96))); }
+        const clear = ProductMaterials[definition.material].transmission > 0;
+        const wallMm = clear ? HollowBottle (components[0], definition.diameterMm, section.depthMm, capBottom, ProductMaterials[definition.material].wallMm, shape.neckHeightMm) : 0;
         components.push (cylinder ('cap', 'closure', neck * 1.08, capBottom, h));
         const depth = section.depthMm / 2;
-        return { apiVersion : 1, generatorVersion : 1, units : 'mm', definition, components, bounds : { min : [-r, 0, -depth], max : [r, h, depth] }, artworkZones : GetArtworkZones (definition), quality : { construction : 'closed-solid-presentation', section : section.shape, hollowWalls : false, threads : false, pullTab : false } };
+        return { apiVersion : 1, generatorVersion : 1, units : 'mm', definition, components, bounds : { min : [-r, 0, -depth], max : [r, h, depth] }, artworkZones : GetArtworkZones (definition), quality : { construction : 'closed-solid-presentation', section : section.shape, hollowWalls : clear, wallMm, cavity : clear ? 'closed-presentation-cavity' : null, threads : false, pullTab : false } };
     } else {
         components.push (cylinder ('body', 'body', r, h * 0.025, h * 0.975));
         components.push (cylinder ('bottom', 'end', r, 0, h * 0.025));

@@ -17,7 +17,7 @@ try {
         catch { return route.fulfill ({ status : 404, body : 'Missing fixture asset' }); }
     });
     await page.goto ('https://auto3d.test/'); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
-    const call = async (id, args = {}) => { const response = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (response.ok, true, JSON.stringify (response)); return response.result; };
+    const call = async (id, args = {}) => { if (process.env.PRIMARY_TEST_PROGRESS) { console.log (id); } const response = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (response.ok, true, JSON.stringify (response)); return response.result; };
     const group = page.getByRole ('group', { name : 'Generation modules', exact : true });
     assert.deepEqual (await group.getByRole ('button').evaluateAll (nodes => nodes.map (node => node.getAttribute ('aria-label'))), ['AI Generative', 'Packaging design', 'Primary Products']);
     assert.notEqual (await group.evaluate (node => getComputedStyle (node).borderTopStyle), 'none');
@@ -43,7 +43,7 @@ try {
     await call ('primary.configure', { diameterMm : 65 });
     const height = panel.getByRole ('spinbutton', { name : 'Product height', exact : true }); await height.fill ('220'); await height.press ('Tab'); assert.equal ((await call ('primary.inspect')).heightMm, 220);
     await panel.getByRole ('slider', { name : 'Product roughness', exact : true }).focus (); await page.keyboard.press ('Delete'); assert.deepEqual (await call ('scene.inspect'), before);
-    await panel.getByRole ('button', { name : 'Wrap label', exact : true }).click (); await mkdir ('work/primary-products-review', { recursive : true });
+    await call ('primary.configure', { labelZone : 'wrap' }); await mkdir ('work/primary-products-review', { recursive : true });
     await panel.evaluate (node => { node.scrollTop = 0; });
     await page.screenshot ({ path : 'work/primary-products-review/minimal.png' });
     await page.getByRole ('button', { name : 'Extended Primary Products panel', exact : true }).click ();
@@ -94,16 +94,20 @@ try {
     await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 250);
     await call ('history.undo'); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 190);
     await call ('history.redo'); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 250);
-    await call ('primary.configure', { material : 'glass' }); assert.equal ((await call ('primary.inspect')).generationAvailable, false);
-    assert.equal (await panel.getByRole ('button', { name : 'Generate', exact : true }).isDisabled (), true);
-    const rejected = await page.evaluate (() => Auto3D.execute ('primary.generate')); assert.equal (rejected.ok, false);
+    await call ('primary.configure', { material : 'glass' }); assert.equal ((await call ('primary.inspect')).generationAvailable, true);
+    await call ('primary.update'); assert.ok ((await call ('material.list')).some (m => m.transmission === 1 && m.ior === 1.5));
+    await call ('primary.materials.open');
+    const opticalEditor = page.locator ('#material_drawer_content');
+    assert.equal (await opticalEditor.getByRole ('spinbutton', { name : 'Index of refraction', exact : true }).inputValue (), '1.5');
+    await page.screenshot ({ path : 'work/primary-products-review/clear-glass-materials.png' });
+    await page.locator ('#material_drawer_close').click ();
     assert.equal ((await call ('scene.inspect')).objects.length, 2); assert.deepEqual (errors, []);
     await panel.getByRole ('button', { name : 'Choose pouch' }).click (); await call ('primary.designs.open', { category : 'pouches', open : false });
     assert.equal (await panel.getByRole ('spinbutton', { name : 'Product diameter', exact : true }).isVisible (), false);
     const pouchWidth = panel.getByRole ('spinbutton', { name : 'Product width', exact : true }); await pouchWidth.fill ('180'); await pouchWidth.press ('Tab');
     assert.equal ((await call ('primary.inspect')).widthMm, 180);
-    await panel.getByRole ('button', { name : 'Back label', exact : true }).click ();
-    assert.equal (await panel.getByRole ('button', { name : 'Wrap label', exact : true }).isVisible (), false);
+    await call ('primary.configure', { labelZone : 'back' });
+    assert.equal (await panel.getByRole ('button', { name : 'Import label image', exact : true }).count (), 0);
     await panel.getByRole ('button', { name : 'Generate', exact : true }).click ();
     let pouchReady = false;
     for (let attempt = 0; attempt < 200; attempt++) {
@@ -116,13 +120,19 @@ try {
     await panel.getByRole ('combobox', { name : 'Product material', exact : true }).selectOption ('foil');
     await panel.locator ('input[type=color]').evaluate (node => { node.value = '#aa7733'; node.dispatchEvent (new Event ('input', { bubbles : true })); });
     assert.equal ((await call ('primary.inspect')).color, '#aa7733');
-    const chooser = page.waitForEvent ('filechooser'); await panel.getByRole ('button', { name : 'Import label image', exact : true }).click (); await (await chooser).setFiles ('test/testfiles/obj/texture.png');
+    await call ('primary.update'); await call ('primary.materials.open');
+    const artworkEditor = page.getByRole ('region', { name : 'Product label artwork' }); await artworkEditor.waitFor ();
+    const roughnessEditor = page.locator ('#material_drawer_content').getByRole ('slider', { name : 'Roughness', exact : true });
+    await roughnessEditor.fill ('0.37'); await roughnessEditor.dispatchEvent ('change');
+    const chooser = page.waitForEvent ('filechooser'); await artworkEditor.getByRole ('button', { name : 'Import label image', exact : true }).click (); await (await chooser).setFiles ('test/testfiles/obj/texture.png');
     let importedArt = false;
     for (let attempt = 0; attempt < 100; attempt++) { if ((await call ('primary.inspect')).artwork.length === 1) { importedArt = true; break; } await page.waitForTimeout (100); }
-    assert.equal (importedArt, true); assert.equal (await panel.getByRole ('img', { name : 'Imported label artwork' }).isVisible (), true);
-    const applied = await call ('primary.update'); assert.ok (applied.components.includes ('label-back'));
+    assert.equal (importedArt, true); assert.equal (await artworkEditor.getByRole ('img', { name : 'Imported label artwork' }).isVisible (), true);
+    await page.screenshot ({ path : 'work/primary-products-review/advanced-label-art.png' });
+    const applied = await call ('primary.artwork.apply');
+    await page.locator ('#material_drawer_close').click (); assert.ok (applied.components.includes ('label-back'));
     const materials = await call ('material.list'); assert.ok (materials.some (m => m.name.startsWith ('Primary label') && m.metalness === 0 && m.maps.diffuseMap));
-    assert.ok (materials.some (m => m.name === 'Primary Products · body' && m.metalness === 1 && m.roughness === 0.28));
+    assert.ok (materials.some (m => m.name === 'Primary Products · body' && m.metalness === 1 && m.roughness === 0.37));
     await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).artwork[0].name, 'texture.png');
     const beforeBad = (await call ('primary.inspect')).widthMm;
     const invalidResize = await page.evaluate (() => Auto3D.execute ('primary.configure', { widthMm : 10, depthMm : 2 })); assert.equal (invalidResize.ok, false); assert.equal ((await call ('primary.inspect')).widthMm, beforeBad);
@@ -138,18 +148,22 @@ try {
     await call ('object.select', { objectId : applied.objectId }); await call ('object.transform', { objectId : applied.objectId, rotation : [0, 180, 0] }); await call ('view.focus', { objectId : applied.objectId });
     await page.waitForTimeout (800); await page.screenshot ({ path : 'work/primary-products-review/artwork-model.png' });
     await call ('primary.artwork.remove', { zone : 'back' });
-    await call ('primary.designs.open', { category : 'clamshell-food', open : true });
+    await panel.getByRole ('button', { name : 'Choose clamshell', exact : true }).click ();
     const drawer = page.getByRole ('region', { name : 'Product designs', exact : true }); await drawer.waitFor ({ state : 'visible' });
     const objectCountReaches = async count => { for (const end = Date.now () + 120000; Date.now () < end; await page.waitForTimeout (100)) { const r = await page.evaluate (() => Auto3D.execute ('scene.inspect')); if (r.ok && r.result.objects.length === count) { return; } } throw new Error ('Scene never reached ' + count + ' objects: ' + await drawer.locator ('.pp_status').textContent ()); };
-    assert.equal (await drawer.locator ('.pp_design_card').count (), 4); const beforeCard = (await call ('scene.inspect')).objects.length; await drawer.getByRole ('button', { name : 'Generate Deli shell' }).click ();
+    assert.equal (await drawer.locator ('.pp_design_card').count (), 8);
+    assert.equal (await drawer.locator ('.pp_design_preview').first ().evaluate (node => getComputedStyle (node).color), 'rgb(69, 139, 155)');
+    await page.screenshot ({ path : 'work/primary-products-review/clamshell-cyan-drawer.png' }); const beforeCard = (await call ('scene.inspect')).objects.length; await drawer.getByRole ('button', { name : 'Generate Deli shell' }).click ();
     await objectCountReaches (beforeCard + 1); /* design cards generate their product */
     assert.equal ((await call ('primary.inspect')).family, 'clamshell'); await drawer.getByRole ('button', { name : 'Close designs' }).click (); await drawer.waitFor ({ state : 'hidden' });
     const shell = await call ('primary.generate'); assert.deepEqual (shell.components, ['base', 'lid']);
-    const shellChooser = page.waitForEvent ('filechooser'); await panel.getByRole ('button', { name : 'Import label image', exact : true }).click (); await (await shellChooser).setFiles ('test/testfiles/obj/texture.png');
+    await call ('primary.materials.open'); await artworkEditor.waitFor ();
+    const shellChooser = page.waitForEvent ('filechooser'); await artworkEditor.getByRole ('button', { name : 'Import label image', exact : true }).click (); await (await shellChooser).setFiles ('test/testfiles/obj/texture.png');
     let shellArtReady = false;
     for (let attempt = 0; attempt < 100; attempt++) { const draft = await call ('primary.inspect'); if (draft.artwork.length === 1 && draft.artwork[0].zone === 'front') { shellArtReady = true; break; } await page.waitForTimeout (100); }
     assert.equal (shellArtReady, true, 'Clamshell image import must finish before Apply');
-    const shellArt = await call ('primary.update'); assert.ok (shellArt.components.includes ('label-front'));
+    const shellArt = await call ('primary.artwork.apply');
+    await page.locator ('#material_drawer_close').click (); assert.ok (shellArt.components.includes ('label-front'));
     const noFit = await page.evaluate (() => Auto3D.execute ('primary.configure', { widthMm : 10, depthMm : 10 })); assert.equal (noFit.ok, false);
     await call ('primary.designs.open', { category : 'beverages', open : true }); await page.setViewportSize ({ width : 390, height : 844 });
     assert.equal (await page.evaluate (() => document.documentElement.scrollWidth > innerWidth), false); await page.screenshot ({ path : 'work/primary-products-review/design-drawer-mobile.png' });
@@ -162,7 +176,9 @@ try {
     const cardBoxes = await drawer.locator ('.pp_design_card').evaluateAll (nodes => nodes.map (node => { const r = node.getBoundingClientRect (); return [Math.round (r.width), Math.round (r.height)]; }));
     assert.equal (cardBoxes.length, 7); assert.ok (cardBoxes.every (box => box[0] === cardBoxes[0][0] && box[1] === cardBoxes[0][1]), JSON.stringify (cardBoxes));
     assert.ok ((await drawer.boundingBox ()).height <= 1000 * .315 + 1, 'drawer is at most 31.5% of the viewport');
-    const callouts = await drawer.locator ('.pp_design_card').first ().locator ('.pp_callout text').allTextContents (); assert.deepEqual (callouts.map (text => text.split (' ')[0]), ['W', 'H', 'L']);
+    assert.equal (await drawer.locator ('.pp_design_card .pp_callout').count (), 0); /* thumbnails carry no dimension brackets; the caption keeps W × L × H */
+    const headerBox = await drawer.locator ('.pp_drawer_header').boundingBox (), sizeBox = await drawer.locator ('.pp_drawer_size').boundingBox (), titleBox = await drawer.locator ('.pp_drawer_header h3').boundingBox ();
+    assert.ok (sizeBox.x - headerBox.x < 2, 'W/L/H inputs start at the left of the drawer'); assert.ok (titleBox.x > sizeBox.x + sizeBox.width, 'category name follows the inputs'); assert.ok (headerBox.height <= 40, 'compact one-line header: ' + headerBox.height);
     assert.match (await drawer.locator ('.pp_design_card .pp_design_size').first ().textContent (), /^66 × 66 × 122 mm$/);
     const beforeCan = (await call ('scene.inspect')).objects.length; await drawer.getByRole ('button', { name : 'Generate Standard beverage can' }).click ();
     await objectCountReaches (beforeCan + 1);
@@ -208,6 +224,6 @@ try {
     console.log ('Design drawer: ten-column equal cards, 30% shorter, W/L/H callouts, card generation, Enter live resize with Undo, Tab draft-only and primary.dimensions.set passed.');
     console.log ('W × L × H, material swatch, local image import, rendered labels and physical-fit validation passed.');
     console.log ('Generate readiness and pillow-pouch generation/layout passed.');
-    console.log ('Primary Products scene flow passed: UI generation, strict update/load, identity, Undo/Redo and glass rejection.');
+    console.log ('Primary Products scene flow passed: UI generation, strict update/load, identity, Undo/Redo and clear glass generation.');
     console.log ('Primary Products desktop/mobile passed: module order/outline, lazy loading, draft controls, minimal/extended/close motion, rapid transitions, reduced motion, unit conversion and unchanged scene/camera.');
 } finally { await browser.close (); }

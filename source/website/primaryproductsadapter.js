@@ -13,7 +13,7 @@ const millimeters = { [Unit.Millimeter] : 1, [Unit.Centimeter] : 10, [Unit.Meter
 export function PrimaryProductModel (data, unit, artwork = [], resources = new Map ())
 {
     const factor = millimeters[unit]; if (!factor) { throw new Error ('Set known scene units before adding a product.'); }
-    if (data.apiVersion !== 1 || data.units !== 'mm' || data.definition.material === 'glass') { throw new Error ('Only opaque Primary Products geometry is supported.'); }
+    if (data.apiVersion !== 1 || data.units !== 'mm') { throw new Error ('Unsupported Primary Products geometry.'); }
     const model = new Model (); model.SetUnit (unit);
     const color = data.definition.color.slice (1).match (/.{2}/g).map (part => parseInt (part, 16));
     const labels = ValidateProductArtwork (data.definition, artwork).map (a => CreateLabelMesh (data.definition, a));
@@ -22,6 +22,12 @@ export function PrimaryProductModel (data, unit, artwork = [], resources = new M
         material.color = new RGBColor (...(component.materialRole === 'body' ? color : [190, 198, 199]));
         material.roughness = component.materialRole === 'body' ? data.definition.roughness : 0.35;
         material.metalness = component.materialRole === 'closure' ? 0 : component.materialRole === 'end' ? 1 : ProductMaterials[data.definition.material].metalness;
+        if (component.materialRole === 'body') {
+            const preset = ProductMaterials[data.definition.material];
+            material.transmission = preset.transmission || 0; material.ior = preset.ior || 1.5;
+            material.thickness = material.transmission ? (data.quality.wallMm || Math.min (1.2, data.definition.widthMm*.04, data.definition.depthMm*.04, data.definition.heightMm*.04))/factor : 0;
+            material.doubleSided = false;
+        }
         if (component.artwork) {
             const a = component.artwork, source = resources.get (a.resourceId); if (!source?.buffer) { throw new Error ('Import the missing label source before generating.'); }
             material.name = 'Primary label · ' + a.resourceId; material.color = new RGBColor (255, 255, 255); material.metalness = 0; material.roughness = 0.5; material.transparent = true; material.alphaTest = 0.01; material.doubleSided = false;
