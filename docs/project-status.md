@@ -2,7 +2,7 @@
 
 ## Bottle contents, optical walls and editable labels — Auto3D 0.66.0 / Primary Products 0.15.0 / Packaging 1.10.7
 
-Stacked in draft #116, following #110 (merged through #109). Adds wall callouts, synchronized glass refraction/absorption, cavity-conforming static contents, and live image/SVG/text label authoring in Edit model. CAD layers remain untouched. Includes main through #117 (`772d313`), preserving the #115 folding closeup and #117 Meshy Workers fix alongside the earlier agent command bar. Local checks: 856 unit/integration tests, 66 MCP tests, lint, production/Pages and engine/module builds, and profile/contents plus command-bar browser regressions passed; see [release-0660.md](release-0660.md) for commit scope. Hosted full-suite results remain outstanding while Actions quota is exhausted. Not deployed.
+Stacked in draft #116, following #110 (merged through #109). Adds wall callouts, synchronized glass refraction/absorption, cavity-conforming static contents, and live image/SVG/text label authoring in Edit model. CAD layers remain untouched. Includes main through #117 (`772d313`), preserving the #115 folding closeup and #117 Meshy Workers fix alongside the earlier agent command bar. Latest conflict-resolution checks: 858 unit/integration tests, lint and production/Pages builds passed. Earlier validation includes 66 MCP tests, engine/module builds and profile/contents plus command-bar browser regressions; see [release-0660.md](release-0660.md) for commit scope. Hosted full-suite results remain outstanding while Actions quota is exhausted. Not deployed.
 
 ## Meshy calls work on Cloudflare — Auto3D 0.65.3 / Primary Products 0.14.0 / Packaging 1.10.7 (2026-11-12)
 
