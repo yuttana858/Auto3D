@@ -36,11 +36,17 @@ describe ('Selected-object orbit', () => {
             const distance = (a, b) => Math.hypot (a.x - b.x, a.y - b.y, a.z - b.z); const radius = distance (nav.camera.eye, nav.orbitCenter), zoom = distance (nav.camera.eye, nav.camera.center); nav.Orbit (20, 10); assert.ok (Math.abs (distance (nav.camera.eye, nav.orbitCenter) - radius) < 1e-8); assert.ok (Math.abs (distance (nav.camera.eye, nav.camera.center) - zoom) < 1e-8);
         }
     });
-    it ('Defaults to a world-Z orbit and holds X/Y/Z as temporary axis constraints', () => {
-        const nav = Object.create (Navigation.prototype); Object.assign (nav, { navigationMode : NavigationMode.FixedUpVector, orbitCenter : new Coord3D (0, 0, 0), camera : { eye : new Coord3D (2, 3, 4), center : new Coord3D (0, 0, 0), up : new Coord3D (0, 1, 0) }, heldOrbitAxes : [] });
+    it ('Preserves a Z-up orbit and holds X/Y/Z as temporary axis constraints', () => {
+        const nav = Object.create (Navigation.prototype); Object.assign (nav, { navigationMode : NavigationMode.FixedUpVector, orbitCenter : new Coord3D (0, 0, 0), camera : { eye : new Coord3D (2, 3, 4), center : new Coord3D (0, 0, 0), up : new Coord3D (0, 0, 1) }, heldOrbitAxes : [] });
         nav.Orbit (20, 0); assert.ok (Math.abs (nav.camera.eye.z - 4) < 1e-9);
         for (const axis of ['x', 'y', 'z']) { nav.OnAxisKeyDown ({ key : axis }); const before = nav.camera.eye[axis]; nav.Orbit (15, 0); assert.ok (Math.abs (nav.camera.eye[axis] - before) < 1e-9); nav.OnAxisKeyUp ({ key : axis }); }
         nav.OnAxisKeyDown ({ key : 'x', target : { closest : () => true } }); assert.equal (nav.heldOrbitAxes.length, 0);
+    });
+    it ('Orbits horizontally without rolling in both Y-up and Z-up views', () => {
+        for (const up of [new Coord3D (0, 1, 0), new Coord3D (0, 0, 1)]) {
+            const nav = Object.create (Navigation.prototype); Object.assign (nav, { navigationMode : NavigationMode.FixedUpVector, orbitCenter : null, heldOrbitAxes : [], camera : { eye : new Coord3D (10, 0, 0), center : new Coord3D (0, 0, 0), up : up.Clone () } });
+            const before = nav.camera.eye.Clone (); nav.Orbit (30, 0); assert.deepEqual (nav.camera.up, up); assert.ok (Math.hypot (nav.camera.eye.x - before.x, nav.camera.eye.y - before.y, nav.camera.eye.z - before.z) > 1); assert.ok (Math.abs (nav.camera.eye.x * up.x + nav.camera.eye.y * up.y + nav.camera.eye.z * up.z) < 1e-9);
+        }
     });
     it ('Temporarily constrains the object rotation gizmo and restores it on release', () => {
         const controls = { showX : true, showY : true, showZ : true, axis : 'Y', dragging : true }; const editor = { controls, mode : 'rotate', website : { viewer : { RequestRender () {} } } };
@@ -50,7 +56,7 @@ describe ('Selected-object orbit', () => {
         const nav = Object.create (Navigation.prototype); const calls = []; let click = true; Object.assign (nav, { enabled : true, canvas : {}, mouse : { Move () {}, GetPosition : () => new Coord2D (0, 0), GetMoveDiff : () => new Coord2D (10, 5), IsButtonDown : () => true, GetButton : () => 3 }, clickDetector : { Move () {}, IsClick : () => click }, onOrbitStart : () => calls.push ('focus'), Orbit : () => calls.push ('orbit'), Update () {} });
         nav.OnMouseMove ({}); assert.deepEqual (calls, []); click = false; nav.OnMouseMove ({}); nav.OnMouseMove ({}); assert.deepEqual (calls, ['focus', 'orbit', 'orbit']); assert.equal (nav.suppressContextMenu, true);
     });
-    it ('Pans sideways on horizontal right-drag and keeps vertical tilt when the main viewer enables it', () => {
+    it ('Keeps optional sideways pan and default orbit routing separate', () => {
         const nav = Object.create (Navigation.prototype); const calls = []; let diff = new Coord2D (10, 0);
         Object.assign (nav, { enabled : true, canvas : {}, camera : { eye : new Coord3D (0, 0, 1000), center : new Coord3D (0, 0, 0) }, mouse : { Move () {}, GetPosition : () => new Coord2D (0, 0), GetMoveDiff : () => diff, IsButtonDown : () => true, GetButton : () => 3 }, clickDetector : { Move () {}, IsClick : () => false }, onOrbitStart : () => calls.push (['focus']), Orbit : (x, y) => calls.push (['orbit', x, y]), Pan : (x, y) => calls.push (['pan', x, y]), Update () {} });
         nav.rightDragPansHorizontally = true;

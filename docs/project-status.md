@@ -1,8 +1,20 @@
 # Auto3D development log and handoff
 
-## Agent messages in the command bar — Auto3D 0.63.2 / Primary Products 0.13.0 / Packaging 1.10.7 (2026-11-12)
+## Agent messages in the command bar — Auto3D 0.64.3 / Primary Products 0.13.0 / Packaging 1.10.7 (2026-11-12)
 
-Command bar text for agents (`@agent …`, or any non-command text while Live Control is connected) is logged for `ui.command_bar.inspect`, and agents reply in the status line above the box with `ui.command_bar.respond`. Adds `selection.clear`, and the Agent access screenshot checkbox now applies immediately and shows the current setting. See [release-0632.md](release-0632.md).
+Command bar text for agents (`@agent …`, or any non-command text while Live Control is connected) is logged for `ui.command_bar.inspect`, and agents reply in the status line above the box with `ui.command_bar.respond`. Adds `selection.clear`, and the Agent access screenshot checkbox now applies immediately and shows the current setting. See [release-0643.md](release-0643.md).
+
+## Fixed motor-scale hero — Auto3D 0.64.2 / Packaging 1.10.7 / Primary Products 0.13.0
+
+Holds the landing camera at the completed motor's opening framing for the entire sequence. Pulp and carton geometry may crop outside the window without shrinking or recentering the motor. Stage jumps, replay and reduced motion retain the same view; viewport resizing refits only the original motor. This supersedes the automatic packaging fit from 0.63.1. See [release-0642.md](release-0642.md).
+
+## Horizontal orbit — Auto3D 0.64.1 / Packaging 1.10.7 / Primary Products 0.13.0
+
+Prevents camera roll during horizontal orbit while preserving selected-object focus, pan and axis constraints. See [release-0641.md](release-0641.md).
+
+## Meshy workflows, revisions and AI viewer — Auto3D 0.64.0 / Primary Products 0.13.0 / Packaging 1.10.7 (2026-11-12)
+
+Adds Multi-image to 3D, current Text to image models and options (multi-view, background removal), texture prompts, revisions for every completed creation type, a 2D image viewer, studio lighting with pan in the 3D preview, and resilient thumbnails. Meshy has no API for assisted prompts. Verified live against Meshy through the real Pages Function in a local browser. Administrators can save an encrypted shared Meshy key in Auto3D that every account without a personal key uses (20 generations per account per hour). See [release-0640.md](release-0640.md). Not deployed.
 
 ## Larger centered landing animation — Auto3D 0.63.1 / Packaging 1.10.7 / Primary Products 0.13.0
 
