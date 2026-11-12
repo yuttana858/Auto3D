@@ -3,7 +3,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { CreateEngineeringPack, PoseEngineeringPack } from './engineeringpack.js';
 import { CreatePresentationPulpSide } from './engineeringpulp.js';
-import { CollectEngineeringFitPoints, FitEngineeringCamera } from './engineeringcamera.js';
+import { CollectEngineeringFitPoints, CreateEngineeringCamera } from './engineeringcamera.js';
 import { ReleaseWebGLRenderer } from './webglcleanup.js';
 import { EngineeringSequenceState, EngineeringStagePositions, EngineeringSequenceDuration, EngineeringTiming } from './engineeringsequence.js';
 
@@ -106,9 +106,9 @@ export function CreateEngineeringHero (canvas, { onState = () => {} } = {})
     const smooth = (t, a, b) => { const v = THREE.MathUtils.clamp ((t - a) / (b - a), 0, 1); return v * v * (3 - 2 * v); };
     const reduced = window.matchMedia ('(prefers-reduced-motion: reduce)');
     let seconds = reduced.matches ? EngineeringSequenceDuration - 1 : 0, playing = !reduced.matches, active = true, disposed = false, previous, stage = -1, viewportWidth = 1, heightPx = 1, stamp = -1;
-    let framing = null; const focus = new THREE.Vector3 ();
+    let framing = null; const focus = new THREE.Vector3 (), fitPoints = [], cameraMotion = CreateEngineeringCamera (camera);
     const inspect = () => { const sequence = EngineeringSequenceState (seconds); return { available : true, playing, active : active && !document.hidden, stage : sequence.stage, time : Math.round (sequence.sceneTime * 10) / 10, sequence, framing }; };
-    function pose () {
+    function pose (delta) {
         const sequence = EngineeringSequenceState (seconds), t = sequence.sceneTime;
         assembly.visible = sequence.sceneVisible; shadow.visible = sequence.sceneVisible; grid.visible = sequence.sceneVisible;
         productLines.forEach ((line, index) => { const count = line.geometry.getAttribute ('position').count; const drawn = smooth (t, 0.1 + index * 0.018, 1.3 + index * 0.018); line.geometry.setDrawRange (0, Math.floor (count * drawn / 2) * 2); });
@@ -119,49 +119,53 @@ export function CreateEngineeringHero (canvas, { onState = () => {} } = {})
         for (const part of insertParts) {
             const d = 1 - smooth (t, 4 + (part.side + 1) * 0.22, 6.8);
             part.group.position.set (part.side * d * 0.75, d * 0.2, 0);
+            part.group.scale.setScalar (THREE.MathUtils.lerp (0.1, 1, smooth (t, 3.8, 5)));
             part.shell.morphTargetInfluences[0] = 1 - smooth (t, 4.4 + (part.side + 1) * 0.18, 6.9);
         }
         board.visible = t > 7.2; for (const mat of [kraft, edge]) { mat.opacity = smooth (t, 7.2, 8.3); mat.transparent = mat.opacity < 1; }
+        // Let the blank grow into view so the camera follows its current outline continuously.
+        const blankScale = THREE.MathUtils.lerp (0.2, 1, smooth (t, 7.2, 8.3)); board.scale.set (blankScale, 1, blankScale);
         PoseEngineeringPack (pack, t);
         const scanning = smooth (t, 17, 19); cut.constant = THREE.MathUtils.lerp (8, 0.3 + Math.sin (t * 0.8) * 0.6, scanning); reveal.constant = -cut.constant;
         for (const mat of [kraft, edge, pulp]) { mat.clippingPlanes = scanning > 0 ? [cut] : []; }
         for (const mat of wireMats) { mat.clippingPlanes = scanning > 0 ? [reveal] : []; mat.opacity = (mat.userData.grid ? 0.08 : 0.5) * Math.max (1 - smooth (t, 2, 4), scanning); }
         assembly.rotation.y = 0.15 + Math.sin (t * 0.22) * 0.16; assembly.position.y = Math.sin (t * 0.45) * 0.07;
         if (sequence.sceneVisible) {
-            const points = CollectEngineeringFitPoints (assembly);
+            const points = CollectEngineeringFitPoints (assembly, fitPoints);
             focus.set (0, 0.15, 0.25).applyMatrix4 (assembly.matrixWorld);
-            if (points.length) { framing = FitEngineeringCamera (camera, points, focus); }
-        }
+            if (points.length) { framing = cameraMotion.update (points, focus, delta); }
+        } else { cameraMotion.reset (); }
         const nextStamp = Math.floor (seconds * (sequence.sequenceTime < EngineeringTiming[0].execute ? 60 : 10));
         if (sequence.stage !== stage || nextStamp !== stamp) { stage = sequence.stage; stamp = nextStamp; onState (inspect ()); }
     }
-    function draw () { pose (); renderer.render (scene, camera); }
+    function draw (delta = 0) { pose (delta); renderer.render (scene, camera); }
     const resize = () => {
         if (disposed) { return; }
         viewportWidth = canvas.clientWidth || 800; heightPx = canvas.clientHeight || 600; renderer.setSize (viewportWidth, heightPx, false); camera.aspect = viewportWidth / heightPx;
         camera.clearViewOffset ();
-        camera.updateProjectionMatrix (); draw ();
+        camera.updateProjectionMatrix (); cameraMotion.reset (); draw ();
     };
     function loop (time) {
         if (disposed || !active || document.hidden) { previous = undefined; return; }
+        const delta = previous === undefined ? 0 : Math.max ((time - previous) / 1000, 0);
         if (previous !== undefined) {
             // Keep the presentation on time even when a device drops frames.
             // Visibility and intersection changes reset previous before playback resumes.
-            seconds += Math.max ((time - previous) / 1000, 0);
+            seconds += delta;
         }
-        previous = time; draw ();
+        previous = time; draw (delta);
     }
     function schedule () { previous = undefined; renderer.setAnimationLoop (playing && active && !document.hidden ? loop : null); }
     function control (action, value) {
         if (disposed) { return { available : false, playing : false, stage }; }
-        if (action === 'stage') { if (!Number.isInteger (value) || value < 0 || value > 3) { throw new Error ('Choose a stage from 0 to 3.'); } seconds = EngineeringStagePositions[value]; playing = false; }
+        if (action === 'stage') { if (!Number.isInteger (value) || value < 0 || value > 3) { throw new Error ('Choose a stage from 0 to 3.'); } seconds = EngineeringStagePositions[value]; playing = false; cameraMotion.reset (); }
         else if (action === 'pause') { playing = false; }
         else if (action === 'play') { playing = true; }
         else if (action === 'restart') { seconds = 0; playing = true; }
         else { throw new Error ('Unknown demo action.'); }
         schedule (); draw (); onState (inspect ()); return inspect ();
     }
-    const motion = () => { playing = !reduced.matches; if (reduced.matches) { seconds = EngineeringSequenceDuration - 1; } schedule (); draw (); onState (inspect ()); };
+    const motion = () => { playing = !reduced.matches; if (reduced.matches) { seconds = EngineeringSequenceDuration - 1; cameraMotion.reset (); } schedule (); draw (); onState (inspect ()); };
     const visibility = () => { schedule (); onState (inspect ()); };
     const observer = new ResizeObserver (resize); observer.observe (canvas); reduced.addEventListener ('change', motion); document.addEventListener ('visibilitychange', visibility);
     resize (); schedule (); onState (inspect ());

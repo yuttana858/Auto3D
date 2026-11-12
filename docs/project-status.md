@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Larger centered landing animation — Auto3D 0.63.1 / Packaging 1.10.7 / Primary Products 0.13.0
+
+Fits the actual visible surfaces more closely and centers their projected silhouette in the animation window. Damped camera motion follows the growing pulp sheets, expanding carton blank and closing folds. Pause freezes the camera; stage selection, resize and reduced-motion stills fit immediately. See [release-0631.md](release-0631.md).
+
 ## Agentic landing and existing sign-in — Auto3D 0.63.0 / Packaging 1.10.7 / Primary Products 0.13.0
 
 Replaces the welcome scene with the approved compact floating banner: frame flash, descending content and sign-in, typed headline, engineering-sketch logo and a 35-second product-to-packaging sequence. Exactly two reinforced formed-pulp cradles protect the motor; the camera fits current geometry around the centered product. The glass prompt is presentation only. The existing AuthService, approved-account routes, saved-session Continue, recovery and logout flows remain in use. Ported onto current main after #106 to preserve all module updates. See [release-0630.md](release-0630.md) and [entry implementation](engineering-landing.md).
