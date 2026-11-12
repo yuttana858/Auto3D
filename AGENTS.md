@@ -6,7 +6,9 @@ The agentic landing/sign-in release is Auto3D 0.63.0 / Packaging 1.10.7 / Primar
 
 The landing camera refinement is Auto3D 0.63.1 / Packaging 1.10.7 / Primary Products 0.13.0, based on main after #107. See docs/release-0631.md.
 
-The live product profile editor candidate is Auto3D 0.65.0 / Packaging 1.10.7 / Primary Products 0.14.0, includes main through #111. See docs/release-0650.md.
+The live product profile editor candidate is Auto3D 0.65.0 / Packaging 1.10.7 / Primary Products 0.14.0, includes main through #112. See docs/release-0650.md.
+
+The fixed motor-scale hero release is Auto3D 0.64.2 / Packaging 1.10.7 / Primary Products 0.13.0, based on main after #111. See docs/release-0642.md.
 
 # Agent-accessible features
 
