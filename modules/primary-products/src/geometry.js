@@ -2,32 +2,12 @@ import { ProductMaterials } from './materials.js';
 import { CreateClamshell } from './clamshell.js';
 import { GetArtworkZones } from './zones.js';
 export { GetArtworkZones } from './zones.js';
-import { CreatePouch } from './pouch.js';
+import { CreatePouchComponents } from './pouch.js';
 import { DefaultProductDraft, UpdateProductDraft, BottleShape } from './state.js';
 import { BottleSectionOf, SectionOutline } from './section.js';
+import { Revolve } from './revolve.js';
 
 // Neutral indexed meshes: base-centred, Y-up, millimeters; no engine dependencies.
-function Revolve (id, role, profile, segments)
-{
-    const positions = []; const normals = []; const uvs = []; const indices = [];
-    // Separate strips retain hard profile corners and a duplicated UV seam.
-    const add = (p, n, uv) => { positions.push (...p); normals.push (...n); uvs.push (...uv); };
-    for (let row = 0; row < profile.length - 1; row++) {
-        const [r0, y0] = profile[row]; const [r1, y1] = profile[row + 1];
-        const length = Math.hypot (y1 - y0, r1 - r0);
-        for (let col = 0; col < segments; col++) {
-            const start = positions.length / 3;
-            for (const [r, y, u, v] of [[r0, y0, col / segments, 0], [r0, y0, (col + 1) / segments, 0], [r1, y1, col / segments, 1], [r1, y1, (col + 1) / segments, 1]]) {
-                const angle = u * Math.PI * 2; const c = Math.cos (angle); const s = Math.sin (angle);
-                add ([r * c, y, r * s], [(y1 - y0) * c / length, (r0 - r1) / length, (y1 - y0) * s / length], [u, (row + v) / (profile.length - 1)]);
-            }
-            if (r0 > 0) { indices.push (start, start + 2, start + 1); }
-            if (r1 > 0) { indices.push (start + 1, start + 2, start + 3); }
-        }
-    }
-    return { id, materialRole : role, positions, normals, uvs, indices };
-}
-
 // Lofted body for oval and rounded-rectangle bottles. Each profile row is either the body section scaled by `scale` or a
 // circle of `radius` (the round neck); the shoulder blends between them along each outline point's own direction.
 function Loft (id, role, section, rows, segments)
@@ -86,7 +66,11 @@ export function CreatePrimaryProduct (input, options = {})
     const segments = options.segments ?? 64;
     if (!Number.isInteger (segments) || segments < 16 || segments > 128 || segments % 4 !== 0) { throw new Error ('Segments must be a multiple of four between 16 and 128.'); }
     if (definition.family === 'clamshell') { return { apiVersion : 1, generatorVersion : 1, units : 'mm', definition, components : CreateClamshell (definition), bounds : { min : [-definition.widthMm/2, 0, -definition.depthMm/2], max : [definition.widthMm/2, definition.heightMm, definition.depthMm/2] }, artworkZones : GetArtworkZones (definition), quality : { construction : 'closed-position-shell', hollowWalls : true, hinge : false } }; }
-    if (definition.family === 'pouch') { return { apiVersion : 1, generatorVersion : 1, units : 'mm', definition, components : [CreatePouch (definition, segments)], bounds : { min : [-definition.widthMm / 2, 0, -definition.depthMm / 2], max : [definition.widthMm / 2, definition.heightMm, definition.depthMm / 2] }, artworkZones : GetArtworkZones (definition), quality : { construction : definition.pouchShape ? 'filled-standup-presentation' : 'filled-pillow-presentation', hollowWalls : false, gusset : definition.pouchShape ? 'bottom' : false, gussetMm : definition.pouchShape?.gussetMm ?? 0, freeStanding : Boolean (definition.pouchShape), zipper : false, simulatedFill : false } }; }
+    if (definition.family === 'pouch') {
+        const shape = definition.pouchShape, style = shape?.style || 'pillow';
+        return { apiVersion : 1, generatorVersion : 1, units : 'mm', definition, components : CreatePouchComponents (definition, segments), bounds : { min : [-definition.widthMm / 2, 0, -definition.depthMm / 2], max : [definition.widthMm / 2, definition.heightMm, definition.depthMm / 2] }, artworkZones : GetArtworkZones (definition),
+            quality : { construction : 'filled-' + { pillow : 'pillow', standup : 'standup', flatbottom : 'flatbottom' }[style] + '-presentation', hollowWalls : false, gusset : { pillow : false, standup : 'bottom', flatbottom : 'box' }[style], gussetMm : shape?.gussetMm ?? 0, freeStanding : style !== 'pillow', zipper : Boolean (shape?.zipper), spout : shape?.spout ? shape.spout.position : false, threads : false, simulatedFill : false } };
+    }
     const h = definition.heightMm; const r = definition.diameterMm / 2; const components = [];
     const cylinder = (id, role, radius, low, high) => Revolve (id, role, [[0, low], [radius, low], [radius, high], [0, high]], segments);
     if (definition.family === 'bottle') {

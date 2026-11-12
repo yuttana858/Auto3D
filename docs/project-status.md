@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Flat-bottom pouches, zippers and spouts — Auto3D 0.61.0 / Primary Products 0.12.0 / Packaging 1.10.7 (2026-11-12)
+
+Pouch construction adds **Flat-bottom (box)** pouches that stand on a W × L base with full-depth side gussets. Any pouch can have a **reclosable zipper**, and stand-up or flat-bottom pouches can have a **center or corner spout** with a cap; H includes the spout. Five designs join the Pouches drawer. See [release-0610.md](release-0610.md).
+
 ## Stand-up pouches — Auto3D 0.60.0 / Primary Products 0.11.0 / Packaging 1.10.7 (2026-11-12)
 
 Pouches gain a **Pouch style** of Pillow or Stand-up. A stand-up pouch opens into a flat elliptical bottom gusset as deep as the filled depth (L), so it stands, and tapers to the top seal. Five stand-up designs are in the **Pouches** drawer. Generated products are named by their construction. `primary.configure` accepts `pouchShape { style, gussetMm }`. See [release-0600.md](release-0600.md).

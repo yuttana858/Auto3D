@@ -1,5 +1,5 @@
 import { ProductMaterials } from './materials.js';
-export const PrimaryProductsVersion = '0.11.0';
+export const PrimaryProductsVersion = '0.12.0';
 export const PrimaryFamilies = Object.freeze ({ clamshell : { name : 'Closed clamshell', material : 'pp', heightMm : 60, widthMm : 180, depthMm : 130, color : '#eee9dd', roughness : .35, labelZone : 'front' }, bottle : { name : 'Round bottle', material : 'plastic', heightMm : 190, diameterMm : 65, color : '#e8eceb', roughness : 0.45, labelZone : 'front' }, can : { name : 'Standard can', material : 'aluminum', heightMm : 122, diameterMm : 66, color : '#c9d2d4', roughness : 0.3, labelZone : 'wrap' }, pouch : { name : 'Pillow pouch', material : 'plastic', heightMm : 200, widthMm : 140, depthMm : 40, color : '#e8eceb', roughness : 0.5, labelZone : 'front' } });
 const fields = ['family', 'heightMm', 'diameterMm', 'widthMm', 'depthMm', 'material', 'color', 'roughness', 'labelZone', 'bottleShape', 'bottleSection', 'pouchShape'];
 export function DefaultProductDraft (family = 'bottle')
@@ -37,19 +37,43 @@ export function UpdateProductDraft (current, changes)
     return { ...next, color : next.color.toLowerCase () };
 }
 
-// Stand-up pouches open into a bottom gusset: the fold height on the front panel. Filled depth (L) is the opened
-// gusset depth. Gusset height is limited by depth and by 35% of the height so the panel keeps a label area.
+// Pouch construction. Pillow pouches bulge from four seals; stand-up pouches open into a bottom gusset (gussetMm is
+// the fold height on the front panel and filled depth L is the opened gusset depth); flat-bottom (box) pouches have a
+// rectangular W × L base with full-depth side gussets. Any style can add a reclosable zipper; stand-up and flat-bottom
+// pouches can add a spout fitment in the top seal. Overall height H includes the spout and its cap.
+export const PouchStyles = Object.freeze (['pillow', 'standup', 'flatbottom']);
+export const PouchSpoutPositions = Object.freeze (['center', 'corner']);
 export function PouchGussetLimit (draft) { return Math.min (draft.depthMm, draft.heightMm * .35); }
+// Spout neck and cap heights follow the bore diameter.
+export function PouchSpoutHeight (spout) { return spout ? spout.diameterMm * 1.9 : 0; }
+export function PouchSpoutLimit (draft) { return Math.min (draft.depthMm / 1.45, draft.widthMm * .3, draft.heightMm * .2 / 1.9, 40); }
 function ValidatePouchShape (draft, input, explicit)
 {
-    if (input === null || input?.style === 'pillow') { return null; }
-    if (!input || typeof input !== 'object' || Array.isArray (input) || input.style !== 'standup' || Object.keys (input).some (key => !['style', 'gussetMm'].includes (key))) { throw new Error ('Choose a pillow or stand-up pouch.'); }
-    if (draft.depthMm < 10) { throw new Error ('Stand-up pouches need a filled depth of at least 10 mm.'); }
-    const limit = PouchGussetLimit (draft); let gusset = input.gussetMm ?? Math.round (Math.min (draft.depthMm * .5, limit) * 100) / 100;
-    // Resizing an existing stand-up pouch keeps the gusset within the new limits instead of rejecting the resize.
-    if (!explicit && Number.isFinite (gusset)) { gusset = Math.min (gusset, limit); }
-    if (!Number.isFinite (gusset) || gusset < 3 || gusset > limit) { throw new Error ('Gusset height must be 3 mm to the filled depth, and at most 35% of the height.'); }
-    return { style : 'standup', gussetMm : gusset };
+    if (input === null) { return null; }
+    if (!input || typeof input !== 'object' || Array.isArray (input) || !PouchStyles.includes (input.style) || Object.keys (input).some (key => !['style', 'gussetMm', 'zipper', 'spout'].includes (key))) { throw new Error ('Choose a pillow, stand-up or flat-bottom pouch.'); }
+    if (input.zipper !== undefined && typeof input.zipper !== 'boolean') { throw new Error ('Zipper must be true or false.'); }
+    const result = { style : input.style };
+    if (input.style === 'standup') {
+        if (draft.depthMm < 10) { throw new Error ('Stand-up pouches need a filled depth of at least 10 mm.'); }
+        const limit = PouchGussetLimit (draft); let gusset = input.gussetMm ?? Math.round (Math.min (draft.depthMm * .5, limit) * 100) / 100;
+        // Resizing an existing stand-up pouch keeps the gusset within the new limits instead of rejecting the resize.
+        if (!explicit && Number.isFinite (gusset)) { gusset = Math.min (gusset, limit); }
+        if (!Number.isFinite (gusset) || gusset < 3 || gusset > limit) { throw new Error ('Gusset height must be 3 mm to the filled depth, and at most 35% of the height.'); }
+        result.gussetMm = gusset;
+    } else if (input.gussetMm !== undefined) { throw new Error ('Gusset height applies only to stand-up pouches.'); }
+    if (input.style === 'flatbottom' && draft.depthMm < 20) { throw new Error ('Flat-bottom pouches need a filled depth of at least 20 mm.'); }
+    if (input.zipper) { if (draft.heightMm < 60) { throw new Error ('Zipper pouches need a height of at least 60 mm.'); } result.zipper = true; }
+    if (input.spout !== undefined && input.spout !== null) {
+        const spout = input.spout;
+        if (input.style === 'pillow') { throw new Error ('Spouts apply to stand-up and flat-bottom pouches.'); }
+        if (!spout || typeof spout !== 'object' || Array.isArray (spout) || !PouchSpoutPositions.includes (spout.position) || Object.keys (spout).some (key => !['position', 'diameterMm'].includes (key))) { throw new Error ('Choose a center or corner spout.'); }
+        const limit = PouchSpoutLimit (draft); let diameter = spout.diameterMm ?? Math.round (Math.min (12, limit) * 100) / 100;
+        if (!explicit && Number.isFinite (diameter)) { diameter = Math.min (diameter, limit); }
+        if (!Number.isFinite (diameter) || diameter < 5 || diameter > limit) { throw new Error ('Spout diameter must be 5 mm to ' + Math.max (5, Math.floor (limit * 10) / 10) + ' mm for this pouch size.'); }
+        result.spout = { position : spout.position, diameterMm : diameter };
+    }
+    // A plain pillow pouch is the default construction and is stored without pouchShape.
+    return result.style === 'pillow' && !result.zipper ? null : result;
 }
 // The narrower side of the body governs the default neck and the neck fit for oval and rectangular bottles.
 export function BodyMinimum (draft) { return Math.min (draft.diameterMm, draft.bottleSection?.depthMm ?? draft.diameterMm); }
@@ -83,7 +107,7 @@ function ValidateBottleShape (draft, input)
 // Display name for a generated object: the family name, refined by bottle section or pouch construction.
 export function ProductName (draft)
 {
-    if (draft.pouchShape?.style === 'standup') { return 'Stand-up pouch'; }
+    if (draft.pouchShape) { return { pillow : 'Pillow pouch', standup : 'Stand-up pouch', flatbottom : 'Flat-bottom pouch' }[draft.pouchShape.style] + (draft.pouchShape.spout ? ' with spout' : draft.pouchShape.zipper ? ' with zipper' : ''); }
     if (draft.bottleSection) { return { oval : 'Oval bottle', rectangle : 'Rounded-rectangle bottle' }[draft.bottleSection.shape]; }
     return PrimaryFamilies[draft.family].name;
 }

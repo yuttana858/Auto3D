@@ -6710,7 +6710,7 @@
       "id": "primary.configure",
       "title": "Configure product draft",
       "category": "Primary Products",
-      "description": "Validate and update the session-local bottle/can/pouch/clamshell draft. Bottles accept bottleSection { shape round|oval|rectangle, depthMm, cornerRadiusMm } with diameterMm as the width. Pouches accept pouchShape { style pillow|standup, gussetMm } (stand-up pouches have a flat bottom gusset as deep as depthMm; null returns to pillow). Does not change scene geometry or upload artwork.",
+      "description": "Validate and update the session-local bottle/can/pouch/clamshell draft. Bottles accept bottleSection { shape round|oval|rectangle, depthMm, cornerRadiusMm } with diameterMm as the width. Pouches accept pouchShape { style pillow|standup|flatbottom, gussetMm (stand-up only), zipper, spout { position center|corner, diameterMm } (stand-up and flat-bottom only) }; stand-up pouches open into a bottom gusset as deep as depthMm, flat-bottom pouches stand on a W × L box base, heightMm includes any spout, and null returns to a plain pillow. Does not change scene geometry or upload artwork.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -6764,13 +6764,45 @@
                     "type": "string",
                     "enum": [
                       "pillow",
-                      "standup"
+                      "standup",
+                      "flatbottom"
                     ]
                   },
                   "gussetMm": {
                     "type": "number",
                     "minimum": 3,
                     "maximum": 200
+                  },
+                  "zipper": {
+                    "type": "boolean"
+                  },
+                  "spout": {
+                    "anyOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "position": {
+                            "type": "string",
+                            "enum": [
+                              "center",
+                              "corner"
+                            ]
+                          },
+                          "diameterMm": {
+                            "type": "number",
+                            "minimum": 5,
+                            "maximum": 40
+                          }
+                        },
+                        "required": [
+                          "position"
+                        ]
+                      }
+                    ]
                   }
                 },
                 "required": [

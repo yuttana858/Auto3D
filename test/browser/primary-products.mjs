@@ -230,6 +230,18 @@ try {
     const badGusset = await page.evaluate (() => Auto3D.execute ('primary.configure', { pouchShape : { style : 'standup', gussetMm : 500 } })); assert.equal (badGusset.ok, false);
     await panel.getByRole ('combobox', { name : 'Pouch construction', exact : true }).selectOption ('pillow'); assert.equal ((await call ('primary.inspect')).pouchShape, undefined);
     await call ('view.focus', { objectId : standup.objectId }); await page.waitForTimeout (800); await page.screenshot ({ path : 'work/primary-products-review/standup-pouch.png' });
+    /* Flat-bottom, zipper and spout options: catalog designs generate the extra parts; the panel controls edit the draft. */
+    const box = await call ('primary.designs.generate', { id : 'flat-bottom-coffee' }); assert.ok ((await call ('scene.inspect')).objects.some (o => o.id === box.objectId && o.name === 'Flat-bottom pouch with zipper'));
+    await call ('primary.selected.load'); assert.equal (await panel.getByRole ('checkbox', { name : 'Reclosable zipper', exact : true }).isChecked (), true);
+    assert.equal (await panel.getByRole ('combobox', { name : 'Pouch construction', exact : true }).inputValue (), 'flatbottom'); assert.equal (await panel.getByRole ('spinbutton', { name : 'Gusset height', exact : true }).isVisible (), false);
+    await panel.getByRole ('combobox', { name : 'Pouch spout', exact : true }).selectOption ('corner'); assert.deepEqual ((await call ('primary.inspect')).pouchShape, { style : 'flatbottom', zipper : true, spout : { position : 'corner', diameterMm : 12 } });
+    const spoutSize = panel.getByRole ('spinbutton', { name : 'Spout diameter', exact : true }); await spoutSize.fill ('16'); await spoutSize.press ('Tab'); assert.equal ((await call ('primary.inspect')).pouchShape.spout.diameterMm, 16);
+    await panel.getByRole ('checkbox', { name : 'Reclosable zipper', exact : true }).uncheck (); assert.equal ((await call ('primary.inspect')).pouchShape.zipper, undefined);
+    const badSpout = await page.evaluate (() => Auto3D.execute ('primary.configure', { pouchShape : { style : 'pillow', spout : { position : 'center' } } })); assert.equal (badSpout.ok, false);
+    const refill = await call ('primary.designs.generate', { id : 'spouted-refill' }); assert.equal ((await calloutsFor (refill.objectId)).find (d => d.axis === 'height').lengthMm, 290);
+    assert.ok ((await call ('scene.inspect')).objects.some (o => o.id === refill.objectId && o.name === 'Stand-up pouch with spout'));
+    await call ('view.focus', { objectId : refill.objectId }); await page.waitForTimeout (800); await page.screenshot ({ path : 'work/primary-products-review/spouted-pouch.png' });
+    await call ('view.focus', { objectId : box.objectId }); await page.waitForTimeout (800); await page.screenshot ({ path : 'work/primary-products-review/flat-bottom-pouch.png' });
     await call ('view.focus', { objectId : rectangular.objectId }); await page.waitForTimeout (800); await page.screenshot ({ path : 'work/primary-products-review/rectangular-bottle.png' });
     await call ('primary.designs.open', { category : 'beverages', open : true }); await drawer.waitFor ({ state : 'visible' });
     await page.screenshot ({ path : 'work/primary-products-review/design-drawer-wide.png' });

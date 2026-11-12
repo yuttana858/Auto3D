@@ -1,8 +1,8 @@
 import { ProductCategories, ListProductDesigns, ProductDesign } from './catalog.js';
 import { GetArtworkZones } from './zones.js';
 import { ListProductMaterials } from './materials.js';
-import { PrimaryFamilies, PrimaryProductsVersion, BottleShape, DefaultProductDraft, ProductSize, DimensionChanges, PouchGussetLimit, ProductName } from './state.js';
-import { StandUpTopSeal } from './pouch.js';
+import { PrimaryFamilies, PrimaryProductsVersion, BottleShape, DefaultProductDraft, ProductSize, DimensionChanges, PouchGussetLimit, PouchSpoutLimit, PouchSpoutHeight, ProductName } from './state.js';
+import { StandUpTopSeal, PouchZipperBand, PouchSpoutCenter } from './pouch.js';
 function Element (tag, className, text, parent)
 {
     const node = document.createElement (tag); if (className) { node.className = className; } if (text !== undefined) { node.textContent = text; } parent?.appendChild (node); return node;
@@ -14,6 +14,31 @@ const icons = {
     can : '<path d="M7 4q6-3 12 0v16q-6 3-12 0Z M7 5q6 3 12 0 M7 18q6 3 12 0 M11 3h4"/>'
 };
 function Icon (family) { return '<svg viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true">' + icons[family] + '</svg>'; }
+// Front outline of a pouch: x/y is the top-left of the overall height h (including any spout), w the width, in SVG units.
+function PouchSvg (d, x, y, w, h)
+{
+    const sc = h / d.heightMm, shape = d.pouchShape, style = shape?.style || 'pillow', by = y + PouchSpoutHeight (shape?.spout) * sc, bottom = y + h, bh = bottom - by, seal = by + bh * StandUpTopSeal;
+    let body, details;
+    if (style === 'standup') {
+        const fold = bottom - shape.gussetMm * sc;
+        body = `M${x + 3} ${by}H${x + w - 3}L${x + w - 1} ${fold}Q${x + w + 2} ${bottom - 3} ${x + w - 2} ${bottom}H${x + 2}Q${x - 2} ${bottom - 3} ${x + 1} ${fold}Z`;
+        details = `M${x + 3} ${seal}H${x + w - 3}M${x + 2} ${fold}Q${x + w / 2} ${fold + Math.min (10, bh * .05)} ${x + w - 2} ${fold}`;
+    } else if (style === 'flatbottom') {
+        const gusset = by + bh * (1 - .62);
+        body = `M${x} ${by}H${x + w}V${bottom}H${x}Z`;
+        details = `M${x} ${seal}H${x + w}M${x + w * .06} ${gusset}V${bottom}M${x + w * .94} ${gusset}V${bottom}M${x} ${bottom - bh * .03}H${x + w}`;
+    } else {
+        body = `M${x} ${by}H${x + w}L${x + w - Math.min (8, w * .06)} ${by + bh / 2}L${x + w} ${bottom}H${x}L${x + Math.min (8, w * .06)} ${by + bh / 2}Z`;
+        details = `M${x} ${by + bh * .04}H${x + w}M${x} ${bottom - bh * .04}H${x + w}`;
+    }
+    const band = PouchZipperBand (d), zipper = band ? `<path d="M${x + w * .04} ${bottom - (band.bottomMm + band.topMm) / 2 * sc}H${x + w * .96}" stroke-width="2.2" stroke-opacity=".55" fill="none"/>` : '';
+    let spout = '';
+    if (shape?.spout) {
+        const dia = shape.spout.diameterMm * sc, cx = x + w / 2 + PouchSpoutCenter (d) * sc, neckTop = by - shape.spout.diameterMm * .8 * sc;
+        spout = `<rect x="${cx - dia / 2}" y="${neckTop}" width="${dia}" height="${by - neckTop + 2}" fill="#9aa6a8"/><rect x="${cx - dia * .725}" y="${y}" width="${dia * 1.45}" height="${neckTop - y}" rx="${Math.min (2, dia * .2)}" fill="#859497"/>`;
+    }
+    return { body, details, zipper, spout };
+}
 function DesignPreview (design)
 {
     const d = ProductDesign (design.id), scale = Math.min (78/(d.diameterMm || d.widthMm), 100/d.heightMm);
@@ -24,11 +49,8 @@ function DesignPreview (design)
         shape = `<path d="M${60-neck/2} ${y}h${neck}v${shoulder-y}L${x+w} ${body}V120H${x}V${body}L${60-neck/2} ${shoulder}Z"/><path d="M${60-neck/2} ${cap}h${neck}"/>`;
     } else if (d.family === 'can') {
         shape = `<path d="M${x} ${y+3}Q60 ${y-3} ${x+w} ${y+3}V117Q60 123 ${x} 117Z"/><path d="M${x} ${y+3}Q60 ${y+9} ${x+w} ${y+3}"/>`;
-    } else if (d.family === 'pouch' && d.pouchShape) {
-        const fold = 120-d.pouchShape.gussetMm*scale;
-        shape = `<path d="M${x+3} ${y}h${w-6}L${x+w-1} ${fold}Q${x+w+2} ${117} ${x+w-2} 120H${x+2}Q${x-2} 117 ${x+1} ${fold}Z"/><path d="M${x+3} ${y+h*StandUpTopSeal}h${w-6}M${x+2} ${fold}Q60 ${fold+5} ${x+w-2} ${fold}"/>`;
     } else if (d.family === 'pouch') {
-        shape = `<path d="M${x} ${y}h${w}l-4 ${h/2}l4 ${h/2}H${x}l4 -${h/2}Z"/><path d="M${x} ${y+5}h${w}M${x} 115h${w}"/>`;
+        const p = PouchSvg (d, x, y, w, h); shape = `<path d="${p.body}"/><path d="${p.details}"/>${p.zipper}${p.spout}`;
     } else {
         const sh = Math.min (45, h*.45), depth = Math.min (45, d.depthMm*scale*.5), top = 100-sh-depth;
         shape = `<path d="M${x} ${top+depth}L${x+12} ${top}H${x+w}l-12 ${depth}Z"/><path d="M${x} ${top+depth}v${sh}h${w-12}l12 -${depth}V${top}M${x+w-12} ${top+depth}v${sh}"/>`;
@@ -100,12 +122,20 @@ export class PrimaryProductsPanel
         }
         this.pouchSection = Element ('section', 'pp_section', undefined, controls); Element ('h3', '', 'Pouch style', this.pouchSection);
         const styleLabel = Element ('label', 'pp_field', 'Construction', this.pouchSection); this.pouchStyle = Element ('select', '', undefined, styleLabel); this.pouchStyle.setAttribute ('aria-label', 'Pouch construction');
-        for (const [value, text] of [['pillow', 'Pillow (flat seals)'], ['standup', 'Stand-up (bottom gusset)']]) { Element ('option', '', text, this.pouchStyle).value = value; }
-        this.pouchStyle.addEventListener ('change', () => this.Change ({ pouchShape : this.pouchStyle.value === 'pillow' ? null : { style : 'standup' } }));
+        for (const [value, text] of [['pillow', 'Pillow (flat seals)'], ['standup', 'Stand-up (bottom gusset)'], ['flatbottom', 'Flat-bottom (box)']]) { Element ('option', '', text, this.pouchStyle).value = value; }
+        this.pouchStyle.addEventListener ('change', () => this.ChangePouch ({ style : this.pouchStyle.value, gussetMm : undefined }));
         this.gussetLabel = Element ('label', 'pp_field', 'Gusset height', this.pouchSection); const gussetWrap = Element ('span', 'pp_input_wrap', undefined, this.gussetLabel); this.gussetInput = Element ('input', '', undefined, gussetWrap); this.gussetUnit = Element ('span', 'pp_unit', '', gussetWrap);
         this.gussetInput.type = 'number'; this.gussetInput.step = 'any'; this.gussetInput.setAttribute ('aria-label', 'Gusset height');
-        this.gussetInput.addEventListener ('change', () => { if (this.host.inspect ().pouchShape) { this.Change ({ pouchShape : { style : 'standup', gussetMm : this.gussetInput.valueAsNumber * this.Factor () } }); } });
-        Element ('p', 'pp_draft_note', 'Stand-up pouches open into a flat bottom gusset as deep as the filled depth (L) so they stand; the gusset height is the fold line on the front panel.', this.pouchSection);
+        this.gussetInput.addEventListener ('change', () => { if (this.host.inspect ().pouchShape?.style === 'standup') { this.ChangePouch ({ gussetMm : this.gussetInput.valueAsNumber * this.Factor () }); } });
+        const zipperLabel = Element ('label', 'pp_toggle', undefined, this.pouchSection); this.zipper = Element ('input', '', undefined, zipperLabel); this.zipper.type = 'checkbox'; this.zipper.setAttribute ('aria-label', 'Reclosable zipper'); Element ('span', '', 'Reclosable zipper', zipperLabel);
+        this.zipper.addEventListener ('change', () => this.ChangePouch ({ zipper : this.zipper.checked || undefined }));
+        this.spoutLabel = Element ('label', 'pp_field', 'Spout', this.pouchSection); this.spoutSelect = Element ('select', '', undefined, this.spoutLabel); this.spoutSelect.setAttribute ('aria-label', 'Pouch spout');
+        for (const [value, text] of [['none', 'None'], ['center', 'Center'], ['corner', 'Corner']]) { Element ('option', '', text, this.spoutSelect).value = value; }
+        this.spoutSelect.addEventListener ('change', () => { const current = this.host.inspect ().pouchShape?.spout; this.ChangePouch ({ spout : this.spoutSelect.value === 'none' ? undefined : { position : this.spoutSelect.value, ...(current ? { diameterMm : current.diameterMm } : {}) } }); });
+        this.spoutSizeLabel = Element ('label', 'pp_field', 'Spout diameter', this.pouchSection); const spoutWrap = Element ('span', 'pp_input_wrap', undefined, this.spoutSizeLabel); this.spoutInput = Element ('input', '', undefined, spoutWrap); this.spoutUnit = Element ('span', 'pp_unit', '', spoutWrap);
+        this.spoutInput.type = 'number'; this.spoutInput.step = 'any'; this.spoutInput.setAttribute ('aria-label', 'Spout diameter');
+        this.spoutInput.addEventListener ('change', () => { const spout = this.host.inspect ().pouchShape?.spout; if (spout) { this.ChangePouch ({ spout : { position : spout.position, diameterMm : this.spoutInput.valueAsNumber * this.Factor () } }); } });
+        Element ('p', 'pp_draft_note', 'Stand-up pouches open into a bottom gusset as deep as L; flat-bottom pouches stand on a W × L box base. Zippers sit below the top seal. Height H includes any spout and cap.', this.pouchSection);
         Element ('p', 'pp_draft_note', 'Overall height includes the cap. The straight body uses the remaining height. Shape edits preserve label size; artwork must still fit.', this.shapeSection);
         const surfaces = Element ('section', 'pp_section', undefined, controls); Element ('h3', '', 'Surface', surfaces);
         const materialRow = Element ('div', 'pp_material_row', undefined, surfaces);
@@ -180,6 +210,14 @@ export class PrimaryProductsPanel
         this.add.title = draft.unavailableReason || 'Generate a product in the session.';
         this.availability.textContent = draft.unavailableReason || '';
     }
+    // Merge a partial pouch construction into the draft; pillow pouches drop the gusset and spout.
+    ChangePouch (patch)
+    {
+        const current = this.host.inspect ().pouchShape || { style : 'pillow' }, next = { ...current, ...patch };
+        for (const key of Object.keys (next)) { if (next[key] === undefined) { delete next[key]; } }
+        if (next.style !== 'standup') { delete next.gussetMm; } if (next.style === 'pillow') { delete next.spout; }
+        this.Change ({ pouchShape : next });
+    }
     Refresh ()
     {
         const draft = this.host.inspect (), factor = this.Factor (), unit = factor === 1 ? 'mm' : 'in', disabled = this.host.blocked ();
@@ -196,8 +234,13 @@ export class PrimaryProductsPanel
         this.callouts.checked = draft.callouts !== false; this.callouts.disabled = disabled || !this.host.setCallouts; this.callouts.parentElement.hidden = !this.host.setCallouts;
         this.shapeSection.hidden = draft.family !== 'bottle'; this.pouchSection.hidden = draft.family !== 'pouch';
         if (draft.family === 'pouch') {
-            this.pouchStyle.value = draft.pouchShape?.style || 'pillow'; this.pouchStyle.disabled = disabled; this.gussetLabel.hidden = !draft.pouchShape; this.gussetUnit.textContent = unit; this.gussetInput.disabled = disabled;
-            if (draft.pouchShape) { this.gussetInput.min = String (3 / factor); this.gussetInput.max = String (PouchGussetLimit (draft) / factor); if (document.activeElement !== this.gussetInput) { this.gussetInput.value = String (Number ((draft.pouchShape.gussetMm / factor).toFixed (6))); } }
+            const shape = draft.pouchShape, style = shape?.style || 'pillow';
+            this.pouchStyle.value = style; this.pouchStyle.disabled = disabled; this.gussetLabel.hidden = style !== 'standup'; this.gussetUnit.textContent = unit; this.gussetInput.disabled = disabled;
+            if (style === 'standup') { this.gussetInput.min = String (3 / factor); this.gussetInput.max = String (PouchGussetLimit (draft) / factor); if (document.activeElement !== this.gussetInput) { this.gussetInput.value = String (Number ((shape.gussetMm / factor).toFixed (6))); } }
+            this.zipper.checked = Boolean (shape?.zipper); this.zipper.disabled = disabled;
+            this.spoutLabel.hidden = style === 'pillow'; this.spoutSelect.value = shape?.spout?.position || 'none'; this.spoutSelect.disabled = disabled;
+            this.spoutSizeLabel.hidden = !shape?.spout; this.spoutUnit.textContent = unit; this.spoutInput.disabled = disabled;
+            if (shape?.spout) { this.spoutInput.min = String (5 / factor); this.spoutInput.max = String (PouchSpoutLimit (draft) / factor); if (document.activeElement !== this.spoutInput) { this.spoutInput.value = String (Number ((shape.spout.diameterMm / factor).toFixed (6))); } }
         }
         if (draft.family === 'bottle') {
             this.sectionSelect.value = draft.bottleSection?.shape || 'round'; this.sectionSelect.disabled = disabled; this.cornerLabel.hidden = draft.bottleSection?.shape !== 'rectangle'; this.cornerUnit.textContent = unit;
@@ -228,10 +271,10 @@ export class PrimaryProductsPanel
         }
         const bottle = draft.family === 'bottle', pouch = ['pouch', 'clamshell'].includes (draft.family); const width = Math.max (70, Math.min (160, (draft.diameterMm || draft.widthMm) / draft.heightMm * 280)), x = 120 - width / 2;
         const shape = bottle ? BottleShape (draft) : null, sy = value => 305-value/draft.heightMm*250, neckWidth = bottle ? width*shape.neckDiameterMm/draft.diameterMm : 0, capBottom = bottle ? sy (draft.heightMm-shape.capHeightMm) : 0, neckBottom = bottle ? sy (draft.heightMm-shape.capHeightMm-shape.neckHeightMm) : 0, bodyTop = bottle ? sy (draft.heightMm-shape.capHeightMm-shape.neckHeightMm-shape.shoulderHeightMm) : 0;
-        const body = draft.family === 'clamshell' ? `M${x} 75H${x+width}V305H${x}Z` : draft.pouchShape ? `M${x + 6} 75H${x + width - 6}L${x + width - 2} 200Q${x + width + 4} 285 ${x + width - 4} 305H${x + 4}Q${x - 4} 285 ${x + 2} 200Z` : pouch ? `M${x} 75H${x + width}L${x + width - 8} 180L${x + width} 305H${x}L${x + 8} 180Z` : bottle ? `M${120-neckWidth/2} ${capBottom}H${120+neckWidth/2}V${neckBottom}L${x+width} ${bodyTop}V305H${x}V${bodyTop}L${120-neckWidth/2} ${neckBottom}Z` : `M${x} 90Q120 78 ${x + width} 90V294Q120 307 ${x} 294Z`;
+        const body = draft.family === 'clamshell' ? `M${x} 75H${x+width}V305H${x}Z` : pouch ? PouchSvg (draft, x, 55, width, 250).body : bottle ? `M${120-neckWidth/2} ${capBottom}H${120+neckWidth/2}V${neckBottom}L${x+width} ${bodyTop}V305H${x}V${bodyTop}L${120-neckWidth/2} ${neckBottom}Z` : `M${x} 90Q120 78 ${x + width} 90V294Q120 307 ${x} 294Z`;
         const zoneDraft = DefaultProductDraft (draft.family); for (const key of Object.keys (zoneDraft)) { zoneDraft[key] = draft[key]; } if (draft.bottleShape) { zoneDraft.bottleShape = draft.bottleShape; } if (draft.bottleSection) { zoneDraft.bottleSection = draft.bottleSection; } if (draft.pouchShape) { zoneDraft.pouchShape = draft.pouchShape; }
         const zone = GetArtworkZones (zoneDraft).find (z => z.id === draft.labelZone), artHeight = art?.heightMm || zone.heightMm*.7, labelY = sy (zone.bottomMm+(zone.heightMm+artHeight)/2), labelHeight = artHeight/draft.heightMm*250;
         const labelX = draft.labelZone === 'wrap' ? x + 1 : 120 - width * .32, labelW = draft.labelZone === 'wrap' ? width - 2 : width * .64;
-        this.drawing.innerHTML = `<svg viewBox="0 0 240 350" role="img" aria-label="${draft.family === 'clamshell' ? 'Clamshell' : pouch ? 'Pouch' : bottle ? 'Bottle' : 'Can'} profile reference"><ellipse cx="120" cy="319" rx="75" ry="9" fill="currentColor" opacity=".07"/><path d="${body}" fill="${draft.color}" fill-opacity="${draft.material === 'glass' ? '.3' : '1'}" stroke="currentColor" stroke-opacity=".23" stroke-width="1.5"/>${draft.pouchShape ? `<path d="M${x + 6} ${75 + 250 * StandUpTopSeal}h${width - 12}M${x + 4} ${sy (draft.pouchShape.gussetMm)}Q120 ${sy (draft.pouchShape.gussetMm) + 10} ${x + width - 4} ${sy (draft.pouchShape.gussetMm)}" stroke="currentColor" stroke-opacity=".3" fill="none"/>` : pouch ? `<path d="M${x} 85h${width}M${x} 295h${width}" stroke="currentColor" stroke-opacity=".3"/>` : bottle ? `<rect x="${120-neckWidth*.54}" y="55" width="${neckWidth*1.08}" height="${capBottom-55}" fill="#859497"/>` : `<ellipse cx="120" cy="90" rx="${width / 2}" ry="6" fill="#cbd3d4" stroke="#7a898b"/><ellipse cx="120" cy="91" rx="12" ry="3" fill="#859497"/>`}${preview ? `<image href="${preview}" x="${labelX}" y="${labelY}" width="${labelW}" height="${labelHeight}" preserveAspectRatio="xMidYMid meet"/>` : `<rect x="${labelX}" y="${labelY}" width="${labelW}" height="${labelHeight}" fill="none" stroke="#458b9b" stroke-dasharray="4 4"/>`}<g class="pp_callout" fill="currentColor" stroke="currentColor" stroke-width=".8">${Bracket (x, 336, x + width, 336, 'W ' + Format (size.widthMm / factor) + ' ' + unit, 'below', 11)}${Bracket (x + width + 10, bottle ? 55 : pouch ? 75 : 84, x + width + 10, 305, 'H ' + Format (size.heightMm / factor), 'right', 11)}<text x="${x + width + 4}" y="322" stroke="none" font-size="11">L ${Format (size.lengthMm / factor)}</text></g></svg>`;
+        this.drawing.innerHTML = `<svg viewBox="0 0 240 350" role="img" aria-label="${draft.family === 'clamshell' ? 'Clamshell' : pouch ? 'Pouch' : bottle ? 'Bottle' : 'Can'} profile reference"><ellipse cx="120" cy="319" rx="75" ry="9" fill="currentColor" opacity=".07"/><path d="${body}" fill="${draft.color}" fill-opacity="${draft.material === 'glass' ? '.3' : '1'}" stroke="currentColor" stroke-opacity=".23" stroke-width="1.5"/>${pouch ? (p => `<g stroke="currentColor"><path d="${p.details}" stroke-opacity=".3" fill="none"/>${p.zipper}</g>${p.spout}`) (PouchSvg (draft, x, 55, width, 250)) : bottle ? `<rect x="${120-neckWidth*.54}" y="55" width="${neckWidth*1.08}" height="${capBottom-55}" fill="#859497"/>` : `<ellipse cx="120" cy="90" rx="${width / 2}" ry="6" fill="#cbd3d4" stroke="#7a898b"/><ellipse cx="120" cy="91" rx="12" ry="3" fill="#859497"/>`}${preview ? `<image href="${preview}" x="${labelX}" y="${labelY}" width="${labelW}" height="${labelHeight}" preserveAspectRatio="xMidYMid meet"/>` : `<rect x="${labelX}" y="${labelY}" width="${labelW}" height="${labelHeight}" fill="none" stroke="#458b9b" stroke-dasharray="4 4"/>`}<g class="pp_callout" fill="currentColor" stroke="currentColor" stroke-width=".8">${Bracket (x, 336, x + width, 336, 'W ' + Format (size.widthMm / factor) + ' ' + unit, 'below', 11)}${Bracket (x + width + 10, bottle || pouch ? 55 : 84, x + width + 10, 305, 'H ' + Format (size.heightMm / factor), 'right', 11)}<text x="${x + width + 4}" y="322" stroke="none" font-size="11">L ${Format (size.lengthMm / factor)}</text></g></svg>`;
     }
 }
