@@ -129,6 +129,7 @@ try {
             const framing = (await inspect ()).framing;
             assert.ok (framing.visiblePoints > 0);
             assert.ok (framing.extent.every (value => value <= framing.fill + 1e-6), 'Current geometry fits the rendering window');
+            assert.ok (framing.screenCenter.every (value => Math.abs (value) < 0.002), 'The visible assembly is centered in the animation window');
             distances.push (framing.distance);
         }
         assert.ok (Math.max (...distances) > Math.min (...distances) * 1.1, 'The camera changes distance with the current assembly');
