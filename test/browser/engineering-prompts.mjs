@@ -123,21 +123,25 @@ try {
         await page.waitForFunction (() => document.querySelector ('.entry_agent').dataset.phase === 'executing');
         await execute ('landing.demo.playback', { action : 'pause' });
         assert.match (await agent.locator ('.entry_execution_percent').textContent (), /\d+%/);
-        const distances = [];
+        const frames = [];
         for (const stage of [0, 1, 2, 3]) {
             await execute ('landing.demo.stage', { stage });
             const framing = (await inspect ()).framing;
             assert.ok (framing.visiblePoints > 0);
-            assert.ok (framing.extent.every (value => value <= framing.fill + 1e-6), 'Current geometry fits the rendering window');
-            assert.ok (framing.screenCenter.every (value => Math.abs (value) < 0.002), 'The visible assembly is centered in the animation window');
-            distances.push (framing.distance);
+            assert.equal (framing.mode, 'motor-scale');
+            assert.ok (framing.referenceExtent.every (value => value <= framing.fill + 1e-6), 'The original motor fills the rendering window');
+            assert.ok (framing.referenceScreenCenter.every (value => Math.abs (value) < 0.002), 'Framing stays centered on the original motor');
+            frames.push (framing);
         }
-        assert.ok (Math.max (...distances) > Math.min (...distances) * 1.1, 'The camera changes distance with the current assembly');
+        assert.ok (frames.every (frame => frame.distance === frames[0].distance), 'The motor never shrinks as packaging appears');
+        assert.ok (frames.every (frame => JSON.stringify (frame.target) === JSON.stringify (frames[0].target)), 'Stage selection cannot move the camera');
+        assert.ok (frames[0].extent.every (value => value <= 0.941), 'The first motor remains fully framed');
+        assert.ok (frames.slice (1).some (frame => frame.extent.some (value => value > 1)), 'Packaging may crop outside the hero window');
         assert.deepEqual (await page.evaluate (() => demoMediaCalls), []);
         assert.deepEqual (apiCalls.filter (path => !['/api/environments', '/api/auth/session'].includes (path)), []);
         assert.equal (await page.locator ('#auth_gate').evaluate (e => e.scrollWidth > e.clientWidth), false);
         assert.equal (await page.locator ('#main').evaluate (e => e.inert), true);
         assert.deepEqual (errors, []); await page.close ();
-        console.log ('Card entrance, logo/greeting, glass docking, current geometry fit, typing/STT, pause and zero media access passed at ' + width + 'px');
+        console.log ('Card entrance, logo/greeting, glass docking, fixed motor scale, typing/STT, pause and zero media access passed at ' + width + 'px');
     }
 } finally { await browser.close (); }

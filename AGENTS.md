@@ -6,6 +6,8 @@ The agentic landing/sign-in release is Auto3D 0.63.0 / Packaging 1.10.7 / Primar
 
 The landing camera refinement is Auto3D 0.63.1 / Packaging 1.10.7 / Primary Products 0.13.0, based on main after #107. See docs/release-0631.md.
 
+The fixed motor-scale hero release is Auto3D 0.64.2 / Packaging 1.10.7 / Primary Products 0.13.0, based on main after #111. See docs/release-0642.md.
+
 # Agent-accessible features
 
 For every new PR, report the application version and PR number to the user. Keep the app version, package version and release notes aligned when preparing a release.
