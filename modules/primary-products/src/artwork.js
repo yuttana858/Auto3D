@@ -1,4 +1,4 @@
-import { CreatePillowPouch } from './pouch.js';
+import { CreatePouch } from './pouch.js';
 import { GetArtworkZones } from './zones.js';
 import { BottleSectionOf, SectionAt } from './section.js';
 export function ValidateProductArtwork (draft, entries = [])
@@ -45,7 +45,7 @@ export function CreateLabelMesh (draft, art)
 function PouchLabel (draft, art)
 {
     const mesh = { id : 'label-' + art.zone, materialRole : 'label', artwork : art, positions : [], normals : [], uvs : [], indices : [] };
-    const body = CreatePillowPouch (draft, 64), side = art.zone === 'back' ? -1 : 1;
+    const body = CreatePouch (draft, 64), side = art.zone === 'back' ? -1 : 1;
     const zone = GetArtworkZones (draft).find (z => z.id === art.zone), y0 = zone.bottomMm + (zone.heightMm - art.heightMm) / 2;
     // Clip the actual body triangles to the physical artwork rectangle. This
     // keeps labels on the exact faceted surface instead of approximating it.

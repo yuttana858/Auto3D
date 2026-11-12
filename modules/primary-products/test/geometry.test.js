@@ -57,10 +57,10 @@ describe ('Primary Products neutral geometry', function () {
     });
 });
 
-describe ('Pillow pouch geometry', function () {
+describe ('Pouch geometry', function () {
     it ('builds a closed filled envelope with valid normals and stable bounds', function () {
-        for (const [widthMm, heightMm, depthMm] of [[10, 20, 2], [140, 200, 40], [500, 1000, 200]]) {
-            const product = CreatePrimaryProduct ({ ...DefaultProductDraft ('pouch'), widthMm, heightMm, depthMm }); const mesh = product.components[0]; const edges = new Map (); let volume = 0;
+        for (const [widthMm, heightMm, depthMm, pouchShape] of [[10, 20, 2], [140, 200, 40], [500, 1000, 200], [10, 20, 10, { style : 'standup', gussetMm : 3 }], [160, 230, 80, { style : 'standup', gussetMm : 40 }], [500, 1000, 200, { style : 'standup' }]]) {
+            const product = CreatePrimaryProduct ({ ...DefaultProductDraft ('pouch'), widthMm, heightMm, depthMm, ...(pouchShape ? { pouchShape } : {}) }); const mesh = product.components[0]; const edges = new Map (); let volume = 0;
             const vertex = i => mesh.positions.slice (3 * i, 3 * i + 3);
             const key = i => vertex (i).map (v => Math.round (v * 1e7)).join (',');
             for (let i = 0; i < mesh.indices.length; i += 3) {
@@ -76,6 +76,24 @@ describe ('Pillow pouch geometry', function () {
             for (let axis = 0; axis < 3; axis++) { const values = mesh.positions.filter ((_, i) => i % 3 === axis); assert.ok (Math.abs (Math.min (...values) - product.bounds.min[axis]) < 0.01); assert.ok (Math.abs (Math.max (...values) - product.bounds.max[axis]) < 0.01); }
             assert.deepEqual (product.artworkZones.map (z => z.id), ['front', 'back']); assert.equal (product.quality.simulatedFill, false);
         }
+    });
+    it ('stands a gusseted pouch on a flat elliptical base that tapers to the top seal', function () {
+        const product = CreatePrimaryProduct ({ ...DefaultProductDraft ('pouch'), widthMm : 160, heightMm : 230, depthMm : 80, pouchShape : { style : 'standup', gussetMm : 40 } }), mesh = product.components[0];
+        assert.equal (product.quality.construction, 'filled-standup-presentation'); assert.equal (product.quality.gusset, 'bottom'); assert.equal (product.quality.freeStanding, true);
+        const at = (y, x) => { let depth = 0; for (let i = 0; i < mesh.positions.length; i += 3) { if (Math.abs (mesh.positions[i + 1] - y) < 4 && Math.abs (mesh.positions[i] - x) < 6) { depth = Math.max (depth, Math.abs (mesh.positions[i + 2])); } } return depth; };
+        let base = 0; for (let i = 0; i < mesh.normals.length; i += 3) { if (mesh.normals[i + 1] < -.999) { assert.equal (mesh.positions[i + 1], 0); base++; } }
+        assert.ok (base > 0); assert.ok (at (0, 0) > 39); assert.ok (at (20, 0) > 39); assert.ok (at (150, 0) < at (60, 0)); assert.ok (at (228, 0) < 2);
+        const pillow = CreatePrimaryProduct ({ ...DefaultProductDraft ('pouch'), widthMm : 160, heightMm : 230, depthMm : 80 }); assert.equal (pillow.quality.gusset, false); assert.equal (pillow.quality.freeStanding, false);
+        const zone = product.artworkZones[0]; assert.ok (zone.bottomMm > 40); assert.ok (zone.bottomMm + zone.heightMm < 230 * .92);
+    });
+    it ('validates stand-up gussets and keeps them within resized limits', function () {
+        const pouch = DefaultProductDraft ('pouch'), standup = UpdateProductDraft (pouch, { pouchShape : { style : 'standup' } });
+        assert.deepEqual (standup.pouchShape, { style : 'standup', gussetMm : 20 });
+        assert.deepEqual (UpdateProductDraft (standup, { depthMm : 12 }).pouchShape, { style : 'standup', gussetMm : 12 });
+        assert.equal (UpdateProductDraft (standup, { pouchShape : null }).pouchShape, undefined); assert.equal (UpdateProductDraft (standup, { pouchShape : { style : 'pillow' } }).pouchShape, undefined);
+        for (const bad of [{ style : 'standup', gussetMm : 2 }, { style : 'standup', gussetMm : 41 }, { style : 'spouted' }, { style : 'standup', zipper : true }, 'standup']) { assert.throws (() => UpdateProductDraft (pouch, { pouchShape : bad }), /pouch|Gusset/i); }
+        assert.throws (() => UpdateProductDraft (standup, { depthMm : 5 }), /at least 10 mm/); assert.throws (() => UpdateProductDraft (DefaultProductDraft ('bottle'), { pouchShape : { style : 'standup' } }), /only to pouches/);
+        assert.equal (UpdateProductDraft (standup, { family : 'can' }).pouchShape, undefined);
     });
     it ('validates filled dimensions and keeps family switching atomic', function () {
         const pouch = DefaultProductDraft ('pouch'); assert.throws (() => CreatePrimaryProduct ({ ...pouch, depthMm : 150 }));

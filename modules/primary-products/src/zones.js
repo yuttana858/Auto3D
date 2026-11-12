@@ -1,9 +1,15 @@
+import { StandUpTopSeal } from './pouch.js';
 import { DefaultProductDraft, UpdateProductDraft, BottleShape } from './state.js';
 import { BottleSectionOf, SectionPerimeter } from './section.js';
 export function GetArtworkZones (input)
 {
     const d = UpdateProductDraft (DefaultProductDraft (), input);
     if (d.family === 'clamshell') { return ['front', 'back'].map (id => ({ id, componentId : id === 'front' ? 'lid' : 'base', surface : 'plane', widthMm : d.widthMm*.8, heightMm : d.depthMm*.8, bottomMm : 0 })); }
+    if (d.family === 'pouch' && d.pouchShape) {
+        // Stand-up panel: above the gusset fold and below the top seal band.
+        const bottom = d.pouchShape.gussetMm + d.heightMm * .03, top = d.heightMm * (1 - StandUpTopSeal - .03);
+        return ['front', 'back'].map (id => ({ id, componentId : 'body', surface : 'pillow', widthMm : d.widthMm * 0.8, heightMm : Math.max (1, top - bottom), bottomMm : bottom, distortionCompensation : false }));
+    }
     if (d.family === 'pouch') { return ['front', 'back'].map (id => ({ id, componentId : 'body', surface : 'pillow', widthMm : d.widthMm * 0.8, heightMm : d.heightMm * 0.8, bottomMm : d.heightMm * 0.1, distortionCompensation : false })); }
     const shape = d.family === 'bottle' ? BottleShape (d) : null, bodyHeight = shape ? d.heightMm - shape.shoulderHeightMm - shape.neckHeightMm - shape.capHeightMm : d.heightMm;
     const bottom = Math.min (d.heightMm * .08, bodyHeight * .2), height = Math.min (d.heightMm * (shape ? .55 : .82), bodyHeight - bottom - d.heightMm * .01);

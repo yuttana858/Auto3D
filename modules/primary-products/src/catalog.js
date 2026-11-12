@@ -37,5 +37,10 @@ add('oval-shampoo', 'Oval shampoo', 'bottles', 'bottle', {heightMm:200, diameter
 add('rect-cleaner', 'Rectangular cleaner', 'bottles', 'bottle', {heightMm:240, diameterMm:90, bottleSection:{shape:'rectangle', depthMm:55, cornerRadiusMm:12}}, 'hdpe', 'Rounded-rectangle household body');
 add('square-juice', 'Square juice bottle', 'beverages', 'bottle', {heightMm:210, diameterMm:62, bottleSection:{shape:'rectangle', depthMm:62, cornerRadiusMm:10}}, 'petOpaque', 'Square-shouldered beverage body');
 add('food-punnet', 'Produce shell', 'clamshell-food', 'clamshell', {heightMm:75, widthMm:120, depthMm:100}, 'petOpaque', 'Compact produce cavity');
+add('standup-snack', 'Stand-up snack pouch', 'pouches', 'pouch', {heightMm:230, widthMm:160, depthMm:80, pouchShape:{style:'standup', gussetMm:40}}, 'glossFilm', 'Free-standing pouch with a bottom gusset');
+add('standup-coffee', 'Stand-up coffee pouch', 'pouches', 'pouch', {heightMm:260, widthMm:150, depthMm:90, pouchShape:{style:'standup', gussetMm:45}}, 'kraftFilm', 'Tall kraft-look gusseted pouch');
+add('standup-mini', 'Mini stand-up pouch', 'pouches', 'pouch', {heightMm:150, widthMm:110, depthMm:60, pouchShape:{style:'standup', gussetMm:30}}, 'matteFilm', 'Small free-standing sample pouch');
+add('standup-refill', 'Refill stand-up pouch', 'pouches', 'pouch', {heightMm:300, widthMm:190, depthMm:110, pouchShape:{style:'standup', gussetMm:55}}, 'satinFilm', 'Large household refill pouch');
+add('standup-foil', 'Foil stand-up pouch', 'pouches', 'pouch', {heightMm:200, widthMm:140, depthMm:70, pouchShape:{style:'standup', gussetMm:35}}, 'foil', 'Barrier-look metallic gusseted pouch');
 export function ListProductDesigns(category){if(category!==undefined&&!Object.hasOwn(ProductCategoryFilters, category)){throw new Error('Unknown product category.');}return designs.filter(d=>!category || d.category === category || d.subcategory === category).map(d=>structuredClone(d));}
 export function ProductDesign(id){const item=designs.find(d=>d.id===id);if(!item){throw new Error('Unknown product design.');}return UpdateProductDraft(DefaultProductDraft(item.family), item.changes);}
