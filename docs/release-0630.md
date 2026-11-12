@@ -1,0 +1,9 @@
+# Auto3D 0.63.0 / Packaging 1.10.7 / Primary Products 0.13.0
+
+The signed-out entry page is a compact grey-and-blue floating banner on black with working account access. Its 1.4-second entrance flashes the beveled frame, reveals content from above, types “Engineering intelligence.” and slides the Welcome/sign-in area down with a settling flash while the engineering-sketch logo begins.
+
+The 35-second presentation draws the product, forms exactly two full-length reinforced molded-pulp cradles, folds the kraft box and exposes its CAD cutaway. The camera fits only current visible geometry around the centered product. The glass prompt types and simulates speech-to-text; it does not submit requests or access a microphone. Pause, Replay and stage selection share the presentation clock. Reduced motion shows a still frame, login focus completes the card entrance, and the renderer is released when entering the workspace.
+
+The existing AuthService, server cookies, approved-account checks, saved-session Continue, account requests, administrator password help, recovery links and logout protection remain in use. Form sign-in enters the workspace after account preferences load; remembered sessions wait for Continue. Authenticated module behavior and server APIs are unchanged. The release is based on main after #106 and retains Packaging 1.10.7 and Primary Products 0.13.0.
+
+Validation covers folded geometry, two connected pulp sheets, current camera bounds, entrance timing, presentation-only prompts and the existing authentication boundaries. Desktop/mobile browser regressions cover failed/successful sign-in, saved-session Continue, logout, account requests, recovery, animated entrance and reduced motion. Production verification checks the served version/bundle, all card animation markers, login input validation, session endpoint and unsigned workspace denial. Browser account fixtures do not verify a real account's credentials or email delivery.

@@ -18,6 +18,8 @@ command-bar
 command-design
 corrugate-review
 dimensions
+engineering-landing
+engineering-prompts
 errorlogs-panel
 feedback
 fefco
@@ -50,6 +52,7 @@ preferences-recovery
 preview-context-lifecycle
 primary-products
 primary-materials
+primary-realism
 render-workspace
 rendercore-state
 rendering

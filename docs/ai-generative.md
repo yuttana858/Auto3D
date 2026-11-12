@@ -1,6 +1,6 @@
 # AI Generative workspace
 
-Auto3D 0.40.0 introduced, and 0.62.0 extends, a same-origin Meshy proxy under `/api/ai/*`. The independent AI workspace supports minimal docked mode and a full-viewport extended modal: interactive model preview in the center, previous creations along the bottom, inputs on the right and Add to session at the top left. Background buttons, navigation and scene keyboard shortcuts cannot receive modal interactions. Closing/minimizing preserves the project for the current account/session.
+Auto3D 0.40.0 introduced, and 0.64.0 extends, a same-origin Meshy proxy under `/api/ai/*`. The independent AI workspace supports minimal docked mode and a full-viewport extended modal: interactive model preview in the center, previous creations along the bottom, inputs on the right and Add to session at the top left. Background buttons, navigation and scene keyboard shortcuts cannot receive modal interactions. Closing/minimizing preserves the project for the current account/session.
 
 ## Meshy capabilities reviewed 2026-11-12
 
@@ -51,7 +51,7 @@ Preferences → AI connections → Manage Meshy key opens a private masked entry
 
 The browser sends a key only on the explicit same-origin HTTPS save request. It is never kept in localStorage, sessionStorage, IndexedDB, preferences, recovery archives, AI projects or command arguments/results. Account changes close the dialog and clear entry; the entire dialog is excluded from workspace capture. Auto3D's server necessarily decrypts the credential in memory to call Meshy. A compromised application runtime or same-origin script could access credentials; encryption at rest is not protection from either. See [secure key setup](meshy-api-keys.md) for operational boundaries.
 
-The proxy prefers the account's personal key, then the administrator-saved shared organization key (encrypted in the same private bucket, see [release-0620.md](release-0620.md#shared-organization-key)), then a deployment key only with `AUTO3D_AI_ALLOW_SHARED_KEY=true`. Shared keys are limited to 20 generations per account per hour and each account sees only its own shared-key tasks. An unreadable personal key or provider rejection does not silently switch to the deployment key. Browser `X-Auto3D-AI-Key` headers remain rejected. `MESHY_API_BASE_URL` is an HTTPS-only server-side override; credentialed requests refuse redirects.
+The proxy prefers the account's personal key, then the administrator-saved shared organization key (encrypted in the same private bucket, see [release-0640.md](release-0640.md#shared-organization-key)), then a deployment key only with `AUTO3D_AI_ALLOW_SHARED_KEY=true`. Shared keys are limited to 20 generations per account per hour and each account sees only its own shared-key tasks. An unreadable personal key or provider rejection does not silently switch to the deployment key. Browser `X-Auto3D-AI-Key` headers remain rejected. `MESHY_API_BASE_URL` is an HTTPS-only server-side override; credentialed requests refuse redirects.
 
 Routes: GET balance; POST/GET text-to-3d, image-to-3d, multi-image-to-3d, text-to-image, image-to-image, retexture, rigging and animations; GET each task by ID. Text to 3D maps to Meshy v2, the others to v1. Allow-listed routes do not expose arbitrary upstream URLs. JSON request bodies are bounded to 28 MiB (including base64 references), upstream metadata to 4 MiB; GLB downloads stream through `/model?url=...`, restricted to HTTPS assets.meshy.ai. Private API middleware enforces account identity and same-origin writes.
 
@@ -69,6 +69,6 @@ Open AI project accepts an AI `.auto3d` file. `ai.project.open_library` opens an
 
 `ui.ai`, `ui.module.mode`, `ai.workspace.inspect`, `ai.creations.refresh`, `ai.creation.preview`, `ai.creation.scale`, `ai.creation.add`, `ai.creation.refine` and `ai.creation.generate_texture` (optional `texturePrompt`), `ai.creation.revise`, `ai.viewer.control`, `ai.reference.open`, `ai.generate` (actions include `multiimage3d`; `texturePrompt`, `multiView`, `removeBackground`), `ai.project.save`, `ai.project.open_library`, `ai.project.open_file`. The file command opens an interactive picker; generation and project saving are explicit writes. Generation fields use the same service as the UI; reference upload remains interactive.
 
-Automated validation uses mocked provider responses and actual textured/animated GLBs. Release 0.62.0 was also verified live against Meshy; see [release-0620.md](release-0620.md).
+Automated validation uses mocked provider responses and actual textured/animated GLBs. Release 0.64.0 was also verified live against Meshy; see [release-0640.md](release-0640.md).
 
 Personal key commands: `ai.connection.open` (interactive), `ai.connection.inspect` (status only), `ai.connection.test` (balance), and `ai.connection.remove` (explicit account mutation).

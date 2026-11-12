@@ -17,9 +17,9 @@ The credential is stored for the signed-in account across devices. A saved key i
 
 If either secure-storage prerequisite is absent, personal saving is unavailable. Status and explicit removal remain possible when the bucket exists but the encryption secret is missing. An existing unreadable personal record fails closed instead of falling back to the shared key. This release is based on the deployed 0.47.2 source and includes only the personal Meshy credential feature.
 
-## Shared organization key (0.62.0)
+## Shared organization key (0.64.0)
 
-Administrators can save one shared key in the same dialog. It is stored with the same encryption under `meshy/shared/v1/organization` and used by every account without a personal key. Status is readable by any signed-in account; save and removal require administrator access on the server. See [release-0620.md](release-0620.md#shared-organization-key).
+Administrators can save one shared key in the same dialog. It is stored with the same encryption under `meshy/shared/v1/organization` and used by every account without a personal key. Status is readable by any signed-in account; save and removal require administrator access on the server. See [release-0640.md](release-0640.md#shared-organization-key).
 
 ## Storage and authorization
 

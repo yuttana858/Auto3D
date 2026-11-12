@@ -43,7 +43,12 @@ export class PrimaryProductsWorkspace
                 for (const mesh of model.meshes) {
                     if (mesh.GetName ().startsWith ('label-')) { continue; }
                     const previousMesh = previousModel.meshes.find (m => m.GetName () === mesh.GetName ());
-                    if (previousMesh?.TriangleCount () && mesh.TriangleCount ()) { model.materials[mesh.GetTriangle (0).mat] = CloneSurface (previousModel.materials[previousMesh.GetTriangle (0).mat]); }
+                    if (previousMesh?.TriangleCount () && mesh.TriangleCount ()) {
+                        const copy = CloneSurface (previousModel.materials[previousMesh.GetTriangle (0).mat]);
+                        const old = this.Selected ().definition.draft, next = definition.draft;
+                        for (const value of Object.values (copy)) { if (value?.name?.startsWith ('primary-') && value.scale) { value.scale.x *= (next.diameterMm || next.widthMm) / (old.diameterMm || old.widthMm); value.scale.y *= next.heightMm / old.heightMm; } }
+                        model.materials[mesh.GetTriangle (0).mat] = copy;
+                    }
                 }
             }
             object = target.AddImported (model, source?.name || module.ProductName (definition.draft));

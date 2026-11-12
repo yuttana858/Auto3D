@@ -749,7 +749,7 @@ export class ImporterGltf extends ImporterBase
         if (gltfMaterial.normalTexture && gltfMaterial.normalTexture.scale !== undefined) {
             material.normalScale = gltfMaterial.normalTexture.scale;
         }
-        for (const [extension, field, key, min, max] of [['KHR_materials_transmission', 'transmissionFactor', 'transmission', 0, 1], ['KHR_materials_ior', 'ior', 'ior', 1, 3], ['KHR_materials_volume', 'thicknessFactor', 'thickness', 0, 1e6]]) {
+        for (const [extension, field, key, min, max] of [['KHR_materials_clearcoat', 'clearcoatFactor', 'clearcoat', 0, 1], ['KHR_materials_clearcoat', 'clearcoatRoughnessFactor', 'clearcoatRoughness', 0, 1], ['KHR_materials_transmission', 'transmissionFactor', 'transmission', 0, 1], ['KHR_materials_ior', 'ior', 'ior', 1, 3], ['KHR_materials_volume', 'thicknessFactor', 'thickness', 0, 1e6]]) {
             const value = gltfMaterial.extensions?.[extension]?.[field];
             if (Number.isFinite (value) && value >= min && value <= max) { material[key] = value; }
         }
