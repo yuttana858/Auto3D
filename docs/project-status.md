@@ -8,6 +8,10 @@ Command bar text for agents (`@agent …`, or any non-command text while Live Co
 
 Edit model opens a split profile/3D workspace. Dimension callouts commit on Enter, preserving labels, custom materials, placement and Undo. Existing 3D controls stay on the original canvas. Includes main through #112 (horizontal orbit and fixed-scale landing fixes); CAD integration remains paused. See [release-0650.md](release-0650.md). Candidate, not deployed. PR #110 also consolidates Actions validation and documents draft batching; see [Actions cost control](actions-cost-control.md).
 
+## Staged hero pullbacks — Auto3D 0.64.3 / Packaging 1.10.7 / Primary Products 0.13.0
+
+Preserves the close motor opening, eases back to half its apparent size as molded pulp appears, then to 35% when the carton appears. Both moves use the presentation clock and the motor as the framing reference; the box view holds through folding and cutaway. See [release-0643.md](release-0643.md).
+
 ## Fixed motor-scale hero — Auto3D 0.64.2 / Packaging 1.10.7 / Primary Products 0.13.0
 
 Holds the landing camera at the completed motor's opening framing for the entire sequence. Pulp and carton geometry may crop outside the window without shrinking or recentering the motor. Stage jumps, replay and reduced motion retain the same view; viewport resizing refits only the original motor. This supersedes the automatic packaging fit from 0.63.1. See [release-0642.md](release-0642.md).

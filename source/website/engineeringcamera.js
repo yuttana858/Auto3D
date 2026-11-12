@@ -95,28 +95,42 @@ export function FitEngineeringCamera (camera, points, target, fill = 0.94)
     return apply (camera, points, target, distanceFor (camera, points, target, fill), fill);
 }
 
-// Fit the completed motor once per viewport size. Later geometry may extend beyond
-// the canvas, but must never shrink the motor or move the camera to follow a flap.
+// Three deliberate shots, all framed from the original motor. Incoming packaging
+// never drives automatic fitting; the presentation clock controls both pullbacks.
 export function CreateEngineeringCamera (camera, motorPoints, anchor, fill = 0.94)
 {
-    const target = new THREE.Vector3 (); let distance, reference;
+    const target = new THREE.Vector3 (), scales = [1, 0.5, 0.35]; let distance, reference, shots, sceneTime = 0, viewScale = 1;
+    function shot (scale) {
+        const aim = anchor.clone (), tan = tangents (camera), shotFill = fill * scale;
+        let depth = distanceFor (camera, motorPoints, aim, shotFill);
+        for (let i = 0; i < 5; i++) {
+            const bounds = boundsFor (camera, motorPoints, aim, depth);
+            aim.addScaledVector (right, bounds.center[0] * depth * tan.x).addScaledVector (up, bounds.center[1] * depth * tan.y);
+            depth = distanceFor (camera, motorPoints, aim, shotFill);
+        }
+        for (let i = 0; i < 5; i++) {
+            const bounds = boundsFor (camera, motorPoints, aim, depth);
+            aim.addScaledVector (right, bounds.center[0] * depth * tan.x).addScaledVector (up, bounds.center[1] * depth * tan.y);
+        }
+        return { target : aim, distance : depth };
+    }
+    function update (time) {
+        sceneTime = time;
+        const box = time >= 7.2, from = box ? 1 : 0, start = box ? 7.2 : 3.8;
+        const t = THREE.MathUtils.clamp ((time - start) / 1.4, 0, 1), progress = t * t * (3 - 2 * t);
+        target.lerpVectors (shots[from].target, shots[from + 1].target, progress);
+        distance = THREE.MathUtils.lerp (shots[from].distance, shots[from + 1].distance, progress);
+        viewScale = THREE.MathUtils.lerp (scales[from], scales[from + 1], progress);
+        apply (camera, motorPoints, target, distance, fill);
+    }
     function resize () {
-        target.copy (anchor); const tan = tangents (camera);
-        distance = distanceFor (camera, motorPoints, target, fill);
-        for (let i = 0; i < 5; i++) {
-            const bounds = boundsFor (camera, motorPoints, target, distance);
-            target.addScaledVector (right, bounds.center[0] * distance * tan.x).addScaledVector (up, bounds.center[1] * distance * tan.y);
-            distance = distanceFor (camera, motorPoints, target, fill);
-        }
-        for (let i = 0; i < 5; i++) {
-            const bounds = boundsFor (camera, motorPoints, target, distance);
-            target.addScaledVector (right, bounds.center[0] * distance * tan.x).addScaledVector (up, bounds.center[1] * distance * tan.y);
-        }
-        reference = apply (camera, motorPoints, target, distance, fill);
+        shots = scales.map (shot);
+        reference = boundsFor (camera, motorPoints, shots[0].target, shots[0].distance);
+        update (sceneTime);
     }
     function inspect (points = motorPoints) {
-        const bounds = boundsFor (camera, points, target, distance);
-        return { mode : 'motor-scale', distance, desiredDistance : distance, target : target.toArray (), fill, extent : bounds.extent, screenCenter : bounds.center, visiblePoints : points.length / 3, referenceExtent : reference.extent, referenceScreenCenter : reference.screenCenter };
+        const bounds = boundsFor (camera, points, target, distance), motor = boundsFor (camera, motorPoints, target, distance);
+        return { mode : 'staged-pullback', viewScale, distance, desiredDistance : distance, target : target.toArray (), fill, extent : bounds.extent, screenCenter : bounds.center, visiblePoints : points.length / 3, referenceExtent : reference.extent, referenceScreenCenter : reference.center, motorExtent : motor.extent, motorScreenCenter : motor.center };
     }
-    resize (); return { resize, inspect };
+    resize (); return { resize, update, inspect };
 }
