@@ -9,3 +9,6 @@ export { DefaultProductDetails, ValidateProductDetails, ScaleProductChanges } fr
 export { ProductSurfaceMaps, LabelFinishes } from './surfaces.js';
 
 export { ProductCategories, ProductCategoryFilters, ListProductDesigns, ProductDesign } from './catalog.js';
+
+export { ProductProfileEditor } from './profileeditor.js';
+export { ProfileChanges } from './profilechanges.js';

@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Live product profile editor — Auto3D 0.64.0 / Packaging 1.10.7 / Primary Products 0.14.0
+
+Edit model opens a split profile/3D workspace. Dimension callouts commit on Enter, preserving labels, custom materials, placement and Undo. Existing 3D controls stay on the original canvas. Built on main after #108; CAD integration remains paused. See [release-0640.md](release-0640.md). Candidate, not deployed.
+
 ## Larger centered landing animation — Auto3D 0.63.1 / Packaging 1.10.7 / Primary Products 0.13.0
 
 Fits the actual visible surfaces more closely and centers their projected silhouette in the animation window. Damped camera motion follows the growing pulp sheets, expanding carton blank and closing folds. Pause freezes the camera; stage selection, resize and reduced-motion stills fit immediately. See [release-0631.md](release-0631.md).

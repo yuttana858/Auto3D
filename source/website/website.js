@@ -173,8 +173,10 @@ class WebsiteLayouter
         this.sidebar.Resize (Math.max (100, contentHeight - panelHeaderHeight));
         SetDomElementOuterHeight (this.parameters.sidebarSplitterDiv, contentHeight);
 
-        this.parameters.viewerDiv.style.width = Math.max (1, contentWidth - safetyMargin) + 'px';
-        this.viewer.Resize (Math.max (1, contentWidth - safetyMargin), contentHeight);
+        const viewport = this.primaryProfile?.Layout (Math.max (1, contentWidth - safetyMargin), contentHeight) || { width : Math.max (1, contentWidth - safetyMargin), height : contentHeight };
+        this.parameters.viewerDiv.style.width = viewport.width + 'px';
+        this.parameters.viewerDiv.style.height = viewport.height + 'px';
+        this.viewer.Resize (viewport.width, viewport.height);
 
         this.measureTool.Resize ();
     }
