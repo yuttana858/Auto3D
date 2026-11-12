@@ -29,6 +29,7 @@ export class PrimaryProfileWorkspace
         this.root = globalThis.document.createElement ('section'); this.wrapper.append (this.root, viewer);
         this.ui = new this.panel.module.ProductProfileEditor ({ inspect : () => this.Inspect (), blocked : () => this.panel.Blocked (), update : (changes, objectId) => this.panel.UpdateProfile (changes, objectId), close : () => this.Close () }, this.root);
         this.open = true; this.website.layouter.primaryProfile = this; this.Sync (); this.website.layouter.Resize (); editor.Focus ();
+        this.website.viewer.navigation.FinishCameraMovement ();
         return this.Inspect ();
     }
     Layout (width, height)
