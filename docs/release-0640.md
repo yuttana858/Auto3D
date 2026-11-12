@@ -1,6 +1,6 @@
 # Auto3D 0.64.0 — Meshy workflows, revisions and AI viewer
 
-Packaging remains 1.10.7; Primary Products remains 0.13.0. Based on main after merged PR #107 (0.63.0). Not deployed.
+Packaging remains 1.10.7; Primary Products remains 0.13.0. Based on main after merged PR #108 (0.63.1). Not deployed.
 
 ## Change
 
