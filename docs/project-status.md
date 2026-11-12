@@ -4,6 +4,10 @@
 
 Stacked in draft #110. Adds wall callouts, synchronized glass refraction/absorption, cavity-conforming static contents, and live image/SVG/text label authoring in Edit model. CAD layers remain untouched. Includes main through #113/#114. Local checks: 856 unit/integration tests, 66 MCP tests, lint, production/Pages and engine/module builds, and both profile/contents browser regressions passed; see [release-0660.md](release-0660.md) for commit scope. Hosted full-suite results remain outstanding while Actions quota is exhausted. Not deployed.
 
+## Agent messages in the command bar — Auto3D 0.65.1 / Primary Products 0.14.0 / Packaging 1.10.7 (2026-11-12)
+
+Command bar text for agents (`@agent …`, or any non-command text while Live Control is connected) is logged for `ui.command_bar.inspect`, and agents reply in the status line above the box with `ui.command_bar.respond`. Adds `selection.clear`, and the Agent access screenshot checkbox now applies immediately and shows the current setting. See [release-0651.md](release-0651.md).
+
 ## Live product profile editor — Auto3D 0.65.0 / Packaging 1.10.7 / Primary Products 0.14.0
 
 Edit model opens a split profile/3D workspace. Dimension callouts commit on Enter, preserving labels, custom materials, placement and Undo. Existing 3D controls stay on the original canvas. Includes main through #112 (horizontal orbit and fixed-scale landing fixes); CAD integration remains paused. See [release-0650.md](release-0650.md). Candidate, not deployed. PR #110 also consolidates Actions validation and documents draft batching; see [Actions cost control](actions-cost-control.md).

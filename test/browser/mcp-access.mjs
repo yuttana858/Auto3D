@@ -55,10 +55,20 @@ try {
     const received = new Promise (resolve => { nextResult = resolve; });
     wire.send (JSON.stringify ({ type : 'request', requestId : 'inspect-a', command : 'scene.inspect', sessionId : tab.activeId, arguments : {} }));
     await received; assert.equal (results[0]?.requestId, 'inspect-a'); assert.equal (results[0].result.ok, true);
+    // While an agent is connected, command bar text that is not a command is sent to the agent, which can read it and reply above the box.
+    const input = page.getByRole ('textbox', { name : 'Command or macro' }); await page.evaluate (() => document.querySelectorAll ('dialog[open]').forEach (open => open.close ()));
+    await page.waitForFunction (() => !document.querySelector ('dialog[open]')); /* modal dialogs block the command bar until they fade out */
+    await input.fill ('make the box taller please'); await input.press ('Enter');
+    await page.waitForFunction (() => document.querySelector ('.scene_command_bar .scene_status').textContent === 'Sent to agent · waiting for a reply');
+    const bar = await call ('ui.command_bar.inspect'); assert.equal (bar.agentConnected, true);
+    const message = bar.entries.find (entry => entry.kind === 'message'); assert.equal (message?.text, 'make the box taller please');
+    await call ('ui.command_bar.respond', { message : 'Working on it.', replyTo : message.id });
+    assert.equal (await page.locator ('.scene_command_bar .scene_status').textContent (), 'Agent: Working on it.');
+    await call ('agent.access.open'); await dialog.waitFor ();
     await dialog.getByRole ('button', { name : 'Disconnect', exact : true }).click (); assert.equal ((await call ('agent.access.inspect')).connected, false);
     await dialog.getByRole ('button', { name : 'Revoke', exact : true }).click ();
     await page.evaluate (() => document.querySelector ('dialog[aria-label="MCP connections"]').close ());
     await call ('admin.agents.open'); const admin = page.getByRole ('dialog', { name : 'Agent administration', exact : true }); await admin.getByLabel ('Pilot account ID').fill ('test-owner'); await admin.getByRole ('button', { name : 'Inspect account' }).click ();
     await admin.getByRole ('status').filter ({ hasText : 'Agent access enabled' }).waitFor ();
-    assert.deepEqual (errors, []); console.log ('MCP browser controls, explicit connection, safe remote read, disconnect, revoke and admin UI passed on generated staging assets.');
+    assert.deepEqual (errors, []); console.log ('MCP browser controls, explicit connection, safe remote read, command bar messages and agent replies, disconnect, revoke and admin UI passed on generated staging assets.');
 } finally { await browser.close (); await new Promise (resolve => server.close (resolve)); }
