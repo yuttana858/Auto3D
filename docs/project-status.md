@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Folding box closeup — Auto3D 0.65.2 / Packaging 1.10.7 / Primary Products 0.14.0
+
+Keeps the close motor, half-size pulp and 35% dieline shots, then eases inward during folding to a centered closed pack filling 96% of the window. The finished fit follows the pack's gentle rotation through cutaway. Open flaps may crop without triggering another pullback. See [release-0652.md](release-0652.md).
+
 ## Agent messages in the command bar — Auto3D 0.65.1 / Primary Products 0.14.0 / Packaging 1.10.7 (2026-11-12)
 
 Command bar text for agents (`@agent …`, or any non-command text while Live Control is connected) is logged for `ui.command_bar.inspect`, and agents reply in the status line above the box with `ui.command_bar.respond`. Adds `selection.clear`, and the Agent access screenshot checkbox now applies immediately and shows the current setting. See [release-0651.md](release-0651.md).
