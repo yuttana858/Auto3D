@@ -1,6 +1,6 @@
 # Auto3D 0.66.0 / Primary Products 0.15.0 / Packaging 1.10.7
 
-Stacked in draft PR #110 with the split profile editor and Actions cost controls. CAD integration remains paused.
+Draft PR #116 follows #110, whose split profile editor and Actions cost controls reached main through #109. CAD integration remains paused.
 
 ## Walls and glass
 

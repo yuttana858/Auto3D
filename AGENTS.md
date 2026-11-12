@@ -38,7 +38,7 @@ Use shared `--workspace-menu-font-size`, `--workspace-help-font-size`, `--worksp
 
 Account catalog defaults, CSV parsing/validation, selector UI and editor styling live in `modules/packaging`. Host storage lives in `source/website/boarddatabase.js` and the authenticated Pages route; do not put it in AI. Keep allowance factors design-specific, preserve saved material snapshots when catalog records change, validate before mutation, and keep revision-based conflict checks. Never silently fall back to a local-only save if the account API fails. See `docs/board-database.md` and the applied `20261027185638_account_board_catalog` migration.
 
-The next stacked candidate in draft PR #110 is Auto3D 0.66.0 / Primary Products 0.15.0 / Packaging 1.10.7: wall controls, glass optics, static bottle contents and editable label sources. See docs/release-0660.md.
+The next stacked candidate in draft PR #116 (following #110, merged through #109) is Auto3D 0.66.0 / Primary Products 0.15.0 / Packaging 1.10.7: wall controls, glass optics, static bottle contents and editable label sources. See docs/release-0660.md.
 
 # Actions spending and stacked work
 
