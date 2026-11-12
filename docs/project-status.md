@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Agentic landing and existing sign-in — Auto3D 0.63.0 / Packaging 1.10.7 / Primary Products 0.13.0
+
+Replaces the welcome scene with the approved compact floating banner: frame flash, descending content and sign-in, typed headline, engineering-sketch logo and a 35-second product-to-packaging sequence. Exactly two reinforced formed-pulp cradles protect the motor; the camera fits current geometry around the centered product. The glass prompt is presentation only. The existing AuthService, approved-account routes, saved-session Continue, recovery and logout flows remain in use. Ported onto current main after #106 to preserve all module updates. See [release-0630.md](release-0630.md) and [entry implementation](engineering-landing.md).
+
 ## Primary Products realism — Auto3D 0.62.0 / Primary Products 0.13.0 / Packaging 1.10.7 (2026-11-12)
 
 Stacked on #103. Adds detailed construction across the 43-design catalog, material grain/bump/roughness, translucent presets, clearcoat, label finishes/offsets and proportional resizing. CAD integration is paused at user request; the local preparation checkpoint remains separate. See [release-0620.md](release-0620.md) and [reference research](primary-product-realism-research.md). Not deployed.

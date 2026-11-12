@@ -418,7 +418,7 @@
       "id": "auth.open",
       "title": "Open account sign-in",
       "category": "Account",
-      "description": "Open the account dialog for interactive sign-in. Does not complete sign-in; credentials must be entered by the user.",
+      "description": "Focus the landing sign-in form while signed out, or open the account dialog inside the workspace. Does not complete sign-in; credentials must be entered by the user.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -427,6 +427,131 @@
         "additionalProperties": false
       },
       "example": {}
+    },
+    {
+      "id": "landing.open",
+      "title": "Show product overview",
+      "category": "Welcome",
+      "description": "Show the public packaging overview when the login gate is visible. Does not open an authenticated workspace.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "landing.demo.stage",
+      "title": "Inspect packaging demo stage",
+      "category": "Welcome",
+      "description": "Pause the illustrative landing animation at a product, protection, folding or cutaway stage. This presentation does not change session geometry.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "stage": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          }
+        },
+        "required": [
+          "stage"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "stage": 3
+      }
+    },
+    {
+      "id": "landing.demo.playback",
+      "title": "Control packaging demo",
+      "category": "Welcome",
+      "description": "Play, pause or restart the illustrative landing animation. Does not generate CAD or modify a session.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "play",
+              "pause",
+              "restart"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "action": "pause"
+      }
+    },
+    {
+      "id": "landing.inspect",
+      "title": "Inspect landing state",
+      "category": "Welcome",
+      "description": "Return the public entry view and animation stage without account data.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "landing.prompt.submit",
+      "title": "Inspect retired prompt interaction",
+      "category": "Welcome",
+      "description": "Compatibility response for the former prompt mockup. The overlay is now animation only; returns accepted:false without changing playback or submitting text. Use landing.demo.playback for animation controls.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "prompt": "Generate 3D model US-54783."
+      }
+    },
+    {
+      "id": "landing.prompt.voice",
+      "title": "Inspect simulated voice display",
+      "category": "Welcome",
+      "description": "Compatibility response for the former narration control. Returns enabled:false; voice transcription and mic activity are visual animation only. Does not access speech or microphone APIs.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "enabled": false
+      }
     },
     {
       "id": "auth.request_account",

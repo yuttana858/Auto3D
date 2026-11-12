@@ -18,9 +18,9 @@ await page.route ('**/api/auth/**', async (route) => {
             await route.fulfill ({ json : { user } });
         });
         await page.goto (process.env.AUTO3D_TEST_URL || 'http://127.0.0.1:8080/website/index.html', { waitUntil : 'domcontentloaded' });
-        // The landing page holds the sign-in panel; there is no separate click-to-continue step.
-        const welcome = page.locator ('#startup_splash'); await welcome.waitFor ({ state : 'visible' });
-        const splash = page.locator ('#auth_gate'); const form = splash.locator ('form');
+        await page.getByRole ('heading', { name : 'Engineering intelligence. Built around your product.' }).waitFor ();
+        assert.equal (await page.locator ('#main').evaluate (node => node.inert), true);
+        const splash = page.locator ('#auth_gate'); const form = splash.locator ('.auth_panel form');
         await form.waitFor ({ state : 'visible' });
         const aligned = async panel => {
             const bounds = await panel.boundingBox ();
@@ -30,6 +30,8 @@ await page.route ('**/api/auth/**', async (route) => {
         };
         await aligned (splash.locator ('.auth_panel')); assert.equal (await splash.getByRole ('button', { name : 'Sign out', exact : true }).isVisible (), false);
 
+        await splash.getByRole ('button', { name : 'Forgot Password', exact : true }).click ();
+        await splash.getByRole ('status').filter ({ hasText : 'administrator' }).waitFor ();
         await form.getByLabel ('Email', { exact : true }).fill ('member@example.com');
         await form.getByLabel ('Password', { exact : true }).fill ('browser-test-password');
         await form.getByRole ('button', { name : 'Sign in', exact : true }).click ();

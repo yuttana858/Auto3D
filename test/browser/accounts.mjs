@@ -23,7 +23,7 @@ try {
     await page.goto ('http://127.0.0.1:8080/website/index.html', { waitUntil : 'domcontentloaded' });
     await page.waitForFunction (() => window.Auto3D);
     const call = async (id) => { const result = await page.evaluate ((id) => Auto3D.execute (id, {}), id); assert.equal (result.ok, true, JSON.stringify (result)); };
-    await call ('auth.open'); await page.getByRole ('dialog', { name : 'Auto3D account', exact : true }).getByRole ('button', { name : 'Request an account', exact : true }).click ();
+    await call ('auth.open'); await page.locator ('#auth_gate').getByRole ('button', { name : 'Request an account', exact : true }).click ();
     const requestDialog = page.getByRole ('dialog').last ();
     await requestDialog.getByLabel ('Name', { exact : true }).fill ('New User');
     await requestDialog.getByLabel ('Email', { exact : true }).fill ('new@example.com');
@@ -34,7 +34,7 @@ try {
     await page.keyboard.press ('Escape');
     await page.waitForFunction (() => !document.querySelector ('dialog[aria-label="Request an Auto3D account"]'));
     await call ('auth.open');
-    const login = page.getByRole ('dialog', { name : 'Auto3D account', exact : true }); await login.getByLabel ('Email', { exact : true }).fill (user.email); await login.getByLabel ('Password', { exact : true }).fill ('browser-test-only');
+    const login = page.locator ('#auth_gate'); await login.getByLabel ('Email', { exact : true }).fill (user.email); await login.getByLabel ('Password', { exact : true }).fill ('browser-test-only');
     await login.getByRole ('button', { name : 'Sign in', exact : true }).click ();
     await page.evaluate (async () => { /* async predicates make waitForFunction resolve at once, so poll in the page */ const end = Date.now () + 120000; while (!((await Auto3D.execute ('auth.inspect')).result?.signedIn)) { if (Date.now () > end) { throw new Error ('Timed out waiting for page state'); } await new Promise (resolve => setTimeout (resolve, 100)); } });
     await page.waitForFunction (() => !document.body.classList.contains ('auth_locked'));

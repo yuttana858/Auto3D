@@ -61,7 +61,7 @@ export class CommandRegistry
     async Invoke (id, args = {})
     {
         const auth = this.context?.website?.auth;
-        if (auth && (!auth.user || this.context.website.accountReady === false) && !['auth.inspect', 'auth.open', 'auth.continue', 'auth.request_account', 'auth.sign_out', 'auth.recover'].includes (id)) { throw new Error ('Sign in to use Auto3D.'); }
+        if (auth && (!auth.user || this.context.website.accountReady === false) && !['auth.inspect', 'auth.open', 'auth.continue', 'auth.request_account', 'auth.sign_out', 'auth.recover', 'auth.password_help', 'landing.open', 'landing.demo.stage', 'landing.demo.playback', 'landing.inspect', 'landing.prompt.submit', 'landing.prompt.voice'].includes (id)) { throw new Error ('Sign in to use Auto3D.'); }
         const command = this.commands.get (id);
         if (!command) { throw new Error ('Unknown command: ' + id); }
         Validate (args, command.inputSchema);

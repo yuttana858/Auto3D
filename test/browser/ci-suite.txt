@@ -18,6 +18,8 @@ command-bar
 command-design
 corrugate-review
 dimensions
+engineering-landing
+engineering-prompts
 errorlogs-panel
 feedback
 fefco
