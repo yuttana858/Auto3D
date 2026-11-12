@@ -10,7 +10,7 @@ Prevents camera roll during horizontal orbit while preserving selected-object fo
 
 ## Meshy workflows, revisions and AI viewer — Auto3D 0.64.0 / Primary Products 0.13.0 / Packaging 1.10.7 (2026-11-12)
 
-Adds Multi-image to 3D, current Text to image models and options (multi-view, background removal), texture prompts, revisions for every completed creation type, a 2D image viewer, studio lighting with pan in the 3D preview, and resilient thumbnails. Meshy has no API for assisted prompts. Verified live against Meshy through the real Pages Function in a local browser. Administrators can save an encrypted shared Meshy key in Auto3D that every account without a personal key uses (20 generations per account per hour). See [release-0640.md](release-0640.md). Not deployed.
+Adds Multi-image to 3D, current Text to image models and options (multi-view, background removal), texture prompts, revisions for every completed creation type, a 2D image viewer, studio lighting with pan in the 3D preview, and resilient thumbnails. Meshy has no API for assisted prompts. Verified live against Meshy through the real Pages Function in a local browser. Administrators can save an encrypted shared Meshy key in Auto3D that every account without a personal key uses (20 generations per account per hour). See [release-0640.md](release-0640.md). Merged in PR #105 and deployed to production on 2026-11-12 (deploy run 114, post-deploy checks passed). An administrator still needs to save the shared Meshy key in Auto3D.
 
 ## Larger centered landing animation — Auto3D 0.63.1 / Packaging 1.10.7 / Primary Products 0.13.0
 
