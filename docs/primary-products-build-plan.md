@@ -191,3 +191,10 @@ Deferred by default: exact molded threads/standards, certified capacity/strength
 Bottle shoulder/neck/cap controls and oval/rounded-rectangle sections (0.9.0) provide the Phase 2 shape increments. Next: physical artwork templates; renderer transmission/IOR/thickness round-trip and hollow-wall spike; then more closures. Stand-up pouches with a bottom gusset (0.11.0), then flat-bottom (box) pouches, zippers and spouts (0.12.0) cover the Phase 3 constructions; tear notches, hang holes, seal-width controls and side-gusset (quad-seal) bags remain. Keep glass disabled until its renderer/geometry gates pass. Finish remaining Phase 1/2 material/export gates alongside these increments; the phase table is not a claim that earlier gates are all complete.
 
 The requested primitive/Boolean track starts with conversion benchmarking and editable primitives, then non-destructive body modifiers. Keep clear-pack, Primary family breadth and general solid editing as separately testable increments.
+
+
+## 2026-11-12: realism track; CAD integration paused
+
+The user asked to wait for the other team's CAD rollout. Do not merge the local CAD-label prototype (`feat/primary-cad-labels`, checkpoint `c7ae486`) into this increment. Reconcile its document/layer/coordinate contract with the completed CAD system first. Current PNG/JPEG/WebP label import remains supported.
+
+The 0.62.0 / Primary Products 0.13.0 candidate adds construction detail throughout the catalog, procedural material textures, translucent materials, label finishes and resizing. It builds on #103's pouch fitments. See [release details](release-0620.md) and [research, limits and next acceptance gates](primary-product-realism-research.md).

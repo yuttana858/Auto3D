@@ -50,6 +50,7 @@ preferences-recovery
 preview-context-lifecycle
 primary-products
 primary-materials
+primary-realism
 render-workspace
 rendercore-state
 rendering

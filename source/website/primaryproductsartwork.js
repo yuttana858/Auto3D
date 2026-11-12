@@ -25,16 +25,17 @@ export class PrimaryProductsArtwork
         if (ticket !== this.generation || panel.Blocked () || owner !== panel.website.auth?.user?.id || target !== panel.website.sessionEditor.document || draft !== JSON.stringify (panel.draft)) { throw new Error ('The product, account or session changed before image import finished.'); }
         const zone = GetArtworkZones (panel.draft).find (z => z.id === panel.draft.labelZone), ratio = info.width / info.height;
         const previous = this.entries.find (a => a.zone === zone.id), widthMm = previous?.widthMm ?? Math.min (zone.widthMm * 0.9, zone.heightMm * 0.9 * ratio), heightMm = previous?.heightMm ?? widthMm / ratio;
-        const entry = { resourceId, name : String (file.name || 'Label').slice (0, 80), mime : info.mime, zone : zone.id, widthMm, heightMm };
+        const entry = { finish : previous?.finish || 'paperMatte', ...(previous?.offsetXmm !== undefined ? { offsetXmm : previous.offsetXmm, offsetYmm : previous.offsetYmm || 0 } : {}), resourceId, name : String (file.name || 'Label').slice (0, 80), mime : info.mime, zone : zone.id, widthMm, heightMm };
         const entries = ValidateProductArtwork (panel.draft, [...this.entries.filter (a => a.zone !== zone.id), entry]);
         this.resources.set (resourceId, { buffer, ...info }); this.entries = entries; this.Prune (); panel.Refresh (); return { imported : true, artwork : this.Inspect () };
     }
     Prune () { for (const id of this.resources.keys ()) { if (!this.entries.some (a => a.resourceId === id)) { this.resources.delete (id); } } }
-    Mapping ({ zone, widthMm, heightMm })
+    Mapping ({ zone, ...changes })
     {
         if (this.panel.Blocked ()) { throw new Error ('Open an editable, idle session.'); }
+        if (Object.keys (changes).some (key => !['widthMm', 'heightMm', 'finish', 'offsetXmm', 'offsetYmm'].includes (key))) { throw new Error ('Invalid label placement or finish.'); }
         if (!this.entries.some (a => a.zone === zone)) { throw new Error ('Import artwork for this zone first.'); }
-        this.entries = ValidateProductArtwork (this.panel.draft, this.entries.map (a => a.zone === zone ? { ...a, widthMm, heightMm } : a)); this.panel.Refresh (); return this.Inspect ();
+        this.entries = ValidateProductArtwork (this.panel.draft, this.entries.map (a => a.zone === zone ? { ...a, ...changes } : a)); this.panel.Refresh (); return this.Inspect ();
     }
     Remove ({ zone })
     {

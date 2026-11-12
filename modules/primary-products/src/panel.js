@@ -1,3 +1,5 @@
+import { ProductDetailPanel } from './detailpanel.js';
+import { LabelFinishes } from './surfaces.js';
 import { ProductCategories, ListProductDesigns, ProductDesign } from './catalog.js';
 import { GetArtworkZones } from './zones.js';
 import { ListProductMaterials } from './materials.js';
@@ -108,6 +110,7 @@ export class PrimaryProductsPanel
         Element ('p', 'pp_draft_note', 'Press Enter to resize the selected generated product live; Tab updates only the draft.', dimensions);
         const calloutLabel = Element ('label', 'pp_toggle', undefined, dimensions); this.callouts = Element ('input', '', undefined, calloutLabel); this.callouts.type = 'checkbox'; this.callouts.setAttribute ('aria-label', 'Show W × L × H on model'); Element ('span', '', 'Show W × L × H on model', calloutLabel);
         this.callouts.addEventListener ('change', () => { if (this.host.setCallouts) { this.Action (() => this.host.setCallouts (this.callouts.checked)); } });
+        this.detailsPanel = new ProductDetailPanel (host, controls, action => this.Action (action));
         this.shapeSection = Element ('section', 'pp_section', undefined, controls); Element ('h3', '', 'Bottle shape', this.shapeSection); this.shapeInputs = new Map ();
         const sectionLabel = Element ('label', 'pp_field', 'Cross-section', this.shapeSection); this.sectionSelect = Element ('select', '', undefined, sectionLabel); this.sectionSelect.setAttribute ('aria-label', 'Bottle cross-section');
         for (const [value, text] of [['round', 'Round'], ['oval', 'Oval'], ['rectangle', 'Rounded rectangle']]) { Element ('option', '', text, this.sectionSelect).value = value; }
@@ -151,7 +154,11 @@ export class PrimaryProductsPanel
         this.artName = Element ('p', 'pp_draft_note', 'Import a PNG, JPEG or WebP label (up to 4 MiB).', artwork);
         const importButton = Element ('button', 'pp_art_import', 'Import label image', artwork); importButton.type = 'button'; importButton.addEventListener ('click', () => this.Action (() => host.artworkOpen ()));
         this.artDimensions = Element ('div', 'pp_art_dimensions', undefined, artwork); this.artInputs = new Map ();
-        for (const [key, label] of [['widthMm', 'Label width'], ['heightMm', 'Label height']]) { const field = Element ('label', 'pp_field', label, this.artDimensions), input = Element ('input', '', undefined, field); input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', label); input.addEventListener ('change', () => { const current = this.host.inspect ().artwork.find (a => a.zone === this.host.inspect ().labelZone); if (current) { this.Action (() => host.artworkMapping ({ zone : current.zone, widthMm : current.widthMm, heightMm : current.heightMm, [key] : input.valueAsNumber * this.Factor () })); } }); this.artInputs.set (key, input); }
+        for (const [key, label] of [['widthMm', 'Label width'], ['heightMm', 'Label height'], ['offsetXmm', 'Label horizontal offset'], ['offsetYmm', 'Label vertical offset']]) { const field = Element ('label', 'pp_field', label, this.artDimensions), input = Element ('input', '', undefined, field); input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', label); input.addEventListener ('change', () => { const current = this.host.inspect ().artwork.find (a => a.zone === this.host.inspect ().labelZone); if (current) { this.Action (() => host.artworkMapping ({ zone : current.zone, widthMm : current.widthMm, heightMm : current.heightMm, [key] : input.valueAsNumber * this.Factor () })); } }); this.artInputs.set (key, input); }
+        const finishLabel = Element ('label', 'pp_field', 'Label finish', artwork); this.labelFinish = Element ('select', '', undefined, finishLabel); this.labelFinish.setAttribute ('aria-label', 'Label finish');
+        for (const [value, preset] of Object.entries (LabelFinishes)) { Element ('option', '', preset.name, this.labelFinish).value = value; }
+        this.labelFinish.addEventListener ('change', () => this.Action (() => host.artworkMapping ({ zone : this.host.inspect ().labelZone, finish : this.labelFinish.value })));
+        Element ('p', 'pp_draft_note', 'Clear film uses the image alpha channel. Use surface masks for spot varnish or relief effects.', artwork);
         this.artRemove = Element ('button', 'pp_reset', 'Remove label image', artwork); this.artRemove.type = 'button'; this.artRemove.addEventListener ('click', () => this.Action (() => host.artworkRemove (this.host.inspect ().labelZone)));
         this.artApply = Element ('button', 'pp_art_import', 'Apply label artwork', artwork); this.artApply.type = 'button'; this.artApply.addEventListener ('click', () => this.Action (() => host.applyArtwork ()));
         this.artStatus = Element ('p', 'pp_status', '', artwork); this.artStatus.setAttribute ('role', 'status');
@@ -209,6 +216,8 @@ export class PrimaryProductsPanel
         this.add.textContent = draft.generating ? 'Generating…' : 'Generate';
         this.add.title = draft.unavailableReason || 'Generate a product in the session.';
         this.availability.textContent = draft.unavailableReason || '';
+        this.detailsPanel?.Refresh ();
+        if (this.labelFinish) { this.labelFinish.disabled = disabled || !draft.artwork?.some (a => a.zone === draft.labelZone); }
     }
     // Merge a partial pouch construction into the draft; pillow pouches drop the gusset and spout.
     ChangePouch (patch)
@@ -253,8 +262,9 @@ export class PrimaryProductsPanel
         const art = draft.artwork?.find (a => a.zone === draft.labelZone), preview = this.host.artworkPreview?.(draft.labelZone);
         this.artImage.hidden = !preview; if (preview) { this.artImage.src = preview; } else { this.artImage.removeAttribute ('src'); }
         this.artName.textContent = art ? art.name + ' · label size in ' + unit : 'Import a PNG, JPEG or WebP label (up to 4 MiB).';
+        this.detailsPanel?.Refresh (); this.labelFinish.disabled = !art || disabled; this.labelFinish.value = art?.finish || 'paperMatte';
         this.artDimensions.hidden = !art; this.artRemove.hidden = !art;
-        if (art) { for (const [key, input] of this.artInputs) { input.value = String (Math.round (art[key] / factor * 1000) / 1000); } }
+        if (art) { for (const [key, input] of this.artInputs) { input.value = String (Math.round ((art[key] || 0) / factor * 1000) / 1000); } }
         for (const [zone, button] of this.zones) { button.hidden = ['pouch', 'clamshell'].includes (draft.family) && zone === 'wrap'; button.textContent = draft.family === 'clamshell' ? (zone === 'front' ? 'Top label' : 'Bottom label') : { front : 'Front label', back : 'Back label', wrap : 'Wrap label' }[zone]; button.setAttribute ('aria-pressed', String (draft.labelZone === zone)); button.disabled = disabled; }
         this.Drawer (draft.catalogOpen === true); this.drawerTitle.textContent = ProductCategories[draft.catalogCategory] || 'Designs';
         const catalogKey = draft.catalogCategory + ':' + unit; if (catalogKey !== this.catalogKey) { this.catalogKey = catalogKey; this.drawerGrid.replaceChildren (); for (const design of ListProductDesigns (draft.catalogCategory)) { const button = Element ('button', 'pp_design_card', undefined, this.drawerGrid); button.type='button'; button.innerHTML=DesignPreview(design); Element('strong', '', design.name, button); const size = ProductSize (ProductDesign (design.id)); Element ('small', 'pp_design_size', [size.widthMm, size.lengthMm, size.heightMm].map (v => Number ((v/factor).toFixed (2))).join (' × ') + ' ' + unit, button); button.title=design.description + ' · ' + design.dimensionsAre; button.setAttribute ('aria-label', 'Generate ' + design.name); button.addEventListener('click', ()=>this.Action(()=>this.host.generateDesign ? this.host.generateDesign(design.id) : this.host.selectDesign(design.id))); } }
