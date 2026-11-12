@@ -31,3 +31,9 @@ See [research, sources and next build gates](primary-product-realism-research.md
 - `test/browser/primary-products.mjs` and `test/browser/primary-materials.mjs` both pass: existing generation, catalog, dimensions/callouts, bottle sections, stand-up/flat-bottom/spouted pouches, label application, material preservation, desktop/mobile and panel motion regressions.
 
 Local review captures are in `work/primary-realism-review/` (not committed).
+
+## Production promotion
+
+PR #104 merged into the stacked parent after #103 had reached main; PR #106 promotes the realism release to main. The earlier CI run passed validation and two browser shards, but its ten-minute per-test watchdog stopped the complete Primary Products flow. That test now has a twenty-minute budget; other tests retain ten minutes. The board-database test also gives its first rendered generation the same two-minute budget used by other geometry checks. Assertions and application behavior are unchanged.
+
+The prior 0.61.0 production workflow also failed in the MCP test helper when reading a retained token response after a subsequent Miniflare dispatch. The helper now consumes the token response immediately, before looking up registrations. All 66 MCP tests and the complete board-database browser regression pass with these test-only changes. No production authentication or CAD behavior is changed.
