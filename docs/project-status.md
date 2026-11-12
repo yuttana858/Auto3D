@@ -1,8 +1,12 @@
 # Auto3D development log and handoff
 
-## Live product profile editor — Auto3D 0.64.0 / Packaging 1.10.7 / Primary Products 0.14.0
+## Live product profile editor — Auto3D 0.65.0 / Packaging 1.10.7 / Primary Products 0.14.0
 
-Edit model opens a split profile/3D workspace. Dimension callouts commit on Enter, preserving labels, custom materials, placement and Undo. Existing 3D controls stay on the original canvas. Built on main after #108; CAD integration remains paused. See [release-0640.md](release-0640.md). Candidate, not deployed.
+Edit model opens a split profile/3D workspace. Dimension callouts commit on Enter, preserving labels, custom materials, placement and Undo. Existing 3D controls stay on the original canvas. Built on main after #105 and #108; CAD integration remains paused. See [release-0650.md](release-0650.md). Candidate, not deployed.
+
+## Meshy workflows, revisions and AI viewer — Auto3D 0.64.0 / Primary Products 0.13.0 / Packaging 1.10.7 (2026-11-12)
+
+Adds Multi-image to 3D, current Text to image models and options (multi-view, background removal), texture prompts, revisions for every completed creation type, a 2D image viewer, studio lighting with pan in the 3D preview, and resilient thumbnails. Meshy has no API for assisted prompts. Verified live against Meshy through the real Pages Function in a local browser. Administrators can save an encrypted shared Meshy key in Auto3D that every account without a personal key uses (20 generations per account per hour). See [release-0640.md](release-0640.md). Not deployed.
 
 ## Larger centered landing animation — Auto3D 0.63.1 / Packaging 1.10.7 / Primary Products 0.13.0
 

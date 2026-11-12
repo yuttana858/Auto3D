@@ -3,7 +3,7 @@ const MeshyBaseUrl = 'https://api.meshy.ai';
 const MeshyAssetHost = 'assets.meshy.ai';
 const ModelLimit = 200 * 1024 * 1024, ImageRequestLimit = 28 * 1024 * 1024, TextRequestLimit = 65536;
 // Routes whose requests may carry reference images as data URIs.
-const ImageRoutes = new Set (['image-to-3d', 'retexture', 'text-to-image']);
+const ImageRoutes = new Set (['image-to-3d', 'multi-image-to-3d', 'image-to-image', 'retexture', 'text-to-image']);
 const SharedCreateLimit = 20, SharedCreateWindowMs = 3600000;
 
 async function boundedText (message, limit)
@@ -117,7 +117,7 @@ export async function onRequest (context)
             return await model (context);
         }
 
-        const routes = { 'text-to-3d' : 'v2', 'image-to-3d' : 'v1', 'text-to-image' : 'v1', retexture : 'v1', rigging : 'v1', animations : 'v1' };
+        const routes = { 'text-to-3d' : 'v2', 'image-to-3d' : 'v1', 'multi-image-to-3d' : 'v1', 'text-to-image' : 'v1', 'image-to-image' : 'v1', retexture : 'v1', rigging : 'v1', animations : 'v1' };
         const version = routes[path[0]];
         if (Object.hasOwn (routes, path[0]) && typeof version === 'string') {
             const base = '/openapi/' + version + '/' + path[0];
