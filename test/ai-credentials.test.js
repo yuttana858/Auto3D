@@ -66,7 +66,7 @@ describe ('Private account Meshy credentials', () => {
         globalThis.fetch = async (url, init) => { calls.push ({ url, init }); return Response.json ({ balance : 42, debug : key }); };
         try {
             const c = Context (env); c.params = { path : ['balance'] }; const response = await proxy (c); assert.equal (response.status, 200);
-            assert.equal (calls[0].init.headers.get ('Authorization'), 'Bearer ' + key); assert.equal (calls[0].init.redirect, 'error'); assert.equal ((await response.text ()).includes (key), false);
+            assert.equal (calls[0].init.headers.get ('Authorization'), 'Bearer ' + key); assert.equal (calls[0].init.redirect, 'manual'); assert.equal ((await response.text ()).includes (key), false);
             env.AUTO3D_AI_KEY_ENCRYPTION_SECRET = 'b2'.repeat (32); assert.equal ((await proxy (c)).status, 503); assert.equal (calls.length, 1);
             env.AUTO3D_AI_CREDENTIALS_R2.get = async () => { throw Object.assign (new Error (key), { status : 503 }); };
             const storageError = await proxy (c); assert.equal (storageError.status, 503); assert.equal ((await storageError.text ()).includes (key), false);
@@ -117,7 +117,7 @@ describe ('Private account Meshy credentials', () => {
     });
     it ('tests an entered key without storage and does not return a provider response or secret', async () => {
         const original = globalThis.fetch; let calls = 0; let providerStatus = 200;
-        globalThis.fetch = async (url, init) => { calls++; assert.equal (url, 'https://api.meshy.ai/openapi/v1/balance'); assert.equal (init.headers.Authorization, 'Bearer ' + key); assert.equal (init.redirect, 'error'); return new Response ('provider echoes ' + key, { status : providerStatus }); };
+        globalThis.fetch = async (url, init) => { calls++; assert.equal (url, 'https://api.meshy.ai/openapi/v1/balance'); assert.equal (init.headers.Authorization, 'Bearer ' + key); assert.equal (init.redirect, 'manual'); return new Response ('provider echoes ' + key, { status : providerStatus }); };
         try {
             const c = Context ({}, 'POST', { key }); let response = await testEnteredKey (c); assert.deepEqual (await response.json (), { valid : true });
             providerStatus = 401; response = await testEnteredKey (Context ({}, 'POST', { key })); const body = await response.text (); assert.equal (response.status, 401); assert.equal (body.includes (key), false);
