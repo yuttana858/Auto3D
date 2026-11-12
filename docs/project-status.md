@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Full access on the consent page — Auto3D 0.59.1 / Primary Products 0.10.0 / Packaging 1.10.7 (2026-11-11)
+
+The OAuth consent page now offers **Full access** (`auto3d.write`) and **Screenshots** (`auto3d.capture`), both ticked by default whatever the client requested, so a client asking only for `auto3d.read` can still be granted every tool. Unticking narrows the grant. Existing read-only grants must be revoked and reconnected. See [release-0591.md](release-0591.md).
+
 ## Clamshell catalog, advanced labels and clear surfaces — Auto3D 0.59.0 / Primary Products 0.10.0 / Packaging 1.10.7
 
 Adds the fourth Clamshell product card, combined food/retail drawer, cyan drawings and artwork in the advanced material editor. Clear glass/PET adds a physical-material pipeline and closed bottle cavities. See [release-0590.md](release-0590.md) for rendering and geometry limits. Not deployed.

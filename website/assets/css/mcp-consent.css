@@ -17,3 +17,8 @@ button { cursor: pointer; background: #65c4ee; color: #071421; border-color: #39
 button[value="deny"] { background: transparent; color: #d5e7f3; border-color: #547087; }
 :focus-visible { outline: 3px solid #69cfff; outline-offset: 3px; }
 @media (max-width: 480px) { body { align-items: flex-start; padding: 20px 14px; } .agent-card { padding: 20px; } }
+.consent_access { display: grid; gap: 8px; margin: 0; padding: 14px 16px; border: 1px solid #36566e; border-radius: 8px; }
+.consent_access legend { padding: 0 6px; color: #eef5fb; font-size: 14px; font-weight: 600; }
+.consent_access label { display: flex; align-items: center; gap: 10px; }
+.consent_access input[type="checkbox"] { flex: 0 0 auto; width: 20px; height: 20px; min-height: 20px; margin: 0; padding: 0; accent-color: #65c4ee; }
+.consent_access p { margin: 0 0 4px 30px; font-size: 13px; }

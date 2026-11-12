@@ -54,10 +54,12 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         return { verifier, form, cookies, fixtureSocket };
     }
     const approve = async (flow, id = userA) => { const result = await fetch ('/oauth/authorize', { method : 'POST', headers : { Cookie : flow.cookies, Origin : origin, 'Content-Type' : 'application/x-www-form-urlencoded' }, body : flow.form.toString (), redirect : 'manual' }); if (result.status === 302) { flow.fixtureSocket?.close (); } return result; };
-    async function grant (id = userA, scope, appWindowCode = null)
+    async function grant (id = userA, scope, appWindowCode = null, choices = null)
     {
         const before = await (await fetch ('/api/agent/registrations', { headers : userHeaders (id) })).json ();
-        const flow = await begin (id, scope, appWindowCode), approval = await approve (flow, id); assert.equal (approval.status, 302);
+        const flow = await begin (id, scope, appWindowCode);
+        if (choices) { for (const [key, value] of Object.entries (choices)) { flow.form.set (key, value); } }
+        const approval = await approve (flow, id); assert.equal (approval.status, 302);
         const redirect = new URL (approval.headers.get ('Location')); assert.equal (redirect.searchParams.get ('state'), 'test-state'); assert.equal (redirect.searchParams.get ('iss'), origin + '/oauth');
         const response = await fetch ('/oauth/oauth/token', { method : 'POST', headers : { 'Content-Type' : 'application/x-www-form-urlencoded' }, body : new URLSearchParams ({ grant_type : 'authorization_code', client_id : clientId, code : redirect.searchParams.get ('code'), code_verifier : flow.verifier, redirect_uri : 'https://client.example/callback', resource : origin + '/mcp' }).toString () });
         assert.equal (response.status, 200);
@@ -220,6 +222,21 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         const listed = await (await rpc (reader.access_token, 'tools/call', { name : 'auto3d.headless.projects', arguments : { action : 'list' } })).json (); assert.ok (listed.result.structuredContent.result.projects.some (item => item.id === project.id));
         const deleteDenied = await rpc (reader.access_token, 'tools/call', { name : 'auto3d.headless.projects', arguments : { action : 'delete', projectId : project.id, expectedRevision : 1 } }); assert.equal (deleteDenied.status, 403);
         const kept = await (await rpc (writer.access_token, 'tools/call', { name : 'auto3d.headless.projects', arguments : { action : 'get', projectId : project.id } })).json (); assert.equal (kept.result.structuredContent.result.project.revision, 1);
+    });
+    it ('lets the consent form grant full access and screenshots to a read-only request, or narrow a write request', async () => {
+        const page = await (await fetch ('/oauth/authorize?' + new URLSearchParams ({ client_id : clientId, response_type : 'code', redirect_uri : 'https://client.example/callback', resource : origin + '/mcp', scope : 'auto3d.read offline_access', state : 's', code_challenge : 'x'.repeat (43), code_challenge_method : 'S256' }), { headers : userHeaders (userA) })).text ();
+        assert.match (page, /name="permissions" value="1"/); assert.match (page, /<input type="checkbox" name="write" value="1" checked><span><strong>Full access:/); assert.match (page, /<input type="checkbox" name="capture" value="1" checked><span><strong>Screenshots/); assert.match (page, /client requested read-only access/);
+        const full = await grant (userA, 'auto3d.read offline_access', null, { permissions : '1', write : '1', capture : '1' });
+        assert.deepEqual (full.scope.split (' ').sort (), ['auto3d.capture', 'auto3d.read', 'auto3d.write', 'offline_access']);
+        const fullTools = (await (await rpc (full.access_token, 'tools/list')).json ()).result.tools.map (tool => tool.name);
+        for (const name of ['auto3d.commands.invoke', 'auto3d.commands.list', 'capture.image', 'auto3d.headless.fefco']) { assert.ok (fullTools.includes (name), name); }
+        const registrations = (await (await fetch ('/api/agent/registrations', { headers : userHeaders (userA) })).json ()).registrations;
+        assert.deepEqual ([...registrations.find (record => record.id === full.registrationId).scopes].sort (), ['auto3d.capture', 'auto3d.read', 'auto3d.write', 'offline_access']);
+        const narrowed = await grant (userA, 'auto3d.read auto3d.write offline_access', null, { permissions : '1' });
+        assert.deepEqual (narrowed.scope.split (' ').sort (), ['auto3d.read', 'offline_access']);
+        assert.ok (!(await (await rpc (narrowed.access_token, 'tools/list')).json ()).result.tools.some (tool => tool.name === 'auto3d.commands.invoke'));
+        const flow = await begin (userA, 'auto3d.read offline_access'); flow.form.set ('permissions', '1'); flow.form.set ('write', 'yes');
+        assert.equal ((await approve (flow)).status, 400);
     });
     it ('exposes the generated full command catalog only with write consent', async () => {
         const reader = await grant (), readerList = await (await rpc (reader.access_token, 'tools/list')).json ();

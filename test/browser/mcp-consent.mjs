@@ -30,6 +30,9 @@ try {
     assert.equal (await page.getByLabel ('App window code').count (), 0);
     assert.equal (await page.locator ('.agent-brand').innerText (), 'SW Auto3D');
     assert.equal (await page.locator ('.agent-card').evaluate (el => getComputedStyle (el).borderRadius), '12px');
+    // Full access and screenshots are preselected even though the client requested read-only access.
+    assert.equal (await page.getByRole ('checkbox', { name : /Full access/ }).isChecked (), true); assert.equal (await page.getByRole ('checkbox', { name : /Screenshots/ }).isChecked (), true);
+    assert.equal ((await page.getByRole ('checkbox', { name : /Full access/ }).boundingBox ()).width <= 24, true);
     await Promise.all ([page.waitForURL (url => url.origin === new URL (callback).origin && url.pathname === new URL (callback).pathname), page.getByRole ('button', { name : 'Allow', exact : true }).click ()]);
     assert.equal (posted.origin, origin); assert.match (posted.form.get ('binding'), /^\d+\.[a-f0-9]{64}$/);
     assert.equal (callbackUrl.searchParams.get ('state'), 'browser-fixture-state'); assert.equal (callbackUrl.searchParams.get ('iss'), origin + '/oauth');
@@ -37,6 +40,7 @@ try {
     assert.equal (errors.some (message => message.includes ('Content Security Policy')), false, 'CSP must allow the validated OAuth callback after the form POST.');
     const token = await runtime.dispatchFetch (origin + '/oauth/oauth/token', { method : 'POST', headers : { 'Content-Type' : 'application/x-www-form-urlencoded' }, body : new URLSearchParams ({ grant_type : 'authorization_code', client_id : clientId, redirect_uri : callback, code : callbackUrl.searchParams.get ('code'), code_verifier : verifier, resource : origin + '/mcp' }).toString () });
     assert.equal (token.status, 200, 'The code returned to the browser client must exchange successfully.');
-    assert.equal (typeof (await token.json ()).access_token, 'string');
+    const issued = await token.json (); assert.equal (typeof issued.access_token, 'string');
+    assert.deepEqual (issued.scope.split (' ').sort (), ['auto3d.capture', 'auto3d.read', 'auto3d.write', 'offline_access']);
     console.log ('Chromium consent form -> validated cross-origin callback -> S256 code exchange passed, with browser-managed consent cookies and canonical Origin.');
 } finally { await browser.close (); await runtime.dispose (); await new Promise (resolve => callbackServer.close (resolve)); }
