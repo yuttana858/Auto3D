@@ -86,12 +86,47 @@ describe ('Pouch geometry', function () {
         const pillow = CreatePrimaryProduct ({ ...DefaultProductDraft ('pouch'), widthMm : 160, heightMm : 230, depthMm : 80 }); assert.equal (pillow.quality.gusset, false); assert.equal (pillow.quality.freeStanding, false);
         const zone = product.artworkZones[0]; assert.ok (zone.bottomMm > 40); assert.ok (zone.bottomMm + zone.heightMm < 230 * .92);
     });
+    it ('builds closed flat-bottom, zipper and spout components inside W × L × H', async function () {
+        const { ProductName, PouchSpoutHeight } = await import ('../src/state.js');
+        const closed = mesh => { const edges = new Map (); let volume = 0; const p = i => mesh.positions.slice (3 * i, 3 * i + 3), key = i => p (i).map (v => Math.round (v * 1e6)).join ();
+            for (let i = 0; i < mesh.indices.length; i += 3) { const ids = mesh.indices.slice (i, i + 3), [a, b, c] = ids.map (p); volume += a[0] * (b[1] * c[2] - b[2] * c[1]) + a[1] * (b[2] * c[0] - b[0] * c[2]) + a[2] * (b[0] * c[1] - b[1] * c[0]); for (let j = 0; j < 3; j++) { const e = [key (ids[j]), key (ids[(j + 1) % 3])].sort ().join ('/'); edges.set (e, (edges.get (e) || 0) + 1); } }
+            return volume > 0 && [...edges.values ()].every (n => n === 2); };
+        const cases = [
+            [{ widthMm : 130, heightMm : 250, depthMm : 80, pouchShape : { style : 'flatbottom', zipper : true } }, 'Flat-bottom pouch with zipper', ['body', 'zipper-front', 'zipper-back']],
+            [{ widthMm : 30, heightMm : 60, depthMm : 20, pouchShape : { style : 'flatbottom' } }, 'Flat-bottom pouch', ['body']],
+            [{ widthMm : 140, heightMm : 200, depthMm : 40, pouchShape : { style : 'pillow', zipper : true } }, 'Pillow pouch with zipper', ['body', 'zipper-front', 'zipper-back']],
+            [{ widthMm : 110, heightMm : 170, depthMm : 50, pouchShape : { style : 'standup', gussetMm : 25, spout : { position : 'center', diameterMm : 9 } } }, 'Stand-up pouch with spout', ['body', 'spout', 'spout-cap']],
+            [{ widthMm : 500, heightMm : 1000, depthMm : 200, pouchShape : { style : 'standup', zipper : true, spout : { position : 'corner' } } }, 'Stand-up pouch with spout', ['body', 'zipper-front', 'zipper-back', 'spout', 'spout-cap']]
+        ];
+        for (const [input, name, ids] of cases) {
+            const draft = UpdateProductDraft (DefaultProductDraft ('pouch'), input), product = CreatePrimaryProduct (draft);
+            assert.equal (ProductName (draft), name); assert.deepEqual (product.components.map (c => c.id), ids);
+            for (const mesh of product.components) { assert.ok (closed (mesh), mesh.id + ' must be closed and outward'); for (let i = 0; i < mesh.positions.length; i++) { assert.ok (mesh.positions[i] >= product.bounds.min[i % 3] - 1e-6 && mesh.positions[i] <= product.bounds.max[i % 3] + 1e-6, mesh.id + ' must stay inside W × L × H'); } }
+            const ys = product.components.flatMap (c => c.positions.filter ((_, i) => i % 3 === 1)); assert.ok (Math.abs (Math.max (...ys) - input.heightMm) < 1e-6);
+            const body = product.components[0].positions.filter ((_, i) => i % 3 === 1); assert.ok (Math.abs (Math.max (...body) - (input.heightMm - PouchSpoutHeight (draft.pouchShape.spout))) < 1e-6);
+            assert.equal (product.quality.zipper, Boolean (input.pouchShape.zipper)); assert.equal (product.quality.spout, input.pouchShape.spout?.position || false); assert.equal (product.quality.freeStanding, input.pouchShape.style !== 'pillow');
+            const zone = product.artworkZones[0], zipper = product.components.find (c => c.id === 'zipper-front'); if (zipper) { assert.ok (zone.bottomMm + zone.heightMm < Math.min (...zipper.positions.filter ((_, i) => i % 3 === 1))); }
+        }
+        const box = CreatePrimaryProduct (UpdateProductDraft (DefaultProductDraft ('pouch'), cases[0][0])).components[0]; let base = 0, sides = 0;
+        for (let i = 0; i < box.normals.length; i += 3) { if (box.normals[i + 1] < -.999) { base++; } if (Math.abs (box.normals[i]) > .999 && box.positions[i + 1] < 100) { sides++; assert.ok (Math.abs (Math.abs (box.positions[i]) - 65) < 1e-9); } }
+        assert.ok (base > 0 && sides > 0); /* flat W × L base and vertical side gussets */
+    });
+    it ('validates zipper, spout and flat-bottom options before mutation', function () {
+        const pouch = UpdateProductDraft (DefaultProductDraft ('pouch'), { depthMm : 40 });
+        assert.equal (UpdateProductDraft (pouch, { pouchShape : { style : 'pillow' } }).pouchShape, undefined);
+        assert.deepEqual (UpdateProductDraft (pouch, { pouchShape : { style : 'standup', spout : { position : 'center' } } }).pouchShape, { style : 'standup', gussetMm : 20, spout : { position : 'center', diameterMm : 12 } });
+        for (const bad of [{ style : 'pillow', spout : { position : 'center' } }, { style : 'standup', spout : { position : 'top' } }, { style : 'flatbottom', gussetMm : 10 }, { style : 'standup', spout : { position : 'center', diameterMm : 60 } }, { style : 'standup', zipper : 'yes' }, { style : 'standup', spout : { position : 'center', angle : 45 } }]) { assert.throws (() => UpdateProductDraft (pouch, { pouchShape : bad })); }
+        assert.throws (() => UpdateProductDraft (UpdateProductDraft (pouch, { depthMm : 15 }), { pouchShape : { style : 'flatbottom' } }), /at least 20 mm/);
+        assert.throws (() => UpdateProductDraft (UpdateProductDraft (pouch, { heightMm : 50 }), { pouchShape : { style : 'standup', zipper : true } }), /at least 60 mm/);
+        const spouted = UpdateProductDraft (pouch, { pouchShape : { style : 'standup', spout : { position : 'corner', diameterMm : 20 } } });
+        assert.equal (UpdateProductDraft (spouted, { heightMm : 120 }).pouchShape.spout.diameterMm, 120 * .2 / 1.9); /* resizing clamps the spout */
+    });
     it ('validates stand-up gussets and keeps them within resized limits', function () {
         const pouch = DefaultProductDraft ('pouch'), standup = UpdateProductDraft (pouch, { pouchShape : { style : 'standup' } });
         assert.deepEqual (standup.pouchShape, { style : 'standup', gussetMm : 20 });
         assert.deepEqual (UpdateProductDraft (standup, { depthMm : 12 }).pouchShape, { style : 'standup', gussetMm : 12 });
         assert.equal (UpdateProductDraft (standup, { pouchShape : null }).pouchShape, undefined); assert.equal (UpdateProductDraft (standup, { pouchShape : { style : 'pillow' } }).pouchShape, undefined);
-        for (const bad of [{ style : 'standup', gussetMm : 2 }, { style : 'standup', gussetMm : 41 }, { style : 'spouted' }, { style : 'standup', zipper : true }, 'standup']) { assert.throws (() => UpdateProductDraft (pouch, { pouchShape : bad }), /pouch|Gusset/i); }
+        for (const bad of [{ style : 'standup', gussetMm : 2 }, { style : 'standup', gussetMm : 41 }, { style : 'spouted' }, { style : 'standup', handle : true }, 'standup']) { assert.throws (() => UpdateProductDraft (pouch, { pouchShape : bad }), /pouch|Gusset/i); }
         assert.throws (() => UpdateProductDraft (standup, { depthMm : 5 }), /at least 10 mm/); assert.throws (() => UpdateProductDraft (DefaultProductDraft ('bottle'), { pouchShape : { style : 'standup' } }), /only to pouches/);
         assert.equal (UpdateProductDraft (standup, { family : 'can' }).pouchShape, undefined);
     });
