@@ -1,3 +1,4 @@
+import { ValidateLabelSource } from './labelsource.js';
 import { LabelFinishes } from './surfaces.js';
 import { SmoothMesh } from './detailmesh.js';
 import { CreatePouch } from './pouch.js';
@@ -8,13 +9,13 @@ export function ValidateProductArtwork (draft, entries = [])
     if (!Array.isArray (entries) || entries.length > 2) { throw new Error ('Use up to two front/back labels or one wrap.'); }
     const seen = new Set (), zones = GetArtworkZones (draft);
     const result = entries.map (a => {
-        if (!a || typeof a !== 'object' || Object.keys (a).some (k => !['resourceId', 'name', 'mime', 'zone', 'widthMm', 'heightMm', 'finish', 'offsetXmm', 'offsetYmm'].includes (k)) || !/^[a-f0-9]{64}$/.test (a.resourceId) || typeof a.name !== 'string' || a.name.length > 80 || !['image/png', 'image/jpeg', 'image/webp'].includes (a.mime)) { throw new Error ('Invalid label artwork.'); }
+        if (!a || typeof a !== 'object' || Object.keys (a).some (k => !['resourceId', 'name', 'mime', 'zone', 'widthMm', 'heightMm', 'finish', 'offsetXmm', 'offsetYmm', 'source'].includes (k)) || !/^[a-f0-9]{64}$/.test (a.resourceId) || typeof a.name !== 'string' || a.name.length > 80 || !['image/png', 'image/jpeg', 'image/webp'].includes (a.mime)) { throw new Error ('Invalid label artwork.'); }
         const z = zones.find (zone => zone.id === a.zone);
         if (!z || seen.has (a.zone) || !Number.isFinite (a.widthMm) || !Number.isFinite (a.heightMm) || a.widthMm < 1 || a.heightMm < 1 || a.widthMm > z.widthMm || a.heightMm > z.heightMm) { throw new Error ('Label must fit its physical zone. Resize or remove artwork before changing the product.'); }
         if (a.finish !== undefined && !Object.hasOwn (LabelFinishes, a.finish)) { throw new Error ('Choose a supported label finish.'); }
         const x = a.offsetXmm ?? 0, y = a.offsetYmm ?? 0;
         if (!Number.isFinite (x) || !Number.isFinite (y) || a.widthMm + 2*Math.abs (x) > z.widthMm + 1e-7 || a.heightMm + 2*Math.abs (y) > z.heightMm + 1e-7) { throw new Error ('Label position must remain within its physical zone.'); }
-        seen.add (a.zone); return { ...a };
+        seen.add (a.zone); return { ...a, ...(a.source !== undefined ? { source : ValidateLabelSource (a.source) } : {}) };
     });
     if (seen.has ('wrap') && seen.size > 1) { throw new Error ('Remove front/back labels before assigning a wrap label.'); }
     return result;

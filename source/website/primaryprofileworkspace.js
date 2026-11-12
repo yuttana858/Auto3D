@@ -27,7 +27,8 @@ export class PrimaryProfileWorkspace
         if (document !== editor.document || owner !== this.website.auth?.user?.id || this.panel.Blocked ()) { throw new Error ('The session changed before the model editor opened.'); }
         const viewer = this.website.parameters.viewerDiv; this.wrapper = globalThis.document.createElement ('div'); this.wrapper.className = 'pp_viewport_split'; viewer.parentNode.insertBefore (this.wrapper, viewer);
         this.root = globalThis.document.createElement ('section'); this.wrapper.append (this.root, viewer);
-        this.ui = new this.panel.module.ProductProfileEditor ({ inspect : () => this.Inspect (), blocked : () => this.panel.Blocked (), update : (changes, objectId) => this.panel.UpdateProfile (changes, objectId), close : () => this.Close () }, this.root);
+        this.ui = new this.panel.module.ProductProfileEditor ({ inspect : () => this.Inspect (), blocked : () => this.panel.Blocked (), update : (changes, objectId) => this.panel.UpdateProfile (changes, objectId), close : () => this.Close (), refreshLabels : () => this.panel.workspace.SetDisabled () }, this.root);
+        this.ui.labelsRoot.appendChild (this.panel.workspace.artworkRoot);
         this.open = true; this.website.layouter.primaryProfile = this; this.Sync (); this.website.layouter.Resize (); editor.Focus ();
         this.website.viewer.navigation.FinishCameraMovement ();
         return this.Inspect ();
@@ -47,12 +48,18 @@ export class PrimaryProfileWorkspace
         if (this.committing || this.website.sessionEditor.busy || this.panel.products.active) { this.ui.SetDisabled (true); return; }
         const state = this.Inspect ();
         if (!state.available) { this.Close (false); return; }
+        const definitionKey = state.objectId + JSON.stringify (this.panel.products.Selected ().definition);
+        if (this.labelKey !== definitionKey && !this.panel.Blocked ()) {
+            this.labelKey = definitionKey; this.panel.artworkTarget = state.objectId;
+            this.panel.products.LoadSelected ();
+        }
         this.ui.Refresh (state);
     }
     async Close (restore = true)
     {
         if (!this.open) { return { open : false }; }
-        this.open = false; this.website.layouter.primaryProfile = null;
+        this.open = false; this.labelKey = null; this.website.layouter.primaryProfile = null;
+        if (this.root.contains (this.panel.workspace.artworkRoot)) { this.panel.workspace.artworkRoot.remove (); }
         const viewer = this.website.parameters.viewerDiv; this.wrapper.before (viewer); this.wrapper.remove (); this.ui = null; this.website.layouter.Resize ();
         if (restore && this.owner === this.website.auth?.user?.id && this.document === this.website.sessionEditor.document) {
             for (const p of this.restore || []) { const active = this.website.modulePanels.Inspect ().find (m => m.side === p.side && m.visible); if (!active) { await this.website.modulePanels.Set (p.id, p.mode); } }

@@ -119,3 +119,14 @@
 .pp_profile_help { opacity: .7; }
 .pp_profile_status { color: #cb7856; min-height: 16px; }
 .pp_vertical .pp_profile_editor { border-right: 0; border-bottom: 1px solid #458b9b; }
+
+.pp_profile_options { margin: 10px 14px; border: 1px solid #458b9b77; border-radius: 7px; padding: 10px; }
+.pp_profile_options summary { cursor: pointer; color: #66bdd0; font-size: var(--workspace-menu-font-size, 13px); }
+.pp_profile_options .pp_field { margin-top: 9px; }
+.pp_profile_options input, .pp_profile_options select, .pp_profile_options textarea { box-sizing: border-box; width: 100%; padding: 7px; background: transparent; color: inherit; border: 1px solid #7777; border-radius: 5px; }
+.pp_profile_options input[type=color] { height: 32px; padding: 2px; }
+.pp_profile_options option { background: var(--ov_background_color, #292b2d); }
+.pp_profile_options textarea { resize: vertical; min-height: 60px; }
+.pp_profile_editor .pp_art_apply { display: none; }
+.pp_profile_editor .pp_artwork_editor { border: 0; padding: 8px 0; }
+.pp_profile_options[hidden], .pp_profile_options [hidden] { display: none; }

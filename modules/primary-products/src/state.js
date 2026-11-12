@@ -1,8 +1,9 @@
+import { ValidateContents, ValidateOptics } from './contents.js';
 import { ValidateProductDetails } from './details.js';
 import { ProductMaterials } from './materials.js';
-export const PrimaryProductsVersion = '0.14.0';
+export const PrimaryProductsVersion = '0.15.0';
 export const PrimaryFamilies = Object.freeze ({ clamshell : { name : 'Closed clamshell', material : 'pp', heightMm : 60, widthMm : 180, depthMm : 130, color : '#eee9dd', roughness : .35, labelZone : 'front' }, bottle : { name : 'Round bottle', material : 'plastic', heightMm : 190, diameterMm : 65, color : '#e8eceb', roughness : 0.45, labelZone : 'front' }, can : { name : 'Standard can', material : 'aluminum', heightMm : 122, diameterMm : 66, color : '#c9d2d4', roughness : 0.3, labelZone : 'wrap' }, pouch : { name : 'Pillow pouch', material : 'plastic', heightMm : 200, widthMm : 140, depthMm : 40, color : '#e8eceb', roughness : 0.5, labelZone : 'front' } });
-const fields = ['family', 'heightMm', 'diameterMm', 'widthMm', 'depthMm', 'material', 'color', 'roughness', 'labelZone', 'bottleShape', 'bottleSection', 'pouchShape', 'details'];
+const fields = ['family', 'heightMm', 'diameterMm', 'widthMm', 'depthMm', 'material', 'color', 'roughness', 'labelZone', 'bottleShape', 'bottleSection', 'pouchShape', 'details', 'contents', 'optics'];
 export function DefaultProductDraft (family = 'bottle')
 {
     if (!Object.hasOwn (PrimaryFamilies, family)) { throw new Error ('Choose bottles, cans, pouches or clamshells.'); }
@@ -36,6 +37,17 @@ export function UpdateProductDraft (current, changes)
         next.bottleShape = ValidateBottleShape (next, next.bottleShape);
     }
     if (next.details !== undefined) { next.details = ValidateProductDetails (next, next.details, changes.details !== undefined); if (next.details === null) { delete next.details; } }
+    if (changes.material !== undefined && changes.material !== current.material && changes.optics === undefined) { delete next.optics; }
+    if (changes.color !== undefined && next.optics && changes.optics === undefined) { next.optics = { ...next.optics, color : changes.color }; }
+    if (next.optics !== undefined) {
+        if (next.family !== 'bottle' || !ProductMaterials[next.material].transmission) { throw new Error ('Glass appearance requires a clear or translucent bottle material.'); }
+        next.optics = ValidateOptics (next.optics); if (next.optics === null) { delete next.optics; }
+    }
+    if (next.contents !== undefined) {
+        if (next.family !== 'bottle') { throw new Error ('Contents currently apply to bottles.'); }
+        next.contents = ValidateContents (next.contents); if (next.contents === null) { delete next.contents; }
+        else if (!next.details) { next.details = ValidateProductDetails (next, {}, false); }
+    }
     return { ...next, color : next.color.toLowerCase () };
 }
 

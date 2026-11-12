@@ -749,15 +749,18 @@ export class ImporterGltf extends ImporterBase
         if (gltfMaterial.normalTexture && gltfMaterial.normalTexture.scale !== undefined) {
             material.normalScale = gltfMaterial.normalTexture.scale;
         }
-        for (const [extension, field, key, min, max] of [['KHR_materials_clearcoat', 'clearcoatFactor', 'clearcoat', 0, 1], ['KHR_materials_clearcoat', 'clearcoatRoughnessFactor', 'clearcoatRoughness', 0, 1], ['KHR_materials_transmission', 'transmissionFactor', 'transmission', 0, 1], ['KHR_materials_ior', 'ior', 'ior', 1, 3], ['KHR_materials_volume', 'thicknessFactor', 'thickness', 0, 1e6]]) {
+        for (const [extension, field, key, min, max] of [['KHR_materials_clearcoat', 'clearcoatFactor', 'clearcoat', 0, 1], ['KHR_materials_clearcoat', 'clearcoatRoughnessFactor', 'clearcoatRoughness', 0, 1], ['KHR_materials_transmission', 'transmissionFactor', 'transmission', 0, 1], ['KHR_materials_ior', 'ior', 'ior', 1, 3], ['KHR_materials_volume', 'thicknessFactor', 'thickness', 0, 1e6], ['KHR_materials_volume', 'attenuationDistance', 'attenuationDistance', 0, 1e6]]) {
             const value = gltfMaterial.extensions?.[extension]?.[field];
             if (Number.isFinite (value) && value >= min && value <= max) { material[key] = value; }
         }
+        const attenuation = gltfMaterial.extensions?.KHR_materials_volume?.attenuationColor;
+        if (Array.isArray (attenuation) && attenuation.length === 3 && attenuation.every (v => Number.isFinite (v) && v >= 0 && v <= 1)) { material.attenuationColor = GetGltfColor (attenuation); }
         const specular = gltfMaterial.extensions && gltfMaterial.extensions.KHR_materials_specular;
         if (specular && Number.isFinite (specular.specularFactor)) { material.specularIntensity = specular.specularFactor; }
         // Keep nonstandard height maps in our extras; ordinary glTF viewers ignore them.
         const surface = gltfMaterial.extras && gltfMaterial.extras.swAuto3D;
         if (surface) {
+            if (surface.transmissionBackground === true) { material.transmissionBackground = true; material.transparent = false; }
             for (const key of ['bumpScale', 'displacementScale', 'displacementBias']) {
                 if (Number.isFinite (surface[key])) { material[key] = surface[key]; }
             }

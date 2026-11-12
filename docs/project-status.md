@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Bottle contents, optical walls and editable labels — Auto3D 0.66.0 / Primary Products 0.15.0 / Packaging 1.10.7
+
+Stacked in draft #110. Adds wall callouts, synchronized glass refraction/absorption, cavity-conforming static contents, and live image/SVG/text label authoring in Edit model. CAD layers remain untouched. See [release-0660.md](release-0660.md). Not deployed.
+
 ## Live product profile editor — Auto3D 0.65.0 / Packaging 1.10.7 / Primary Products 0.14.0
 
 Edit model opens a split profile/3D workspace. Dimension callouts commit on Enter, preserving labels, custom materials, placement and Undo. Existing 3D controls stay on the original canvas. Includes main through #112 (horizontal orbit and fixed-scale landing fixes); CAD integration remains paused. See [release-0650.md](release-0650.md). Candidate, not deployed. PR #110 also consolidates Actions validation and documents draft batching; see [Actions cost control](actions-cost-control.md).

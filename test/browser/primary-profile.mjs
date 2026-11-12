@@ -54,7 +54,7 @@ try {
     await profile.getByRole ('button', { name : 'Close model editor' }).click (); await profile.waitFor ({ state : 'detached' });
     assert.equal (await canvas.evaluate (el => el === document.querySelector ('#main_viewer canvas')), true); assert.ok ((await page.locator ('#main_viewer').boundingBox ()).width > right.width);
     await call ('primary.designs.select', { id : 'standard-beverage' }); const can = await call ('primary.generate');
-    await call ('primary.profile.open'); assert.equal (await profile.locator ('select').count (), 1); assert.equal (await profile.locator ('select').isVisible (), false);
+    await call ('primary.profile.open'); assert.equal (await profile.locator ('select[aria-label="Profile cross-section"]').count (), 1); assert.equal (await profile.locator ('select[aria-label="Profile cross-section"]').isVisible (), false);
     await call ('object.select', { objectId }); await poll (async () => await shoulder.isVisible ());
     await call ('object.select', { objectId : can.objectId }); await call ('object.delete', { objectId : can.objectId }); await profile.waitFor ({ state : 'detached' });
     assert.deepEqual (errors, []); console.log ('Live profile: create-on-open, same canvas, Enter updates, Undo/Redo, validation, inches, orbit/zoom, mobile, close and selection passed.');

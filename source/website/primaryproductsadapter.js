@@ -1,3 +1,4 @@
+import { ContentPresets } from '../../modules/primary-products/src/contents.js';
 import { ProductSurfaceMaps, ProductGrain, LabelFinishes } from '../../modules/primary-products/src/surfaces.js';
 import { ProductMaterials } from '../../modules/primary-products/src/materials.js';
 import { CreateLabelMesh, ValidateProductArtwork } from '../../modules/primary-products/src/artwork.js';
@@ -11,6 +12,18 @@ import { RGBColor } from '../engine/model/color.js';
 import { Unit } from '../engine/model/unit.js';
 
 const millimeters = { [Unit.Millimeter] : 1, [Unit.Centimeter] : 10, [Unit.Meter] : 1000, [Unit.Inch] : 25.4, [Unit.Foot] : 304.8 };
+export function ApplyProductOptics (material, draft, wallMm, unit)
+{
+    const factor = millimeters[unit];
+    if (material.transmission > 0 || draft.optics) { material.thickness = wallMm / factor; }
+    if (draft.optics) {
+        const optics = draft.optics;
+        material.color = new RGBColor (255, 255, 255); material.attenuationColor = new RGBColor (...optics.color.slice (1).match (/.{2}/g).map (n => parseInt (n, 16)));
+        material.attenuationDistance = optics.tintDistanceMm / factor; material.transmission = 1 - optics.opacity; material.ior = optics.ior; material.opacity = 1; material.transparent = false; material.transmissionBackground = false;
+        // Absorption is inactive at zero transmission; retain the selected tint on opaque glass.
+        if (optics.opacity === 1) { material.color = new RGBColor (material.attenuationColor.r, material.attenuationColor.g, material.attenuationColor.b); }
+    }
+}
 export function PrimaryProductModel (data, unit, artwork = [], resources = new Map ())
 {
     const factor = millimeters[unit]; if (!factor) { throw new Error ('Set known scene units before adding a product.'); }
@@ -30,6 +43,7 @@ export function PrimaryProductModel (data, unit, artwork = [], resources = new M
             material.transmission = preset.transmission || 0; material.ior = preset.ior || 1.5;
             material.thickness = material.transmission ? (data.quality.wallMm || Math.min (1.2, data.definition.widthMm*.04, data.definition.depthMm*.04, data.definition.heightMm*.04))/factor : 0;
             material.doubleSided = false;
+            ApplyProductOptics (material, data.definition, data.quality.wallMm || 0, unit);
             material.clearcoat = preset.clearcoat ?? (['petOpaque', 'lacquer', 'glossFilm'].includes (data.definition.material) ? .8 : 0); material.clearcoatRoughness = .12;
         }
         if (data.definition.details && ['body', 'end', 'closure'].includes (component.materialRole)) {
@@ -41,6 +55,13 @@ export function PrimaryProductModel (data, unit, artwork = [], resources = new M
                 material.reliefMode = 'bump'; material.bumpScale = (kind === 'fiber' ? .12 : kind === 'paper' ? .04 : kind === 'film' ? .035 : kind === 'smooth' ? .002 : .015) * detail.textureStrength / factor;
                 material.normalScale = detail.textureStrength * .25;
             }
+        }
+        if (component.materialRole === 'contents') {
+            const fill = data.definition.contents, preset = ContentPresets[fill.type];
+            material.color = new RGBColor (...fill.color.slice (1).match (/.{2}/g).map (n => parseInt (n, 16))); material.metalness = 0; material.roughness = preset.roughness; material.ior = preset.ior;
+            // Opaque-pass alpha compositing keeps static liquid visible in the glass refraction buffer.
+            // Ordinary blended/transmissive inner objects are omitted by Three's transmission pass.
+            material.opacity = fill.opacity; material.transmissionBackground = true; material.transparent = false; material.transmission = 0; material.doubleSided = false; material.clearcoat = .4;
         }
         if (component.artwork) {
             const a = component.artwork, source = resources.get (a.resourceId); if (!source?.buffer) { throw new Error ('Import the missing label source before generating.'); }

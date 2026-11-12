@@ -534,7 +534,7 @@ export class ExporterGltf extends ExporterBase
                 alphaMode : 'OPAQUE'
             };
 
-            if (material.transparent) {
+            if (material.transparent || material.transmissionBackground) {
                 // TODO: mask, alphaCutoff?
                 jsonMaterial.alphaMode = 'BLEND';
             }
@@ -562,7 +562,7 @@ export class ExporterGltf extends ExporterBase
                     ['KHR_materials_clearcoat', material.clearcoat > 0 ? { clearcoatFactor : material.clearcoat, clearcoatRoughnessFactor : material.clearcoatRoughness } : null],
                     ['KHR_materials_transmission', material.transmission > 0 ? { transmissionFactor : material.transmission } : null],
                     ['KHR_materials_ior', material.ior !== 1.5 ? { ior : material.ior } : null],
-                    ['KHR_materials_volume', material.transmission > 0 && material.thickness > 0 ? { thicknessFactor : material.thickness } : null]
+                    ['KHR_materials_volume', material.transmission > 0 && material.thickness > 0 ? { thicknessFactor : material.thickness, attenuationColor : ColorToRGB (material.attenuationColor), ...(material.attenuationDistance > 0 ? { attenuationDistance : material.attenuationDistance } : {}) } : null]
                 ]) {
                     if (!values) { continue; }
                     mainJson.extensionsUsed ||= []; if (!mainJson.extensionsUsed.includes (name)) { mainJson.extensionsUsed.push (name); }
@@ -581,8 +581,9 @@ export class ExporterGltf extends ExporterBase
             }
             const aoTexture = GetTextureParams (mainJson, material.aoMap, addTexture);
             if (aoTexture !== null) { jsonMaterial.occlusionTexture = { ...aoTexture, strength : Math.min (1, material.aoIntensity) }; }
-            if (material.bumpMap || material.displacementMap) {
+            if (material.bumpMap || material.displacementMap || material.transmissionBackground) {
                 jsonMaterial.extras = { swAuto3D : {
+                    transmissionBackground : material.transmissionBackground,
                     bumpScale : material.bumpScale,
                     displacementScale : material.displacementScale,
                     displacementBias : material.displacementBias,

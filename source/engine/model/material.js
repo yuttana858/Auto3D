@@ -122,6 +122,7 @@ export class FaceMaterial extends MaterialBase
 
         this.opacity = 1.0; // 0.0 .. 1.0
         this.transparent = false;
+        this.transmissionBackground = false;
 
         this.diffuseMap = null;
         this.bumpMap = null;
@@ -174,7 +175,7 @@ export class FaceMaterial extends MaterialBase
         if (!TextureMapIsEqual (this.emissiveMap, rhs.emissiveMap)) {
             return false;
         }
-        for (const key of ['doubleSided', 'emissiveIntensity', 'bumpScale', 'normalScale', 'aoIntensity', 'displacementScale', 'displacementBias', 'reliefMode', 'boardFluteLinked', 'boardSurfaceRole']) {
+        for (const key of ['transmissionBackground', 'doubleSided', 'emissiveIntensity', 'bumpScale', 'normalScale', 'aoIntensity', 'displacementScale', 'displacementBias', 'reliefMode', 'boardFluteLinked', 'boardSurfaceRole']) {
             if (this[key] !== rhs[key]) { return false; }
         }
         if (JSON.stringify (this.surfaceRelief) !== JSON.stringify (rhs.surfaceRelief)) { return false; }
@@ -240,6 +241,8 @@ export class PhysicalMaterial extends FaceMaterial
         this.ior = 1.5;
         this.clearcoat = 0.0; this.clearcoatRoughness = 0.0;
         this.thickness = 0.0; // scene units
+        this.attenuationColor = new RGBColor (255, 255, 255);
+        this.attenuationDistance = 0.0; // scene units; zero disables absorption
         this.specularMap = null;
     }
 
@@ -257,7 +260,8 @@ export class PhysicalMaterial extends FaceMaterial
         if (!IsEqual (this.roughness, rhs.roughness)) {
             return false;
         }
-        for (const key of ['transmission', 'ior', 'thickness', 'clearcoat', 'clearcoatRoughness']) { if (!IsEqual (this[key], rhs[key])) { return false; } }
+        for (const key of ['transmission', 'ior', 'thickness', 'clearcoat', 'clearcoatRoughness', 'attenuationDistance']) { if (!IsEqual (this[key], rhs[key])) { return false; } }
+        if (!RGBColorIsEqual (this.attenuationColor, rhs.attenuationColor)) { return false; }
         if (!IsEqual (this.specularIntensity, rhs.specularIntensity)) { return false; }
         if (!TextureMapIsEqual (this.roughnessMap, rhs.roughnessMap)) { return false; }
         if (!TextureMapIsEqual (this.metalnessMap, rhs.metalnessMap)) {

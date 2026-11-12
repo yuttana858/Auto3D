@@ -7142,6 +7142,136 @@
       }
     },
     {
+      "id": "primary.contents.set",
+      "title": "Fill selected bottle",
+      "category": "Primary Products",
+      "description": "Set a static fill inside the actual inner bottle cavity; null empties it. Fill is percent of cavity height, opacity is 0–1 and viscosity is metadata in mPa·s, not a flow simulation. Immediate undoable rebuild preserves artwork and body materials.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contents": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "liquid",
+                      "oil",
+                      "syrup",
+                      "lotion"
+                    ]
+                  },
+                  "fillPercent": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "color": {
+                    "type": "string",
+                    "pattern": "^#[a-fA-F0-9]{6}$"
+                  },
+                  "opacity": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "viscosity": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 1000000
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              }
+            ]
+          },
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "contents"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "contents": {
+          "type": "oil",
+          "fillPercent": 75
+        }
+      }
+    },
+    {
+      "id": "primary.glass.set",
+      "title": "Set glass tint and refraction",
+      "category": "Primary Products",
+      "description": "Edit a clear/translucent bottle material: color absorption, opacity (1 minus transmission), IOR and tint depth in mm. Geometry wall thickness sets the optical thickness. Immediate undoable rebuild.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "optics": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "color": {
+                    "type": "string",
+                    "pattern": "^#[a-fA-F0-9]{6}$"
+                  },
+                  "opacity": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "ior": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 2.5
+                  },
+                  "tintDistanceMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 1000
+                  }
+                }
+              }
+            ]
+          },
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "optics"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "optics": {
+          "color": "#d5ab60",
+          "opacity": 0.05,
+          "ior": 1.5,
+          "tintDistanceMm": 20
+        }
+      }
+    },
+    {
       "id": "primary.profile.open",
       "title": "Open live product profile",
       "category": "Primary Products",
@@ -7185,9 +7315,9 @@
     },
     {
       "id": "primary.profile.update",
-      "title": "Edit product dimensions live",
+      "title": "Edit product model live",
       "category": "Primary Products",
-      "description": "Immediately rebuild the selected product from a partial physical profile edit in millimeters. Preserves materials, artwork, placement and identity with one Undo step. Optional objectId rejects stale selection; validates label fit before mutation.",
+      "description": "Immediately rebuild the selected product from a partial dimension, wall, material, optics or contents edit in millimeters. Preserves materials, artwork, placement and identity with one Undo step. Optional objectId rejects stale selection; validates label fit before mutation.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -7195,6 +7325,126 @@
           "objectId": {
             "type": "string",
             "maxLength": 4096
+          },
+          "wallMm": {
+            "type": "number",
+            "minimum": 0.001,
+            "maximum": 10
+          },
+          "material": {
+            "type": "string",
+            "enum": [
+              "frostedGlass",
+              "amberGlass",
+              "naturalHDPE",
+              "frostedPP",
+              "pearlPlastic",
+              "clearFilm",
+              "paperboard",
+              "moldedFiber",
+              "kraftFilm",
+              "satinFilm",
+              "lacquer",
+              "softTouch",
+              "plastic",
+              "hdpe",
+              "pp",
+              "petOpaque",
+              "glass",
+              "petClear",
+              "aluminum",
+              "steel",
+              "coatedMetal",
+              "brushedMetal",
+              "matteFilm",
+              "glossFilm",
+              "foil"
+            ]
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[a-fA-F0-9]{6}$"
+          },
+          "roughness": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "optics": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "color": {
+                    "type": "string",
+                    "pattern": "^#[a-fA-F0-9]{6}$"
+                  },
+                  "opacity": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "ior": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 2.5
+                  },
+                  "tintDistanceMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 1000
+                  }
+                }
+              }
+            ]
+          },
+          "contents": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "liquid",
+                      "oil",
+                      "syrup",
+                      "lotion"
+                    ]
+                  },
+                  "fillPercent": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "color": {
+                    "type": "string",
+                    "pattern": "^#[a-fA-F0-9]{6}$"
+                  },
+                  "opacity": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "viscosity": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 1000000
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              }
+            ]
           },
           "widthMm": {
             "type": "number",
@@ -7338,6 +7588,90 @@
       "example": {}
     },
     {
+      "id": "primary.artwork.text",
+      "title": "Create editable text label",
+      "category": "Primary Products",
+      "description": "Create or replace the active label zone with editable text and a portable PNG preview. Retains text authoring in the product definition. Applies immediately in the profile editor; otherwise use primary.artwork.apply. Does not touch CAD layers.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[a-fA-F0-9]{6}$"
+          },
+          "background": {
+            "type": "string",
+            "pattern": "^(transparent|#[a-fA-F0-9]{6})$"
+          },
+          "fontSize": {
+            "type": "number",
+            "minimum": 8,
+            "maximum": 120
+          },
+          "fontFamily": {
+            "type": "string",
+            "enum": [
+              "sans-serif",
+              "serif",
+              "monospace"
+            ]
+          },
+          "align": {
+            "type": "string",
+            "enum": [
+              "left",
+              "center",
+              "right"
+            ]
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "text": "BOTANICAL\nBODY OIL",
+        "color": "#123740",
+        "background": "#ffffff"
+      }
+    },
+    {
+      "id": "primary.artwork.svg",
+      "title": "Import vector label source",
+      "category": "Primary Products",
+      "description": "Import self-contained SVG paths/text with a viewBox, retaining sanitized vector source and a PNG material preview. Rejects scripts, external resources and unsupported styling. Applies immediately in the profile editor; otherwise use primary.artwork.apply. CAD integration remains separate.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "svg": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "svg"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 50\"><rect width=\"100\" height=\"50\" fill=\"#458b9b\"/></svg>"
+      }
+    },
+    {
       "id": "primary.artwork.apply",
       "title": "Apply label artwork",
       "category": "Primary Products",
@@ -7355,7 +7689,7 @@
       "id": "primary.artwork.open",
       "title": "Import label image",
       "category": "Primary Products",
-      "description": "Open an interactive local PNG/JPEG/WebP picker. Returns opened, not imported; source bytes stay local until an explicit save.",
+      "description": "Open an interactive local PNG/JPEG/WebP/SVG picker. In the profile editor imports apply immediately. Returns opened, not imported; source bytes stay local until an explicit save.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -7369,7 +7703,7 @@
       "id": "primary.artwork.mapping",
       "title": "Set physical label size",
       "category": "Primary Products",
-      "description": "Set label size, position and paper/film/foil finish; validates physical fit before mutation. Generate or Apply to update the scene.",
+      "description": "Set label size, position and paper/film/foil finish; validates physical fit before mutation. Applies immediately in the profile editor; otherwise Generate or Apply commits the draft.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -7429,7 +7763,7 @@
       "id": "primary.artwork.remove",
       "title": "Remove label image",
       "category": "Primary Products",
-      "description": "Remove a draft label and its unused local source. Generate or Apply to update the scene.",
+      "description": "Remove a draft label and its unused local source. Applies immediately in the profile editor; otherwise Generate or Apply commits the draft.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
