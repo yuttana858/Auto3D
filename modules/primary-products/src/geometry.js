@@ -2,7 +2,7 @@ import { ProductMaterials } from './materials.js';
 import { CreateClamshell } from './clamshell.js';
 import { GetArtworkZones } from './zones.js';
 export { GetArtworkZones } from './zones.js';
-import { CreatePillowPouch } from './pouch.js';
+import { CreatePouch } from './pouch.js';
 import { DefaultProductDraft, UpdateProductDraft, BottleShape } from './state.js';
 import { BottleSectionOf, SectionOutline } from './section.js';
 
@@ -86,7 +86,7 @@ export function CreatePrimaryProduct (input, options = {})
     const segments = options.segments ?? 64;
     if (!Number.isInteger (segments) || segments < 16 || segments > 128 || segments % 4 !== 0) { throw new Error ('Segments must be a multiple of four between 16 and 128.'); }
     if (definition.family === 'clamshell') { return { apiVersion : 1, generatorVersion : 1, units : 'mm', definition, components : CreateClamshell (definition), bounds : { min : [-definition.widthMm/2, 0, -definition.depthMm/2], max : [definition.widthMm/2, definition.heightMm, definition.depthMm/2] }, artworkZones : GetArtworkZones (definition), quality : { construction : 'closed-position-shell', hollowWalls : true, hinge : false } }; }
-    if (definition.family === 'pouch') { return { apiVersion : 1, generatorVersion : 1, units : 'mm', definition, components : [CreatePillowPouch (definition, segments)], bounds : { min : [-definition.widthMm / 2, 0, -definition.depthMm / 2], max : [definition.widthMm / 2, definition.heightMm, definition.depthMm / 2] }, artworkZones : GetArtworkZones (definition), quality : { construction : 'filled-pillow-presentation', hollowWalls : false, gusset : false, zipper : false, simulatedFill : false } }; }
+    if (definition.family === 'pouch') { return { apiVersion : 1, generatorVersion : 1, units : 'mm', definition, components : [CreatePouch (definition, segments)], bounds : { min : [-definition.widthMm / 2, 0, -definition.depthMm / 2], max : [definition.widthMm / 2, definition.heightMm, definition.depthMm / 2] }, artworkZones : GetArtworkZones (definition), quality : { construction : definition.pouchShape ? 'filled-standup-presentation' : 'filled-pillow-presentation', hollowWalls : false, gusset : definition.pouchShape ? 'bottom' : false, gussetMm : definition.pouchShape?.gussetMm ?? 0, freeStanding : Boolean (definition.pouchShape), zipper : false, simulatedFill : false } }; }
     const h = definition.heightMm; const r = definition.diameterMm / 2; const components = [];
     const cylinder = (id, role, radius, low, high) => Revolve (id, role, [[0, low], [radius, low], [radius, high], [0, high]], segments);
     if (definition.family === 'bottle') {

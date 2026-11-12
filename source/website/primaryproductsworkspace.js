@@ -46,7 +46,7 @@ export class PrimaryProductsWorkspace
                     if (previousMesh?.TriangleCount () && mesh.TriangleCount ()) { model.materials[mesh.GetTriangle (0).mat] = CloneSurface (previousModel.materials[previousMesh.GetTriangle (0).mat]); }
                 }
             }
-            object = target.AddImported (model, source?.name || module.PrimaryFamilies[definition.draft.family].name);
+            object = target.AddImported (model, source?.name || module.ProductName (definition.draft));
             if (source) {
                 for (const key of ['id', 'name', 'source', 'visible', 'castShadow', 'receiveShadow']) { object[key] = source[key]; }
                 for (const key of ['position', 'rotation', 'scale']) { object[key] = [...source[key]]; }

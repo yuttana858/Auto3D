@@ -217,6 +217,19 @@ try {
     for (const end = Date.now () + 120000; (await calloutsFor (rectangular.objectId)).find (d => d.axis === 'length').lengthMm !== 55; await page.waitForTimeout (100)) { assert.ok (Date.now () < end, 'depth did not update live'); }
     await call ('primary.selected.load'); assert.deepEqual ((await call ('primary.inspect')).bottleSection, { shape : 'rectangle', depthMm : 55, cornerRadiusMm : 6 }); assert.equal ((await call ('primary.inspect')).diameterMm, 80);
     const ovalDesign = await call ('primary.designs.generate', { id : 'oval-shampoo' }); assert.equal ((await calloutsFor (ovalDesign.objectId)).find (d => d.axis === 'length').lengthMm, 42);
+    /* Stand-up pouches: a catalog card in Pouches generates a gusseted pouch; the style select and gusset field drive the draft. */
+    const standup = await call ('primary.designs.generate', { id : 'standup-snack' }); assert.equal ((await calloutsFor (standup.objectId)).find (d => d.axis === 'length').lengthMm, 80);
+    assert.ok ((await call ('scene.inspect')).objects.some (o => o.id === standup.objectId && o.name === 'Stand-up pouch'));
+    await call ('primary.selected.load'); assert.deepEqual ((await call ('primary.inspect')).pouchShape, { style : 'standup', gussetMm : 40 });
+    assert.equal (await panel.getByRole ('combobox', { name : 'Pouch construction', exact : true }).inputValue (), 'standup');
+    const gusset = panel.getByRole ('spinbutton', { name : 'Gusset height', exact : true }); assert.equal (await gusset.inputValue (), '40'); await gusset.fill ('30'); await gusset.press ('Tab');
+    assert.equal ((await call ('primary.inspect')).pouchShape.gussetMm, 30);
+    const pouchLength = panel.getByRole ('spinbutton', { name : 'Product length', exact : true }); await pouchLength.fill ('24'); await pouchLength.press ('Enter');
+    for (const end = Date.now () + 120000; (await calloutsFor (standup.objectId)).find (d => d.axis === 'length').lengthMm !== 24; await page.waitForTimeout (100)) { assert.ok (Date.now () < end, 'pouch depth did not update live'); }
+    await call ('primary.selected.load'); assert.deepEqual ((await call ('primary.inspect')).pouchShape, { style : 'standup', gussetMm : 24 }); /* the gusset is clamped to the new depth */
+    const badGusset = await page.evaluate (() => Auto3D.execute ('primary.configure', { pouchShape : { style : 'standup', gussetMm : 500 } })); assert.equal (badGusset.ok, false);
+    await panel.getByRole ('combobox', { name : 'Pouch construction', exact : true }).selectOption ('pillow'); assert.equal ((await call ('primary.inspect')).pouchShape, undefined);
+    await call ('view.focus', { objectId : standup.objectId }); await page.waitForTimeout (800); await page.screenshot ({ path : 'work/primary-products-review/standup-pouch.png' });
     await call ('view.focus', { objectId : rectangular.objectId }); await page.waitForTimeout (800); await page.screenshot ({ path : 'work/primary-products-review/rectangular-bottle.png' });
     await call ('primary.designs.open', { category : 'beverages', open : true }); await drawer.waitFor ({ state : 'visible' });
     await page.screenshot ({ path : 'work/primary-products-review/design-drawer-wide.png' });

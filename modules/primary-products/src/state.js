@@ -1,7 +1,7 @@
 import { ProductMaterials } from './materials.js';
-export const PrimaryProductsVersion = '0.10.0';
+export const PrimaryProductsVersion = '0.11.0';
 export const PrimaryFamilies = Object.freeze ({ clamshell : { name : 'Closed clamshell', material : 'pp', heightMm : 60, widthMm : 180, depthMm : 130, color : '#eee9dd', roughness : .35, labelZone : 'front' }, bottle : { name : 'Round bottle', material : 'plastic', heightMm : 190, diameterMm : 65, color : '#e8eceb', roughness : 0.45, labelZone : 'front' }, can : { name : 'Standard can', material : 'aluminum', heightMm : 122, diameterMm : 66, color : '#c9d2d4', roughness : 0.3, labelZone : 'wrap' }, pouch : { name : 'Pillow pouch', material : 'plastic', heightMm : 200, widthMm : 140, depthMm : 40, color : '#e8eceb', roughness : 0.5, labelZone : 'front' } });
-const fields = ['family', 'heightMm', 'diameterMm', 'widthMm', 'depthMm', 'material', 'color', 'roughness', 'labelZone', 'bottleShape', 'bottleSection'];
+const fields = ['family', 'heightMm', 'diameterMm', 'widthMm', 'depthMm', 'material', 'color', 'roughness', 'labelZone', 'bottleShape', 'bottleSection', 'pouchShape'];
 export function DefaultProductDraft (family = 'bottle')
 {
     if (!Object.hasOwn (PrimaryFamilies, family)) { throw new Error ('Choose bottles, cans, pouches or clamshells.'); }
@@ -25,6 +25,11 @@ export function UpdateProductDraft (current, changes)
         next.bottleSection = ValidateBottleSection (next, next.bottleSection);
         if (next.bottleSection === null) { delete next.bottleSection; }
     }
+    if (next.pouchShape !== undefined) {
+        if (next.family !== 'pouch') { throw new Error ('Pouch style controls apply only to pouches.'); }
+        next.pouchShape = ValidatePouchShape (next, next.pouchShape, changes.pouchShape !== undefined);
+        if (next.pouchShape === null) { delete next.pouchShape; }
+    }
     if (next.bottleShape !== undefined) {
         if (next.family !== 'bottle') { throw new Error ('Bottle shape controls apply only to bottles.'); }
         next.bottleShape = ValidateBottleShape (next, next.bottleShape);
@@ -32,6 +37,20 @@ export function UpdateProductDraft (current, changes)
     return { ...next, color : next.color.toLowerCase () };
 }
 
+// Stand-up pouches open into a bottom gusset: the fold height on the front panel. Filled depth (L) is the opened
+// gusset depth. Gusset height is limited by depth and by 35% of the height so the panel keeps a label area.
+export function PouchGussetLimit (draft) { return Math.min (draft.depthMm, draft.heightMm * .35); }
+function ValidatePouchShape (draft, input, explicit)
+{
+    if (input === null || input?.style === 'pillow') { return null; }
+    if (!input || typeof input !== 'object' || Array.isArray (input) || input.style !== 'standup' || Object.keys (input).some (key => !['style', 'gussetMm'].includes (key))) { throw new Error ('Choose a pillow or stand-up pouch.'); }
+    if (draft.depthMm < 10) { throw new Error ('Stand-up pouches need a filled depth of at least 10 mm.'); }
+    const limit = PouchGussetLimit (draft); let gusset = input.gussetMm ?? Math.round (Math.min (draft.depthMm * .5, limit) * 100) / 100;
+    // Resizing an existing stand-up pouch keeps the gusset within the new limits instead of rejecting the resize.
+    if (!explicit && Number.isFinite (gusset)) { gusset = Math.min (gusset, limit); }
+    if (!Number.isFinite (gusset) || gusset < 3 || gusset > limit) { throw new Error ('Gusset height must be 3 mm to the filled depth, and at most 35% of the height.'); }
+    return { style : 'standup', gussetMm : gusset };
+}
 // The narrower side of the body governs the default neck and the neck fit for oval and rectangular bottles.
 export function BodyMinimum (draft) { return Math.min (draft.diameterMm, draft.bottleSection?.depthMm ?? draft.diameterMm); }
 // Oval and rounded-rectangle bottles keep diameterMm as the body width (W) and add the front-to-back depth (L).
@@ -61,6 +80,13 @@ function ValidateBottleShape (draft, input)
     return { ...input };
 }
 
+// Display name for a generated object: the family name, refined by bottle section or pouch construction.
+export function ProductName (draft)
+{
+    if (draft.pouchShape?.style === 'standup') { return 'Stand-up pouch'; }
+    if (draft.bottleSection) { return { oval : 'Oval bottle', rectangle : 'Rounded-rectangle bottle' }[draft.bottleSection.shape]; }
+    return PrimaryFamilies[draft.family].name;
+}
 // Overall size as W × L × H: round products use their diameter for both width and length; pouches and clamshells use
 // width and front-to-back depth.
 export function ProductSize (draft)

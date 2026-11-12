@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Stand-up pouches — Auto3D 0.60.0 / Primary Products 0.11.0 / Packaging 1.10.7 (2026-11-12)
+
+Pouches gain a **Pouch style** of Pillow or Stand-up. A stand-up pouch opens into a flat elliptical bottom gusset as deep as the filled depth (L), so it stands, and tapers to the top seal. Five stand-up designs are in the **Pouches** drawer. Generated products are named by their construction. `primary.configure` accepts `pouchShape { style, gussetMm }`. See [release-0600.md](release-0600.md).
+
 ## Full access on the consent page — Auto3D 0.59.1 / Primary Products 0.10.0 / Packaging 1.10.7 (2026-11-11)
 
 The OAuth consent page now offers **Full access** (`auto3d.write`) and **Screenshots** (`auto3d.capture`), both ticked by default whatever the client requested, so a client asking only for `auto3d.read` can still be granted every tool. Unticking narrows the grant. Existing read-only grants must be revoked and reconnected. See [release-0591.md](release-0591.md).
