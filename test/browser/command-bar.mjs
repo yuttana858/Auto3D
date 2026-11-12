@@ -36,13 +36,51 @@ try {
     assert.equal (await bar.isVisible (), false); assert.equal (await toggle.getAttribute ('aria-pressed'), 'false');
     assert.deepEqual ((await run ({})).result, { visible : true }); assert.equal (await bar.isVisible (), true);
 
+    // The command bar is a message channel: non-command text and @agent text go to agents, replies show above the box.
+    const input = page.getByRole ('textbox', { name : 'Command or macro' }), status = page.locator ('.scene_status');
+    const inspect = (args = {}) => page.evaluate ((value) => window.Auto3D.execute ('ui.command_bar.inspect', value), args);
+    const start = (await inspect ()).result.lastId;
+    // Without a connected agent, unknown text stays a command error so typos are visible.
+    await input.fill ('please make the box 400 wide'); await input.press ('Enter');
+    await page.waitForFunction (() => document.querySelector ('.scene_status').textContent.startsWith ('Unknown command'));
+    await input.fill ('@agent what is selected?'); await input.press ('Enter');
+    await page.waitForFunction (() => document.querySelector ('.scene_status').textContent.startsWith ('No agent connected'));
+    await input.fill ('fit'); await input.press ('Enter'); await page.waitForFunction (() => document.querySelector ('.scene_status').textContent.startsWith ('Completed'));
+    const read = (await inspect ({ after : start })).result; assert.equal (read.agentConnected, false);
+    const messages = read.entries.filter (entry => entry.kind === 'message');
+    assert.deepEqual (messages.map (entry => [entry.from, entry.text]), [['user', 'what is selected?']]);
+    assert.ok (read.entries.some (entry => entry.kind === 'command' && entry.text === 'please make the box 400 wide' && entry.ok === false));
+    assert.ok (read.entries.some (entry => entry.kind === 'command' && entry.text === 'fit' && entry.ok === true));
+    assert.ok (read.entries.some (entry => entry.kind === 'status' && entry.from === 'app' && entry.text.startsWith ('Completed')));
+    assert.ok (!read.entries.some (entry => entry.kind === 'status' && entry.text.startsWith ('No agent connected')), 'messages the bar shows itself are not logged as app status');
+    assert.equal ((await inspect ({ after : read.lastId })).result.entries.length, 0);
+    await run ({ visible : false });
+    const reply = await page.evaluate ((id) => window.Auto3D.execute ('ui.command_bar.respond', { message : 'Nothing is selected yet.', replyTo : id }), messages[0].id);
+    assert.equal (reply.ok, true, JSON.stringify (reply)); assert.equal (await bar.isVisible (), true);
+    assert.equal (await status.textContent (), 'Agent: Nothing is selected yet.'); assert.equal (await status.getAttribute ('data-tone'), 'agent');
+    const after = (await inspect ({ after : read.lastId })).result.entries; assert.deepEqual (after.map (entry => [entry.from, entry.kind, entry.replyTo]), [['agent', 'response', messages[0].id]]);
+    assert.equal ((await page.evaluate (() => window.Auto3D.execute ('ui.command_bar.respond', { message : 'x', replyTo : 999999 }))).ok, false);
+    assert.equal ((await page.evaluate (() => window.Auto3D.execute ('ui.command_bar.respond', { message : '' }))).ok, false);
+    assert.equal (await status.textContent (), 'Agent: Nothing is selected yet.');
+    // A later app status replaces the agent styling.
+    await input.fill ('fit'); await input.press ('Enter'); await page.waitForFunction (() => document.querySelector ('.scene_status').textContent.startsWith ('Completed'));
+    assert.equal (await status.getAttribute ('data-tone'), null);
+    // selection.clear deselects, the same as clicking empty space.
+    const cleared = await page.evaluate (() => window.Auto3D.execute ('selection.clear', {})); assert.deepEqual (cleared.result, { selectedObjectIds : [] });
+    assert.equal ((await page.evaluate (() => window.Auto3D.execute ('scene.inspect', {}))).result.selectedObjectId, null);
+
     // MCP connections lists only usable registrations and names the connect action Live Control.
     assert.equal ((await page.evaluate (() => window.Auto3D.execute ('agent.access.open', {}))).ok, true);
     const dialog = page.getByRole ('dialog', { name : 'MCP connections', exact : true }); await dialog.getByText ('Active agent · Active', { exact : false }).waitFor ();
     assert.equal (await dialog.getByText ('Revoked agent').count (), 0); assert.equal (await dialog.getByText ('Expired agent').count (), 0);
-    assert.equal (await dialog.getByRole ('button', { name : 'Live Control', exact : true }).count (), 1); assert.equal (await dialog.getByRole ('button', { name : 'Connect this window' }).count (), 0);
+    assert.equal (await dialog.getByRole ('button', { name : 'Live Control', exact : true }).count (), 1);
+    // The screenshot checkbox shows and changes the live setting without reconnecting.
+    const screenshots = dialog.getByRole ('checkbox', { name : 'Allow screenshots from this window' }); assert.equal (await screenshots.isChecked (), false);
+    await screenshots.check (); assert.equal ((await page.evaluate (() => window.Auto3D.execute ('agent.access.inspect', {}))).result.screenshots, true); assert.equal (await dialog.getByRole ('button', { name : 'Connect this window' }).count (), 0);
     registrations.splice (2, 1); await dialog.getByRole ('button', { name : 'Close MCP connections' }).click ();
-    await page.evaluate (() => window.Auto3D.execute ('agent.access.open', {})); await page.getByRole ('dialog', { name : 'MCP connections', exact : true }).getByText ('No active connections.', { exact : true }).waitFor ();
+    await page.waitForFunction (() => !document.querySelector ('dialog[aria-label="MCP connections"]')); /* closing dialogs fade out before removal */
+    await page.evaluate (() => window.Auto3D.execute ('agent.access.open', {})); const reopened = page.getByRole ('dialog', { name : 'MCP connections', exact : true }); await reopened.getByText ('No active connections.', { exact : true }).waitFor ();
+    assert.equal (await reopened.getByRole ('checkbox', { name : 'Allow screenshots from this window' }).isChecked (), true);
 
-    assert.deepEqual (errors, []); console.log ('Command bar close/reopen, ui.command_bar and MCP active-connection list passed.');
+    assert.deepEqual (errors, []); console.log ('Command bar close/reopen, agent messages and replies, selection.clear, ui.command_bar, live screenshot setting and MCP active-connection list passed.');
 } finally { await browser.close (); }

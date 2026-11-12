@@ -2366,6 +2366,20 @@
       }
     },
     {
+      "id": "selection.clear",
+      "title": "Clear selection",
+      "category": "Objects",
+      "description": "Deselect every object, the same as clicking empty space in the viewer. Does not change the scene.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
       "id": "object.tool",
       "title": "Activate model tool",
       "category": "Objects",
@@ -6491,6 +6505,64 @@
       },
       "example": {
         "visible": true
+      }
+    },
+    {
+      "id": "ui.command_bar.inspect",
+      "title": "Read the command bar",
+      "category": "Commands",
+      "description": "Read the status line above the command box and the command bar log: user messages for agents (text that is not a command, or starts with @agent), typed commands with success, app status changes and agent replies. Pass after = the last id you read to get only newer entries. The draft the user is still typing is not included.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "after": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "after": 0,
+        "limit": 20
+      }
+    },
+    {
+      "id": "ui.command_bar.respond",
+      "title": "Reply in the command bar",
+      "category": "Commands",
+      "description": "Show an agent reply in the status line above the command box (reopening the bar if hidden) and add it to the command bar log. Optional replyTo is the id of the user entry being answered. Does not run commands or change the scene.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "replyTo": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "message": "Done. The box is now 400 mm wide.",
+        "replyTo": 1
       }
     },
     {
