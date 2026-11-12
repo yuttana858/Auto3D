@@ -87,3 +87,20 @@ describe ('Shared organization Meshy key', () => {
         const catalog = registry.Catalog ().filter (item => item.id.startsWith ('ai.shared_connection')); assert.deepEqual (catalog.map (item => item.mutates), [false, true]); assert.ok (catalog.every (item => !Object.keys (item.inputSchema.properties).length));
     });
 });
+
+describe ('Meshy upstream calls on the Cloudflare Workers runtime', () => {
+    let original; beforeEach (() => { original = globalThis.fetch; }); afterEach (() => { globalThis.fetch = original; });
+    // Workers throw for redirect: 'error' ("use 'manual'"); production failed every Meshy call before 0.65.2.
+    const WorkersFetch = respond => async (url, init = {}) => { if (!['follow', 'manual', undefined].includes (init.redirect)) { throw new TypeError ('Invalid redirect value, must be one of "follow" or "manual"'); } return respond (String (url), init); };
+    const env = () => ({ MESHY_API_KEY : sharedKey, AUTO3D_AI_ALLOW_SHARED_KEY : 'true', AUTO3D_AI_CREDENTIALS_R2 : { async get () { return null; }, async put () { return {}; } } });
+    const call = (path, method = 'GET', body) => proxy ({ env : env (), data : { user : { id : userId } }, params : { path }, request : new Request ('https://auto3d.test/api/ai/' + path.join ('/'), { method, ...(body ? { body } : {}) }) });
+    it ('reaches Meshy for balance, submission and polling with a Workers-compatible fetch', async () => {
+        globalThis.fetch = WorkersFetch ((url, init) => Response.json (url.endsWith ('/balance') ? { balance : 7 } : init.method === 'POST' ? { result : 'task-1' } : []));
+        const balance = await call (['balance']); assert.equal (balance.status, 200); assert.deepEqual (await balance.json (), { balance : 7 });
+        const submitted = await call (['text-to-3d'], 'POST', JSON.stringify ({ mode : 'preview', prompt : 'mug' })); assert.equal (submitted.status, 200); assert.deepEqual (await submitted.json (), { result : 'task-1' });
+    });
+    it ('refuses a Meshy redirect instead of following it with the key', async () => {
+        const seen = []; globalThis.fetch = WorkersFetch (url => { seen.push (url); return new Response (null, { status : 302, headers : { Location : 'https://elsewhere.test/' } }); });
+        const response = await call (['balance']); assert.equal (response.status, 502); assert.equal ((await response.json ()).code, 'MESHY_REQUEST_FAILED'); assert.deepEqual (seen, ['https://api.meshy.ai/openapi/v1/balance']);
+    });
+});

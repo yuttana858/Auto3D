@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Meshy calls work on Cloudflare — Auto3D 0.65.2 / Primary Products 0.14.0 / Packaging 1.10.7 (2026-11-12)
+
+Fixes the long-standing production Meshy failure. Cloudflare Workers reject `fetch(..., { redirect: 'error' })`, so every proxied Meshy call and key test threw before reaching Meshy. That surfaced as "Could not reach Meshy" and "Submission response was lost". Calls now use `redirect: 'manual'` and refuse redirects. Reproduced and verified in `workerd`. See [release-0652.md](release-0652.md).
+
 ## Agent messages in the command bar — Auto3D 0.65.1 / Primary Products 0.14.0 / Packaging 1.10.7 (2026-11-12)
 
 Command bar text for agents (`@agent …`, or any non-command text while Live Control is connected) is logged for `ui.command_bar.inspect`, and agents reply in the status line above the box with `ui.command_bar.respond`. Adds `selection.clear`, and the Agent access screenshot checkbox now applies immediately and shows the current setting. See [release-0651.md](release-0651.md).
