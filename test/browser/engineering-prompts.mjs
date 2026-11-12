@@ -128,20 +128,21 @@ try {
             await execute ('landing.demo.stage', { stage });
             const framing = (await inspect ()).framing;
             assert.ok (framing.visiblePoints > 0);
-            assert.equal (framing.mode, 'motor-scale');
+            assert.equal (framing.mode, 'staged-pullback');
             assert.ok (framing.referenceExtent.every (value => value <= framing.fill + 1e-6), 'The original motor fills the rendering window');
             assert.ok (framing.referenceScreenCenter.every (value => Math.abs (value) < 0.002), 'Framing stays centered on the original motor');
+            assert.ok (framing.motorScreenCenter.every (value => Math.abs (value) < 0.002), 'The motor stays centered in every shot');
             frames.push (framing);
         }
-        assert.ok (frames.every (frame => frame.distance === frames[0].distance), 'The motor never shrinks as packaging appears');
-        assert.ok (frames.every (frame => JSON.stringify (frame.target) === JSON.stringify (frames[0].target)), 'Stage selection cannot move the camera');
+        assert.deepEqual (frames.map (frame => frame.viewScale), [1, 0.5, 0.35, 0.35]);
+        assert.ok (frames[0].distance < frames[1].distance && frames[1].distance < frames[2].distance, 'Pull back for pulp, then again for the box');
+        assert.equal (frames[2].distance, frames[3].distance, 'Hold the box view through the final cutaway');
         assert.ok (frames[0].extent.every (value => value <= 0.941), 'The first motor remains fully framed');
-        assert.ok (frames.slice (1).some (frame => frame.extent.some (value => value > 1)), 'Packaging may crop outside the hero window');
         assert.deepEqual (await page.evaluate (() => demoMediaCalls), []);
         assert.deepEqual (apiCalls.filter (path => !['/api/environments', '/api/auth/session'].includes (path)), []);
         assert.equal (await page.locator ('#auth_gate').evaluate (e => e.scrollWidth > e.clientWidth), false);
         assert.equal (await page.locator ('#main').evaluate (e => e.inert), true);
         assert.deepEqual (errors, []); await page.close ();
-        console.log ('Card entrance, logo/greeting, glass docking, fixed motor scale, typing/STT, pause and zero media access passed at ' + width + 'px');
+        console.log ('Card entrance, logo/greeting, glass docking, staged camera pullbacks, typing/STT, pause and zero media access passed at ' + width + 'px');
     }
 } finally { await browser.close (); }

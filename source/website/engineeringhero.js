@@ -106,7 +106,7 @@ export function CreateEngineeringHero (canvas, { onState = () => {} } = {})
     const smooth = (t, a, b) => { const v = THREE.MathUtils.clamp ((t - a) / (b - a), 0, 1); return v * v * (3 - 2 * v); };
     const reduced = window.matchMedia ('(prefers-reduced-motion: reduce)');
     let seconds = reduced.matches ? EngineeringSequenceDuration - 1 : 0, playing = !reduced.matches, active = true, disposed = false, previous, stage = -1, viewportWidth = 1, heightPx = 1, stamp = -1;
-    // Preserve the opening motor's framing even when starting directly on a later stage.
+    // Keep the opening motor as the reference for all three camera shots.
     const motorTime = EngineeringStages[0].time;
     function placeAssembly (t) { assembly.rotation.y = 0.15 + Math.sin (t * 0.22) * 0.16; assembly.position.y = Math.sin (t * 0.45) * 0.07; }
     placeAssembly (motorTime); assembly.updateMatrixWorld (true);
@@ -116,6 +116,7 @@ export function CreateEngineeringHero (canvas, { onState = () => {} } = {})
     const inspect = () => { const sequence = EngineeringSequenceState (seconds); return { available : true, playing, active : active && !document.hidden, stage : sequence.stage, time : Math.round (sequence.sceneTime * 10) / 10, sequence, framing }; };
     function pose () {
         const sequence = EngineeringSequenceState (seconds), t = sequence.sceneTime;
+        cameraView.update (t);
         assembly.visible = sequence.sceneVisible; shadow.visible = sequence.sceneVisible; grid.visible = sequence.sceneVisible;
         productLines.forEach ((line, index) => { const count = line.geometry.getAttribute ('position').count; const drawn = smooth (t, 0.1 + index * 0.018, 1.3 + index * 0.018); line.geometry.setDrawRange (0, Math.floor (count * drawn / 2) * 2); });
         const opening = smooth (t, 0.2, 3.4);
