@@ -63,26 +63,34 @@ describe ('Engineering presentation camera and card entrance', function () {
         }
         clean (motor);
     });
-    it ('holds the chosen box view while real pulp and carton geometry continues folding', function () {
+    it ('pushes inward through the fold and fills the frame with the centered closed carton', function () {
         const root = new THREE.Group (), material = new THREE.MeshBasicMaterial ();
         const motor = block (root, [2.2, 1.65, 1.65], material, [0, 0.28, 0]);
         const motorPoints = CollectEngineeringFitPoints (motor);
         const pulp = [-1, 1].map (side => mesh (root, CreatePresentationPulpSide (side), material));
         const pack = CreateEngineeringPack ({ block, mesh, surface : material, edge : material }); root.add (pack.group);
+        PoseEngineeringPack (pack, 16.4); const closedPoints = CollectEngineeringFitPoints (pack.group);
         for (const aspect of [0.7, 1.3, 2.7]) {
             const view = camera (aspect), framing = CreateEngineeringCamera (view, motorPoints, new THREE.Vector3 (0, 0.15, 0.25));
-            framing.update (16.4); const boxed = framing.inspect (); let cropped = false;
-            for (let t = 3.8; t <= 20; t += 0.2) {
+            framing.update (8.6, closedPoints); const wide = framing.inspect (); let previous = wide.distance;
+            for (let t = 8.6; t <= 16.4; t += 0.1) {
                 for (const item of pulp) { item.morphTargetInfluences[0] = 1 - THREE.MathUtils.clamp ((t - 4.4) / 2.5, 0, 1); }
                 pack.group.visible = t > 7.2; PoseEngineeringPack (pack, t);
-                framing.update (t); const matrix = view.matrixWorld.elements.slice (), projection = view.projectionMatrix.elements.slice ();
+                framing.update (t, closedPoints); const matrix = view.matrixWorld.elements.slice (), projection = view.projectionMatrix.elements.slice ();
                 const frame = framing.inspect (CollectEngineeringFitPoints (root));
-                if (t >= 8.6) { assert.equal (frame.distance, boxed.distance); assert.deepEqual (frame.target, boxed.target); }
+                assert.ok (frame.distance <= previous + 1e-8 && previous - frame.distance < 0.4, 'zoom inward smoothly while panels fold'); previous = frame.distance;
                 assert.deepEqual (view.matrixWorld.elements, matrix); assert.deepEqual (view.projectionMatrix.elements, projection);
-                cropped ||= frame.extent.some (value => value > 1);
             }
-            assert.equal (cropped, true, 'large unfolded panels may still crop without triggering another camera move');
-            framing.resize (); assert.equal (framing.inspect ().distance, boxed.distance, 'resizing during packaging preserves its chosen shot');
+            framing.update (16.4, closedPoints); const boxed = framing.inspect (closedPoints), screen = new THREE.Box3 ();
+            assert.equal (boxed.mode, 'fold-fit'); assert.equal (boxed.foldProgress, 1); assert.ok (boxed.distance < wide.distance * 0.85);
+            for (let i = 0; i < closedPoints.length; i += 3) { screen.expandByPoint (new THREE.Vector3 (closedPoints[i], closedPoints[i + 1], closedPoints[i + 2]).project (view)); }
+            const center = screen.getCenter (new THREE.Vector3 ()), size = screen.getSize (new THREE.Vector3 ());
+            assert.ok (Math.abs (center.x) < 0.002 && Math.abs (center.y) < 0.002);
+            assert.ok (Math.abs (Math.max (size.x, size.y) - 1.92) < 0.002, 'closed carton fills 96% of the limiting viewport dimension');
+            const paused = view.matrixWorld.elements.slice (); framing.update (16.4, closedPoints); assert.deepEqual (view.matrixWorld.elements, paused);
+            framing.resize (); assert.equal (framing.inspect ().distance, boxed.distance, 'resize preserves the closed-box fit');
+            framing.update (0); assert.equal (framing.inspect ().viewScale, 1); assert.equal (framing.inspect ().foldProgress, 0);
+            framing.update (16.4, closedPoints); assert.equal (framing.inspect ().distance, boxed.distance, 'direct stage jumps reproduce the finished view');
         }
         clean (root);
     });

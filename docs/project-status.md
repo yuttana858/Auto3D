@@ -1,8 +1,12 @@
 # Auto3D development log and handoff
 
-## Meshy calls work on Cloudflare — Auto3D 0.65.2 / Primary Products 0.14.0 / Packaging 1.10.7 (2026-11-12)
+## Meshy calls work on Cloudflare — Auto3D 0.65.3 / Primary Products 0.14.0 / Packaging 1.10.7 (2026-11-12)
 
-Fixes the long-standing production Meshy failure. Cloudflare Workers reject `fetch(..., { redirect: 'error' })`, so every proxied Meshy call and key test threw before reaching Meshy. That surfaced as "Could not reach Meshy" and "Submission response was lost". Calls now use `redirect: 'manual'` and refuse redirects. Reproduced and verified in `workerd`. See [release-0652.md](release-0652.md).
+Fixes the long-standing production Meshy failure. Cloudflare Workers reject `fetch(..., { redirect: 'error' })`, so every proxied Meshy call and key test threw before reaching Meshy. That surfaced as "Could not reach Meshy" and "Submission response was lost". Calls now use `redirect: 'manual'` and refuse redirects. Reproduced and verified in `workerd`. See [release-0653.md](release-0653.md).
+
+## Folding box closeup — Auto3D 0.65.2 / Packaging 1.10.7 / Primary Products 0.14.0
+
+Keeps the close motor, half-size pulp and 35% dieline shots, then eases inward during folding to a centered closed pack filling 96% of the window. The finished fit follows the pack's gentle rotation through cutaway. Open flaps may crop without triggering another pullback. See [release-0652.md](release-0652.md).
 
 ## Agent messages in the command bar — Auto3D 0.65.1 / Primary Products 0.14.0 / Packaging 1.10.7 (2026-11-12)
 

@@ -1,24 +1,7 @@
-# Auto3D 0.65.2 — Meshy calls work on Cloudflare
+# Auto3D 0.65.2 / Packaging 1.10.7 / Primary Products 0.14.0
 
-Primary Products remains 0.14.0; Packaging remains 1.10.7. Based on main after 0.65.1.
+The landing camera now zooms inward as the carton folds, finishing with the closed box centered at 96% of the animation window's limiting dimension. The motor opening, 50% pulp shot and 35% carton-reveal shot remain intact.
 
-## Fix
+The push-in runs from scene time 8.6 to 15.6, covering the panel and lid folds. A captured closed-pack silhouette defines the destination; open flaps may crop without causing an extra pullback. The reference follows the assembly's gentle rotation and float so the finished box and cutaway stay centered and fill the frame. The shared timeline preserves pause, replay, stage jumps, reduced motion and resize behavior.
 
-Every Meshy request from production failed before it left the server. The AI proxy (`functions/api/ai/[[path]].js`) and the key test (`functions/api/ai/credential-test.js`) called `fetch` with `redirect: 'error'`. Cloudflare Workers do not support that value and throw: *"Invalid redirect value, must be one of "follow" or "manual" ("error" won't be implemented since it does not make sense at the edge; use "manual" and check the response status code)"*. The catch-all handlers turned that into:
-
-- "Could not reach Meshy. Try again shortly." for Test saved connection and the balance;
-- "Submission response was lost. Check recent creations before retrying; Meshy may have accepted the task." for every generation. No task reached Meshy, so nothing was charged.
-
-This was the long-standing undiagnosed production Meshy failure. It affected personal keys, the shared organization key and the deployment key alike. Node accepts `redirect: 'error'`, so unit tests and local runs passed.
-
-Both calls now use `redirect: 'manual'` and refuse any 3xx or opaque-redirect response with `MESHY_REQUEST_FAILED`, so the key is still never forwarded to another host.
-
-## Validation
-
-- Reproduced in `workerd` (Cloudflare's runtime) through `wrangler dev`. With the old code, the proxy returned 502 for the balance and for text-to-3D submissions, and the key test returned 503. With the fix, all three return 200. The harness used workerd's own `Request` validation, with a local responder in place of Meshy.
-- New regression tests use a Workers-like `fetch` that rejects `redirect: 'error'`; they fail on the old code. They also check that a Meshy redirect is refused and not followed.
-- The two credential tests that asserted `redirect: 'error'` now assert `'manual'`.
-
-## After deploy
-
-Use Preferences → AI connections → **Test saved connection**. A personal key saved on an account takes priority over the shared organization key. Remove the personal key to use the shared one.
+Tests check the existing pullbacks, smooth inward motion, independent projected bounds for the completed carton, centered 96% fit, pause/reset/resize behavior and real folded geometry. Desktop/mobile presentation checks cover the completed pack and cutaway alongside the existing entrance and prompts. Account flows and manufacturing modules are unchanged.

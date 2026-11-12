@@ -95,42 +95,53 @@ export function FitEngineeringCamera (camera, points, target, fill = 0.94)
     return apply (camera, points, target, distanceFor (camera, points, target, fill), fill);
 }
 
-// Three deliberate shots, all framed from the original motor. Incoming packaging
-// never drives automatic fitting; the presentation clock controls both pullbacks.
+// Keep the approved motor/pulp/dieline shots, then push toward the centered closed
+// box while its panels fold. Open flaps never cause an additional pullback.
 export function CreateEngineeringCamera (camera, motorPoints, anchor, fill = 0.94)
 {
-    const target = new THREE.Vector3 (), scales = [1, 0.5, 0.35]; let distance, reference, shots, sceneTime = 0, viewScale = 1;
-    function shot (scale) {
-        const aim = anchor.clone (), tan = tangents (camera), shotFill = fill * scale;
-        let depth = distanceFor (camera, motorPoints, aim, shotFill);
+    const target = new THREE.Vector3 (), scales = [1, 0.5, 0.35];
+    let distance, reference, shots, sceneTime = 0, viewScale = 1, foldProgress = 0, closedBoxPoints = null;
+    function shot (points, shotFill) {
+        const aim = anchor.clone (), tan = tangents (camera);
+        let depth = distanceFor (camera, points, aim, shotFill);
         for (let i = 0; i < 5; i++) {
-            const bounds = boundsFor (camera, motorPoints, aim, depth);
+            const bounds = boundsFor (camera, points, aim, depth);
             aim.addScaledVector (right, bounds.center[0] * depth * tan.x).addScaledVector (up, bounds.center[1] * depth * tan.y);
-            depth = distanceFor (camera, motorPoints, aim, shotFill);
+            depth = distanceFor (camera, points, aim, shotFill);
         }
         for (let i = 0; i < 5; i++) {
-            const bounds = boundsFor (camera, motorPoints, aim, depth);
+            const bounds = boundsFor (camera, points, aim, depth);
             aim.addScaledVector (right, bounds.center[0] * depth * tan.x).addScaledVector (up, bounds.center[1] * depth * tan.y);
         }
         return { target : aim, distance : depth };
     }
-    function update (time) {
+    function update (time, boxPoints = null) {
         sceneTime = time;
+        if (boxPoints?.length) { closedBoxPoints = boxPoints; }
         const box = time >= 7.2, from = box ? 1 : 0, start = box ? 7.2 : 3.8;
         const t = THREE.MathUtils.clamp ((time - start) / 1.4, 0, 1), progress = t * t * (3 - 2 * t);
         target.lerpVectors (shots[from].target, shots[from + 1].target, progress);
         distance = THREE.MathUtils.lerp (shots[from].distance, shots[from + 1].distance, progress);
         viewScale = THREE.MathUtils.lerp (scales[from], scales[from + 1], progress);
+        const closing = THREE.MathUtils.clamp ((time - 8.6) / 7, 0, 1);
+        foldProgress = closedBoxPoints ? closing * closing * (3 - 2 * closing) : 0;
+        if (foldProgress > 0) {
+            const closeup = shot (closedBoxPoints, 0.96);
+            target.lerpVectors (shots[2].target, closeup.target, foldProgress);
+            distance = THREE.MathUtils.lerp (shots[2].distance, closeup.distance, foldProgress);
+            viewScale = null;
+        }
         apply (camera, motorPoints, target, distance, fill);
     }
     function resize () {
-        shots = scales.map (shot);
+        shots = scales.map (scale => shot (motorPoints, fill * scale));
         reference = boundsFor (camera, motorPoints, shots[0].target, shots[0].distance);
         update (sceneTime);
     }
     function inspect (points = motorPoints) {
         const bounds = boundsFor (camera, points, target, distance), motor = boundsFor (camera, motorPoints, target, distance);
-        return { mode : 'staged-pullback', viewScale, distance, desiredDistance : distance, target : target.toArray (), fill, extent : bounds.extent, screenCenter : bounds.center, visiblePoints : points.length / 3, referenceExtent : reference.extent, referenceScreenCenter : reference.center, motorExtent : motor.extent, motorScreenCenter : motor.center };
+        const box = closedBoxPoints ? boundsFor (camera, closedBoxPoints, target, distance) : null;
+        return { mode : foldProgress > 0 ? 'fold-fit' : 'staged-pullback', viewScale, foldProgress, boxFill : 0.96, boxExtent : box?.extent ?? null, boxScreenCenter : box?.center ?? null, wideDistance : shots[2].distance, distance, desiredDistance : distance, target : target.toArray (), fill, extent : bounds.extent, screenCenter : bounds.center, visiblePoints : points.length / 3, referenceExtent : reference.extent, referenceScreenCenter : reference.center, motorExtent : motor.extent, motorScreenCenter : motor.center };
     }
     resize (); return { resize, update, inspect };
 }
