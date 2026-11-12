@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Fixed motor-scale hero — Auto3D 0.64.2 / Packaging 1.10.7 / Primary Products 0.13.0
+
+Holds the landing camera at the completed motor's opening framing for the entire sequence. Pulp and carton geometry may crop outside the window without shrinking or recentering the motor. Stage jumps, replay and reduced motion retain the same view; viewport resizing refits only the original motor. This supersedes the automatic packaging fit from 0.63.1. See [release-0642.md](release-0642.md).
+
 ## Horizontal orbit — Auto3D 0.64.1 / Packaging 1.10.7 / Primary Products 0.13.0
 
 Prevents camera roll during horizontal orbit while preserving selected-object focus, pan and axis constraints. See [release-0641.md](release-0641.md).

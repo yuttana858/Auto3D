@@ -95,46 +95,28 @@ export function FitEngineeringCamera (camera, points, target, fill = 0.94)
     return apply (camera, points, target, distanceFor (camera, points, target, fill), fill);
 }
 
-// Exact critically damped spring integration: continuous position/velocity at any frame rate.
-function spring (value, velocity, goal, delta, frequency)
+// Fit the completed motor once per viewport size. Later geometry may extend beyond
+// the canvas, but must never shrink the motor or move the camera to follow a flap.
+export function CreateEngineeringCamera (camera, motorPoints, anchor, fill = 0.94)
 {
-    const change = value - goal, slope = velocity + frequency * change, decay = Math.exp (-frequency * delta);
-    return [goal + (change + slope * delta) * decay, (velocity - frequency * slope * delta) * decay];
-}
-
-export function CreateEngineeringCamera (camera, fill = 0.94)
-{
-    let distance = null, speed = 0; const target = new THREE.Vector3 ();
-    return {
-        reset () { distance = null; speed = 0; },
-        update (points, anchor, delta = 0) {
-            const goal = anchor.clone (), tan = tangents (camera);
-            let desiredDistance = distanceFor (camera, points, goal, fill);
-            // Center the visible silhouette, rather than the origin of the mechanical model.
-            for (let i = 0; i < 5; i++) {
-                const bounds = boundsFor (camera, points, goal, desiredDistance);
-                goal.addScaledVector (right, bounds.center[0] * desiredDistance * tan.x).addScaledVector (up, bounds.center[1] * desiredDistance * tan.y);
-                desiredDistance = distanceFor (camera, points, goal, fill);
-            }
-            const first = distance === null;
-            if (first) { distance = desiredDistance; }
-            else if (delta > 0) {
-                const previous = distance;
-                [distance, speed] = spring (distance, speed, desiredDistance, delta, 12);
-                // Expanding material already follows an eased reveal. Follow its outline outward
-                // without letting smoothing crop a flap, then ease inward as the structure closes.
-                if (distance < desiredDistance) { distance = desiredDistance; speed = Math.max (0, (distance - previous) / delta); }
-            }
-            if (first || delta > 0) {
-                target.copy (goal);
-                // Center at the displayed distance as well, so zoom easing cannot pull the pack
-                // below the middle of the window while its flat blank grows or folds.
-                for (let i = 0; i < 5; i++) {
-                    const bounds = boundsFor (camera, points, target, distance);
-                    target.addScaledVector (right, bounds.center[0] * distance * tan.x).addScaledVector (up, bounds.center[1] * distance * tan.y);
-                }
-            }
-            return { ...apply (camera, points, target, distance, fill), desiredDistance };
+    const target = new THREE.Vector3 (); let distance, reference;
+    function resize () {
+        target.copy (anchor); const tan = tangents (camera);
+        distance = distanceFor (camera, motorPoints, target, fill);
+        for (let i = 0; i < 5; i++) {
+            const bounds = boundsFor (camera, motorPoints, target, distance);
+            target.addScaledVector (right, bounds.center[0] * distance * tan.x).addScaledVector (up, bounds.center[1] * distance * tan.y);
+            distance = distanceFor (camera, motorPoints, target, fill);
         }
-    };
+        for (let i = 0; i < 5; i++) {
+            const bounds = boundsFor (camera, motorPoints, target, distance);
+            target.addScaledVector (right, bounds.center[0] * distance * tan.x).addScaledVector (up, bounds.center[1] * distance * tan.y);
+        }
+        reference = apply (camera, motorPoints, target, distance, fill);
+    }
+    function inspect (points = motorPoints) {
+        const bounds = boundsFor (camera, points, target, distance);
+        return { mode : 'motor-scale', distance, desiredDistance : distance, target : target.toArray (), fill, extent : bounds.extent, screenCenter : bounds.center, visiblePoints : points.length / 3, referenceExtent : reference.extent, referenceScreenCenter : reference.screenCenter };
+    }
+    resize (); return { resize, inspect };
 }
