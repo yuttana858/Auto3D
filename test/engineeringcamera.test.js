@@ -30,24 +30,40 @@ describe ('Engineering presentation camera and card entrance', function () {
         const formed = CollectEngineeringFitPoints (pulp); pulp.morphTargetInfluences[0] = 1;
         assert.notDeepEqual (CollectEngineeringFitPoints (pulp), formed); clean (pulp);
     });
-    it ('fills the opening view with the centered motor and only refits that reference on resize', function () {
+    it ('frames the motor at full, half and 35% size on portrait and wide viewports', function () {
         const motor = new THREE.Group (), material = new THREE.MeshBasicMaterial ();
         block (motor, [2.2, 1.65, 1.65], material, [0, 0.28, 0]); block (motor, [0.46, 0.46, 0.8], material, [0, 0.28, 1.62]);
         const points = CollectEngineeringFitPoints (motor), view = camera (2.7), framing = CreateEngineeringCamera (view, points, new THREE.Vector3 (0, 0.15, 0.25));
         for (const aspect of [2.7, 0.7, 1.3, 2.7]) {
-            view.aspect = aspect; framing.resize (); const state = framing.inspect ();
-            assert.equal (state.mode, 'motor-scale');
-            assert.ok (Math.abs (Math.max (...state.extent) - 0.94) < 0.002);
-            const screen = new THREE.Box3 ();
-            for (let i = 0; i < points.length; i += 3) { screen.expandByPoint (new THREE.Vector3 (points[i], points[i + 1], points[i + 2]).project (view)); }
-            const center = screen.getCenter (new THREE.Vector3 ()); assert.ok (Math.abs (center.x) < 0.002 && Math.abs (center.y) < 0.002);
-            const before = view.matrixWorld.elements.slice ();
-            framing.inspect (points.map (value => value * 5));
-            assert.deepEqual (view.matrixWorld.elements, before, 'larger surroundings cannot change the motor framing');
+            view.aspect = aspect; framing.resize ();
+            for (const [time, scale] of [[3.5, 1], [7.1, 0.5], [16.4, 0.35]]) {
+                framing.update (time); const state = framing.inspect ();
+                assert.equal (state.mode, 'staged-pullback'); assert.equal (state.viewScale, scale);
+                const screen = new THREE.Box3 ();
+                for (let i = 0; i < points.length; i += 3) { screen.expandByPoint (new THREE.Vector3 (points[i], points[i + 1], points[i + 2]).project (view)); }
+                const center = screen.getCenter (new THREE.Vector3 ()), size = screen.getSize (new THREE.Vector3 ());
+                assert.ok (Math.abs (center.x) < 0.002 && Math.abs (center.y) < 0.002);
+                assert.ok (Math.abs (Math.max (size.x, size.y) - 1.88 * scale) < 0.002, 'actual projected size matches the requested shot');
+                const before = view.matrixWorld.elements.slice ();
+                framing.inspect (points.map (value => value * 5));
+                assert.deepEqual (view.matrixWorld.elements, before, 'larger surroundings cannot change the staged camera');
+                framing.resize (); assert.equal (framing.inspect ().distance, state.distance, 'resize preserves the active shot');
+            }
+        }
+        for (const [start, end] of [[3.8, 5.2], [7.2, 8.6]]) {
+            framing.update (start); let previous = framing.inspect ().distance;
+            for (let t = start; t <= end; t += 1 / 60) {
+                framing.update (t); const current = framing.inspect ().distance;
+                assert.ok (current >= previous && current - previous < 0.2, 'pullback is continuous and monotonic'); previous = current;
+            }
+            framing.update (end); const held = view.matrixWorld.elements.slice ();
+            framing.update (end); assert.deepEqual (view.matrixWorld.elements, held, 'pausing the timeline freezes the camera');
+            framing.update (start); const first = framing.inspect ().distance; framing.update (start + 0.001);
+            assert.ok (framing.inspect ().distance - first < 0.0001, 'ease into each pullback without a velocity jump');
         }
         clean (motor);
     });
-    it ('preserves motor scale and camera aim as the real pulp and carton extend outside the viewport', function () {
+    it ('holds the chosen box view while real pulp and carton geometry continues folding', function () {
         const root = new THREE.Group (), material = new THREE.MeshBasicMaterial ();
         const motor = block (root, [2.2, 1.65, 1.65], material, [0, 0.28, 0]);
         const motorPoints = CollectEngineeringFitPoints (motor);
@@ -55,17 +71,18 @@ describe ('Engineering presentation camera and card entrance', function () {
         const pack = CreateEngineeringPack ({ block, mesh, surface : material, edge : material }); root.add (pack.group);
         for (const aspect of [0.7, 1.3, 2.7]) {
             const view = camera (aspect), framing = CreateEngineeringCamera (view, motorPoints, new THREE.Vector3 (0, 0.15, 0.25));
-            const opening = framing.inspect (), matrix = view.matrixWorld.elements.slice (), projection = view.projectionMatrix.elements.slice (); let cropped = false;
+            framing.update (16.4); const boxed = framing.inspect (); let cropped = false;
             for (let t = 3.8; t <= 20; t += 0.2) {
                 for (const item of pulp) { item.morphTargetInfluences[0] = 1 - THREE.MathUtils.clamp ((t - 4.4) / 2.5, 0, 1); }
                 pack.group.visible = t > 7.2; PoseEngineeringPack (pack, t);
+                framing.update (t); const matrix = view.matrixWorld.elements.slice (), projection = view.projectionMatrix.elements.slice ();
                 const frame = framing.inspect (CollectEngineeringFitPoints (root));
-                assert.equal (frame.distance, opening.distance); assert.deepEqual (frame.target, opening.target);
+                if (t >= 8.6) { assert.equal (frame.distance, boxed.distance); assert.deepEqual (frame.target, boxed.target); }
                 assert.deepEqual (view.matrixWorld.elements, matrix); assert.deepEqual (view.projectionMatrix.elements, projection);
                 cropped ||= frame.extent.some (value => value > 1);
             }
-            assert.equal (cropped, true, 'hero framing intentionally crops larger packaging instead of pulling back');
-            framing.resize (); assert.equal (framing.inspect ().distance, opening.distance, 'resizing during packaging still uses the original motor');
+            assert.equal (cropped, true, 'large unfolded panels may still crop without triggering another camera move');
+            framing.resize (); assert.equal (framing.inspect ().distance, boxed.distance, 'resizing during packaging preserves its chosen shot');
         }
         clean (root);
     });
