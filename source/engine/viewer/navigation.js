@@ -640,11 +640,12 @@ export class Navigation
 			if (IsGreater (newAngle, 0.0) && IsLower (newAngle, Math.PI)) {
 				rotate (horizontalDirection, -radAngleY);
 			}
-			const worldZ = new Coord3D (0, 0, 1); rotate (worldZ, -radAngleX); this.camera.up.Rotate (worldZ, -radAngleX, new Coord3D (0, 0, 0));
+			// Orbit about the view's actual up direction to avoid camera roll.
+			const upAxis = this.camera.up.Clone ().Normalize (); rotate (upAxis, -radAngleX);
 		} else if (this.navigationMode === NavigationMode.FreeOrbit) {
 			let verticalDirection = CrossVector3D (horizontalDirection, viewDirection).Normalize ();
 			rotate (horizontalDirection, -radAngleY);
-			const worldZ = new Coord3D (0, 0, 1); rotate (worldZ, -radAngleX); this.camera.up = verticalDirection; this.camera.up.Rotate (worldZ, -radAngleX, new Coord3D (0, 0, 0));
+			rotate (verticalDirection, -radAngleX); this.camera.up = verticalDirection;
 		}
 	}
 
