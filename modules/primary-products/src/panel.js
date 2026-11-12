@@ -100,7 +100,7 @@ export class PrimaryProductsPanel
         note.setAttribute ('aria-hidden', 'true');
         this.stage = Element ('section', 'pp_stage', undefined, this.layout); this.stage.setAttribute ('aria-label', 'Product profile reference');
         this.profileName = Element ('span', 'pp_profile_name', '', this.stage); this.drawing = Element ('div', 'pp_drawing', undefined, this.stage);
-        this.size = Element ('div', 'pp_size', '', this.stage); Element ('span', 'pp_profile_note', 'Illustrative profile', this.stage);
+        this.size = Element ('div', 'pp_size', '', this.stage); const editModel = Element ('button', 'pp_edit_model', 'Edit model', this.stage); editModel.type = 'button'; editModel.addEventListener ('click', () => this.Action (() => this.host.openProfile ()));
         const controls = Element ('div', 'pp_controls', undefined, this.layout);
         const dimensions = Element ('section', 'pp_section', undefined, controls); Element ('h3', '', 'Dimensions · W × L × H', dimensions); const row = Element ('div', 'pp_dimension_row', undefined, dimensions); this.inputs = new Map ();
         for (const [key, label] of [['widthMm', 'Width'], ['lengthMm', 'Length'], ['heightMm', 'Height']]) {

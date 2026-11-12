@@ -7214,6 +7214,118 @@
       }
     },
     {
+      "id": "primary.profile.open",
+      "title": "Open live product profile",
+      "category": "Primary Products",
+      "description": "Split the main workspace into an editable profile and the existing 3D viewer. Loads the selected generated product; creates the current draft once if no product is selected. Local operation with no upload.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "primary.profile.close",
+      "title": "Close live product profile",
+      "category": "Primary Products",
+      "description": "Restore the full 3D viewport and prior docked panels without changing the model.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "primary.profile.inspect",
+      "title": "Inspect live product profile",
+      "category": "Primary Products",
+      "description": "Read the selected product dimensions, display units and split-workspace state.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "primary.profile.update",
+      "title": "Edit product dimensions live",
+      "category": "Primary Products",
+      "description": "Immediately rebuild the selected product from a partial physical profile edit in millimeters. Preserves materials, artwork, placement and identity with one Undo step. Optional objectId rejects stale selection; validates label fit before mutation.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "widthMm": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 500
+          },
+          "lengthMm": {
+            "type": "number",
+            "minimum": 2,
+            "maximum": 500
+          },
+          "heightMm": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 1000
+          },
+          "neckDiameterMm": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 500
+          },
+          "shoulderHeightMm": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 1000
+          },
+          "neckHeightMm": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 1000
+          },
+          "capHeightMm": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 1000
+          },
+          "crossSection": {
+            "type": "string",
+            "enum": [
+              "round",
+              "oval",
+              "rectangle"
+            ]
+          },
+          "cornerRadiusMm": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 250
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "heightMm": 220,
+        "neckDiameterMm": 28
+      }
+    },
+    {
       "id": "primary.generate",
       "title": "Generate product",
       "category": "Primary Products",

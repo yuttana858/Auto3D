@@ -1,6 +1,6 @@
-# Auto3D 0.64.3 — agents talk through the command bar, deselect, live screenshot setting
+# Auto3D 0.65.1 — agents talk through the command bar, deselect, live screenshot setting
 
-Packaging remains 1.10.7 and Primary Products remains 0.13.0. PR #109, based on main after Auto3D 0.64.2 (#112). Not deployed.
+Packaging remains 1.10.7 and Primary Products remains 0.14.0. PR #109 is a combined release: it is based on main after Auto3D 0.64.2 (#112) and also carries #110 (Auto3D 0.65.0 live product profile editor and CI consolidation, see [release-0650.md](release-0650.md)) and #113 (0.64.0 deployment record). Not deployed.
 
 ## Command bar as an agent channel
 
@@ -16,7 +16,7 @@ The status line above the command box now also carries messages between the user
 - **`selection.clear`** deselects every object, through the same `Select (null)` path as clicking empty space. Like `object.select`, it does not change the scene and is not marked as mutating. Move, rotate, scale, delete, duplicate, visibility and the rest were already available through `auto3d.commands.invoke` with full access.
 - **Screenshot setting applies immediately.** Ticking **Allow screenshots from this window** in Agent access now applies straight away, and reopening the dialog shows the current setting. Previously it took effect only on the next Live Control, and the box always reopened unticked. Agents still cannot turn screenshots on themselves; that stays the user's choice.
 
-The catalog has 302 commands.
+The catalog has 306 commands.
 
 ## Validation
 

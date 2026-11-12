@@ -1,8 +1,12 @@
 # Auto3D development log and handoff
 
-## Agent messages in the command bar — Auto3D 0.64.3 / Primary Products 0.13.0 / Packaging 1.10.7 (2026-11-12)
+## Agent messages in the command bar — Auto3D 0.65.1 / Primary Products 0.14.0 / Packaging 1.10.7 (2026-11-12)
 
-Command bar text for agents (`@agent …`, or any non-command text while Live Control is connected) is logged for `ui.command_bar.inspect`, and agents reply in the status line above the box with `ui.command_bar.respond`. Adds `selection.clear`, and the Agent access screenshot checkbox now applies immediately and shows the current setting. See [release-0643.md](release-0643.md).
+Command bar text for agents (`@agent …`, or any non-command text while Live Control is connected) is logged for `ui.command_bar.inspect`, and agents reply in the status line above the box with `ui.command_bar.respond`. Adds `selection.clear`, and the Agent access screenshot checkbox now applies immediately and shows the current setting. See [release-0651.md](release-0651.md).
+
+## Live product profile editor — Auto3D 0.65.0 / Packaging 1.10.7 / Primary Products 0.14.0
+
+Edit model opens a split profile/3D workspace. Dimension callouts commit on Enter, preserving labels, custom materials, placement and Undo. Existing 3D controls stay on the original canvas. Includes main through #112 (horizontal orbit and fixed-scale landing fixes); CAD integration remains paused. See [release-0650.md](release-0650.md). Candidate, not deployed. PR #110 also consolidates Actions validation and documents draft batching; see [Actions cost control](actions-cost-control.md).
 
 ## Fixed motor-scale hero — Auto3D 0.64.2 / Packaging 1.10.7 / Primary Products 0.13.0
 

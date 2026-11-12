@@ -35,6 +35,7 @@ lighting-ui
 login-gate
 login-updates
 material-surface
+mcp-access
 mcp-consent
 mini-presentation
 module-panels
@@ -53,6 +54,7 @@ preview-context-lifecycle
 primary-products
 primary-materials
 primary-realism
+primary-profile
 render-workspace
 rendercore-state
 rendering
