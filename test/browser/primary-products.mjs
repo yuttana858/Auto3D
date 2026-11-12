@@ -156,7 +156,7 @@ try {
     await page.screenshot ({ path : 'work/primary-products-review/clamshell-cyan-drawer.png' }); const beforeCard = (await call ('scene.inspect')).objects.length; await drawer.getByRole ('button', { name : 'Generate Deli shell' }).click ();
     await objectCountReaches (beforeCard + 1); /* design cards generate their product */
     assert.equal ((await call ('primary.inspect')).family, 'clamshell'); await drawer.getByRole ('button', { name : 'Close designs' }).click (); await drawer.waitFor ({ state : 'hidden' });
-    const shell = await call ('primary.generate'); assert.deepEqual (shell.components, ['base', 'lid']);
+    const shell = await call ('primary.generate'); assert.deepEqual (shell.components, ['base', 'lid', 'hinge', 'latch-left', 'latch-right']);
     await call ('primary.materials.open'); await artworkEditor.waitFor ();
     const shellChooser = page.waitForEvent ('filechooser'); await artworkEditor.getByRole ('button', { name : 'Import label image', exact : true }).click (); await (await shellChooser).setFiles ('test/testfiles/obj/texture.png');
     let shellArtReady = false;

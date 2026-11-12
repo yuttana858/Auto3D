@@ -238,6 +238,7 @@ export class PhysicalMaterial extends FaceMaterial
         this.specularIntensity = 1.0;
         this.transmission = 0.0;
         this.ior = 1.5;
+        this.clearcoat = 0.0; this.clearcoatRoughness = 0.0;
         this.thickness = 0.0; // scene units
         this.specularMap = null;
     }
@@ -256,7 +257,7 @@ export class PhysicalMaterial extends FaceMaterial
         if (!IsEqual (this.roughness, rhs.roughness)) {
             return false;
         }
-        for (const key of ['transmission', 'ior', 'thickness']) { if (!IsEqual (this[key], rhs[key])) { return false; } }
+        for (const key of ['transmission', 'ior', 'thickness', 'clearcoat', 'clearcoatRoughness']) { if (!IsEqual (this[key], rhs[key])) { return false; } }
         if (!IsEqual (this.specularIntensity, rhs.specularIntensity)) { return false; }
         if (!TextureMapIsEqual (this.roughnessMap, rhs.roughnessMap)) { return false; }
         if (!TextureMapIsEqual (this.metalnessMap, rhs.metalnessMap)) {

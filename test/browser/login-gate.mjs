@@ -16,7 +16,7 @@ const errors = [];
 const open = async () => { const page = await context.newPage (); page.setDefaultTimeout (20000); page.on ('pageerror', (error) => errors.push (error.message)); await page.goto ('http://127.0.0.1:8080/website/index.html', { waitUntil : 'domcontentloaded' }); await page.waitForFunction (() => window.Auto3D); return page; };
 const locked = async (page) => page.waitForFunction (() => document.body?.classList.contains ('auth_locked'));
 const unlocked = async (page) => page.waitForFunction (() => document.body && !document.body.classList.contains ('auth_locked'));
-const login = async (page) => { const gate = page.locator ('#auth_gate'); await gate.getByLabel ('Email', { exact : true }).fill (user.email); await gate.getByLabel ('Password', { exact : true }).fill ('browser-test-only'); await gate.getByRole ('button', { name : 'Sign in', exact : true }).click (); await unlocked (page); };
+const login = async (page) => { const gate = page.locator ('#auth_gate'); await gate.getByLabel ('Email', { exact : true }).fill (user.email); await gate.getByLabel ('Password', { exact : true }).fill ('browser-test-only'); await gate.locator ('form').getByRole ('button', { name : 'Sign in', exact : true }).click (); await unlocked (page); };
 const call = (page, id) => page.evaluate ((id) => Auto3D.execute (id, {}), id);
 try {
     let page = await open (); await locked (page);

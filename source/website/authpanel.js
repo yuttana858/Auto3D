@@ -44,31 +44,33 @@ export class AuthPanel
         if (this.recovery) { return this.CreateRecovery (); }
         const panel = document.createElement ('section'); panel.className = 'auth_panel'; panel.setAttribute ('aria-label', 'Auto3D sign in');
         const heading = document.createElement ('h2'); heading.textContent = 'Sign in to Auto3D';
+        const intro = document.createElement ('p'); intro.className = 'auth_intro'; intro.textContent = 'Sign in to continue your engineering work.';
         const form = document.createElement ('form');
         const emailLabel = document.createElement ('label'); emailLabel.textContent = 'Email';
-        const email = document.createElement ('input'); email.type = 'email'; email.autocomplete = 'username'; email.required = true; email.maxLength = 254; emailLabel.appendChild (email);
+        const email = document.createElement ('input'); email.type = 'email'; email.placeholder = 'you@company.com'; email.spellcheck = false; email.autocapitalize = 'none'; email.autocomplete = 'username'; email.required = true; email.maxLength = 254; emailLabel.appendChild (email);
         const passwordLabel = document.createElement ('label'); passwordLabel.textContent = 'Password';
-        const password = document.createElement ('input'); password.type = 'password'; password.autocomplete = 'current-password'; password.required = true; password.maxLength = 1024; password.setAttribute ('aria-label', 'Password'); passwordLabel.appendChild (PasswordVisibility (password));
+        const password = document.createElement ('input'); password.type = 'password'; password.placeholder = 'Your password'; password.autocomplete = 'current-password'; password.required = true; password.maxLength = 1024; password.setAttribute ('aria-label', 'Password'); passwordLabel.appendChild (PasswordVisibility (password));
         const submit = document.createElement ('button'); submit.type = 'submit'; submit.textContent = 'Sign in';
         const status = document.createElement ('p'); status.className = 'auth_status'; status.setAttribute ('role', 'status'); status.setAttribute ('aria-live', 'polite');
         const hint = document.createElement ('p'); hint.className = 'auth_hint'; hint.textContent = 'Use the account provided by your administrator. Request an account below.';
         const signOut = document.createElement ('button'); signOut.type = 'button'; signOut.className = 'auth_sign_out'; signOut.textContent = 'Sign out';
         const requestAccount = document.createElement ('button'); requestAccount.type = 'button'; requestAccount.textContent = 'Request an account';
         requestAccount.addEventListener ('click', () => this.admin.OpenRequest ());
-        const forgot = document.createElement ('button'); forgot.type = 'button'; forgot.textContent = 'Forgot Password';
+        const forgot = document.createElement ('button'); forgot.type = 'button'; forgot.className = 'auth_forgot'; forgot.textContent = 'Forgot Password';
         let busy = false;
         const render = () => {
             const user = this.auth.user; form.hidden = Boolean (user); hint.hidden = Boolean (user); signOut.hidden = !user; forgot.hidden = Boolean (user); requestAccount.hidden = Boolean (user);
-            heading.textContent = user ? 'Welcome back' : 'Sign in to Auto3D';
+            heading.textContent = user ? 'Your account' : 'Welcome back.'; intro.hidden = Boolean (user);
+            form.setAttribute ('aria-busy', String (busy)); submit.textContent = busy ? 'Signing in…' : 'Sign in';
             if (!busy) { status.textContent = user ? 'Signed in as ' + (user.email || 'Auto3D user') : ''; }
-            email.disabled = password.disabled = submit.disabled = signOut.disabled = forgot.disabled = busy;
+            email.disabled = password.disabled = submit.disabled = signOut.disabled = forgot.disabled = requestAccount.disabled = busy;
         };
         forgot.addEventListener ('click', () => { if (!busy) { status.textContent = this.PasswordHelp ().message; } });
         form.addEventListener ('submit', async (event) => {
             event.preventDefault (); if (busy) { return; } busy = true; render (); status.textContent = 'Signing in…';
             try { await this.auth.SignIn (email.value, password.value); status.textContent = 'Signed in as ' + (this.auth.user.email || 'Auto3D user'); }
             catch (error) { status.textContent = /unavailable/i.test (error.message) ? 'Sign-in could not be completed. Please try again.' : error.message; }
-            finally { password.value = ''; password.type = 'password'; busy = false; email.disabled = password.disabled = submit.disabled = signOut.disabled = forgot.disabled = false; }
+            finally { password.value = ''; password.type = 'password'; const eye = panel.querySelector ('.password_eye'); eye.setAttribute ('aria-pressed', 'false'); eye.setAttribute ('aria-label', 'Show password'); eye.title = 'Show password'; busy = false; form.setAttribute ('aria-busy', 'false'); submit.textContent = 'Sign in'; email.disabled = password.disabled = submit.disabled = signOut.disabled = forgot.disabled = requestAccount.disabled = false; }
         });
         signOut.addEventListener ('click', async () => {
             if (busy) { return; } busy = true; render (); status.textContent = 'Signing out…';
@@ -76,7 +78,7 @@ export class AuthPanel
             try { await this.auth.SignOut (); } catch (error) { message = error.message; }
             finally { busy = false; render (); status.textContent = message || 'Signed out.'; }
         });
-        form.append (emailLabel, passwordLabel, submit); panel.append (heading, form, forgot, status, hint, requestAccount, signOut);
+        form.append (emailLabel, passwordLabel, submit); panel.append (heading, intro, form, forgot, status, hint, requestAccount, signOut);
         if (onContinue) {
             const proceed = document.createElement ('button'); proceed.type = 'button'; proceed.className = 'auth_continue';
             const update = () => { proceed.textContent = 'Continue to workspace'; proceed.hidden = !this.auth.user; }; update ();

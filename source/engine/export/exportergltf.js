@@ -559,6 +559,7 @@ export class ExporterGltf extends ExporterBase
                     jsonMaterial.extensions = { KHR_materials_specular : { specularFactor : material.specularIntensity } };
                 }
                 for (const [name, values] of [
+                    ['KHR_materials_clearcoat', material.clearcoat > 0 ? { clearcoatFactor : material.clearcoat, clearcoatRoughnessFactor : material.clearcoatRoughness } : null],
                     ['KHR_materials_transmission', material.transmission > 0 ? { transmissionFactor : material.transmission } : null],
                     ['KHR_materials_ior', material.ior !== 1.5 ? { ior : material.ior } : null],
                     ['KHR_materials_volume', material.transmission > 0 && material.thickness > 0 ? { thicknessFactor : material.thickness } : null]

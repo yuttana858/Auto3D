@@ -16,15 +16,15 @@ await context.route ('**/api/auth/**', async route => {
 const errors = [];
 const open = async () => { const page = await context.newPage (); page.setDefaultTimeout (30000); page.on ('pageerror', error => errors.push (error.message)); await page.goto ('http://127.0.0.1:8080/website/index.html', { waitUntil : 'domcontentloaded' }); await page.waitForFunction (() => window.Auto3D); return page; };
 const locked = page => page.waitForFunction (() => document.body.classList.contains ('auth_locked'));
-const unlocked = page => page.waitForFunction (() => !document.body.classList.contains ('auth_locked') && !document.getElementById ('startup_splash'));
+const unlocked = page => page.waitForFunction (() => !document.body.classList.contains ('auth_locked') && document.getElementById ('auth_gate').hidden);
 try {
     // Signed out: one landing page with the welcome scene and the sign-in form; nothing else bypasses it.
-    let page = await open (); const landing = page.locator ('#startup_splash');
-    const form = landing.locator ('#auth_gate form'); await form.waitFor ({ state : 'visible' });
-    assert.equal (await landing.locator ('.splash_logo').isVisible (), true); assert.equal (await page.locator ('body > #auth_gate').count (), 0);
+    let page = await open (); const landing = page.locator ('#auth_gate');
+    const form = landing.locator ('form'); await form.waitFor ({ state : 'visible' });
+    assert.equal (await landing.locator ('.entry_brand').isVisible (), true); assert.equal (await page.locator ('body > #auth_gate').count (), 1);
     await landing.click ({ position : { x : 20, y : 20 } }); await page.keyboard.press ('Escape'); await page.keyboard.press ('Enter'); await locked (page);
     assert.equal (await landing.isVisible (), true); assert.equal (await landing.getByRole ('button', { name : 'Continue to workspace', exact : true }).isVisible (), false);
-    const [logo, panel] = [await landing.locator ('.splash_identity').boundingBox (), await landing.locator ('#auth_gate').boundingBox ()];
+    const [logo, panel] = [await landing.locator ('.entry_story').boundingBox (), await landing.locator ('.entry_login').boundingBox ()];
     assert.ok (panel.x > logo.x + logo.width - 1, 'sign-in sits beside the identity on a wide screen');
     await page.screenshot ({ path : 'work/landing-signin.png' });
     // Signing in with the form is the user's action: the workspace opens directly.
@@ -32,8 +32,8 @@ try {
     await form.getByRole ('button', { name : 'Sign in', exact : true }).click (); await unlocked (page);
     assert.equal ((await page.evaluate (() => Auto3D.execute ('scene.inspect', {}))).ok, true); await page.close ();
     // Saved sign-in: the landing pauses with Welcome back until Continue.
-    page = await open (); const saved = page.locator ('#startup_splash');
-    await saved.getByRole ('heading', { name : 'Welcome back' }).waitFor (); const proceed = saved.getByRole ('button', { name : 'Continue to workspace', exact : true }); await proceed.waitFor ();
+    page = await open (); const saved = page.locator ('#auth_gate');
+    await saved.getByRole ('heading', { name : 'Your account' }).waitFor (); const proceed = saved.getByRole ('button', { name : 'Continue to workspace', exact : true }); await proceed.waitFor ();
     await page.waitForTimeout (800); assert.equal (await page.evaluate (() => document.body.classList.contains ('auth_locked')), true, 'the landing waits for the user');
     assert.equal ((await page.evaluate (() => Auto3D.execute ('auth.inspect', {}))).result.signedIn, true);
     await page.screenshot ({ path : 'work/landing-continue.png' });
@@ -42,14 +42,14 @@ try {
     assert.equal ((await page.evaluate (() => Auto3D.execute ('auth.sign_out', {}))).ok, true); await locked (page);
     await page.locator ('body > #auth_gate form').waitFor ({ state : 'visible' }); await page.close ();
     // The agent command continues from the landing as well.
-    page = await open (); await page.locator ('#startup_splash').getByRole ('button', { name : 'Sign in', exact : true }).waitFor ();
+    page = await open (); await page.locator ('#auth_gate form').getByRole ('button', { name : 'Sign in', exact : true }).waitFor ();
     assert.equal ((await page.evaluate (() => Auto3D.execute ('auth.continue', {}))).result.continued, false, 'continue needs a signed-in account');
-    const signInForm = page.locator ('#startup_splash #auth_gate form'); await signInForm.getByLabel ('Email', { exact : true }).fill (user.email); await signInForm.getByLabel ('Password', { exact : true }).fill ('landing-test-only'); await signInForm.getByRole ('button', { name : 'Sign in', exact : true }).click (); await unlocked (page); await page.close ();
-    page = await open (); await page.locator ('#startup_splash').getByRole ('button', { name : 'Continue to workspace', exact : true }).waitFor ();
+    const signInForm = page.locator ('#auth_gate form'); await signInForm.getByLabel ('Email', { exact : true }).fill (user.email); await signInForm.getByLabel ('Password', { exact : true }).fill ('landing-test-only'); await signInForm.getByRole ('button', { name : 'Sign in', exact : true }).click (); await unlocked (page); await page.close ();
+    page = await open (); await page.locator ('#auth_gate').getByRole ('button', { name : 'Continue to workspace', exact : true }).waitFor ();
     assert.equal ((await page.evaluate (() => Auto3D.execute ('auth.continue', {}))).result.continued, true); await unlocked (page);
     // Narrow screens stack the identity above the sign-in panel without horizontal overflow.
-    await page.close (); page = await open (); await page.setViewportSize ({ width : 390, height : 844 }); await page.locator ('#startup_splash').getByRole ('button', { name : 'Continue to workspace', exact : true }).waitFor ();
-    const overflow = await page.evaluate (() => document.getElementById ('startup_splash').scrollWidth - document.getElementById ('startup_splash').clientWidth); assert.ok (overflow <= 1, 'no horizontal overflow: ' + overflow);
+    await page.close (); page = await open (); await page.setViewportSize ({ width : 390, height : 844 }); await page.locator ('#auth_gate').getByRole ('button', { name : 'Continue to workspace', exact : true }).waitFor ();
+    const overflow = await page.evaluate (() => document.getElementById ('auth_gate').scrollWidth - document.getElementById ('auth_gate').clientWidth); assert.ok (overflow <= 1, 'no horizontal overflow: ' + overflow);
     await page.screenshot ({ path : 'work/landing-mobile.png' });
     assert.deepEqual (errors, []); console.log ('Landing sign-in: form on the welcome scene, no bypass, form sign-in opens the workspace, saved sign-in pauses for Continue, auth.continue, sign-out gate and mobile layout passed.');
 } finally { await browser.close (); }

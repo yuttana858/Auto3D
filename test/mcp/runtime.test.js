@@ -63,9 +63,11 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         const redirect = new URL (approval.headers.get ('Location')); assert.equal (redirect.searchParams.get ('state'), 'test-state'); assert.equal (redirect.searchParams.get ('iss'), origin + '/oauth');
         const response = await fetch ('/oauth/oauth/token', { method : 'POST', headers : { 'Content-Type' : 'application/x-www-form-urlencoded' }, body : new URLSearchParams ({ grant_type : 'authorization_code', client_id : clientId, code : redirect.searchParams.get ('code'), code_verifier : flow.verifier, redirect_uri : 'https://client.example/callback', resource : origin + '/mcp' }).toString () });
         assert.equal (response.status, 200);
+        // Consume the token body before another Miniflare dispatch; do not retain its live response stream across requests.
+        const tokens = await response.json ();
         const after = await (await fetch ('/api/agent/registrations', { headers : userHeaders (id) })).json ();
         const registration = after.registrations.find (record => !before.registrations.some (previous => previous.id === record.id));
-        assert.ok (registration); return { ...await response.json (), registrationId : registration.id };
+        assert.ok (registration); return { ...tokens, registrationId : registration.id };
     }
     before (async () => {
         const outboundService = async request => {
