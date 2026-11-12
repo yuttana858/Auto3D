@@ -1,4 +1,10 @@
 export const ProductMaterials = Object.freeze ({
+    frostedGlass : { name : 'Frosted glass', color : '#eef2ed', families : ['bottle'], metalness : 0, roughness : .42, transmission : .94, ior : 1.5, wallMm : 1.5 },
+    amberGlass : { name : 'Amber glass', color : '#b55c16', families : ['bottle'], metalness : 0, roughness : .1, transmission : .96, ior : 1.5, wallMm : 1.5 },
+    naturalHDPE : { name : 'Natural HDPE · translucent', color : '#f4f0e1', families : ['bottle'], metalness : 0, roughness : .48, transmission : .4, ior : 1.52, wallMm : .8 },
+    frostedPP : { name : 'Frosted PP · translucent', color : '#eef3ee', families : ['bottle', 'clamshell'], metalness : 0, roughness : .4, transmission : .65, ior : 1.49, wallMm : .6 },
+    pearlPlastic : { name : 'Pearl satin plastic', color : '#ede9dc', families : ['bottle', 'clamshell'], metalness : .12, roughness : .28, clearcoat : .5 },
+    clearFilm : { name : 'Clear barrier film', color : '#ffffff', families : ['pouch'], metalness : 0, roughness : .12, transmission : .95, ior : 1.49, wallMm : .1 },
     paperboard : { name : 'Paperboard · uncoated', families : ['clamshell'], metalness : 0, roughness : .88 },
     moldedFiber : { name : 'Molded fiber · matte', color : '#b69b71', families : ['clamshell'], metalness : 0, roughness : .95 },
     kraftFilm : { name : 'Kraft-look laminate', color : '#ba9865', families : ['pouch'], metalness : 0, roughness : .85 },

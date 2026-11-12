@@ -86,7 +86,7 @@ describe ('Primary Products scene integration', function () {
     });
     it ('persists and rebuilds clamshells with material defaults and stable identity', async function () {
         const { panel, editor, workspace } = Fixture (); panel.draft = module.ProductDesign ('food-fiber'); await workspace.Generate ();
-        const id = editor.selected.id; assert.equal (editor.document.model.meshes.length, 2);
+        const id = editor.selected.id; assert.deepEqual (editor.document.model.meshes.map (m => m.GetName ()), ['base', 'lid', 'hinge', 'latch-left', 'latch-right']);
         assert.equal (panel.draft.color, '#b69b71'); panel.draft.widthMm = 230; await workspace.Generate (true); assert.equal (editor.selected.id, id);
         const saved = OpenSessionArchive (CreateSessionArchive (PackSession (editor.document))).document;
         const definition = module.ValidateProductDefinition (JSON.parse (saved.objects[0].userData[PrimaryProductDataKey]));
