@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - main
+    # Documentation-only merges do not change the deployed app.
+    paths-ignore:
+      - 'docs/**'
+      - 'AGENTS.md'
+      - 'README.md'
   workflow_dispatch:
 
 permissions:

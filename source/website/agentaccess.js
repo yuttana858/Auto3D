@@ -70,6 +70,11 @@ export class AgentAccess
         if (!response.ok) { throw new Error ('Agent access unavailable. Check staging setup and permissions.'); }
         const result = await response.json (); if (this.Account () !== owner) { throw new Error ('Account changed.'); } return result;
     }
+    SetScreenshots (allowed)
+    {
+        if (typeof allowed !== 'boolean') { throw new Error ('Invalid screenshot preference.'); }
+        this.screenshots = allowed; return { screenshots : allowed, connected : this.socket?.readyState === 1 };
+    }
     Inspect () { return { status : this.status, connected : this.socket?.readyState === 1, screenshots : this.screenshots === true, allowSelect : this.allowSelect === true, connectionId : this.connectionId || null }; }
     Sessions () { return this.website.sessionEditor.sessions.Inspect ().tabs.map (tab => ({ id : tab.id, name : tab.name.slice (0, 100), active : tab.active })); }
     Disconnect ({ preserveRetry = false } = {})
@@ -189,7 +194,9 @@ export class AgentAccess
         await this.Request ('config');
         const dialog = WorkspaceDialog ('MCP connections'); dialog.dataset.capturePrivate = '';
         const form = document.createElement ('div'); form.className = 'workspace_save_form';
-        const captureLabel = document.createElement ('label'), capture = document.createElement ('input'); capture.type = 'checkbox'; captureLabel.append (capture, 'Allow screenshots from this window');
+        const captureLabel = document.createElement ('label'), capture = document.createElement ('input'); capture.type = 'checkbox'; capture.checked = this.screenshots === true; captureLabel.append (capture, 'Allow screenshots from this window');
+        // Applies at once to the live connection (the screenshot gate runs in this window), and to the next Live Control.
+        capture.addEventListener ('change', () => { this.SetScreenshots (capture.checked); });
         const status = document.createElement ('p'); status.setAttribute ('role', 'status'); status.textContent = this.status; this.statusElement = status;
         const connect = document.createElement ('button'); connect.textContent = 'Live Control'; connect.onclick = () => { this.Connect ({ screenshots : capture.checked }).then (() => { status.textContent = 'Connected'; }).catch (error => { this.Disconnect (); status.textContent = error.message; }); };
         const disconnect = document.createElement ('button'); disconnect.textContent = 'Disconnect'; disconnect.onclick = () => { this.Disconnect (); status.textContent = this.status; };

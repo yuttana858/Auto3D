@@ -1,3 +1,5 @@
+import { ProfileChanges } from '../../modules/primary-products/src/profilechanges.js';
+import { PrimaryProfileWorkspace } from './primaryprofileworkspace.js';
 import { DefaultProductDetails, ScaleProductChanges } from '../../modules/primary-products/src/details.js';
 import { ProductCategories, ListProductDesigns, ProductDesign } from '../../modules/primary-products/src/catalog.js';
 import { PrimaryProductsArtwork } from './primaryproductsartwork.js';
@@ -11,7 +13,7 @@ export class PrimaryProductsPanel
 {
     constructor (website)
     {
-        this.website = website; this.artwork = new PrimaryProductsArtwork (this); this.products = new PrimaryProductsWorkspace (this, async () => { await this.Ensure (); return this.module; }); this.draft = UpdateProductDraft (DefaultProductDraft (), { details : {} }); this.callouts = true; this.owner = website.auth?.user?.id || null;
+        this.website = website; this.artwork = new PrimaryProductsArtwork (this); this.products = new PrimaryProductsWorkspace (this, async () => { await this.Ensure (); return this.module; }); this.draft = UpdateProductDraft (DefaultProductDraft (), { details : {} }); this.profileEditor = new PrimaryProfileWorkspace (this); this.callouts = true; this.owner = website.auth?.user?.id || null;
         this.panel = document.createElement ('section'); this.panel.id = 'primary_products_module_panel'; this.panel.className = 'primary_products_module_panel'; this.panel.hidden = true; this.panel.setAttribute ('aria-label', 'Primary Products'); website.parameters.rightContainerDiv.appendChild (this.panel);
         website.modulePanels.Register ('primary-products', { title : 'Primary Products', body : this.panel, animated : true, onOpen : () => this.Ensure (), onMode : () => this.Refresh () });
         website.auth?.Subscribe?.(user => { const owner = user?.id || null; if (owner !== this.owner) { this.owner = owner; this.artworkTarget = null; this.catalogOpen = false; this.artwork.Clear (); this.draft = UpdateProductDraft (DefaultProductDraft (), { details : {} }); this.Refresh (); } });
@@ -26,7 +28,7 @@ export class PrimaryProductsPanel
         if (this.website.sessionEditor.busy) { return 'Wait for the current scene operation to finish.'; }
         return '';
     }
-    RefreshAvailability () { this.workspace?.SetDisabled (); }
+    RefreshAvailability () { this.workspace?.SetDisabled (); this.profileEditor?.Sync (); }
     Inspect () { const shape = this.draft.family === 'bottle' ? BottleShape (this.draft) : null; return { catalogCategory : this.catalogCategory || 'bottles', catalogOpen : this.catalogOpen === true, profile : shape ? { ...shape, bodyHeightMm : this.draft.heightMm - shape.shoulderHeightMm - shape.neckHeightMm - shape.capHeightMm } : null, schemaVersion : 1, units : 'mm', ...this.draft, artwork : this.artwork?.Inspect () || [], draftOnly : false, generationAvailable : true, callouts : this.callouts, unavailableReason : this.UnavailableReason (), generating : this.products?.active === true }; }
     Configure (changes)
     {
@@ -101,6 +103,22 @@ export class PrimaryProductsPanel
         if (this.Blocked ()) { throw new Error ('Open an editable session before changing the product draft.'); }
         this.artwork?.Clear (); this.draft = UpdateProductDraft (DefaultProductDraft (), { details : {} }); this.Refresh (); return this.Inspect ();
     }
+    async UpdateProfile (changes, objectId)
+    {
+        if (this.Blocked ()) { throw new Error ('Open an editable, idle session to edit a product.'); }
+        const selected = this.products.Selected ();
+        if (objectId !== undefined && objectId !== selected.object.id) { throw new Error ('The selected product changed. Edit its current profile.'); }
+        const next = ProfileChanges (selected.definition.draft, changes);
+        ValidateProductArtwork (next, selected.definition.artwork || []);
+        const previous = { draft : this.draft, entries : this.artwork.entries, resources : this.artwork.resources };
+        this.profileEditor.committing = true;
+        try {
+            this.artwork.Load (selected.definition, this.website.sessionEditor.document.CompactModel ([selected.object], true)); this.draft = next;
+            const result = await this.products.Generate (true, true);
+            return { ...result, message : 'Model updated. Undo restores the previous dimensions.' };
+        } catch (error) { this.draft = previous.draft; this.artwork.entries = previous.entries; this.artwork.resources = previous.resources; throw error; }
+        finally { this.profileEditor.committing = false; this.Refresh (); }
+    }
     async OpenMaterials ()
     {
         this.products.LoadSelected (); await this.Ensure ();
@@ -137,11 +155,11 @@ export class PrimaryProductsPanel
                 }
                 const url = new URL (moduleUrl); if (this.attempts) { url.searchParams.set ('retry', String (this.attempts)); } this.attempts = (this.attempts || 0) + 1;
                 const module = await import (url.href); if (module.PrimaryProductsAPIVersion !== 1) { throw new Error ('Unsupported Primary Products module.'); } this.module = module; this.panel.replaceChildren ();
-                this.workspace = new module.PrimaryProductsPanel ({ setDetails : changes => this.Details (changes), scaleProduct : args => this.Scale (args), openMaterials : () => this.OpenMaterials (), applyArtwork : () => this.ApplyArtwork (), catalog : (category, open) => this.Catalog (category, open), selectDesign : id => this.SelectDesign (id), generateDesign : id => this.GenerateDesign (id), setCallouts : visible => this.SetCallouts (visible), setDimensions : dimensions => this.SetDimensions (dimensions), inspect : () => this.Inspect (), configure : changes => this.Configure (changes), reset : () => this.Reset (), generate : () => this.products.Generate (), update : () => this.products.Generate (true), loadSelected : () => this.products.LoadSelected (), artworkOpen : () => this.artwork.Open (), artworkRemove : zone => this.artwork.Remove ({ zone }), artworkMapping : args => this.artwork.Mapping (args), artworkPreview : zone => { if (this.previewUrl) { URL.revokeObjectURL (this.previewUrl); this.previewUrl = null; } const a = this.artwork.entries.find (a => a.zone === zone), r = a && this.artwork.resources.get (a.resourceId); if (r) { this.previewUrl = URL.createObjectURL (new Blob ([r.buffer], { type : a.mime })); } return this.previewUrl; }, units : () => this.website.preferences.units, blocked : () => this.Blocked () }, this.panel);
+                this.workspace = new module.PrimaryProductsPanel ({ openProfile : () => this.profileEditor.Open (), setDetails : changes => this.Details (changes), scaleProduct : args => this.Scale (args), openMaterials : () => this.OpenMaterials (), applyArtwork : () => this.ApplyArtwork (), catalog : (category, open) => this.Catalog (category, open), selectDesign : id => this.SelectDesign (id), generateDesign : id => this.GenerateDesign (id), setCallouts : visible => this.SetCallouts (visible), setDimensions : dimensions => this.SetDimensions (dimensions), inspect : () => this.Inspect (), configure : changes => this.Configure (changes), reset : () => this.Reset (), generate : () => this.products.Generate (), update : () => this.products.Generate (true), loadSelected : () => this.products.LoadSelected (), artworkOpen : () => this.artwork.Open (), artworkRemove : zone => this.artwork.Remove ({ zone }), artworkMapping : args => this.artwork.Mapping (args), artworkPreview : zone => { if (this.previewUrl) { URL.revokeObjectURL (this.previewUrl); this.previewUrl = null; } const a = this.artwork.entries.find (a => a.zone === zone), r = a && this.artwork.resources.get (a.resourceId); if (r) { this.previewUrl = URL.createObjectURL (new Blob ([r.buffer], { type : a.mime })); } return this.previewUrl; }, units : () => this.website.preferences.units, blocked : () => this.Blocked () }, this.panel);
             })().catch (error => { this.loading = null; this.panel.textContent = error.message; throw error; });
         }
         await this.loading; this.Refresh ();
     }
     Open () { return this.website.modulePanels.Open ('primary-products'); }
-    Refresh () { this.workspace?.Refresh (); }
+    Refresh () { this.workspace?.Refresh (); this.profileEditor?.Sync (); }
 }

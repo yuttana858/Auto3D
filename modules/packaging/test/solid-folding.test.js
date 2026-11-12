@@ -22,7 +22,7 @@ describe ('Finite-caliper FEFCO surfaces', () => {
         assert.equal (SolidIntersections ([tab, prism ('outside bevel', -35, -34, 0, 1, 3)]).clear, true);
     });
     it ('Audits every available catalog style over the complete route, including caliper and overlap limits', async function () {
-        this.timeout (15000);
+        this.timeout (60000); // CPU-bound full-route audit: about 9 s locally, over 15 s on shared hosted runners.
         const variants = [{}, { length : 120, width : 120, height : 120, thickness : 15, overlap : 119 }, { length : 10000, width : 10000, height : 20, thickness : 0.5, overlap : 9999 }, { length : 900.125, width : 300.375, height : 200.5, thickness : 0.625 }, { length : 601, width : 300, height : 200, thickness : 3 }, { length : 599, width : 300, height : 200, thickness : 3 }];
         for (const style of FefcoCatalog ().styles) {
             assert.equal (style.folding.cadMapped, true); assert.equal (style.folding.solidCaliper, true);

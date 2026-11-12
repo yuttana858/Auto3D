@@ -1,24 +1,9 @@
 name: Verify isolated MCP pilot
 
+# CI already covers lint, units, MCP, isolated packaging and browser access/consent.
+# Run this only when a downloadable isolated pilot candidate is actually needed.
 on:
   workflow_dispatch:
-  push:
-    branches: [feat/mcp-staging-registrations]
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - 'mcp/**'
-      - 'source/website/agent*.js'
-      - 'source/website/commandregistry.js'
-      - 'source/website/preferences.js'
-      - 'source/website/sessiontabs.js'
-      - 'tools/*mcp*.mjs'
-      - 'test/mcp/**'
-      - 'test/browser/mcp-access.mjs'
-      - 'test/browser/mcp-consent.mjs'
-      - 'test/fixtures/mcp-*.mjs'
-      - 'package*.json'
-      - '.github/workflows/mcp-pilot.yml'
 
 permissions:
   contents: read
@@ -29,7 +14,6 @@ concurrency:
 
 jobs:
   verify:
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -53,7 +37,7 @@ jobs:
           path: |
             build/mcp-pilot
             build/mcp-workers
-          retention-days: 7
+          retention-days: 1
 
 # This workflow deliberately has no deployment job or production credentials.
 # Live staging requires the isolated identity project and pilot allowlist first.

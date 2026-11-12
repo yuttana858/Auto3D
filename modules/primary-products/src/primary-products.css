@@ -90,3 +90,32 @@
 .primary_artwork_mount { grid-column: span 2; min-width: 0; }
 .pp_artwork_editor { min-width: 0; padding: 10px; border: 1px solid var(--ov_border_color); border-radius: 6px; }
 .pp_artwork_editor .pp_art_image { max-height: 70px; }
+
+.pp_edit_model { display: block; margin: 8px auto 0; border: 1px solid #458b9b; border-radius: 5px; padding: 7px 18px; background: #458b9b18; color: inherit; font: inherit; cursor: pointer; }
+.pp_viewport_split { display: flex; flex: 1; min-width: 0; overflow: hidden; }
+.pp_viewport_split.pp_vertical { flex-direction: column; }
+.pp_profile_editor { flex: none; box-sizing: border-box; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--ov_background_color, #292b2d); color: var(--ov_foreground_color, #eee); border-right: 1px solid #458b9b; font: inherit; }
+.pp_profile_editor header { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid var(--ov_border_color, #555); }
+.pp_profile_editor header strong { color: #458b9b; font-size: var(--workspace-title-font-size, 14px); }
+.pp_profile_editor header small { display: block; margin-top: 4px; font-size: var(--workspace-meta-font-size, 11px); }
+.pp_profile_editor header button { border: 0; background: transparent; color: inherit; font: inherit; font-size: 22px; cursor: pointer; }
+.pp_profile_section { display: flex; gap: 12px; align-items: center; padding: 8px 15px; font-size: var(--workspace-menu-font-size, 13px); }
+.pp_profile_section[hidden] { display: none; }
+.pp_profile_section select { flex: 1; min-width: 0; padding: 6px; background: transparent; color: inherit; border: 1px solid var(--ov_border_color, #555); border-radius: 5px; }
+.pp_profile_section option { background: var(--ov_background_color, #292b2d); }
+.pp_profile_scroll { flex: 1; min-height: 0; overflow: auto; }
+.pp_profile_board { position: relative; width: 100%; max-width: 500px; aspect-ratio: 500/610; margin: 0 auto; }
+.pp_profile_board > svg { display: block; width: 100%; height: 100%; }
+.pp_profile_callout { position: absolute; width: 26%; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; font-size: clamp(10px, 1vw, 13px); }
+.pp_profile_callout[hidden] { display: none; }
+.pp_profile_callout > span { display: flex; align-items: center; background: var(--ov_background_color, #292b2d); border: 1px solid #458b9b; border-radius: 5px; overflow: hidden; }
+.pp_profile_callout input { width: 100%; min-width: 0; box-sizing: border-box; padding: 7px 4px; border: 0; color: inherit; background: transparent; font: inherit; }
+.pp_profile_unit { font-size: .85em; opacity: .65; padding-right: 4px; }
+.pp_profile_callout:focus-within { color: #66bdd0; }
+.pp_profile_callout input[aria-invalid=true] { outline: 2px solid #cb7856; outline-offset: -2px; }
+.pp_profile_editor input:focus-visible, .pp_profile_editor select:focus-visible, .pp_profile_editor button:focus-visible { outline: 2px solid #458b9b; }
+.pp_profile_editor :disabled { opacity: .55; }
+.pp_profile_help, .pp_profile_status { margin: 6px 14px; font-size: var(--workspace-help-font-size, 11px); line-height: 1.45; }
+.pp_profile_help { opacity: .7; }
+.pp_profile_status { color: #cb7856; min-height: 16px; }
+.pp_vertical .pp_profile_editor { border-right: 0; border-bottom: 1px solid #458b9b; }

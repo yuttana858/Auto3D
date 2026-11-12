@@ -7,7 +7,7 @@ import { CommandIds } from '../mcp/command-catalog.js';
 const catalog = CreateAgentCommands ({ sessionEditor : {} }).Catalog ();
 // mutates means the command changes the open document/session or shared data, which read-only viewers block.
 // Sign-in, personal preferences, local diagnostics and local macros stay available in read-only viewers.
-const NonMutatingVerbs = new Set (['packaging.draft.cancel', 'polygon.cancel', 'material.texture.save', 'ui.save', 'macro.cancel', 'auth.sign_out', 'auth.recover', 'diagnostics.clear', 'macro.save']);
+const NonMutatingVerbs = new Set (['packaging.draft.cancel', 'polygon.cancel', 'material.texture.save', 'ui.save', 'macro.cancel', 'auth.sign_out', 'auth.recover', 'diagnostics.clear', 'macro.save', 'selection.clear']); // selection.clear only deselects, like object.select.
 const MustMutate = ['lighting.effects', 'lighting.restore', 'view.background', 'camera.fov', 'render.now', 'render.queue.enqueue', 'render.queue.start', 'render.queue.clear', 'render.queue.delete', 'render.queue.cancel', 'object.array.playback', 'packaging.fefco.playback'];
 
 describe ('Agent command catalog contract', () => {
