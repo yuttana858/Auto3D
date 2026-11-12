@@ -35,6 +35,7 @@ lighting-ui
 login-gate
 login-updates
 material-surface
+mcp-access
 mcp-consent
 mini-presentation
 module-panels

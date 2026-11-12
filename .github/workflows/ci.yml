@@ -2,7 +2,7 @@ name: CI
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
   workflow_dispatch:
 
 permissions:
@@ -53,8 +53,15 @@ jobs:
       - run: npm run build_engine
       - run: npm run build_engine_module
       - run: npm run build_website
+      - name: Verify isolated MCP pilot packaging without a duplicate validation job
+        run: |
+          node tools/build_pages.mjs
+          node tools/build_mcp_pilot.mjs
+          node tools/check_mcp_licenses.mjs build/mcp-pilot/MCP-LICENSES.txt
 
   browser:
+    # Do not allocate three software-GPU runners when validation already fails.
+    needs: validate
     # Real-browser regressions listed in test/browser/ci-suite.txt; add a test there once it passes reliably.
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     # Software-GPU tests are slow on hosted runners, so the suite is split across parallel shards.
@@ -62,7 +69,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 75
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         shard: [1, 2, 3]
     steps:
@@ -88,16 +95,21 @@ jobs:
           npm run preview_packaging > packaging-preview.log 2>&1 &
           for attempt in $(seq 90); do curl -sf http://127.0.0.1:8080/website/index.html > /dev/null && break; sleep 2; done
           for attempt in $(seq 90); do curl -sf http://127.0.0.1:8082/ > /dev/null && break; sleep 2; done
-          mkdir -p work; failed=()
+          mkdir -p work
           index=0
           while read -r name; do
             [ -z "$name" ] && continue
             index=$((index + 1))
             [ $(( (index - 1) % 3 + 1 )) -ne ${{ matrix.shard }} ] && continue
             echo "::group::$name"
+            # Only the shard that exercises the isolated pilot needs its generated assets.
+            if [ "$name" = mcp-access ]; then node tools/build_mcp_pilot.mjs; fi
             # The complete product flow includes many physical-material rebuilds under SwiftShader.
             case "$name" in primary-products) limit=1200 ;; *) limit=600 ;; esac
-            timeout "$limit" node "test/browser/$name.mjs" || failed+=("$name")
+            if ! timeout "$limit" node "test/browser/$name.mjs"; then
+              echo "::error::Browser regression failed: $name"
+              echo "::endgroup::"
+              exit 1
+            fi
             echo "::endgroup::"
           done < test/browser/ci-suite.txt
-          if [ ${#failed[@]} -gt 0 ]; then echo "Failed: ${failed[*]}"; exit 1; fi

@@ -33,3 +33,7 @@ Use shared `--workspace-menu-font-size`, `--workspace-help-font-size`, `--worksp
 # Board catalog
 
 Account catalog defaults, CSV parsing/validation, selector UI and editor styling live in `modules/packaging`. Host storage lives in `source/website/boarddatabase.js` and the authenticated Pages route; do not put it in AI. Keep allowance factors design-specific, preserve saved material snapshots when catalog records change, validate before mutation, and keep revision-based conflict checks. Never silently fall back to a local-only save if the account API fails. See `docs/board-database.md` and the applied `20261027185638_account_board_catalog` migration.
+
+# Actions spending and stacked work
+
+Keep active development PRs in draft and stack related increments into the current integration PR where practical. Draft conversion cancels superseded CI; draft pushes skip runner jobs. Validate locally and record the exact commit/results. Mark ready once the batch is complete and Actions quota is available; ready PR pushes run the full gate, so return to draft before further iterative work. Never treat quota failures or skipped checks as passing. CI already covers MCP; dispatch the separate isolated pilot workflow only when its downloadable artifact is needed. See docs/actions-cost-control.md. Do not change spending limits, bypass branch protection, or deploy as part of CI cost optimization.

@@ -2,7 +2,7 @@
 
 ## Live product profile editor — Auto3D 0.65.0 / Packaging 1.10.7 / Primary Products 0.14.0
 
-Edit model opens a split profile/3D workspace. Dimension callouts commit on Enter, preserving labels, custom materials, placement and Undo. Existing 3D controls stay on the original canvas. Includes main through #111 (horizontal orbit fix); CAD integration remains paused. See [release-0650.md](release-0650.md). Candidate, not deployed.
+Edit model opens a split profile/3D workspace. Dimension callouts commit on Enter, preserving labels, custom materials, placement and Undo. Existing 3D controls stay on the original canvas. Includes main through #111 (horizontal orbit fix); CAD integration remains paused. See [release-0650.md](release-0650.md). Candidate, not deployed. PR #110 also consolidates Actions validation and documents draft batching; see [Actions cost control](actions-cost-control.md).
 
 ## Horizontal orbit — Auto3D 0.64.1 / Packaging 1.10.7 / Primary Products 0.13.0
 
