@@ -43,7 +43,9 @@ async function upstreamJson (context, path, init = {}, credential = null)
     if (init.body !== undefined && !headers.has ('Content-Type')) { headers.set ('Content-Type', 'application/json'); }
     const target = new URL (meshyUrl (context, path));
     if (target.protocol !== 'https:') { return json ({ error : 'Invalid Meshy server configuration.' }, 503); }
-    const response = await fetch (target.toString (), { ...init, headers, redirect : 'error', signal : AbortSignal.timeout (30000) });
+    // Cloudflare Workers reject redirect: 'error'; use 'manual' and refuse any redirect so the key is never forwarded.
+    const response = await fetch (target.toString (), { ...init, headers, redirect : 'manual', signal : AbortSignal.timeout (30000) });
+    if (response.status >= 300 && response.status < 400 || response.type === 'opaqueredirect') { await response.body?.cancel (); return json ({ error : 'Meshy redirected the request; it was not followed.', code : 'MESHY_REQUEST_FAILED' }, 502); }
     if (response.status === 401) { await response.body?.cancel (); return json ({ error : 'Meshy rejected the saved key. Check the key.', code : 'MESHY_KEY_REJECTED' }, 401); }
     const text = (await boundedText (response, 4 * 1024 * 1024)).replaceAll (key, '[redacted]');
     let body = null;

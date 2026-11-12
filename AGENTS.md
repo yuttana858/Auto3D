@@ -12,6 +12,10 @@ The fixed motor-scale hero release is Auto3D 0.64.2 / Packaging 1.10.7 / Primary
 
 The staged hero pullbacks release is Auto3D 0.64.3 / Packaging 1.10.7 / Primary Products 0.13.0, based on main after #112. See docs/release-0643.md.
 
+The folding box closeup release is Auto3D 0.65.2 / Packaging 1.10.7 / Primary Products 0.14.0, based on main after #109. See docs/release-0652.md.
+
+The Meshy Workers fetch fix is Auto3D 0.65.3 / Packaging 1.10.7 / Primary Products 0.14.0, based on main after #115 (0.65.2). Cloudflare Workers reject `redirect: 'error'`; use `'manual'` and refuse 3xx. See docs/release-0653.md.
+
 # Agent-accessible features
 
 For every new PR, report the application version and PR number to the user. Keep the app version, package version and release notes aligned when preparing a release.
