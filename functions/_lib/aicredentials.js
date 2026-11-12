@@ -6,6 +6,8 @@ export function CredentialPath (owner)
     if (typeof owner !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test (owner)) { throw unavailable (); }
     return 'meshy/v1/' + owner;
 }
+// The organization key lives outside the per-account namespace so no account id can address it.
+export const SharedCredentialPath = 'meshy/shared/v1/organization';
 export function CredentialReady (env)
 {
     return !!env.AUTO3D_AI_CREDENTIALS_R2 && /^[a-fA-F0-9]{64}$/.test (env.AUTO3D_AI_KEY_ENCRYPTION_SECRET || '');
@@ -23,17 +25,20 @@ export function ValidateMeshyKey (value)
     }
     return value;
 }
-export async function StoreMeshyKey (env, owner, value)
+export async function StoreMeshyKey (env, owner, value) { return StoreAt (env, CredentialPath (owner), value); }
+export async function StoreSharedMeshyKey (env, value) { return StoreAt (env, SharedCredentialPath, value); }
+export async function ReadMeshyKey (env, owner) { return ReadAt (env, CredentialPath (owner)); }
+export async function ReadSharedMeshyKey (env) { return ReadAt (env, SharedCredentialPath); }
+async function StoreAt (env, path, value)
 {
     ValidateMeshyKey (value);
-    const path = CredentialPath (owner), key = await encryptionKey (env);
+    const key = await encryptionKey (env);
     const iv = crypto.getRandomValues (new Uint8Array (12));
     const ciphertext = await crypto.subtle.encrypt ({ name : 'AES-GCM', iv, additionalData : encoder.encode (path) }, key, encoder.encode (value));
     await env.AUTO3D_AI_CREDENTIALS_R2.put (path, JSON.stringify ({ version : 1, iv : Array.from (iv), ciphertext : Array.from (new Uint8Array (ciphertext)) }), { httpMetadata : { contentType : 'application/json', cacheControl : 'no-store' } });
 }
-export async function ReadMeshyKey (env, owner)
+async function ReadAt (env, path)
 {
-    const path = CredentialPath (owner);
     if (!env.AUTO3D_AI_CREDENTIALS_R2) { return null; }
     try {
         const object = await env.AUTO3D_AI_CREDENTIALS_R2.get (path);
@@ -55,6 +60,9 @@ export async function MeshyCredential (context)
     if (!context.data?.user?.id) { throw Object.assign (new Error ('Sign in to use Meshy.'), { status : 401 }); }
     const personal = await ReadMeshyKey (context.env, context.data.user.id);
     if (personal) { return { key : personal, shared : false }; }
+    // Administrator-saved organization key: used by every account without a personal key. Unreadable records fail closed.
+    const organization = await ReadSharedMeshyKey (context.env);
+    if (organization) { return { key : organization, shared : true }; }
     const shared = String (context.env.AUTO3D_AI_ALLOW_SHARED_KEY || '').toLowerCase () === 'true' ? String (context.env.MESHY_API_KEY || '').trim () : '';
     return { key : shared, shared : Boolean (shared) };
 }
