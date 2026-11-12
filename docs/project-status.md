@@ -2,7 +2,7 @@
 
 ## Bottle contents, optical walls and editable labels — Auto3D 0.66.0 / Primary Products 0.15.0 / Packaging 1.10.7
 
-Stacked in draft #110. Adds wall callouts, synchronized glass refraction/absorption, cavity-conforming static contents, and live image/SVG/text label authoring in Edit model. CAD layers remain untouched. See [release-0660.md](release-0660.md). Not deployed.
+Stacked in draft #110. Adds wall callouts, synchronized glass refraction/absorption, cavity-conforming static contents, and live image/SVG/text label authoring in Edit model. CAD layers remain untouched. Includes main through #113/#114. Local checks: 856 unit/integration tests, 66 MCP tests, lint, production/Pages and engine/module builds, and both profile/contents browser regressions passed; see [release-0660.md](release-0660.md) for commit scope. Hosted full-suite results remain outstanding while Actions quota is exhausted. Not deployed.
 
 ## Live product profile editor — Auto3D 0.65.0 / Packaging 1.10.7 / Primary Products 0.14.0
 
