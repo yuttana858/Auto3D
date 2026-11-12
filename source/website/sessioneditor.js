@@ -56,6 +56,7 @@ export function DropToFloorDelta (box, upVector)
 
 const Icons = {
     'primary-products' : '<path d="M6 2h5v4l2 4v12H4V10l2-4ZM4 14h9M17 7q4-2 7 0v14q-4 2-7 0ZM17 9q4 2 7 0"/>',
+    'molded-pulp' : '<path d="M2 16h4l2-6h3l2 6h2l2-6h3l2 6h2M2 19h22"/>',
     packaging : '<path d="M3 4h18v16H3Z M8 4v16 M16 4v16 M3 10h18"/>',
     dimension : '<path d="M4 3v18M20 3v18M4 12h16M8 8l-4 4 4 4m8-8 4 4-4 4"/>',
     select : '<path d="m6 3 13 10-7 1-3 7Z"/>', move : '<path d="M12 2v20M2 12h20m-13-7 3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3m14-6 3 3-3 3"/>',
@@ -235,7 +236,7 @@ export class SessionEditor
 
     ModelTools ()
     {
-        return [['ai', 'AI Generative', () => this.website.aiWorkspace?.Open ()], ['packaging', 'Packaging design', () => this.website.packagingPanel?.Open ()], ['primary-products', 'Primary Products', () => this.website.primaryProductsPanel?.Open ()], ['select', 'Select (V)', () => this.SetMode ('select')], ['move', 'Move (W)', () => this.SetMode ('translate')], ['rotate', 'Rotate (E)', () => this.SetMode ('rotate')], ['scale', 'Scale (R)', () => this.SetMode ('scale')], ['dimension', 'Dimensions · drag an edge', () => this.website.dimensions.SetActive (!this.website.dimensions.active)], ['duplicate', 'Duplicate object (Ctrl+D)', () => this.Duplicate ()], ['array', 'Array selected object', () => this.ArrayDialog ()], ['floor', 'Drop selected object to floor', () => this.DropToFloor ()], ['visible', 'Hide or show object (H)', () => this.ToggleVisibility ()], ['remove', 'Delete object', () => this.Delete ()], ['focus', 'Focus object (F)', () => this.Focus ()], ['fit', 'Fit all objects to screen', () => this.FitScene ()], ['update', 'Update selected model', () => this.UpdateModel ()], ['undo', 'Undo object edit (Ctrl+Z)', () => this.Undo ()], ['redo', 'Redo object edit (Ctrl+Shift+Z)', () => this.Redo ()], ['add', 'Add model', () => this.AddModel ()], ['save', 'Save or open session (Ctrl+S)', () => this.library.SaveDialog (true)], ['export', 'Export', () => this.Export ()], ['library', 'Model library', () => this.library.Open ()], ['commands', 'Command bar', () => this.commandBar.SetVisible (!this.commandBar.visible)]];
+        return [['ai', 'AI Generative', () => this.website.aiWorkspace?.Open ()], ['packaging', 'Packaging design', () => this.website.packagingPanel?.Open ()], ['primary-products', 'Primary Products', () => this.website.primaryProductsPanel?.Open ()], ['molded-pulp', 'Molded Pulp', () => this.website.moldedPulpPanel?.Open ()], ['select', 'Select (V)', () => this.SetMode ('select')], ['move', 'Move (W)', () => this.SetMode ('translate')], ['rotate', 'Rotate (E)', () => this.SetMode ('rotate')], ['scale', 'Scale (R)', () => this.SetMode ('scale')], ['dimension', 'Dimensions · drag an edge', () => this.website.dimensions.SetActive (!this.website.dimensions.active)], ['duplicate', 'Duplicate object (Ctrl+D)', () => this.Duplicate ()], ['array', 'Array selected object', () => this.ArrayDialog ()], ['floor', 'Drop selected object to floor', () => this.DropToFloor ()], ['visible', 'Hide or show object (H)', () => this.ToggleVisibility ()], ['remove', 'Delete object', () => this.Delete ()], ['focus', 'Focus object (F)', () => this.Focus ()], ['fit', 'Fit all objects to screen', () => this.FitScene ()], ['update', 'Update selected model', () => this.UpdateModel ()], ['undo', 'Undo object edit (Ctrl+Z)', () => this.Undo ()], ['redo', 'Redo object edit (Ctrl+Shift+Z)', () => this.Redo ()], ['add', 'Add model', () => this.AddModel ()], ['save', 'Save or open session (Ctrl+S)', () => this.library.SaveDialog (true)], ['export', 'Export', () => this.Export ()], ['library', 'Model library', () => this.library.Open ()], ['commands', 'Command bar', () => this.commandBar.SetVisible (!this.commandBar.visible)]];
     }
 
     ToolDisabled (key)
@@ -257,7 +258,7 @@ export class SessionEditor
         const historyTools = Element ('div', 'session_history_tools', undefined, document.getElementById ('toolbar')); historyTools.setAttribute ('role', 'group'); historyTools.setAttribute ('aria-label', 'Edit history'); document.getElementById ('toolbar').prepend (historyTools);
         const tools = this.ModelTools ().filter (([key]) => !stripHidden.has (key));
         for (const [key, label, action] of tools) {
-            const button = Element ('button', 'scene_tool', undefined, ['ai', 'packaging', 'primary-products'].includes (key) ? moduleTools : ['undo', 'redo'].includes (key) ? historyTools : this.strip); button.title = label; button.setAttribute ('aria-label', label); button.innerHTML = '<svg viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">' + Icons[key] + '</svg>';
+            const button = Element ('button', 'scene_tool', undefined, ['ai', 'packaging', 'primary-products', 'molded-pulp'].includes (key) ? moduleTools : ['undo', 'redo'].includes (key) ? historyTools : this.strip); button.title = label; button.setAttribute ('aria-label', label); button.innerHTML = '<svg viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">' + Icons[key] + '</svg>';
             button.addEventListener ('click', async () => { if (['undo', 'redo'].includes (key)) { button.setAttribute ('aria-busy', 'true'); button.disabled = true; try { await this.Run (action); } finally { button.removeAttribute ('aria-busy'); this.RefreshButtons (); } } else { await this.Run (action); } }); this.buttons.set (key, button);
         }
         this.transformPanel = Element ('div', 'scene_transform_panel', undefined, this.website.parameters.viewerDiv); this.transformPanel.hidden = true;
@@ -720,7 +721,7 @@ export class SessionEditor
     RefreshButtons ()
     {
         this.website?.dimensions?.Draw (this.website.viewer.camera);
-        this.website?.primaryProductsPanel?.RefreshAvailability ();
+        this.website?.primaryProductsPanel?.RefreshAvailability (); this.website?.moldedPulpPanel?.RefreshAvailability ();
         this.processing?.Sync (this.busy && !this.packaging?.foldOperation && !this.packaging?.dimensionUpdating && this.arrayOperation?.stage !== 'revealing' && !this.website?.rendering?.running); this.commandBar?.SetBusy (this.busy);
         this.website?.packagingPanel?.fefcoPanel?.SetDisabled ();
         for (const [key, button] of this.buttons) {

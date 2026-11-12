@@ -19,7 +19,7 @@ try {
     await page.goto ('https://auto3d.test/'); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
     const call = async (id, args = {}) => { if (process.env.PRIMARY_TEST_PROGRESS) { console.log (id); } const response = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (response.ok, true, JSON.stringify (response)); return response.result; };
     const group = page.getByRole ('group', { name : 'Generation modules', exact : true });
-    assert.deepEqual (await group.getByRole ('button').evaluateAll (nodes => nodes.map (node => node.getAttribute ('aria-label'))), ['AI Generative', 'Packaging design', 'Primary Products']);
+    assert.deepEqual (await group.getByRole ('button').evaluateAll (nodes => nodes.map (node => node.getAttribute ('aria-label'))), ['AI Generative', 'Packaging design', 'Primary Products', 'Molded Pulp']);
     assert.notEqual (await group.evaluate (node => getComputedStyle (node).borderTopStyle), 'none');
     assert.equal (requests.some (url => url.includes ('primary-products.module')), false);
     await page.locator ('#open_file').setInputFiles ('test/testfiles/gltf/BoxTextured/glTF-Binary/BoxTextured.glb');
