@@ -338,7 +338,7 @@
 @media (max-width: 650px) { .ai_workspace_panel[data-mode="extended"] .ai_workspace_pane { grid-template-columns: minmax(0, 1fr); } }
 .ai_project_toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 .ai_project_toolbar input { min-width: 80px; flex: 1; }
-.ai_preview_host { position: relative; min-height: 280px; background: #20262e; overflow: hidden; border-radius: 6px; }
+.ai_preview_host { position: relative; min-height: 280px; background: #1e2024; overflow: hidden; border-radius: 6px; }
 .ai_preview_host canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .ai_preview_message { position: absolute; inset: 45% 12px auto; color: #e4e9f0; text-align: center; z-index: 1; pointer-events: none; }
 .ai_image_preview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
@@ -373,3 +373,34 @@
 .ai_workspace_panel[data-mode="extended"] .ai_preview_button { padding: 2px 6px; }
 .ai_workspace_panel[data-mode="extended"] .ai_recent_actions { padding: 2px 4px; }
 .ai_workspace_panel[data-mode="extended"] .ai_recent_actions button { padding: 2px 4px; }
+
+/* Viewer controls shared by the 3D preview and the 2D image viewer. */
+.ai_viewer_tools { position: absolute; top: 8px; right: 8px; z-index: 3; display: flex; gap: 4px; }
+.ai_viewer_tools button { min-width: 30px; height: 28px; padding: 0 8px; border: 1px solid rgba(255,255,255,.18); border-radius: 4px; background: rgba(20,22,26,.72); color: #e4e9f0; font: inherit; font-size: var(--workspace-meta-font-size, 12px); cursor: pointer; }
+.ai_viewer_tools button:hover { background: rgba(40,44,52,.9); }
+.ai_viewer_hint { position: absolute; left: 8px; bottom: 6px; z-index: 2; color: rgba(228,233,240,.6); font-size: var(--workspace-help-font-size, 11px); pointer-events: none; }
+.ai_preview_host.showing_image canvas { visibility: hidden; }
+.ai_preview_host.showing_image .ai_viewer_hint { visibility: hidden; }
+.ai_image_viewer { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; background: #1e2024; }
+.ai_image_viewer[hidden] { display: none; }
+.ai_image_stage { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; cursor: grab; touch-action: none; background: repeating-conic-gradient(#24272c 0% 25%, #1e2024 0% 50%) 50% / 24px 24px; }
+.ai_image_stage:active { cursor: grabbing; }
+.ai_image_view { position: absolute; left: 0; top: 0; max-width: none; transform-origin: 0 0; user-select: none; }
+.ai_image_caption { flex: 0 0 auto; padding: 4px 8px; color: #e4e9f0; font-size: var(--workspace-meta-font-size, 12px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ai_image_strip { flex: 0 0 auto; display: flex; gap: 6px; padding: 0 8px 8px; overflow-x: auto; }
+.ai_image_strip[hidden] { display: none; }
+.ai_image_thumb { flex: 0 0 auto; width: 52px; height: 52px; padding: 0; border: 2px solid transparent; border-radius: 4px; background: #111; cursor: pointer; }
+.ai_image_thumb.selected { border-color: var(--ov_button_color); }
+.ai_image_thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 2px; }
+
+.ai_texture_prompt_label { display: flex; flex-direction: column; gap: 4px; font-size: var(--workspace-menu-font-size, 13px); }
+.ai_texture_prompt { width: 100%; box-sizing: border-box; resize: vertical; padding: 6px; border: 1px solid var(--ov_border_color); border-radius: 4px; background: var(--ov_background_color); color: var(--ov_foreground_color); font: inherit; }
+.ai_revise_banner { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border: 1px solid var(--ov_button_color); border-radius: 4px; font-size: var(--workspace-help-font-size, 12px); }
+.ai_revise_banner[hidden] { display: none; }
+.ai_recent_actions { flex-wrap: wrap; }
+.ai_recent_actions button { flex: 1 1 auto; min-width: 0; padding: 2px 4px; font-size: var(--workspace-meta-font-size, 11px); }
+.ai_workspace_panel[data-mode="extended"] .ai_recent_card { height: auto; min-height: 165px; }
+
+.ai_shared_key_section { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--ov_border_color); }
+.ai_shared_key_section[hidden] { display: none; }
+.ai_shared_key_section label { display: flex; flex-direction: column; gap: 4px; }
