@@ -79,6 +79,8 @@ jobs:
 
       - name: Verify deployed version and bundle
         run: node tools/verify_deployment.mjs https://auto3d-5av.pages.dev "${GITHUB_SHA}"
+      - name: Verify animated landing and existing login routes
+        run: node tools/verify_landing_deployment.mjs https://auto3d-5av.pages.dev
       - name: Verify Meshy UI and credential authentication boundary
         run: node tools/verify_meshy_deployment.mjs https://auto3d-5av.pages.dev
       - name: Verify live MCP discovery and authentication boundary
