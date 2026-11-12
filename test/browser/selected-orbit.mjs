@@ -8,7 +8,7 @@ try {
     await page.route ('**/api/auth/**', r => r.fulfill ({ json : { user : { id : 'orbit', email : 'test@example.com' } } }));
     await page.route ('**/api/preferences', r => r.fulfill ({ json : { preferences : { theme : 2, units : 'metric' }, folders : [] } }));
     for (const path of ['accounts/**', 'personal/items', 'environments']) { await page.route ('**/api/' + path, r => r.fulfill ({ json : path.startsWith ('accounts') ? { isAdmin : false } : [] })); }
-    await page.goto ('http://127.0.0.1:8080/website/index.html'); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
+    await page.goto (process.env.AUTO3D_TEST_URL || 'http://127.0.0.1:8080/website/index.html'); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
     const call = async (id, args = {}) => { const r = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (r.ok, true, JSON.stringify (r)); return r.result; };
     const labels = await page.locator ('.scene_tools button').evaluateAll (nodes => nodes.map (node => node.getAttribute ('aria-label'))); for (const text of ['Hide or show', 'Delete object', 'Model library', 'Save or open', 'Export', 'Add model']) { assert.equal (labels.some (label => label.startsWith (text)), false); }
     assert.equal (await page.locator ('.header_library_button').count () > 0, true);
@@ -19,6 +19,7 @@ try {
     // Focus keeps the camera position and aims the orbit center at the selection.
     const focused = await call ('camera.current.inspect'); assert.deepEqual (focused.eye, before.eye); assert.deepEqual (focused.center, focus.pivot); assert.equal (focused.fov, before.fov);
     const canvas = page.locator ('#main_viewer canvas').first (); const area = await canvas.boundingBox (); const point = { x : area.x + area.width * .6, y : area.y + area.height * .45 };
+    await page.mouse.move (point.x, point.y); await page.mouse.down ({ button : 'right' }); await page.mouse.move (point.x + 35, point.y, { steps : 8 }); await page.mouse.up ({ button : 'right' }); const horizontal = await call ('camera.current.inspect'); assert.notDeepEqual (horizontal.eye, focused.eye); assert.deepEqual (horizontal.up, focused.up);
     await page.mouse.move (point.x, point.y); await page.mouse.down ({ button : 'right' }); await page.mouse.move (point.x + 65, point.y + 25, { steps : 8 }); await page.mouse.up ({ button : 'right' });
     const after = await call ('camera.current.inspect'); const span = camera => Math.hypot (...camera.eye.map ((v, i) => v - camera.center[i]));
     /* Main viewer: right-drag orbits around the selected model; the view center stays on it and the viewing distance is unchanged. */
