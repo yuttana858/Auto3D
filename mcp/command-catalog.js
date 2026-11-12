@@ -280,6 +280,8 @@ export const CommandIds = Object.freeze ([
     'ai.reference.open',
     'ai.creation.refine',
     'ai.creation.generate_texture',
+    'ai.creation.revise',
+    'ai.viewer.control',
     'ai.generate',
     'ui.ai',
     'ui.ai.packaging',

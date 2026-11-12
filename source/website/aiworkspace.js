@@ -6,6 +6,14 @@ import { UnitFactor } from './preferences.js';
 import * as THREE from 'three';
 
 const AIStorageKey = 'auto3d-ai-connections-v1';
+// Current Meshy image models (openapi.json, 2026-11-12). GPT Image models also accept 3:2 and 2:3.
+export const AIImageModels = ['nano-banana', 'nano-banana-2', 'nano-banana-2-lite', 'nano-banana-2-1', 'nano-banana-pro', 'gpt-image-2', 'gpt-image-2-5-flare', 'gpt-image-2-5-sunburst', 'gpt-image-2-6-flare', 'gpt-image-2-6-sunburst'];
+export const AIAspectRatios = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'];
+export const AIGenerationActions = ['text3d', 'image3d', 'multiimage3d', 'textimage', 'texture', 'rigging', 'animations'];
+const ReferenceImageLimit = 20 * 1024 * 1024, ReferenceImageCount = 4;
+const ImageRouteTypes = new Set (['text-to-image', 'image-to-image']);
+function AspectAllowed (model, aspect) { return AIAspectRatios.includes (aspect) && (model.startsWith ('gpt-image') || !['3:2', '2:3'].includes (aspect)); }
+const RouteLabels = { 'text-to-3d' : 'Text to 3D', 'image-to-3d' : 'Image to 3D', 'multi-image-to-3d' : 'Multi-image to 3D', 'text-to-image' : 'Text to image', 'image-to-image' : 'Image revision', retexture : 'Texture', rigging : 'Rig', animations : 'Animation' };
 
 function Element (tag, className, text, parent)
 {
@@ -48,7 +56,7 @@ export class AIWorkspace
     constructor (website)
     {
         this.website = website;
-        this.imageFile = null;
+        this.imageFile = null; this.imageFiles = []; this.revising = null;
         this.recent = []; this.assets = new Map (); this.selectedTask = null; this.previewSequence = 0;
         this.settings = this.LoadSettings ();
         this.CreateHeaderButton ();
@@ -110,11 +118,17 @@ export class AIWorkspace
         this.aiPane = Element ('div', 'ai_workspace_pane', undefined, panel);
         this.previewHost = Element ('div', 'ai_preview_host', undefined, this.aiPane); this.previewHost.setAttribute ('aria-label', 'AI model viewer'); this.previewHost.tabIndex = 0;
         this.previewMessage = Element ('p', 'ai_preview_message', 'Select a completed creation to preview', this.previewHost);
+        const viewerTools = Element ('div', 'ai_viewer_tools', undefined, this.previewHost);
+        for (const [action, label, title] of [['zoomOut', '−', 'Zoom out'], ['fit', 'Fit', 'Fit to view'], ['zoomIn', '+', 'Zoom in']]) {
+            const button = Element ('button', null, label, viewerTools); button.type = 'button'; button.title = title; button.setAttribute ('aria-label', title);
+            button.addEventListener ('click', () => this.Run (() => this.ViewerControl (action)));
+        }
+        Element ('span', 'ai_viewer_hint', 'Drag to orbit · right-drag or Shift+drag to pan · scroll to zoom', this.previewHost);
         const inputSection = Element ('div', 'ai_workspace_section ai_input_section', undefined, this.aiPane);
         Element ('strong', null, 'Create', inputSection);
         this.prompt = Element ('textarea', 'ai_prompt', undefined, inputSection); this.prompt.rows = 4; this.prompt.maxLength = 800; this.prompt.placeholder = 'Describe the object, image, or texture you want to create…'; this.prompt.setAttribute ('aria-label', 'AI generation prompt'); this.prompt.addEventListener ('input', () => this.RefreshActions ());
         this.generateButton = Element ('button', 'ai_generate_button', 'Generate', inputSection); this.generateButton.type = 'button'; this.generateButton.setAttribute ('aria-keyshortcuts', 'Enter');
-        this.generateButton.addEventListener ('click', () => this.Run (() => this.Generate (this.UIOptions (this.PrimaryGenerationAction ()))));
+        this.generateButton.addEventListener ('click', () => this.Run (() => this.revising ? this.Revise (this.revising, this.prompt.value.trim ()) : this.Generate (this.UIOptions (this.PrimaryGenerationAction ()))));
         this.prompt.addEventListener ('keydown', event => {
             if (event.key !== 'Enter' || event.shiftKey || event.isComposing || event.repeat || this.generateButton.disabled) { return; }
             event.preventDefault (); this.generateButton.click ();
@@ -134,24 +148,33 @@ export class AIWorkspace
         const pbrLabel = Element ('label', 'ai_checkbox_label', undefined, generationOptions);
         this.pbrCheckbox = Element ('input', null, undefined, pbrLabel); this.pbrCheckbox.type = 'checkbox'; this.pbrCheckbox.checked = true;
         pbrLabel.appendChild (document.createTextNode (' PBR textures'));
+        const textureLabel0 = Element ('label', 'ai_texture_prompt_label', 'Texture prompt (optional)', inputSection);
+        this.texturePrompt = Element ('textarea', 'ai_texture_prompt', undefined, textureLabel0); this.texturePrompt.rows = 2; this.texturePrompt.maxLength = 800; this.texturePrompt.placeholder = 'Glazed white ceramic, matte black rim…'; this.texturePrompt.setAttribute ('aria-label', 'Texture prompt');
+        this.reviseBanner = Element ('div', 'ai_revise_banner', undefined, inputSection); this.reviseBanner.hidden = true; this.reviseText = Element ('span', null, '', this.reviseBanner);
+        const cancelRevision = Element ('button', null, 'Cancel revision', this.reviseBanner); cancelRevision.type = 'button'; cancelRevision.addEventListener ('click', () => this.CancelRevision ());
 
         const imageRow = Element ('div', 'ai_image_row', undefined, inputSection);
-        this.imageInput = Element ('input', null, undefined, imageRow); this.imageInput.type = 'file'; this.imageInput.accept = 'image/png,image/jpeg,image/webp'; this.imageInput.hidden = true;
-        this.imageButton = Element ('button', null, 'Upload reference image', imageRow); this.imageButton.addEventListener ('click', () => this.OpenReferencePicker ());
+        this.imageInput = Element ('input', null, undefined, imageRow); this.imageInput.type = 'file'; this.imageInput.accept = 'image/png,image/jpeg,image/webp'; this.imageInput.multiple = true; this.imageInput.hidden = true;
+        this.imageButton = Element ('button', null, 'Upload reference images (1–4)', imageRow); this.imageButton.addEventListener ('click', () => this.OpenReferencePicker ());
         this.imageName = Element ('span', 'ai_image_name', 'No image selected', imageRow);
-        this.imageInput.addEventListener ('change', () => { this.imageFile = this.imageInput.files[0] || null; this.imageName.textContent = this.imageFile?.name || 'No image selected'; this.RefreshActions (); });
+        this.imageInput.addEventListener ('change', () => this.Run (() => this.SetReferenceFiles ([...this.imageInput.files])));
 
         const actions = Element ('div', 'ai_generation_actions', undefined, inputSection);
         this.actionButtons = new Map ();
-        for (const [id, label] of [['text3d', 'Text to 3D'], ['image3d', 'Image to 3D'], ['textimage', 'Text to image'], ['texture', 'Texture generation']]) {
+        for (const [id, label] of [['text3d', 'Text to 3D'], ['image3d', 'Image to 3D'], ['multiimage3d', 'Multi-image to 3D'], ['textimage', 'Text to image'], ['texture', 'Texture generation']]) {
             const button = Element ('button', 'ai_generation_action', label, actions);
             button.addEventListener ('click', () => this.Run (() => this.Generate (this.UIOptions (id))));
             this.actionButtons.set (id, button);
         }
         const scaleLabel = Element ('label', null, 'Model scale', inputSection); this.scaleInput = Element ('input', null, undefined, scaleLabel); this.scaleInput.type = 'number'; this.scaleInput.min = '.001'; this.scaleInput.max = '1000'; this.scaleInput.step = '.01'; this.scaleInput.value = '1'; this.scaleInput.setAttribute ('aria-label', 'AI model scale'); this.scaleInput.addEventListener ('change', () => this.Run (() => this.SetScale (Number (this.scaleInput.value))));
-        const imageLabel = Element ('label', null, 'Image model', inputSection); this.imageModel = Element ('select', null, undefined, imageLabel); for (const name of ['nano-banana', 'nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2']) { this.imageModel.add (new Option (name, name)); }
-        const aspectLabel = Element ('label', null, 'Image aspect ratio', inputSection); this.aspect = Element ('select', null, undefined, aspectLabel); for (const ratio of ['1:1', '16:9', '9:16', '4:3', '3:4']) { this.aspect.add (new Option (ratio, ratio)); }
+        const imageLabel = Element ('label', null, 'Image model', inputSection); this.imageModel = Element ('select', null, undefined, imageLabel); for (const name of AIImageModels) { this.imageModel.add (new Option (name, name)); } this.imageModel.addEventListener ('change', () => this.RefreshImageOptions ());
+        const aspectLabel = Element ('label', null, 'Image aspect ratio', inputSection); this.aspect = Element ('select', null, undefined, aspectLabel); for (const ratio of AIAspectRatios) { this.aspect.add (new Option (ratio, ratio)); }
+        const imageFlags = Element ('div', 'ai_generation_options', undefined, inputSection);
+        const multiLabel = Element ('label', 'ai_checkbox_label', undefined, imageFlags); this.multiView = Element ('input', null, undefined, multiLabel); this.multiView.type = 'checkbox'; multiLabel.appendChild (document.createTextNode (' 4-view image')); multiLabel.title = 'Generate front/side/back views for Multi-image to 3D. Ignores aspect ratio.';
+        const cutoutLabel = Element ('label', 'ai_checkbox_label', undefined, imageFlags); this.removeBackground = Element ('input', null, undefined, cutoutLabel); this.removeBackground.type = 'checkbox'; cutoutLabel.appendChild (document.createTextNode (' Remove background'));
+        this.multiView.addEventListener ('change', () => this.RefreshImageOptions ());
         const textureLabel = Element ('label', null, 'Texture resolution', inputSection); this.textureResolution = Element ('select', null, undefined, textureLabel); for (const res of ['2k', '4k']) { this.textureResolution.add (new Option (res.toUpperCase (), res)); }
+        this.RefreshImageOptions ();
         this.status = Element ('p', 'section_hint ai_status', 'Connect a provider in Preferences to enable the generation workspace.', inputSection);
 
         const recentSection = Element ('div', 'ai_workspace_section ai_recent_section', undefined, this.aiPane);
@@ -229,10 +252,16 @@ export class AIWorkspace
         const selected = this.recent.find (item => item.id === this.selectedTask);
         const hasPrompt = !!this.prompt?.value.trim ();
         const hasImage = !!this.imageFile || !!selected?.imageUrl;
+        const hasViews = (this.imageFiles?.length || 0) > 1 || (!this.imageFiles?.length && ImageRouteTypes.has (selected?.route) && selected?.status === 'SUCCEEDED');
         const busy = !!this.submitting;
-        if (this.generateButton) { this.generateButton.disabled = !connected || busy || (this.PrimaryGenerationAction () === 'text3d' ? !hasPrompt : !hasImage); }
+        if (this.generateButton) {
+            const primary = this.PrimaryGenerationAction ();
+            this.generateButton.disabled = !connected || busy || (this.revising ? !hasPrompt : primary === 'text3d' ? !hasPrompt : primary === 'multiimage3d' ? !hasViews : !hasImage);
+            this.generateButton.textContent = this.revising ? 'Submit revision' : 'Generate';
+        }
         this.actionButtons.get ('text3d').disabled = !connected || busy || !hasPrompt;
         this.actionButtons.get ('image3d').disabled = !connected || busy || !hasImage;
+        this.actionButtons.get ('multiimage3d').disabled = !connected || busy || !hasViews;
         this.actionButtons.get ('textimage').disabled = !connected || busy || !hasPrompt;
         this.actionButtons.get ('texture').disabled = !connected || busy || (!selected?.modelUrl && !this.assets.has (selected?.id)) || (!hasPrompt && !this.imageFile);
         if (this.addButton) { this.addButton.disabled = !this.assets.has (this.selectedTask); }
@@ -261,29 +290,87 @@ export class AIWorkspace
     async StartTextTo3D () { return this.Generate (this.UIOptions ('text3d')); }
     async PollTextTo3DTask (id) { return this.PollTask ('text-to-3d', id); }
 
-    async RefineTask (item)
+    async RefineTask (item, { texturePrompt = this.texturePrompt?.value.trim () || '', revisionOf = null } = {})
     {
         this.AssertEditable ();
         if (!item?.id || item.status !== 'SUCCEEDED' || item.type !== 'text-to-3d-preview') { throw new Error ('Select a completed Text to 3D preview.'); }
-        const owner = this.website.auth.user.id;
-        const { result } = await this.RequestJSON (this.settings.baseUrl + '/text-to-3d', { method : 'POST', headers : this.Headers (true), body : JSON.stringify ({ mode : 'refine', preview_task_id : item.id, enable_pbr : this.pbrCheckbox.checked, texture_resolution : this.textureResolution.value, target_formats : ['glb'] }) });
+        if (typeof texturePrompt !== 'string' || texturePrompt.length > 800) { throw new Error ('Texture prompt must be 800 characters or fewer.'); }
+        if (this.submitting) { throw new Error ('A generation is already being submitted.'); }
+        const owner = this.website.auth.user.id; this.submitting = true; let result;
+        try { ({ result } = await this.RequestJSON (this.settings.baseUrl + '/text-to-3d', { method : 'POST', headers : this.Headers (true), body : JSON.stringify ({ mode : 'refine', preview_task_id : item.id, enable_pbr : this.pbrCheckbox?.checked ?? true, texture_resolution : this.textureResolution?.value || '2k', target_formats : ['glb'], ...(texturePrompt.trim () ? { texture_prompt : texturePrompt.trim () } : {}) }) })); }
+        finally { this.submitting = false; this.RefreshActions (); }
         if (typeof result.result !== 'string' || !result.result) { throw new Error ('Provider did not return a task ID.'); }
-        const task = { id : result.result, name : item.name, status : 'PENDING', progress : 0, route : 'text-to-3d', type : 'text-to-3d-refine', provider : 'Meshy', createdAt : Date.now () }; this.UpsertTask (task);
+        const task = { id : result.result, name : item.name, texturePrompt : texturePrompt.trim () || null, status : 'PENDING', progress : 0, route : 'text-to-3d', type : 'text-to-3d-refine', provider : 'Meshy', createdAt : Date.now (), parentId : item.id, ...(revisionOf ? { revisionOf } : {}) }; this.UpsertTask (task);
         this.PollTask ('text-to-3d', task.id, owner).catch (error => { if (owner === this.website.auth?.user?.id) { this.status.textContent = error.message; } }); return { queued : task.id, route : task.route };
     }
 
     async ImportTask (item) { await this.SelectTask (item.id); return this.AddSelected (); }
 
+    // A revision resubmits a completed creation's source with an edited prompt. Each revision is a new paid task;
+    // the original stays in history. Meshy's free geometry retry is not in its public API.
+    RevisionPlan (item)
+    {
+        if (!item || item.status !== 'SUCCEEDED') { throw new Error ('Select a completed creation to revise.'); }
+        const type = item.type || item.route;
+        if (type === 'text-to-3d-preview') { return { kind : 'text3d', label : 'Edit the 3D prompt', prompt : item.prompt || item.name || '' }; }
+        if (type === 'text-to-3d-refine' || type === 'text-to-3d') {
+            const parent = this.recent.find (task => task.id === item.parentId);
+            if (!parent) { throw new Error ('Revise this model from its Text to 3D preview: the preview is not in this history.'); }
+            return { kind : 'refine', parent, label : 'Edit the texture prompt', prompt : item.texturePrompt || '' };
+        }
+        if (ImageRouteTypes.has (type)) { return { kind : 'image', label : 'Describe the change to this image', prompt : '' }; }
+        if (type === 'image-to-3d' || type === 'multi-image-to-3d') { return { kind : type, label : 'Describe the texture for a new model from the same images', prompt : item.texturePrompt || '' }; }
+        if (type === 'retexture') { return { kind : 'retexture', label : 'Edit the texture prompt', prompt : item.texturePrompt || item.name || '' }; }
+        throw new Error ('This creation type cannot be revised.');
+    }
+    StartRevision (id)
+    {
+        this.AssertEditable (); const item = this.recent.find (task => task.id === id); const plan = this.RevisionPlan (item);
+        this.revising = id; this.prompt.value = plan.prompt; this.reviseText.textContent = 'Revising “' + (item.name || 'creation') + '” · ' + plan.label;
+        this.reviseBanner.hidden = false; this.prompt.focus (); this.RefreshActions (); return { revising : id, kind : plan.kind, prompt : plan.prompt };
+    }
+    CancelRevision () { this.revising = null; if (this.reviseBanner) { this.reviseBanner.hidden = true; } this.RefreshActions (); return { revising : null }; }
+    async Revise (id, prompt)
+    {
+        this.AssertEditable ();
+        if (typeof prompt !== 'string' || !prompt.trim () || prompt.length > 800) { throw new Error ('Enter a revision prompt of up to 800 characters.'); }
+        const item = this.recent.find (task => task.id === id); const plan = this.RevisionPlan (item); const text = prompt.trim ();
+        const base = { ...this.UIOptions ('text3d'), taskId : id, revisionOf : id };
+        let result;
+        if (plan.kind === 'text3d') { result = await this.Generate ({ ...base, action : 'text3d', prompt : text, texturePrompt : '' }); }
+        else if (plan.kind === 'refine') { result = await this.RefineTask (plan.parent, { texturePrompt : text, revisionOf : id }); }
+        else if (plan.kind === 'image') { result = await this.EditImage (item, text, base.imageModel); }
+        else if (plan.kind === 'retexture') { result = await this.Generate ({ ...base, action : 'texture', prompt : text, reuseInput : true }); }
+        else { result = await this.Generate ({ ...base, action : plan.kind === 'image-to-3d' ? 'image3d' : 'multiimage3d', prompt : '', texturePrompt : text, reuseInput : true }); }
+        this.CancelRevision (); return result;
+    }
+    async EditImage (item, prompt, imageModel)
+    {
+        this.AssertEditable (); if (this.submitting) { throw new Error ('A generation is already being submitted.'); }
+        if (!AIImageModels.includes (imageModel)) { throw new Error ('Choose a supported image model.'); }
+        const owner = this.website.auth.user.id; this.submitting = true; let result;
+        try { ({ result } = await this.RequestJSON (this.settings.baseUrl + '/image-to-image', { method : 'POST', headers : this.Headers (true), body : JSON.stringify ({ ai_model : imageModel, input_task_id : item.id, prompt }) })); }
+        finally { this.submitting = false; this.RefreshActions (); }
+        if (typeof result.result !== 'string' || !result.result) { throw new Error ('Provider did not return a task ID.'); }
+        const task = { id : result.result, route : 'image-to-image', type : 'image-to-image', name : prompt, status : 'PENDING', progress : 0, createdAt : Date.now (), provider : 'Meshy', parentId : item.id, revisionOf : item.id }; this.UpsertTask (task);
+        this.PollTask ('image-to-image', task.id, owner).catch (error => { if (owner === this.website.auth?.user?.id) { this.status.textContent = error.message; } }); return { queued : task.id, route : task.route };
+    }
+
     NormalizeMeshyTask (item)
     {
+        const route = item.route || (item.type?.startsWith ('text-to-3d') ? 'text-to-3d' : item.type === 'animate' ? 'animations' : item.type);
+        const images = Array.isArray (item.image_urls) ? item.image_urls.filter (url => typeof url === 'string' && url) : [];
+        const texturePrompt = item.texture_prompt || item.text_style_prompt || null;
         return {
             id : item.id,
-            name : item.prompt || (item.type === 'image-to-3d' ? 'Image to 3D' : 'Text to 3D'),
+            name : item.prompt || texturePrompt || RouteLabels[route] || 'Generated asset',
             status : item.status || 'UNKNOWN',
             progress : Number.isFinite (item.progress) ? item.progress : null,
-            thumbnail : item.thumbnail_url || item.image_urls?.[0] || null,
-            imageUrl : item.image_urls?.[0] || null,
-            route : item.route || (item.type?.startsWith ('text-to-3d') ? 'text-to-3d' : item.type === 'animate' ? 'animations' : item.type),
+            thumbnail : item.thumbnail_url || images[0] || null,
+            imageUrl : images[0] || null,
+            imageUrls : images.length ? images : null,
+            texturePrompt,
+            route,
             modelUrl : item.model_urls?.glb || item.result?.rigged_character_glb_url || item.result?.animation_glb_url || null,
             createdAt : item.created_at || null,
             type : item.type || null,
@@ -296,7 +383,11 @@ export class AIWorkspace
     {
         const index = this.recent.findIndex ((item) => item.id === task.id);
         if (index === -1) { this.recent.unshift (task); }
-        else { this.recent[index] = { ...this.recent[index], ...task }; }
+        else {
+            // Provider refreshes renew signed URLs but omit local fields; keep known values instead of erasing them.
+            const merged = { ...this.recent[index] }; for (const [key, value] of Object.entries (task)) { if (value !== null && value !== undefined) { merged[key] = value; } }
+            if (task.thumbnail) { delete merged.thumbnailFailed; } this.recent[index] = merged;
+        }
         this.recent.sort ((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
         this.recent = this.recent.filter ((item, index) => index < 48 || this.assets.has (item.id));
         this.RenderRecent (); this.ScheduleWorkspaceSave ();
@@ -304,42 +395,77 @@ export class AIWorkspace
 
     async Run (action) { try { return await action (); } catch (error) { this.status.textContent = error.message; return null; } }
     AssertEditable () { if (this.website.sessionEditor.readOnly || !this.website.auth?.user?.id) { throw new Error ('Sign in to an editable workspace.'); } }
-    Inspect () { return { selected : this.selectedTask, tasks : this.recent.map (item => ({ ...item, loaded : this.assets.has (item.id), scale : this.assets.get (item.id)?.scale || 1 })), models : this.assets.size }; }
+    Inspect () { return { selected : this.selectedTask, revising : this.revising || null, references : this.imageFiles?.length || 0, viewer : this.previewHost?.classList.contains ('showing_image') ? this.imageViewer?.State () : this.preview?.root ? this.preview.State () : null, tasks : this.recent.map (item => ({ ...item, loaded : this.assets.has (item.id), scale : this.assets.get (item.id)?.scale || 1 })), models : this.assets.size }; }
     UIOptions (action)
     {
-        return { action, prompt : this.prompt.value.trim (), detail : this.detailSelect.value, pbr : this.pbrCheckbox.checked, textureResolution : this.textureResolution.value, imageModel : this.imageModel.value, aspect : this.aspect.value, taskId : this.selectedTask };
+        return { action, prompt : this.prompt.value.trim (), texturePrompt : this.texturePrompt?.value.trim () || '', detail : this.detailSelect.value, pbr : this.pbrCheckbox.checked, textureResolution : this.textureResolution.value, imageModel : this.imageModel.value, aspect : this.aspect.value, multiView : !!this.multiView?.checked, removeBackground : !!this.removeBackground?.checked, taskId : this.selectedTask };
     }
     PrimaryGenerationAction ()
     {
         const selected = this.recent.find (item => item.id === this.selectedTask);
+        if ((this.imageFiles?.length || 0) > 1) { return 'multiimage3d'; }
         return this.imageFile || (!this.prompt.value.trim () && selected?.imageUrl) ? 'image3d' : 'text3d';
     }
+    ValidateReferenceFiles (files)
+    {
+        if (files.length > ReferenceImageCount) { throw new Error ('Choose up to ' + ReferenceImageCount + ' reference images.'); }
+        if (files.some (file => !['image/png', 'image/jpeg', 'image/webp'].includes (file.type))) { throw new Error ('Choose PNG, JPG or WebP images.'); }
+        // Requests are bounded at 28 MiB; base64 adds a third, so keep the originals within 20 MB in total.
+        if (files.reduce ((sum, file) => sum + file.size, 0) > ReferenceImageLimit) { throw new Error ('Reference images must total 20 MB or less.'); }
+    }
+    SetReferenceFiles (files)
+    {
+        this.ValidateReferenceFiles (files);
+        this.imageFiles = files; this.imageFile = files[0] || null;
+        this.imageName.textContent = files.length ? files.length + (files.length === 1 ? ' image · ' : ' images · ') + files.map (file => file.name).join (', ') : 'No image selected';
+        if (files.length) { this.ShowImages (files.map (file => URL.createObjectURL (file)), files.length > 1 ? 'Reference views for Multi-image to 3D' : 'Reference image', true); }
+        this.RefreshActions (); return { images : files.length };
+    }
+    ReadDataURL (file) { return new Promise ((resolve, reject) => { const reader = new FileReader (); reader.onload = () => resolve (reader.result); reader.onerror = () => reject (new Error ('Cannot read reference image.')); reader.readAsDataURL (file); }); }
     async ReferenceImage ()
     {
         if (!this.imageFile) { return null; }
-        if (!['image/png', 'image/jpeg', 'image/webp'].includes (this.imageFile.type) || this.imageFile.size > 20 * 1024 * 1024) { throw new Error ('Choose a PNG, JPG or WebP image up to 20 MB.'); }
-        return new Promise ((resolve, reject) => { const reader = new FileReader (); reader.onload = () => resolve (reader.result); reader.onerror = () => reject (new Error ('Cannot read reference image.')); reader.readAsDataURL (this.imageFile); });
+        this.ValidateReferenceFiles ([this.imageFile]); return this.ReadDataURL (this.imageFile);
+    }
+    async ReferenceImages ()
+    {
+        const files = this.imageFiles?.length ? this.imageFiles : this.imageFile ? [this.imageFile] : [];
+        this.ValidateReferenceFiles (files); return Promise.all (files.map (file => this.ReadDataURL (file)));
+    }
+    RefreshImageOptions ()
+    {
+        if (!this.aspect) { return; }
+        const model = this.imageModel.value; for (const option of this.aspect.options) { option.disabled = !AspectAllowed (model, option.value); }
+        if (this.aspect.selectedOptions[0]?.disabled) { this.aspect.value = '1:1'; }
+        this.aspect.disabled = !!this.multiView?.checked; if (this.removeBackground) { this.removeBackground.disabled = !!this.multiView?.checked; if (this.multiView.checked) { this.removeBackground.checked = false; } }
     }
     async Generate (options)
     {
         this.AssertEditable (); if (this.submitting) { throw new Error ('A generation is already being submitted.'); }
-        const { action, prompt = '', detail = 'standard:30000', pbr = true, textureResolution = '2k', imageModel = 'nano-banana', aspect = '1:1', taskId = this.selectedTask, actionId = 92, height = 1.7 } = options;
+        const { action, prompt = '', texturePrompt = '', detail = 'standard:30000', pbr = true, textureResolution = '2k', imageModel = 'nano-banana', aspect = '1:1', multiView = false, removeBackground = false, taskId = this.selectedTask, actionId = 92, height = 1.7, revisionOf = null, reuseInput = false } = options;
         if (this.settings.provider !== 'meshy') { throw new Error ('Choose Meshy in AI connections.'); }
-        if (!['text3d', 'image3d', 'textimage', 'texture', 'rigging', 'animations'].includes (action) || typeof prompt !== 'string' || prompt.length > 800 || !['2k', '4k'].includes (textureResolution)) { throw new Error ('Invalid AI generation options.'); }
+        if (!AIGenerationActions.includes (action) || typeof prompt !== 'string' || prompt.length > 800 || typeof texturePrompt !== 'string' || texturePrompt.length > 800 || !['2k', '4k'].includes (textureResolution)) { throw new Error ('Invalid AI generation options.'); }
+        const textureGuide = texturePrompt.trim () ? { texture_prompt : texturePrompt.trim () } : {};
         const selected = this.recent.find (item => item.id === taskId); let route, payload;
         const [mode, faces] = detail.split (':'); if (!['smart', 'standard'].includes (mode) || ![4000, 10000, 30000, 75000, 150000].includes (Number (faces))) { throw new Error ('Choose a supported detail preset.'); }
         const topology = { model_type : mode === 'smart' ? 'smart-topology' : 'standard', ai_model : mode === 'smart' ? 'meshy-t2' : 'latest', ...(mode === 'smart' ? { topology : 'triangle' } : { should_remesh : true }), target_polycount : Number (faces) };
         if (action === 'text3d') { if (!prompt.trim ()) { throw new Error ('Enter a prompt.'); } route = 'text-to-3d'; payload = { mode : 'preview', prompt, target_formats : ['glb'], ...topology }; }
-        if (action === 'textimage') { if (!prompt.trim () || !['nano-banana', 'nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2'].includes (imageModel) || !['1:1', '16:9', '9:16', '4:3', '3:4'].includes (aspect)) { throw new Error ('Choose an image model, aspect and prompt.'); } route = 'text-to-image'; payload = { prompt, ai_model : imageModel, aspect_ratio : aspect }; }
-        if (action === 'image3d') { const image = await this.ReferenceImage (); if (!image && !selected?.imageUrl) { throw new Error ('Upload an image or select a generated image.'); } route = 'image-to-3d'; payload = { ...(image ? { image_url : image } : { input_task_id : selected.id }), ...topology, should_texture : true, enable_pbr : pbr, texture_resolution : textureResolution, target_formats : ['glb'] }; }
+        if (action === 'textimage') { if (!prompt.trim () || !AIImageModels.includes (imageModel) || (!multiView && !AspectAllowed (imageModel, aspect))) { throw new Error ('Choose an image model, a supported aspect ratio and a prompt.'); } route = 'text-to-image'; payload = { prompt, ai_model : imageModel, ...(multiView ? { generate_multi_view : true } : { aspect_ratio : aspect, ...(removeBackground ? { remove_background : true } : {}) }) }; }
+        if (action === 'image3d') { const image = reuseInput ? null : await this.ReferenceImage (); if (!image && !selected?.imageUrl && !(reuseInput && selected?.status === 'SUCCEEDED')) { throw new Error ('Upload an image or select a generated image.'); } route = 'image-to-3d'; payload = { ...(image ? { image_url : image } : { input_task_id : selected.id }), ...topology, should_texture : true, enable_pbr : pbr, texture_resolution : textureResolution, target_formats : ['glb'], ...textureGuide }; }
+        if (action === 'multiimage3d') {
+            const images = !reuseInput && this.imageFiles?.length > 1 ? await this.ReferenceImages () : [];
+            if (images.length < 2 && !((reuseInput || ImageRouteTypes.has (selected?.route)) && selected?.status === 'SUCCEEDED')) { throw new Error ('Upload 2–4 views of the same object or select a generated image.'); }
+            // Multi-image does not offer Smart Topology; keep the selected face budget on the standard pipeline.
+            route = 'multi-image-to-3d'; payload = { ...(images.length > 1 ? { image_urls : images } : { input_task_id : selected.id }), ai_model : 'latest', topology : 'triangle', should_remesh : true, target_polycount : Number (faces), should_texture : true, enable_pbr : pbr, texture_resolution : textureResolution, target_formats : ['glb'], ...textureGuide };
+        }
         if (['texture', 'rigging', 'animations'].includes (action) && (!selected || selected.status !== 'SUCCEEDED' || (!selected.modelUrl && !this.assets.has (selected.id)))) { throw new Error ('Select a completed 3D model.'); }
-        if (action === 'texture') { const image = await this.ReferenceImage (); if (!image && !prompt.trim ()) { throw new Error ('Enter a texture prompt or reference image.'); } route = 'retexture'; payload = { input_task_id : selected.id, ...(image ? { image_style_url : image } : { text_style_prompt : prompt }), enable_original_uv : true, enable_pbr : pbr, texture_resolution : textureResolution }; }
+        if (action === 'texture') { const image = reuseInput ? null : await this.ReferenceImage (); if (!image && !prompt.trim ()) { throw new Error ('Enter a texture prompt or reference image.'); } route = 'retexture'; payload = { input_task_id : selected.id, ...(image ? { image_style_url : image } : { text_style_prompt : prompt }), enable_original_uv : true, enable_pbr : pbr, texture_resolution : textureResolution }; }
         if (action === 'rigging') { if (!Number.isFinite (height) || height <= 0 || height > 100) { throw new Error ('Enter a positive character height up to 100 meters.'); } route = 'rigging'; payload = { input_task_id : selected.id, height_meters : height }; }
         if (action === 'animations') { if (selected.route !== 'rigging' || !Number.isInteger (actionId) || actionId < 0) { throw new Error ('Select a completed rig and a valid animation action ID.'); } route = 'animations'; payload = { rig_task_id : selected.id, action_id : actionId }; }
         const owner = this.website.auth.user.id; this.submitting = true; this.status.textContent = 'Submitting ' + route + '…';
         try { const { result } = await this.RequestJSON (this.settings.baseUrl + '/' + route, { method : 'POST', headers : this.Headers (true), body : JSON.stringify (payload) });
             if (typeof result.result !== 'string' || !result.result) { throw new Error ('Provider did not return a task ID.'); }
-            const task = { id : result.result, route, type : action === 'text3d' ? 'text-to-3d-preview' : route, name : prompt || selected?.name || route, status : 'PENDING', progress : 0, createdAt : Date.now (), provider : 'Meshy' }; this.UpsertTask (task);
+            const task = { id : result.result, route, type : action === 'text3d' ? 'text-to-3d-preview' : route, name : prompt || texturePrompt || selected?.name || RouteLabels[route], texturePrompt : action === 'texture' && !payload.image_style_url ? prompt : texturePrompt.trim () || null, status : 'PENDING', progress : 0, createdAt : Date.now (), provider : 'Meshy', ...(revisionOf ? { revisionOf } : {}), ...(payload.input_task_id || payload.rig_task_id ? { parentId : payload.input_task_id || payload.rig_task_id } : {}) }; this.UpsertTask (task);
             // Poll independently; callers receive the real queued task without waiting for a long generation.
             this.PollTask (route, task.id, owner).catch (error => { if (owner === this.website.auth?.user?.id) { this.status.textContent = error.message; } }); return { queued : task.id, route };
         } finally { this.submitting = false; this.RefreshActions (); }
@@ -366,14 +492,31 @@ export class AIWorkspace
         }
         throw new Error ('Generation polling timed out. Refresh creations to check its status.');
     }
+    async ShowImages (urls, caption, local)
+    {
+        if (!this.imageViewer) { const { AIImageViewer } = await import ('./aiimageviewer.js'); this.imageViewer = new AIImageViewer (this.previewHost); }
+        if (this.localImageUrls && this.localImageUrls !== urls) { this.localImageUrls.forEach (url => URL.revokeObjectURL (url)); this.localImageUrls = null; }
+        if (local) { this.localImageUrls = urls; }
+        this.previewHost.classList.add ('showing_image'); this.previewMessage.hidden = true; this.imageViewer.Show (urls, caption); return this.imageViewer.State ();
+    }
+    HideImages () { this.previewHost?.classList.remove ('showing_image'); this.imageViewer?.Hide (); }
+    ViewerControl (action, value)
+    {
+        if (this.previewHost.classList.contains ('showing_image')) { return this.imageViewer.Control (action, value); }
+        if (!this.preview?.root) { throw new Error ('Preview a model or image first.'); } return this.preview.Control (action, value);
+    }
     async EnsurePreview () { if (!this.preview) { const { AIPreview } = await import ('./aipreview.js'); this.preview = new AIPreview (this.previewHost); } return this.preview; }
     async SelectTask (id)
     {
         const task = this.recent.find (item => item.id === id); if (!task) { throw new Error ('Creation not found.'); }
         this.selectedTask = id; const sequence = ++this.previewSequence; const owner = this.website.auth?.user?.id;
         this.RenderRecent (); this.previewMessage.hidden = false; this.previewMessage.textContent = 'Loading ' + task.name + '…';
-        if (!task.modelUrl && !this.assets.has (id)) { this.preview?.Clear (); this.previewImage?.remove (); if (task.imageUrl) { this.previewImage = Element ('img', 'ai_image_preview', undefined, this.previewHost); this.previewImage.src = task.imageUrl; } this.previewMessage.textContent = task.imageUrl ? 'Generated reference image' : task.status; this.ScheduleWorkspaceSave (); return { selected : id, image : !!task.imageUrl }; }
-        this.previewImage?.remove ();
+        if (!task.modelUrl && !this.assets.has (id)) {
+            this.preview?.Clear (); const urls = task.imageUrls || (task.imageUrl ? [task.imageUrl] : []);
+            if (urls.length) { await this.ShowImages (urls, task.name, false); this.previewMessage.hidden = true; } else { this.HideImages (); this.previewMessage.textContent = task.status === 'SUCCEEDED' ? 'No preview available' : task.status + (Number.isFinite (task.progress) ? ' · ' + task.progress + '%' : ''); }
+            this.RefreshActions (); this.ScheduleWorkspaceSave (); return { selected : id, image : urls.length > 0, images : urls.length };
+        }
+        this.HideImages ();
         let asset = this.assets.get (id);
         if (!asset) { const response = await fetch (this.settings.baseUrl + '/model?url=' + encodeURIComponent (task.modelUrl), { headers : this.Headers () }); if (!response.ok) { throw new Error ('Model download failed (' + response.status + '). Refresh expired creations.'); } const buffer = await response.arrayBuffer (); if (owner !== this.website.auth?.user?.id) { throw new Error ('Account changed.'); } asset = { ...task, buffer, scale : 1 }; this.assets.set (id, asset); }
         if (sequence !== this.previewSequence) { return { superseded : true }; }
@@ -443,15 +586,16 @@ export class AIWorkspace
         try {
             const urls = [
                 this.settings.baseUrl + '/text-to-3d?page_size=8&sort_by=-created_at',
-                ...['image-to-3d', 'text-to-image', 'retexture'].map (route => this.settings.baseUrl + '/' + route + '?page_size=4&sort_by=-created_at')
+                ...['image-to-3d', 'multi-image-to-3d', 'text-to-image', 'image-to-image', 'retexture'].map (route => this.settings.baseUrl + '/' + route + '?page_size=6&sort_by=-created_at')
             ];
             const owner = this.website.auth?.user?.id;
             const responses = await Promise.allSettled (urls.map (url => this.RequestJSON (url, { headers : this.Headers () })));
             if (owner !== this.website.auth?.user?.id) { throw new Error ('Account changed.'); }
             const successful = responses.filter (item => item.status === 'fulfilled');
             if (!successful.length) { throw responses[0].reason; }
-            const groups = successful.map (item => Array.isArray (item.value.result) ? item.value.result : []);
-            const loaded = groups.flat ().filter ((item) => item && item.id).map ((item) => this.NormalizeMeshyTask (item)).sort ((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice (0, 12);
+            const routes = ['text-to-3d', 'image-to-3d', 'multi-image-to-3d', 'text-to-image', 'image-to-image', 'retexture'];
+            const groups = responses.map ((item, index) => item.status === 'fulfilled' && Array.isArray (item.value.result) ? item.value.result.map (task => ({ ...task, route : routes[index] })) : []);
+            const loaded = groups.flat ().filter ((item) => item && item.id).map ((item) => this.NormalizeMeshyTask (item)).sort ((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice (0, 24);
             for (const task of loaded) { this.UpsertTask (task); }
             this.RenderRecent ();
             this.status.textContent = successful.length < responses.length ? 'Some creation history could not be loaded. Try refreshing again.' : this.recent.length ? 'Loaded ' + this.recent.length + ' recent creations.' : 'No recent Meshy 3D creations found.';
@@ -471,21 +615,24 @@ export class AIWorkspace
             const card = Element ('div', 'ai_recent_card', undefined, this.recentGrid);
             card.dataset.taskId = item.id; card.classList.toggle ('selected', item.id === this.selectedTask);
             const previewButton = Element ('button', 'ai_preview_button', 'Preview', card); previewButton.addEventListener ('click', () => this.Run (() => this.SelectTask (item.id)));
-            if (item.thumbnail) { const image = Element ('img', null, undefined, card); image.src = item.thumbnail; image.alt = ''; }
-            else {
-                const placeholder = Element ('div', 'ai_recent_placeholder', undefined, card);
-                Element ('span', null, item.progress === null || item.progress === undefined ? 'AI' : item.progress + '%', placeholder);
+            const placeholder = () => { const box = Element ('div', 'ai_recent_placeholder', undefined); Element ('span', null, item.status !== 'SUCCEEDED' && Number.isFinite (item.progress) ? item.progress + '%' : RouteLabels[item.route] || 'AI', box); return box; };
+            if (item.thumbnail && !item.thumbnailFailed) {
+                const image = Element ('img', null, undefined, card); image.alt = ''; image.loading = 'lazy'; image.decoding = 'async'; image.referrerPolicy = 'no-referrer';
+                // Meshy thumbnails are signed URLs that expire; fall back instead of showing a broken image.
+                image.addEventListener ('error', () => { item.thumbnailFailed = true; image.replaceWith (placeholder ()); }, { once : true }); image.src = item.thumbnail;
             }
+            else { card.appendChild (placeholder ()); }
             Element ('strong', null, item.name || 'Generated asset', card);
-            const meta = [item.provider, item.status, Number.isFinite (item.progress) && item.status !== 'SUCCEEDED' ? item.progress + '%' : null, Number.isFinite (item.credits) ? item.credits + ' cr' : null].filter (Boolean).join (' · ');
-            Element ('span', 'ai_recent_meta', meta, card);
+            const meta = [RouteLabels[item.route] || item.provider, item.revisionOf ? 'Revision' : null, item.status, Number.isFinite (item.progress) && item.status !== 'SUCCEEDED' ? item.progress + '%' : null, Number.isFinite (item.credits) ? item.credits + ' cr' : null].filter (Boolean).join (' · ');
+            Element ('span', 'ai_recent_meta', meta, card).title = meta;
             const actions = Element ('div', 'ai_recent_actions', undefined, card);
             if (item.status === 'SUCCEEDED' && item.type === 'text-to-3d-preview') {
-                const refine = Element ('button', null, 'Generate texture', actions); refine.addEventListener ('click', () => this.Run (() => this.RefineTask (item)));
-                const retry = Element ('button', null, 'Refine', actions); retry.disabled = true; retry.title = 'Free geometry retry is available in Meshy, but is not documented in its public API.';
+                const refine = Element ('button', null, 'Texture', actions); refine.title = 'Generate textures for this preview (uses the texture prompt when entered)'; refine.addEventListener ('click', () => this.Run (() => this.RefineTask (item)));
             }
+            let revisable = false; try { this.RevisionPlan (item); revisable = true; } catch { /* Not revisable. */ }
+            if (revisable) { const revise = Element ('button', null, 'Revise', actions); revise.title = 'Edit the prompt and resubmit as a new creation'; revise.addEventListener ('click', () => this.Run (() => this.StartRevision (item.id))); }
             if (item.status === 'SUCCEEDED' && item.modelUrl) {
-                const importButton = Element ('button', null, 'Import GLB', actions); importButton.addEventListener ('click', () => this.Run (() => this.ImportTask (item)));
+                const importButton = Element ('button', null, 'Import', actions); importButton.title = 'Add this model to the Auto3D session'; importButton.addEventListener ('click', () => this.Run (() => this.ImportTask (item)));
             }
         }
         this.RefreshActions ();

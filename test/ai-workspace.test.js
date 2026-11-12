@@ -2,7 +2,7 @@ import { FinalizeModel } from '../source/engine/model/modelfinalization.js';
 import { Model } from '../source/engine/model/model.js';
 import { PhysicalMaterial } from '../source/engine/model/material.js';
 import assert from 'node:assert/strict';
-import { AIWorkspace, MatchAISceneUnits, PlaceAIModel } from '../source/website/aiworkspace.js';
+import { AIWorkspace, MatchAISceneUnits, PlaceAIModel, AIImageModels, AIAspectRatios, AIGenerationActions } from '../source/website/aiworkspace.js';
 import { ReleasePreviewDrag } from '../source/website/aipreview.js';
 import * as THREE from 'three';
 import { Unit } from '../source/engine/model/unit.js';
@@ -84,8 +84,8 @@ describe ('Extended AI workspace services', () => {
  });
  it ('Loads history concurrently and retains successful results when one route fails', async () => {
   const { workspace } = Workspace (); workspace.RenderRecent = () => {}; let started = 0, release; const gate = new Promise (resolve => { release = resolve; });
-  workspace.RequestJSON = async url => { started++; if (started === 4) { release (); } await gate; if (url.includes ('retexture')) { throw new Error ('unavailable'); } return { result : [{ id : url, status : 'SUCCEEDED' }] }; };
-  await workspace.RefreshRecent (); assert.equal (started, 4); assert.equal (workspace.recent.length, 4); assert.match (workspace.status.textContent, /Some creation history/);
+  workspace.RequestJSON = async url => { started++; if (started === 6) { release (); } await gate; if (url.includes ('retexture')) { throw new Error ('unavailable'); } return { result : [{ id : url, status : 'SUCCEEDED' }] }; };
+  await workspace.RefreshRecent (); assert.equal (started, 6); assert.equal (workspace.recent.length, 6); assert.match (workspace.status.textContent, /Some creation history/);
  });
  it ('Warns against duplicate paid submissions when the connection drops', async () => {
   const { workspace } = Workspace (); const previous = globalThis.fetch; workspace.RequestJSON = AIWorkspace.prototype.RequestJSON;
@@ -96,13 +96,74 @@ describe ('Extended AI workspace services', () => {
   const doc = new SceneDocument (); const model = new Model (); model.AddMaterial (new PhysicalMaterial ()); const mesh = GenerateCuboid (new GeneratorParams (), 1, 1, 1); mesh.triangles.forEach (t => { t.mat = 0; }); model.root.AddMeshIndex (model.AddMesh (mesh)); FinalizeModel (model, {}); doc.AddImported (model, 'AI texture'); doc.model.materials[0].multiplyDiffuseMap = true;
   const saved = OpenSessionArchive (CreateSessionArchive (PackSession (doc))); assert.equal (saved.document.model.materials[0].multiplyDiffuseMap, true);
  });
+ it ('Builds multi-image, multi-view and texture-guided payloads from the current Meshy contract', async () => {
+  let { workspace, requests } = Workspace (); workspace.imageFiles = [{}, {}, {}]; workspace.ReferenceImages = async () => ['data:image/png;base64,A', 'data:image/png;base64,B', 'data:image/png;base64,C'];
+  await workspace.Generate ({ action : 'multiimage3d', texturePrompt : 'glazed ceramic', detail : 'smart:10000', pbr : true });
+  assert.ok (requests[0][0].endsWith ('/multi-image-to-3d')); assert.deepEqual (requests[0][1].image_urls.length, 3); assert.equal (requests[0][1].texture_prompt, 'glazed ceramic'); assert.equal (requests[0][1].target_polycount, 10000); assert.equal (requests[0][1].ai_model, 'latest'); assert.equal (requests[0][1].model_type, undefined);
+  ({ workspace, requests } = Workspace ()); workspace.recent[0] = { id : 'views', route : 'text-to-image', status : 'SUCCEEDED', imageUrl : 'https://assets.meshy.ai/v.png' }; workspace.selectedTask = 'views';
+  await workspace.Generate ({ action : 'multiimage3d' }); assert.equal (requests[0][1].input_task_id, 'views'); assert.equal (requests[0][1].image_urls, undefined);
+  ({ workspace, requests } = Workspace ()); workspace.imageFiles = [{}]; await assert.rejects (() => workspace.Generate ({ action : 'multiimage3d' }), /2–4 views/); assert.deepEqual (requests, []);
+  await workspace.Generate ({ action : 'textimage', prompt : 'a mug', imageModel : 'nano-banana-2-1', multiView : true, aspect : '16:9' }); assert.deepEqual (requests[0][1], { prompt : 'a mug', ai_model : 'nano-banana-2-1', generate_multi_view : true });
+  await workspace.Generate ({ action : 'textimage', prompt : 'a mug', imageModel : 'gpt-image-2', aspect : '3:2', removeBackground : true }); assert.deepEqual (requests[1][1], { prompt : 'a mug', ai_model : 'gpt-image-2', aspect_ratio : '3:2', remove_background : true });
+  await assert.rejects (() => workspace.Generate ({ action : 'textimage', prompt : 'a mug', imageModel : 'nano-banana', aspect : '3:2' }), /aspect/); assert.equal (requests.length, 2);
+  workspace.recent[0].imageUrl = 'https://assets.meshy.ai/i.png'; await workspace.Generate ({ action : 'image3d', texturePrompt : 'brushed steel' }); assert.equal (requests[2][1].texture_prompt, 'brushed steel'); assert.equal (workspace.recent.at (-1).parentId, 'model');
+ });
+ it ('Validates reference image count, type and total size before reading files', () => {
+  const { workspace } = Workspace (); const png = size => ({ type : 'image/png', size });
+  assert.doesNotThrow (() => workspace.ValidateReferenceFiles ([png (5e6), png (5e6), png (5e6), png (5e6)]));
+  assert.throws (() => workspace.ValidateReferenceFiles ([png (1), png (1), png (1), png (1), png (1)]), /up to 4/);
+  assert.throws (() => workspace.ValidateReferenceFiles ([png (15e6), png (6e6)]), /20 MB/);
+  assert.throws (() => workspace.ValidateReferenceFiles ([{ type : 'image/gif', size : 1 }]), /PNG, JPG or WebP/);
+ });
+ it ('Revises each creation type as a new task from the right source without touching the original', async () => {
+  const { workspace, requests } = Workspace ();
+  workspace.recent = [
+   { id : 'preview', type : 'text-to-3d-preview', route : 'text-to-3d', status : 'SUCCEEDED', name : 'mug' },
+   { id : 'refined', type : 'text-to-3d-refine', route : 'text-to-3d', status : 'SUCCEEDED', parentId : 'preview', modelUrl : 'https://assets.meshy.ai/r.glb' },
+   { id : 'orphan', type : 'text-to-3d-refine', route : 'text-to-3d', status : 'SUCCEEDED', modelUrl : 'https://assets.meshy.ai/o.glb' },
+   { id : 'image', type : 'text-to-image', route : 'text-to-image', status : 'SUCCEEDED', imageUrl : 'https://assets.meshy.ai/i.png' },
+   { id : 'photo', type : 'image-to-3d', route : 'image-to-3d', status : 'SUCCEEDED', modelUrl : 'https://assets.meshy.ai/p.glb' },
+   { id : 'views', type : 'multi-image-to-3d', route : 'multi-image-to-3d', status : 'SUCCEEDED', modelUrl : 'https://assets.meshy.ai/v.glb' },
+   { id : 'skin', type : 'retexture', route : 'retexture', status : 'SUCCEEDED', modelUrl : 'https://assets.meshy.ai/s.glb' },
+   { id : 'running', type : 'text-to-3d-preview', route : 'text-to-3d', status : 'IN_PROGRESS' }
+  ];
+  Object.assign (workspace, { prompt : { value : '' }, texturePrompt : { value : '' }, detailSelect : { value : 'standard:30000' }, pbrCheckbox : { checked : true }, textureResolution : { value : '2k' }, imageModel : { value : 'nano-banana' }, aspect : { value : '1:1' }, CancelRevision () {} });
+  const RequestJSON = workspace.RequestJSON; workspace.RequestJSON = async (url, init) => { if (init?.method === 'POST') { return RequestJSON (url, init); } return { result : {} }; };
+  await workspace.Revise ('preview', 'a taller mug'); assert.ok (requests[0][0].endsWith ('/text-to-3d')); assert.equal (requests[0][1].mode, 'preview'); assert.equal (requests[0][1].prompt, 'a taller mug');
+  await workspace.Revise ('refined', 'speckled glaze'); assert.deepEqual ([requests[1][1].mode, requests[1][1].preview_task_id, requests[1][1].texture_prompt], ['refine', 'preview', 'speckled glaze']);
+  await assert.rejects (() => workspace.Revise ('orphan', 'x'), /preview/);
+  await workspace.Revise ('image', 'make it blue'); assert.ok (requests[2][0].endsWith ('/image-to-image')); assert.deepEqual (requests[2][1], { ai_model : 'nano-banana', input_task_id : 'image', prompt : 'make it blue' });
+  workspace.imageFile = { type : 'image/png', size : 1 }; workspace.imageFiles = [workspace.imageFile, workspace.imageFile]; workspace.ReferenceImage = async () => { throw new Error ('must reuse the original images'); };
+  await workspace.Revise ('photo', 'rubber'); assert.ok (requests[3][0].endsWith ('/image-to-3d')); assert.equal (requests[3][1].input_task_id, 'photo'); assert.equal (requests[3][1].texture_prompt, 'rubber');
+  await workspace.Revise ('views', 'oak'); assert.ok (requests[4][0].endsWith ('/multi-image-to-3d')); assert.equal (requests[4][1].input_task_id, 'views'); assert.equal (requests[4][1].texture_prompt, 'oak');
+  await workspace.Revise ('skin', 'chrome'); assert.ok (requests[5][0].endsWith ('/retexture')); assert.deepEqual ([requests[5][1].input_task_id, requests[5][1].text_style_prompt], ['skin', 'chrome']);
+  await assert.rejects (() => workspace.Revise ('running', 'x'), /completed/); await assert.rejects (() => workspace.Revise ('preview', '  '), /revision prompt/);
+  assert.equal (requests.length, 6); assert.ok (workspace.recent.filter (task => task.revisionOf).length >= 6); assert.equal (workspace.recent.find (task => task.id === 'preview').status, 'SUCCEEDED');
+ });
+ it ('Keeps a known thumbnail when a provider refresh omits it and normalizes image histories', () => {
+  const workspace = Object.create (AIWorkspace.prototype); Object.assign (workspace, { recent : [{ id : 'a', thumbnail : 'data:image/png;base64,X', thumbnailFailed : true, parentId : 'p', createdAt : 1 }], assets : new Map (), RenderRecent () {}, ScheduleWorkspaceSave () {} });
+  workspace.UpsertTask ({ id : 'a', status : 'SUCCEEDED', thumbnail : null, parentId : undefined }); assert.equal (workspace.recent[0].thumbnail, 'data:image/png;base64,X'); assert.equal (workspace.recent[0].parentId, 'p'); assert.equal (workspace.recent[0].thumbnailFailed, true);
+  workspace.UpsertTask ({ id : 'a', thumbnail : 'https://assets.meshy.ai/new.png' }); assert.equal (workspace.recent[0].thumbnailFailed, undefined);
+  const task = workspace.NormalizeMeshyTask ({ id : 'img', type : 'text-to-image', route : 'text-to-image', status : 'SUCCEEDED', image_urls : ['https://assets.meshy.ai/1.png', 'https://assets.meshy.ai/2.png'] });
+  assert.deepEqual ([task.thumbnail, task.imageUrl, task.imageUrls.length, task.name], ['https://assets.meshy.ai/1.png', 'https://assets.meshy.ai/1.png', 2, 'Text to image']);
+  assert.equal (workspace.NormalizeMeshyTask ({ id : 't', type : 'retexture', text_style_prompt : 'chrome', status : 'SUCCEEDED' }).texturePrompt, 'chrome');
+ });
+ it ('Keeps agent command enums aligned with the workspace and validates revisions and viewer controls', async () => {
+  const { workspace } = Workspace (); let revised = null; workspace.Revise = async (id, prompt) => { revised = [id, prompt]; return { queued : 'r' }; }; workspace.ViewerControl = (action, value) => ({ action, value });
+  const registry = CreateAgentCommands ({ sessionEditor : {}, aiWorkspace : workspace }); const schema = id => registry.Catalog ().find (item => item.id === id).inputSchema;
+  const generate = schema ('ai.generate'); assert.deepEqual (generate.properties.imageModel.enum, AIImageModels); assert.deepEqual (generate.properties.aspect.enum, AIAspectRatios); assert.deepEqual (generate.properties.action.enum, AIGenerationActions);
+  assert.equal ((await registry.Execute ('ai.creation.revise', { id : 'model' })).ok, false); assert.equal (revised, null);
+  assert.equal ((await registry.Execute ('ai.creation.revise', { id : 'model', prompt : 'taller' })).ok, true); assert.deepEqual (revised, ['model', 'taller']);
+  assert.equal ((await registry.Execute ('ai.viewer.control', { action : 'spin' })).ok, false); assert.equal ((await registry.Execute ('ai.viewer.control', { action : 'zoomIn', value : 2 })).ok, true);
+ });
  it ('Proxies only allow-listed Meshy routes, preserves retry headers and rejects malformed/oversized submissions', async () => {
   const previous = globalThis.fetch; const calls = []; globalThis.fetch = async (url, init) => { calls.push ([url, init]); return new Response ('{"result":"task"}', { headers : { 'Retry-After' : '5' } }); };
   const objects = new Map (), bucket = { async get (key) { const body = objects.get (key); return body ? { size : body.length, async json () { return JSON.parse (body); } } : null; }, async put (key, body) { objects.set (key, body); return {}; } };
   const context = (path, body = '{}') => ({ data : { user : { id : 'owner' } }, params : { path }, env : { MESHY_API_KEY : 'test-server-key', AUTO3D_AI_ALLOW_SHARED_KEY : 'true', AUTO3D_AI_CREDENTIALS_R2 : bucket }, request : new Request ('https://auto3d.test/api/ai/' + path.join ('/'), { method : 'POST', body }) });
   try {
-   for (const route of ['text-to-3d', 'image-to-3d', 'text-to-image', 'retexture', 'rigging', 'animations']) { const response = await onRequest (context ([route])); assert.equal (response.status, 200); assert.equal (response.headers.get ('Retry-After'), '5'); assert.ok (calls.at (-1)[0].includes ('/openapi/' + (route === 'text-to-3d' ? 'v2' : 'v1') + '/' + route)); }
+   for (const route of ['text-to-3d', 'image-to-3d', 'multi-image-to-3d', 'text-to-image', 'image-to-image', 'retexture', 'rigging', 'animations']) { const response = await onRequest (context ([route])); assert.equal (response.status, 200); assert.equal (response.headers.get ('Retry-After'), '5'); assert.ok (calls.at (-1)[0].includes ('/openapi/' + (route === 'text-to-3d' ? 'v2' : 'v1') + '/' + route)); }
    assert.equal ((await onRequest (context (['unknown']))).status, 404); assert.equal ((await onRequest (context (['rigging'], '[]'))).status, 400); assert.equal ((await onRequest (context (['rigging'], '{'))).status, 400);
+   for (const route of ['multi-image-to-3d', 'image-to-image']) { const images = context ([route], JSON.stringify ({ image_urls : ['data:image/png;base64,' + 'A'.repeat (70000)] })); assert.equal ((await onRequest (images)).status, 200); }
    const large = context (['image-to-3d']); large.request.headers.set ('Content-Length', String (29 * 1024 * 1024)); assert.equal ((await onRequest (large)).status, 413);
    const personal = context (['text-to-3d']); personal.request.headers.set ('X-Auto3D-AI-Key', 'do-not-use'); assert.equal ((await onRequest (personal)).status, 400);
    const missing = context (['text-to-3d']); missing.env = {}; assert.equal ((await onRequest (missing)).status, 401); assert.equal (calls[0][1].headers.get ('Authorization'), 'Bearer test-server-key');

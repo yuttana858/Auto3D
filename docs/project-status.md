@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Meshy workflows, revisions and AI viewer — Auto3D 0.61.0 / Primary Products 0.11.0 / Packaging 1.10.7 (2026-11-12)
+
+Adds Multi-image to 3D, current Text to image models and options (multi-view, background removal), texture prompts, revisions for every completed creation type, a 2D image viewer, studio lighting with pan in the 3D preview, and resilient thumbnails. Meshy has no API for assisted prompts. Verified live against Meshy through the real Pages Function in a local browser. Shared-key generation for all accounts needs the `MESHY_API_KEY` secret and `AUTO3D_AI_ALLOW_SHARED_KEY=true` in Pages. See [release-0610.md](release-0610.md). Not deployed.
+
 ## Stand-up pouches — Auto3D 0.60.0 / Primary Products 0.11.0 / Packaging 1.10.7 (2026-11-12)
 
 Pouches gain a **Pouch style** of Pillow or Stand-up. A stand-up pouch opens into a flat elliptical bottom gusset as deep as the filled depth (L), so it stands, and tapers to the top seal. Five stand-up designs are in the **Pouches** drawer. Generated products are named by their construction. `primary.configure` accepts `pouchShape { style, gussetMm }`. See [release-0600.md](release-0600.md).

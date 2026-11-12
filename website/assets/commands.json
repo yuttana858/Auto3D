@@ -7367,9 +7367,9 @@
     },
     {
       "id": "ai.reference.open",
-      "title": "Choose AI reference image",
+      "title": "Choose AI reference images",
       "category": "AI",
-      "description": "Open the interactive PNG/JPEG/WebP reference image picker. Does not upload or generate until an explicit submission. Requires a user gesture; otherwise returns requiresUserGesture.",
+      "description": "Open the interactive PNG/JPEG/WebP reference picker for 1–4 images (20 MB total; two or more enable Multi-image to 3D). Selected images show in the AI viewer. Does not upload or generate until an explicit submission. Requires a user gesture; otherwise returns requiresUserGesture.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -7383,7 +7383,7 @@
       "id": "ai.creation.refine",
       "title": "Refine AI preview",
       "category": "AI",
-      "description": "Explicitly submit a successful Text to 3D preview for PBR texturing using the workspace texture settings.",
+      "description": "Explicitly submit a successful Text to 3D preview for PBR texturing using the workspace texture settings and an optional texture prompt.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -7392,6 +7392,10 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 200
+          },
+          "texturePrompt": {
+            "type": "string",
+            "maxLength": 800
           }
         },
         "required": [
@@ -7400,14 +7404,15 @@
         "additionalProperties": false
       },
       "example": {
-        "id": "meshy-task-id"
+        "id": "meshy-task-id",
+        "texturePrompt": "Glazed white ceramic"
       }
     },
     {
       "id": "ai.creation.generate_texture",
       "title": "Generate texture for AI preview",
       "category": "AI",
-      "description": "Texture an existing successful Text to 3D preview using Meshy refine. Provider credits may apply.",
+      "description": "Texture an existing successful Text to 3D preview using Meshy refine, optionally guided by a texture prompt. Provider credits may apply.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -7416,6 +7421,10 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 200
+          },
+          "texturePrompt": {
+            "type": "string",
+            "maxLength": 800
           }
         },
         "required": [
@@ -7428,10 +7437,75 @@
       }
     },
     {
+      "id": "ai.creation.revise",
+      "title": "Revise AI creation",
+      "category": "AI",
+      "description": "Explicit paid-provider resubmission of a completed creation with an edited prompt, kept as a new creation beside the original. Text to 3D previews regenerate from the new prompt; textured models re-texture their preview; images are edited (image to image); image/multi-image models rebuild from the same images with the prompt as texture guidance; textures re-texture the model.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 800
+          }
+        },
+        "required": [
+          "id",
+          "prompt"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "meshy-task-id",
+        "prompt": "A taller mug with a wider handle"
+      }
+    },
+    {
+      "id": "ai.viewer.control",
+      "title": "Control AI viewer",
+      "category": "AI",
+      "description": "Fit, zoom in or out, or select an image view in the AI viewer (3D model or 2D image). Does not change the session.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "fit",
+              "zoomIn",
+              "zoomOut",
+              "select"
+            ]
+          },
+          "value": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "action": "zoomIn",
+        "value": 1.5
+      }
+    },
+    {
       "id": "ai.generate",
       "title": "Generate with Meshy",
       "category": "AI",
-      "description": "Explicit paid-provider submission: text/image to 3D, text to image, texture, humanoid rigging or animation. Image actions use the reference selected interactively or the selected generated image. Returns queued task; progress appears in history.",
+      "description": "Explicit paid-provider submission: text/image/multi-image to 3D, text to image (optionally 4-view or background removed), texture, humanoid rigging or animation. Image actions use the references selected interactively or the selected generated image; multiimage3d needs 2–4 uploaded views or a selected generated image. texturePrompt guides image/multi-image model textures. Returns queued task; progress appears in history.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -7441,6 +7515,7 @@
             "enum": [
               "text3d",
               "image3d",
+              "multiimage3d",
               "textimage",
               "texture",
               "rigging",
@@ -7448,6 +7523,10 @@
             ]
           },
           "prompt": {
+            "type": "string",
+            "maxLength": 800
+          },
+          "texturePrompt": {
             "type": "string",
             "maxLength": 800
           },
@@ -7477,8 +7556,13 @@
               "nano-banana",
               "nano-banana-2",
               "nano-banana-2-lite",
+              "nano-banana-2-1",
               "nano-banana-pro",
-              "gpt-image-2"
+              "gpt-image-2",
+              "gpt-image-2-5-flare",
+              "gpt-image-2-5-sunburst",
+              "gpt-image-2-6-flare",
+              "gpt-image-2-6-sunburst"
             ]
           },
           "aspect": {
@@ -7488,8 +7572,16 @@
               "16:9",
               "9:16",
               "4:3",
-              "3:4"
+              "3:4",
+              "3:2",
+              "2:3"
             ]
+          },
+          "multiView": {
+            "type": "boolean"
+          },
+          "removeBackground": {
+            "type": "boolean"
           },
           "taskId": {
             "type": "string",
