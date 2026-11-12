@@ -27,24 +27,26 @@ describe ('Clear primary product materials', function () {
         }
     });
     it ('renders physical transmission and retains optical values through clone, archives and GLB', async function () {
-        const data = CreatePrimaryProduct ({ ...ProductDesign ('round-care'), material : 'petClear' });
+        const draft = ProductDesign ('round-care'); draft.details.textureStrength = 0; // Texture loading is exercised in Chromium; this test isolates optical conversion.
+        const data = CreatePrimaryProduct ({ ...draft, material : 'petClear' });
         const model = PrimaryProductModel (data, Unit.Millimeter), original = model.materials[0];
+        original.clearcoat = .65; original.clearcoatRoughness = .18;
         assert.equal (original.opacity, 1); assert.equal (original.transmission, 1); assert.equal (original.ior, 1.575); assert.ok (original.thickness > 0);
         assert.equal (CloneSurface (original).IsEqual (original), true);
         const converted = await new Promise (resolve => ConvertModelToThreeObject (model, new ModelToThreeConversionParams (), new ModelToThreeConversionOutput (), { onModelLoaded : resolve, onTextureLoaded () {} }));
         const materials = []; converted.traverse (node => { if (node.material) { materials.push (...(Array.isArray (node.material) ? node.material : [node.material])); } });
         assert.ok (materials.some (m => m.isMeshPhysicalMaterial && m.transmission === 1 && m.ior === 1.575 && m.thickness === original.thickness));
         const doc = new SceneDocument (); doc.AddImported (model, 'Clear PET'); const packed = PackSession (doc), saved = ReadSession (packed).document.model.materials[0];
-        for (const field of ['transmission', 'ior', 'thickness']) { assert.equal (saved[field], original[field]); }
+        for (const field of ['transmission', 'ior', 'thickness', 'clearcoat', 'clearcoatRoughness']) { assert.equal (saved[field], original[field]); }
         const recovered = ReadSession (PackRecoverySnapshot (structuredClone (RecoverySnapshot (doc, {})))).document.model.materials[0];
-        for (const field of ['transmission', 'ior', 'thickness']) { assert.equal (recovered[field], original[field]); }
+        for (const field of ['transmission', 'ior', 'thickness', 'clearcoat', 'clearcoatRoughness']) { assert.equal (recovered[field], original[field]); }
         const bad = structuredClone (packed); bad.model.materials[0].ior = 0; assert.throws (() => ReadSession (bad), /optical/);
         const files = await new Promise (resolve => new ExporterGltf ().Export (new ExporterModel (model), FileFormat.Binary, resolve));
         const buffer = files[0].GetBufferContent (), json = JSON.parse (new TextDecoder ().decode (new Uint8Array (buffer, 20, new DataView (buffer).getUint32 (12, true))).trim ());
         assert.equal (json.materials[0].extensions.KHR_materials_transmission.transmissionFactor, 1); assert.equal (json.materials[0].extensions.KHR_materials_ior.ior, 1.575); assert.equal (json.materials[0].extensions.KHR_materials_volume.thicknessFactor, original.thickness);
         const importer = new ImporterGltf ();
         await new Promise ((resolve, reject) => importer.Import (files[0].GetName (), 'glb', buffer, { getDefaultMaterialColor : () => new RGBColor (0,0,0), getDefaultLineMaterialColor : () => new RGBColor (0,0,0), getFileBuffer : () => null, onSuccess : resolve, onError : () => reject (new Error (importer.GetErrorMessage ())) }));
-        for (const field of ['transmission', 'ior', 'thickness']) { assert.equal (importer.GetModel ().materials[0][field], original[field]); }
+        for (const field of ['transmission', 'ior', 'thickness', 'clearcoat', 'clearcoatRoughness']) { assert.equal (importer.GetModel ().materials[0][field], original[field]); }
         const inch = PrimaryProductModel (data, Unit.Inch); assert.ok (Math.abs (inch.materials[0].thickness*25.4-original.thickness) < 1e-10);
     });
 });

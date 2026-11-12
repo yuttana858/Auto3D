@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Primary Products realism — Auto3D 0.62.0 / Primary Products 0.13.0 / Packaging 1.10.7 (2026-11-12)
+
+Stacked on #103. Adds detailed construction across the 43-design catalog, material grain/bump/roughness, translucent presets, clearcoat, label finishes/offsets and proportional resizing. CAD integration is paused at user request; the local preparation checkpoint remains separate. See [release-0620.md](release-0620.md) and [reference research](primary-product-realism-research.md). Not deployed.
+
 ## Flat-bottom pouches, zippers and spouts — Auto3D 0.61.0 / Primary Products 0.12.0 / Packaging 1.10.7 (2026-11-12)
 
 Pouch construction adds **Flat-bottom (box)** pouches that stand on a W × L base with full-depth side gussets. Any pouch can have a **reclosable zipper**, and stand-up or flat-bottom pouches can have a **center or corner spout** with a cap; H includes the spout. Five designs join the Pouches drawer. See [release-0610.md](release-0610.md).
