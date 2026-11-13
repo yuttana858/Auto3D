@@ -7,7 +7,7 @@ import { WorkspaceDialog } from './modellibrary.js';
 import { Unit } from '../engine/model/unit.js';
 import { OpenCommandPanel } from './commandpanel.js';
 
-export const AppVersion = '0.66.2';
+export const AppVersion = '0.67.1';
 
 export function AppBuildInfo ()
 {

@@ -57,6 +57,7 @@ primary-materials
 primary-realism
 primary-profile
 primary-contents
+molded-pulp
 render-workspace
 rendercore-state
 rendering

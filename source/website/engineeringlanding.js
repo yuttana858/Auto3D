@@ -1,5 +1,5 @@
 import { CreateEngineeringHero, EngineeringStages } from './engineeringhero.js';
-import { EngineeringSequenceState, EngineeringSequenceDuration } from './engineeringsequence.js';
+import { EngineeringSequenceState, EngineeringStagePositions } from './engineeringsequence.js';
 import { EngineeringIntroMarkup, CreateEngineeringIntroduction } from './engineeringintro.js';
 import { CreateEngineeringEntrance } from './engineeringentrance.js';
 import { EngineeringMaterialsMarkup, CreateEngineeringMaterials } from './engineeringmaterials.js';
@@ -59,7 +59,8 @@ export function CreateEngineeringLanding (root, { panel, onSignIn, version = '' 
     const setText = (selector, text) => { const element = root.querySelector (selector); if (element.textContent !== text) { element.textContent = text; } };
     const update = value => {
         state = value; const stage = EngineeringStages[value.stage];
-        const sequence = value.sequence || EngineeringSequenceState (EngineeringSequenceDuration - 1);
+        const sequence = value.sequence || EngineeringSequenceState (EngineeringStagePositions[3]);
+        root.querySelector ('.entry_visual').style.setProperty ('--entry-loop-opacity', sequence.outro.opacity);
         const welcoming = sequence.phase === 'logo' || sequence.phase === 'greeting';
         setText ('.entry_scene_number', welcoming ? '00 /' : '0' + (value.stage + 1) + ' /'); setText ('.entry_scene_title', welcoming ? 'An idea starts here' : value.stage === 3 ? sequence.finish.title : stage.title);
         const pause = root.querySelector ('[data-action="pause"]'); pause.textContent = value.playing ? 'Ⅱ' : '▷'; pause.setAttribute ('aria-label', value.playing ? 'Pause animation' : 'Play animation'); pause.title = pause.getAttribute ('aria-label');
