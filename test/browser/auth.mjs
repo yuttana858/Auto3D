@@ -23,9 +23,18 @@ await page.route ('**/api/auth/**', async (route) => {
         const splash = page.locator ('#auth_gate'); const form = splash.locator ('.auth_panel form');
         await form.waitFor ({ state : 'visible' });
         const aligned = async panel => {
-            const bounds = await panel.boundingBox ();
-            for (const button of await panel.locator (':scope > button:visible, form > button:visible').all ()) {
-                const box = await button.boundingBox (); assert.ok (Math.abs (box.width - bounds.width) < 1); assert.ok (Math.abs (box.x - bounds.x) < 1);
+            // The landing card scales during its entrance. Read parent and child
+            // rectangles in one task so protocol latency cannot mix animation frames.
+            const snapshot = await panel.evaluate (node => {
+                const bounds = node.getBoundingClientRect ();
+                const buttons = [...node.querySelectorAll (':scope > button, form > button')].map (button => {
+                    const box = button.getBoundingClientRect (); return { width : box.width, x : box.x, height : box.height, visibility : getComputedStyle (button).visibility, label : button.textContent.trim () };
+                }).filter (button => button.width > 0 && button.height > 0 && button.visibility !== 'hidden');
+                return { width : bounds.width, x : bounds.x, buttons };
+            });
+            assert.ok (snapshot.buttons.length > 0);
+            for (const button of snapshot.buttons) {
+                assert.ok (Math.abs (button.width - snapshot.width) < 1, JSON.stringify ({ panel : snapshot.width, button })); assert.ok (Math.abs (button.x - snapshot.x) < 1, JSON.stringify ({ panel : snapshot.x, button }));
             }
         };
         await aligned (splash.locator ('.auth_panel')); assert.equal (await splash.getByRole ('button', { name : 'Sign out', exact : true }).isVisible (), false);
