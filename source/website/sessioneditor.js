@@ -268,6 +268,7 @@ export class SessionEditor
             if (key === 'scale') { this.scaleHeading = heading; }
             for (let axis = 0; axis < 3; axis++) {
                 const label = Element ('label', null, 'XYZ'[axis], group); const input = Element ('input', null, undefined, label); input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', title + ' ' + 'XYZ'[axis]); this.inputs.push ({ input, key, axis });
+                input.addEventListener ('blur', () => this.SyncInputs ()); // Show the applied, rounded value after editing.
                 input.addEventListener ('input', () => {
                     if (!this.selected || !Number.isFinite (input.valueAsNumber)) { return; }
                     if (key === 'scale') {
@@ -708,6 +709,8 @@ export class SessionEditor
         }
         for (const { input, key, axis } of this.inputs) {
             if (!this.selected) { input.value = ''; continue; }
+            // Never rewrite the field being typed in: "1." would become "1" and the next digit would follow it.
+            if (input === document.activeElement) { continue; }
             const value = key === 'scale' ? DisplaySizeFromScale (base[axis], this.selected.scale[axis], this.selected.unit, units) : key === 'position' ? this.selected.position[axis] * (factor ?? 1) : this.selected[key][axis];
             input.value = Number (value.toFixed (5));
         }

@@ -198,6 +198,12 @@ export class AIWorkspace
                 event.preventDefault (); this.generateButton.click ();
             });
         }
+        // Visible progress for provider requests: sending, then processing with a percentage, then done or failed.
+        this.progressBox = Element ('div', 'ai_progress', undefined, inputSection); this.progressBox.setAttribute ('role', 'status'); this.progressBox.setAttribute ('aria-live', 'polite'); this.progressBox.hidden = true;
+        Element ('span', 'ai_progress_spinner', undefined, this.progressBox).setAttribute ('aria-hidden', 'true');
+        this.progressText = Element ('span', 'ai_progress_text', '', this.progressBox);
+        this.progressBar = Element ('progress', 'ai_progress_bar', undefined, this.progressBox); this.progressBar.max = 100; this.progressBar.setAttribute ('aria-label', 'Generation progress');
+        this.progressState = null;
         this.status = Element ('p', 'section_hint ai_status', 'Connect a provider in Preferences to enable the generation workspace.', inputSection);
         const selectedSection = Element ('div', 'ai_field ai_scale_field', undefined, inputSection);
         const scaleLabel = Element ('label', null, 'Selected model scale', selectedSection); this.scaleInput = Element ('input', null, undefined, scaleLabel); this.scaleInput.type = 'number'; this.scaleInput.min = '.001'; this.scaleInput.max = '1000'; this.scaleInput.step = '.01'; this.scaleInput.value = '1'; this.scaleInput.setAttribute ('aria-label', 'AI model scale'); this.scaleInput.addEventListener ('change', () => this.Run (() => this.SetScale (Number (this.scaleInput.value))));
@@ -342,7 +348,7 @@ export class AIWorkspace
         if (!item?.id || item.status !== 'SUCCEEDED' || item.type !== 'text-to-3d-preview') { throw new Error ('Select a completed Text to 3D preview.'); }
         if (typeof texturePrompt !== 'string' || texturePrompt.length > 800) { throw new Error ('Texture prompt must be 800 characters or fewer.'); }
         if (this.submitting) { throw new Error ('A generation is already being submitted.'); }
-        const owner = this.website.auth.user.id; this.submitting = true; let result;
+        const owner = this.website.auth.user.id; this.submitting = true; let result; this.ShowProgress ('sending', { taskId : null });
         try { ({ result } = await this.RequestJSON (this.settings.baseUrl + '/text-to-3d', { method : 'POST', headers : this.Headers (true), body : JSON.stringify ({ mode : 'refine', preview_task_id : item.id, enable_pbr : this.pbrCheckbox?.checked ?? true, texture_resolution : this.textureResolution?.value || '2k', target_formats : ['glb'], ...(texturePrompt.trim () ? { texture_prompt : texturePrompt.trim () } : {}) }) })); }
         finally { this.submitting = false; this.RefreshActions (); }
         if (typeof result.result !== 'string' || !result.result) { throw new Error ('Provider did not return a task ID.'); }
@@ -394,7 +400,7 @@ export class AIWorkspace
     {
         this.AssertEditable (); if (this.submitting) { throw new Error ('A generation is already being submitted.'); }
         if (!AIImageModels.includes (imageModel)) { throw new Error ('Choose a supported image model.'); }
-        const owner = this.website.auth.user.id; this.submitting = true; let result;
+        const owner = this.website.auth.user.id; this.submitting = true; let result; this.ShowProgress ('sending', { taskId : null });
         try { ({ result } = await this.RequestJSON (this.settings.baseUrl + '/image-to-image', { method : 'POST', headers : this.Headers (true), body : JSON.stringify ({ ai_model : imageModel, input_task_id : item.id, prompt }) })); }
         finally { this.submitting = false; this.RefreshActions (); }
         if (typeof result.result !== 'string' || !result.result) { throw new Error ('Provider did not return a task ID.'); }
@@ -439,9 +445,27 @@ export class AIWorkspace
         this.RenderRecent (); this.ScheduleWorkspaceSave ();
     }
 
-    async Run (action) { try { return await action (); } catch (error) { this.status.textContent = error.message; return null; } }
+    async Run (action) { try { return await action (); } catch (error) { this.status.textContent = error.message; if (this.progressState?.phase === 'sending') { this.ShowProgress ('failed', { message : error.message }); } return null; } }
+    // phase: sending | processing | complete | failed. Processing tracks one task id; percent is 0–100 or null.
+    ShowProgress (phase, { taskId = this.progressState?.taskId ?? null, percent = null, message = '' } = {})
+    {
+        const label = { sending : 'Sending request…', processing : percent ? 'Request processing · ' + percent + '%' : 'Request accepted · processing…', complete : 'Complete · select Preview to review', failed : 'Request failed' + (message ? ': ' + message : '') }[phase];
+        this.progressState = { phase, taskId, percent, message : label };
+        if (!this.progressBox) { return; }
+        this.progressBox.hidden = false; this.progressBox.dataset.phase = phase; this.progressText.textContent = label;
+        if (phase === 'processing' && percent) { this.progressBar.value = percent; } else if (phase === 'complete') { this.progressBar.value = 100; } else { this.progressBar.removeAttribute ('value'); }
+        this.progressBar.hidden = phase === 'failed';
+        for (const card of this.recentGrid?.querySelectorAll ('.ai_recent_card') || []) { const active = phase === 'processing' && card.dataset.taskId === taskId; card.classList.toggle ('ai_recent_active', active); card.setAttribute ('aria-busy', String (active)); }
+    }
+    // Scroll the latest creations list once to the card of a newly queued task and highlight it while it runs.
+    RevealTask (id)
+    {
+        const card = [...(this.recentGrid?.querySelectorAll ('.ai_recent_card') || [])].find (item => item.dataset.taskId === id); if (!card) { return false; }
+        const reduced = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        card.scrollIntoView?.({ block : 'nearest', inline : 'nearest', behavior : reduced ? 'auto' : 'smooth' }); return true;
+    }
     AssertEditable () { if (this.website.sessionEditor.readOnly || !this.website.auth?.user?.id) { throw new Error ('Sign in to an editable workspace.'); } }
-    Inspect () { return { mode : this.mode, selected : this.selectedTask, revising : this.revising || null, references : this.ReferenceCount (), viewer : this.previewHost?.classList.contains ('showing_image') ? this.imageViewer?.State () : this.preview?.root ? this.preview.State () : null, tasks : this.recent.map (item => ({ ...item, loaded : this.assets.has (item.id), scale : this.assets.get (item.id)?.scale || 1 })), models : this.assets.size }; }
+    Inspect () { return { progress : this.progressState ? { ...this.progressState } : null, mode : this.mode, selected : this.selectedTask, revising : this.revising || null, references : this.ReferenceCount (), viewer : this.previewHost?.classList.contains ('showing_image') ? this.imageViewer?.State () : this.preview?.root ? this.preview.State () : null, tasks : this.recent.map (item => ({ ...item, loaded : this.assets.has (item.id), scale : this.assets.get (item.id)?.scale || 1 })), models : this.assets.size }; }
     UIOptions (action)
     {
         const texturePrompt = this.texturePrompt?.value.trim () || '';
@@ -510,7 +534,7 @@ export class AIWorkspace
         if (typeof prompt !== 'string' || !prompt.trim () || prompt.length > 800) { throw new Error ('Describe the object to generate reference views.'); }
         if (!AIImageModels.includes (imageModel)) { throw new Error ('Choose a supported image model.'); }
         if (this.ReferenceCount () >= ReferenceImageCount) { throw new Error ('Remove a reference before generating views.'); }
-        const owner = this.website.auth.user.id; this.submitting = true; this.RefreshActions (); let result;
+        const owner = this.website.auth.user.id; this.submitting = true; this.RefreshActions (); let result; this.ShowProgress ('sending', { taskId : null });
         try { ({ result } = await this.RequestJSON (this.settings.baseUrl + '/text-to-image', { method : 'POST', headers : this.Headers (true), body : JSON.stringify ({ prompt : prompt.trim (), ai_model : imageModel, generate_multi_view : true }) })); }
         finally { this.submitting = false; this.RefreshActions (); }
         if (typeof result.result !== 'string' || !result.result) { throw new Error ('Provider did not return a task ID.'); }
@@ -558,7 +582,7 @@ export class AIWorkspace
         if (action === 'texture') { const image = reuseInput ? null : await this.ReferenceImage (); if (!image && !prompt.trim ()) { throw new Error ('Enter a texture prompt or reference image.'); } route = 'retexture'; payload = { input_task_id : selected.id, ...(image ? { image_style_url : image } : { text_style_prompt : prompt }), enable_original_uv : true, enable_pbr : pbr, texture_resolution : textureResolution }; }
         if (action === 'rigging') { if (!Number.isFinite (height) || height <= 0 || height > 100) { throw new Error ('Enter a positive character height up to 100 meters.'); } route = 'rigging'; payload = { input_task_id : selected.id, height_meters : height }; }
         if (action === 'animations') { if (selected.route !== 'rigging' || !Number.isInteger (actionId) || actionId < 0) { throw new Error ('Select a completed rig and a valid animation action ID.'); } route = 'animations'; payload = { rig_task_id : selected.id, action_id : actionId }; }
-        const owner = this.website.auth.user.id; this.submitting = true; this.status.textContent = 'Submitting ' + route + '…';
+        const owner = this.website.auth.user.id; this.submitting = true; this.status.textContent = 'Submitting ' + route + '…'; this.ShowProgress ('sending', { taskId : null });
         try { const { result } = await this.RequestJSON (this.settings.baseUrl + '/' + route, { method : 'POST', headers : this.Headers (true), body : JSON.stringify (payload) });
             if (typeof result.result !== 'string' || !result.result) { throw new Error ('Provider did not return a task ID.'); }
             const task = { id : result.result, route, type : action === 'text3d' ? 'text-to-3d-preview' : route, name : prompt || texturePrompt || selected?.name || RouteLabels[route], texturePrompt : action === 'texture' && !payload.image_style_url ? prompt : texturePrompt.trim () || null, status : 'PENDING', progress : 0, createdAt : Date.now (), provider : 'Meshy', ...(revisionOf ? { revisionOf } : {}), ...(payload.input_task_id || payload.rig_task_id ? { parentId : payload.input_task_id || payload.rig_task_id } : {}) }; this.UpsertTask (task);
@@ -567,6 +591,13 @@ export class AIWorkspace
         } finally { this.submitting = false; this.RefreshActions (); }
     }
     async PollTask (route, id, owner = this.website.auth?.user?.id)
+    {
+        this.ShowProgress ('processing', { taskId : id, percent : this.recent.find (item => item.id === id)?.progress || null }); this.RevealTask (id);
+        const mine = () => this.progressState?.taskId === id; // A newer submission takes over the progress display.
+        try { return await this.PollTaskStatus (route, id, owner, mine); }
+        catch (error) { if (mine () && owner === this.website.auth?.user?.id) { this.ShowProgress ('failed', { taskId : id, message : error.message }); } throw error; }
+    }
+    async PollTaskStatus (route, id, owner, mine)
     {
         let failures = 0;
         for (let attempt = 0; attempt < 720; attempt++) {
@@ -581,7 +612,8 @@ export class AIWorkspace
                 this.status.textContent = 'Connection interrupted; checking generation again…'; await Delay (seconds * 1000); continue;
             }
             const existing = this.recent.find (item => item.id === id); const task = this.NormalizeMeshyTask ({ ...result, route, type : existing?.type || result.type, prompt : result.prompt || existing?.name }); this.UpsertTask (task); this.status.textContent = route + ' · ' + (task.progress || 0) + '%';
-            if (task.status === 'SUCCEEDED') { this.status.textContent = 'Complete · select Preview to review'; return task; }
+            if (mine () && task.status !== 'SUCCEEDED') { this.ShowProgress ('processing', { taskId : id, percent : task.progress || null }); }
+            if (task.status === 'SUCCEEDED') { this.status.textContent = 'Complete · select Preview to review'; if (mine ()) { this.ShowProgress ('complete', { taskId : id }); } return task; }
             if (['FAILED', 'CANCELED'].includes (task.status)) { throw new Error (result.task_error?.message || 'Generation ' + task.status.toLowerCase ()); }
             const retry = Number (response.headers.get ('Retry-After')); if (Number.isFinite (retry) && retry > 3600) { throw new Error ('Meshy requested a longer wait. Refresh creations later.'); }
             await Delay (Number.isFinite (retry) && retry > 0 ? retry * 1000 : 4000);
@@ -710,6 +742,7 @@ export class AIWorkspace
         for (const item of this.recent.slice (0, 48)) {
             const card = Element ('div', 'ai_recent_card', undefined, this.recentGrid);
             card.dataset.taskId = item.id; card.classList.toggle ('selected', item.id === this.selectedTask);
+            card.classList.toggle ('ai_recent_active', item.id === this.progressState?.taskId && this.progressState.phase === 'processing'); card.setAttribute ('aria-busy', String (card.classList.contains ('ai_recent_active')));
             const previewButton = Element ('button', 'ai_preview_button', 'Preview', card); previewButton.addEventListener ('click', () => this.Run (() => this.SelectTask (item.id)));
             const placeholder = () => { const box = Element ('div', 'ai_recent_placeholder', undefined); Element ('span', null, item.status !== 'SUCCEEDED' && Number.isFinite (item.progress) ? item.progress + '%' : RouteLabels[item.route] || 'AI', box); return box; };
             if (item.thumbnail && !item.thumbnailFailed) {

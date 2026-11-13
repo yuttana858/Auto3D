@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Decimal size entry and AI progress — Auto3D 0.69.1 / Primary Products 0.15.0 / Packaging 1.10.7 (2026-11-13)
+
+Transform Size/Position/Rotation fields keep a typed decimal point (the live update no longer rewrites the focused field). AI Generative shows Sending request → Request processing · NN% → Complete or failed under Generate, scrolls once to the new creation and highlights it while it runs; `ai.workspace.inspect` reports the progress. See [release-0691.md](release-0691.md).
+
 ## Mode-first AI Create panel — Auto3D 0.69.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0 (2026-11-13)
 
 The AI Create panel starts with the generation type (Text to 3D, Image to 3D, Multi-image to 3D, Text to image, Texture) and shows only that type's inputs. The "4-view image" checkbox is removed. Meshy multi-view returns usually 3 views, so reference views are now always multi-view inside Multi-image to 3D, with up to 4 reference slots shared with uploads. See [release-0690.md](release-0690.md).

@@ -3,6 +3,7 @@ accounts
 admin-controls
 ai-credentials
 ai-extended
+ai-progress
 animation
 array-spacing
 auth
@@ -17,10 +18,11 @@ capture
 command-bar
 command-design
 corrugate-review
+decimal-inputs
 dimensions
+engineering-artwork
 engineering-landing
 engineering-prompts
-engineering-artwork
 errorlogs-panel
 feedback
 fefco
@@ -40,6 +42,7 @@ mcp-access
 mcp-consent
 mini-presentation
 module-panels
+molded-pulp
 multiwall-glue
 packaging-cleanup
 packaging-effects
@@ -52,12 +55,11 @@ packaging-thumbnail-generation
 popup-fonts
 preferences-recovery
 preview-context-lifecycle
-primary-products
-primary-materials
-primary-realism
-primary-profile
 primary-contents
-molded-pulp
+primary-materials
+primary-products
+primary-profile
+primary-realism
 render-workspace
 rendercore-state
 rendering
