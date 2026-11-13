@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Mode-first AI Create panel — Auto3D 0.69.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0 (2026-11-13)
+
+The AI Create panel starts with the generation type (Text to 3D, Image to 3D, Multi-image to 3D, Text to image, Texture) and shows only that type's inputs. The "4-view image" checkbox is removed. Meshy multi-view returns usually 3 views, so reference views are now always multi-view inside Multi-image to 3D, with up to 4 reference slots shared with uploads. See [release-0690.md](release-0690.md).
+
 ## Unified agent tool and screenshot approval — Auto3D 0.68.0 / Packaging 1.10.7 / Primary Products 0.15.0 / Molded Pulp 0.1.0
 
 Combines read, write and screenshot permissions into one agent connection approval, advertises the complete scope set, and removes the Agent preferences screenshot toggle. Adds effective grant inspection and actionable reconnection guidance for restricted credentials. Old consent forms require a restart; existing tokens are not silently elevated. See [release-0680.md](release-0680.md).
