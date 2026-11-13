@@ -14,9 +14,9 @@ try {
     await page.waitForFunction (() => /^(Added|Imported)/.test (document.querySelector ('.scene_status')?.textContent || ''));
     const call = async (id, args = {}) => { const r = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (r.ok, true, JSON.stringify (r)); return r.result; };
     await call ('lighting.effects', { ambientIntensity : 0.4, ambientColor : '#ffddbb' });
-    await page.locator ('#data_panel_toggle[aria-expanded="false"]').click ();
-    /* Details starts minimized (website.js) until the user expands it. */
-    await page.getByRole ('button', { name : 'Expand Details', exact : true }).click ();
+    /* Model spec (and its Details) open by default since 0.70.0; expand them only if a narrow layout closed them. */
+    if (await page.locator ('#data_panel_toggle').getAttribute ('aria-expanded') === 'false') { await page.locator ('#data_panel_toggle').click (); }
+    const detailsToggle = page.locator ('.details_collapse'); if (await detailsToggle.getAttribute ('aria-expanded') === 'false') { await detailsToggle.click (); }
     const dimension = page.locator ('[data-dimension-axis="0"]'); const before = Number (await dimension.inputValue ()); await dimension.fill (String (before * 1.5));
     assert.ok (Math.abs ((await call ('scene.inspect')).objects[0].scale[0] - 1.5) < 0.001);
     await dimension.press ('Tab');

@@ -41,6 +41,7 @@ material-surface
 mcp-access
 mcp-consent
 mini-presentation
+model-spec
 module-panels
 molded-pulp
 multiwall-glue

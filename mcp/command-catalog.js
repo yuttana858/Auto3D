@@ -99,6 +99,8 @@ export const CommandIds = Object.freeze ([
     'packaging.download',
     'scene.inspect',
     'object.select',
+    'ui.model_spec.inspect',
+    'ui.model_spec.preview',
     'ui.transform_panel.position',
     'selection.clear',
     'object.tool',

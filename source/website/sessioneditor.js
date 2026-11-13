@@ -781,7 +781,7 @@ export class SessionEditor
         const panel = this.website.sidebar.detailsPanel;
         const table = panel.contentDiv.querySelector ('.ov_property_table');
         if (!table) { return; }
-        this.UpdateModelPreview (panel, object);
+        this.UpdateModelPreview (panel, object); this.RenderPackagingSpec (panel, object);
 
         table.querySelectorAll ('.scene_dimension').forEach ((row) => row.remove ());
         table.querySelectorAll ('.ov_property_table_row').forEach ((row) => {
@@ -878,11 +878,61 @@ export class SessionEditor
     DisposeModelPreview ()
     {
         if (!this.modelPreview) { return; }
+        cancelAnimationFrame (this.modelPreview.frame);
         ReleaseWebGLRenderer (this.modelPreview.renderer);
         this.modelPreview.element.remove ();
         this.modelPreview = null;
     }
 
+    // Turntable for the Model spec preview; the choice carries over to the next selected model.
+    SetPreviewRotation (enabled)
+    {
+        if (typeof enabled !== 'boolean') { throw new Error ('Rotation must be true or false.'); }
+        this.previewRotationWanted = enabled; const preview = this.modelPreview;
+        if (preview) {
+            preview.rotating = enabled && Boolean (preview.pivot); preview.rotateButton?.setAttribute ('aria-pressed', String (preview.rotating)); cancelAnimationFrame (preview.frame);
+            const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+            const step = () => { if (this.modelPreview !== preview || !preview.rotating) { return; } preview.pivot.rotation.y += reduced ? 0 : 0.012; preview.render (); preview.frame = requestAnimationFrame (step); };
+            if (preview.rotating) { preview.frame = requestAnimationFrame (step); }
+        }
+        return { rotating : enabled, preview : Boolean (preview?.pivot) };
+    }
+    // Packaging specs and tools shown in Model spec when a generated box is selected.
+    PackagingSpec (object = this.selected)
+    {
+        let fefco = null; try { fefco = object?.userData?._auto3dFefco ? JSON.parse (object.userData._auto3dFefco) : null; } catch { fefco = null; }
+        if (!fefco) { return null; }
+        const mm = value => Number.isFinite (value) ? Number (value.toFixed (1)) : null;
+        return { code : fefco.code, length : mm (fefco.length), width : mm (fefco.width), height : mm (fefco.height), thickness : mm (fefco.thickness), closure : fefco.closure || null, state : object.userData._auto3dPackagingState || null };
+    }
+    RenderPackagingSpec (panel, object)
+    {
+        panel.contentDiv.querySelectorAll ('.scene_packaging_spec').forEach (item => item.remove ());
+        const spec = this.PackagingSpec (object); if (!spec) { return; }
+        const section = Element ('section', 'scene_packaging_spec'); section.setAttribute ('aria-label', 'Packaging spec');
+        Element ('strong', null, 'Packaging · FEFCO ' + spec.code, section);
+        const list = Element ('dl', null, undefined, section);
+        for (const [name, value] of [['Score size (L × W × H)', [spec.length, spec.width, spec.height].join (' × ') + ' mm'], ['Board caliper', spec.thickness + ' mm'], ['Closure', spec.closure], ['State', spec.state]]) {
+            if (value === null || value === undefined) { continue; } Element ('dt', null, name, list); Element ('dd', null, String (value), list);
+        }
+        const tools = Element ('div', 'scene_packaging_spec_actions', undefined, section);
+        const run = (id) => this.Run (async () => { const result = await this.website.commands.Execute (id, {}); if (!result.ok) { throw new Error (result.error?.message || 'Packaging action failed.'); } return result.result; });
+        for (const [label, id, title, readOnlyAllowed] of [['Open in CAD Studio', 'packaging.open_selected', 'Open this box dieline in the Packaging Designer CAD', false], [spec.state === 'unfolded' ? 'Fold' : 'Unfold', 'packaging.fefco.toggle', 'Fold or unfold this box', false], ['Packaging Gen tools', 'ui.packaging', 'Open the full Packaging Gen panel', true]]) {
+            const button = Element ('button', null, label, tools); button.type = 'button'; button.title = title; button.disabled = this.readOnly && !readOnlyAllowed; button.addEventListener ('click', () => run (id));
+        }
+        const preview = panel.contentDiv.querySelector ('.scene_model_preview');
+        panel.contentDiv.insertBefore (section, preview ? preview.nextSibling : panel.contentDiv.firstChild);
+    }
+    // Read-only summary of what Model spec shows for the selection.
+    ModelSpec ()
+    {
+        const panel = this.website.modulePanels?.state?.Inspect?.('data'); const object = this.selected;
+        if (!object) { return { open : Boolean (panel?.visible), selected : null, rotating : Boolean (this.previewRotationWanted) }; }
+        const base = this.GetObjectBaseSize (object), units = this.website.preferences?.units || 'metric';
+        const size = [0, 2, 1].map (axis => Number (DisplaySizeFromScale (base[axis], object.scale[axis], object.unit, units).toFixed (3)));
+        const counts = { vertices : 0, triangles : 0 }; object.node?.EnumerateMeshIndices ((index) => { const mesh = this.document.model.GetMesh (index); counts.vertices += mesh.VertexCount (); counts.triangles += mesh.TriangleCount (); });
+        return { open : Boolean (panel?.visible), rotating : Boolean (this.previewRotationWanted), selected : { id : object.id, name : object.name, width : size[0], length : size[1], height : size[2], unit : UnitFactor (object.unit, units) === null ? 'model units' : DisplayUnitLabel (units), scale : [...object.scale], ...counts, packaging : this.PackagingSpec (object) } };
+    }
     UpdateModelPreview (panel, object)
     {
         if (this.modelPreview && this.modelPreview.object === object && this.modelPreview.root === object.threeObject && this.modelPreview.element.isConnected) { return; }
@@ -891,13 +941,21 @@ export class SessionEditor
         const element = Element ('div', 'scene_model_preview');
         const title = Element ('div', 'scene_model_preview_title', undefined, element); Element ('strong', null, 'Model preview', title); Element ('span', null, 'Drag X/Y · Shift+drag Z', title);
         const canvas = Element ('canvas', 'scene_model_preview_canvas', undefined, element); canvas.width = 300; canvas.height = 190; canvas.setAttribute ('aria-label', 'Interactive model preview'); canvas.setAttribute ('role', 'img');
+        // Actions attached to the preview window; Assign facing will join them once placement is built.
+        const actions = Element ('div', 'scene_model_preview_actions', undefined, element); actions.setAttribute ('role', 'toolbar'); actions.setAttribute ('aria-label', 'Selected model actions');
+        const rotate = Element ('button', null, 'Rotate', actions); rotate.type = 'button'; rotate.title = 'Turn the preview continuously'; rotate.setAttribute ('aria-pressed', 'false');
+        rotate.addEventListener ('click', () => this.SetPreviewRotation (!this.modelPreview?.rotating));
+        const update = Element ('button', null, 'Update', actions); update.type = 'button'; update.title = 'Reload this model from a file'; update.disabled = this.readOnly;
+        update.addEventListener ('click', () => this.Run (() => this.UpdateModel (object)));
+        const remove = Element ('button', 'scene_model_preview_delete', '×', actions); remove.type = 'button'; remove.title = 'Delete this model (Undo restores it)'; remove.setAttribute ('aria-label', 'Delete selected model'); remove.disabled = this.readOnly;
+        remove.addEventListener ('click', () => this.Run (() => this.Delete ()));
         panel.contentDiv.insertBefore (element, panel.contentDiv.firstChild);
 
         if (!panel.IsVisible () || this.website.parameters.rightContainerDiv.classList.contains ('collapsed')) { element.remove (); return; }
         let renderer;
         try { renderer = new THREE.WebGLRenderer ({ canvas, antialias : true, alpha : true, preserveDrawingBuffer : false }); }
         catch (error) { element.remove (); throw error; }
-        this.modelPreview = { object, root : object.threeObject, element, renderer };
+        this.modelPreview = { object, root : object.threeObject, element, renderer, rotateButton : rotate, rotating : false, frame : 0 };
         try {
         renderer.setPixelRatio (Math.min (window.devicePixelRatio || 1, 2)); renderer.setSize (300, 190, false); renderer.outputColorSpace = THREE.SRGBColorSpace;
         const scene = new THREE.Scene ();
@@ -932,7 +990,8 @@ export class SessionEditor
         const release = (event) => { if (pointer?.id === event.pointerId) { pointer = null; } };
         canvas.addEventListener ('pointerup', release); canvas.addEventListener ('pointercancel', release); canvas.addEventListener ('contextmenu', (event) => event.preventDefault ());
         render ();
-        Object.assign (this.modelPreview, { scene, camera, pivot });
+        Object.assign (this.modelPreview, { scene, camera, pivot, render });
+        if (this.previewRotationWanted) { this.SetPreviewRotation (true); }
         } catch (error) { this.DisposeModelPreview (); throw error; }
     }
 

@@ -2518,6 +2518,42 @@
       }
     },
     {
+      "id": "ui.model_spec.inspect",
+      "title": "Read Model spec",
+      "category": "Panels",
+      "description": "Read what the default right Model spec panel shows for the selection: name, W/L/H in display units, scale, vertex and triangle counts, the packaging spec for a generated box (FEFCO code, score size, caliper, closure, folded state), whether the panel is open, and whether the preview turntable is on. Scale with object.dimension or object.scaling.percent; Update is ui.update_model and Delete is object.delete.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ui.model_spec.preview",
+      "title": "Rotate the Model spec preview",
+      "category": "Panels",
+      "description": "Turn the Model spec preview turntable on or off, the same as its Rotate button. The choice carries over to the next selected model. Does not change the scene.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "rotate": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "rotate"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "rotate": true
+      }
+    },
+    {
       "id": "ui.transform_panel.position",
       "title": "Move the Object transform panel",
       "category": "Panels",
