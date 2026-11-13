@@ -1,11 +1,17 @@
 import { CommandIds } from './command-catalog.js';
-import { AgentError, AgentName, ErrorCode, Identifier, ReadTools, SafeText } from './common.js';
+import { AgentError, AgentName, ErrorCode, Identifier, MissingScopeError, ReadTools, SafeText } from './common.js';
 import { Registrations } from './registrations.js';
 import { FefcoProfile, ValidateFefco } from '../modules/packaging/src/fefco.js';
 
 const ToolIds = new Set (CommandIds);
 const LongCommands = /^(?:render\.(?:now|queue\.start)|ai\.|library\.|material\.(?:textures?\.|surface\.|relief|uv\.generate)|packaging\.(?:export|download|extrude|apply|fefco\.(?:generate|animate|toggle|unfold))|polygon\.|session\.(?:model\.|recovery\.restore|tabs\.new)|primary\.(?:generate|update)|commands\.text$)/;
 const RequestRetentionMs = 3600000, RateWindowMs = 60000, RateLimit = 120;
+const WindowCodeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function CreateWindowCode ()
+{
+    const bytes = crypto.getRandomValues (new Uint8Array (16));
+    return [...bytes].map (byte => WindowCodeAlphabet[byte & 31]).join ('').match (/.{4}/g).join ('-');
+}
 // Reads stay short; ordinary mutations and long-running work get longer limits.
 export function CommandTimeout (command, baseMs)
 {
@@ -36,7 +42,7 @@ function Sessions (sessions)
 }
 function BrowserError (error)
 {
-    const allowed = ['invalid_arguments', 'unknown_command', 'permission_required', 'session_changed', 'result_too_large', 'command_failed', 'conflict', 'not_found'];
+    const allowed = ['invalid_arguments', 'unknown_command', 'permission_required', 'session_changed', 'session_unavailable', 'invalid_code', 'timeout', 'result_too_large', 'command_failed', 'conflict', 'not_found'];
     const code = allowed.includes (error?.code) ? error.code : 'command_failed';
     return AgentError (code, typeof error?.message === 'string' && error.message ? SafeText (error.message) : undefined);
 }
@@ -92,7 +98,7 @@ export class BrokerCore
         Identifier (grantId);
         const codeHash = await WindowCodeHash (code), registration = await this.registrations.Assert ({ accountId, id : grantId });
         const target = this.Connections (accountId).find (({ data }) => data.windowCodeHash === codeHash && data.windowCodeExpiresAt > this.now () && data.sessions.some (session => session.active));
-        if (!target || !Number.isSafeInteger (expiresAt) || expiresAt <= this.now ()) { throw AgentError ('invalid_code', 'App window code unavailable. Reconnect the window in Agent access and use its new code.'); }
+        if (!target || !Number.isSafeInteger (expiresAt) || expiresAt <= this.now ()) { throw AgentError ('invalid_code', 'App window code unavailable. Choose Live Control or New code in Agent access and share the current code.'); }
         await this.state.storage.transaction (async storage => {
             const key = 'used-window-code:' + codeHash, used = await storage.get (key);
             if (used?.expiresAt > this.now ()) { throw AgentError ('invalid_code', 'App window code already used.'); }
@@ -101,7 +107,7 @@ export class BrokerCore
             await storage.put (key, { expiresAt : target.data.windowCodeExpiresAt });
         });
         await this.registrations.Assert ({ accountId, id : grantId });
-        this.Notify (accountId);
+        this.Notify (accountId, { connectionId : target.data.connectionId, windowCodeId : target.data.windowCodeId });
         return { paired : true };
     }
     async CheckWindowCode ({ accountId, code })
@@ -112,10 +118,10 @@ export class BrokerCore
         const used = await this.state.storage.get ('used-window-code:' + codeHash);
         return Boolean (target && (!used || used.expiresAt <= this.now ()));
     }
-    Notify (accountId)
+    Notify (accountId, codeUsed = null)
     {
-        // Names are fetched separately by the account UI; sockets carry no credentials.
-        for (const { socket } of this.Connections (accountId)) { try { socket.send (JSON.stringify ({ type : 'access_changed' })); } catch { /* Closed connection. */ } }
+        // Names are fetched separately; this notification only marks a code as used.
+        for (const { socket, data } of this.Connections (accountId)) { try { socket.send (JSON.stringify ({ type : 'access_changed', ...(codeUsed?.connectionId === data.connectionId ? { windowCodeUsed : codeUsed.windowCodeId } : {}) })); } catch { /* Closed connection. */ } }
     }
     async Resolve ({ accountId, grantId })
     {
@@ -147,7 +153,7 @@ export class BrokerCore
         if (!ToolIds.has (command) || !args || typeof args !== 'object' || Array.isArray (args)) { throw AgentError ('unknown_command'); }
         const registration = await this.registrations.Assert ({ accountId, id : grantId });
         if (!ReadTools.includes (command) && !registration.scopes.includes ('auto3d.write')) { throw AgentError ('permission_required', 'Write permission required. Authorize again with auto3d.write.'); }
-        if (command === 'capture.image' && !registration.scopes.includes ('auto3d.capture')) { throw AgentError ('permission_required', 'Screenshot permission required. Authorize auto3d.capture and allow screenshots in the window.'); }
+        if (command === 'capture.image' && !registration.scopes.includes ('auto3d.capture')) { throw MissingScopeError ('auto3d.capture', 'Screenshot permission required. Reconnect Auto3D to approve all tools and screenshots together.'); }
         const now = this.now (); this.recent = this.recent.filter (time => now - time < RateWindowMs);
         if (this.recent.length >= RateLimit) { throw AgentError ('rate_limited', 'Too many requests for this account. Wait a minute and retry.'); }
         const { pair, target } = await this.Resolve ({ accountId, grantId });
@@ -283,12 +289,18 @@ export class BrokerCore
                     if (item.data.sessionFingerprint !== data.sessionFingerprint || item.socket === socket) { throw new Error ('Duplicate window.'); }
                     item.socket.close (1000, 'Replaced by reconnect'); this.Close (item.socket);
                 }
-                let windowCodeHash = null, windowCodeExpiresAt = null;
-                if (message.windowCode !== undefined) {
-                    windowCodeHash = await WindowCodeHash (message.windowCode); windowCodeExpiresAt = this.now () + 600000;
-                }
-                socket.serializeAttachment ({ ...data, instanceId : message.instanceId, windowLabel, windowCodeHash, windowCodeExpiresAt, allowSelect : message.allowSelect === true, sessions : Sessions (message.sessions), ready : true });
-                socket.send (JSON.stringify ({ type : 'hello_ack', connectionId : data.connectionId, expiresAt : data.expiresAt })); return;
+                // New clients receive a server-issued code. Keep accepting older clients'
+                // valid codes until their next app reload; only a digest is retained.
+                const windowCode = message.windowCode === undefined ? CreateWindowCode () : message.windowCode;
+                const windowCodeHash = await WindowCodeHash (windowCode), windowCodeExpiresAt = this.now () + 600000, windowCodeId = crypto.randomUUID ();
+                socket.serializeAttachment ({ ...data, instanceId : message.instanceId, windowLabel, windowCodeHash, windowCodeExpiresAt, windowCodeId, allowSelect : message.allowSelect === true, sessions : Sessions (message.sessions), ready : true });
+                socket.send (JSON.stringify ({ type : 'hello_ack', connectionId : data.connectionId, expiresAt : data.expiresAt, windowCode, windowCodeExpiresAt, windowCodeId })); return;
+            }
+            if (message.type === 'window_code' && data.ready && text.length <= 1024 && message.instanceId === data.instanceId) {
+                Identifier (message.requestId);
+                const windowCode = CreateWindowCode (), windowCodeHash = await WindowCodeHash (windowCode), windowCodeExpiresAt = this.now () + 600000, windowCodeId = crypto.randomUUID ();
+                socket.serializeAttachment ({ ...socket.deserializeAttachment (), windowCodeHash, windowCodeExpiresAt, windowCodeId });
+                socket.send (JSON.stringify ({ type : 'window_code', requestId : message.requestId, windowCode, windowCodeExpiresAt, windowCodeId })); return;
             }
             if (message.type === 'sessions' && data.ready && text.length <= 65536 && message.instanceId === data.instanceId) {
                 socket.serializeAttachment ({ ...data, sessions : Sessions (message.sessions) }); return;

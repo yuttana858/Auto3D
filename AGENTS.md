@@ -24,6 +24,8 @@ The Molded Pulp candidate is Auto3D 0.67.0 / Packaging 1.10.7 / Primary Products
 
 # Agent-accessible features
 
+The unified agent approval release in PR #123 is Auto3D 0.68.0 / Packaging 1.10.7 / Primary Products 0.15.0 / Molded Pulp 0.1.0. One OAuth approval grants read, write and screenshots; Live Control has no separate screenshot preference. Server-issued window codes are visible in the header, Preferences and MCP connections; Copy code/New code use `agent.access.code.copy/refresh`, and agents pair with a user-supplied code through `auto3d.sessions.pair_code`. Existing restricted credentials require reconnection. Use `auto3d.capabilities.inspect` for effective grant permissions. See docs/release-0680.md.
+
 For every new PR, report the application version and PR number to the user. Keep the app version, package version and release notes aligned when preparing a release.
 
 Every new user-facing action must have a stable command in `source/website/agentcommands.js` using the shared `CommandRegistry`. Include category, description, strict input schema, example, mutation flag and structured result. Keep UI actions and agent commands on shared underlying functions. Do not make agents depend on DOM selectors, arbitrary evaluation, or simulated clicks.

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { Registrations } from '../../mcp/registrations.js';
 import { BrokerCore } from '../../mcp/broker-core.js';
-import { ErrorCode, PilotConfig } from '../../mcp/common.js';
+import { ConnectionScopes, ErrorCode, GrantedScopes, PilotConfig } from '../../mcp/common.js';
 import { PilotService } from '../../mcp/service.js';
 import { Validate } from '../../source/website/commandregistry.js';
 
@@ -20,6 +20,22 @@ const State = () => ({ storage : new Storage (), sockets : [], getWebSockets () 
 const Socket = () => ({ readyState : 1, sent : [], serializeAttachment (data) { this.data = structuredClone (data); }, deserializeAttachment () { return structuredClone (this.data); }, send (text) { this.sent.push (JSON.parse (text)); this.onSend?.(JSON.parse (text)); }, close () { this.readyState = 3; } });
 
 describe ('MCP registration and isolation boundary', () => {
+    it ('grants one complete permission set regardless of the client requested subset', () => {
+        assert.deepEqual (GrantedScopes (['auto3d.read']), [...ConnectionScopes]);
+        assert.deepEqual (GrantedScopes (['auto3d.read', 'auto3d.write', 'offline_access']), [...ConnectionScopes, 'offline_access']);
+    });
+    it ('reports restricted credentials and full permissions without a connected window', async () => {
+        const broker = { AssertRegistration : async () => ({ scopes : [...ConnectionScopes] }) };
+        const actor = { userId : owner, props : { registrationId : 'grant-a' }, scope : ['auto3d.read'], expiresAt : Date.now () / 1000 + 60 };
+        const service = new PilotService (broker, []);
+        assert.ok (service.Tools (actor).some (tool => tool.id === 'auto3d.capabilities.inspect'));
+        const restricted = await service.Call (actor, 'auto3d.capabilities.inspect', {});
+        assert.deepEqual (restricted.permissions, { read : true, write : false, screenshots : false });
+        assert.equal (restricted.reauthorizationRequired, true); assert.match (restricted.hint, /Reconnect Auto3D/);
+        const full = await service.Call ({ ...actor, scope : [...ConnectionScopes] }, 'auto3d.capabilities.inspect', {});
+        assert.deepEqual (full.permissions, { read : true, write : true, screenshots : true }); assert.equal (full.reauthorizationRequired, false);
+        await assert.rejects (service.Call (actor, 'auto3d.capabilities.inspect', { unexpected : true }), /Unknown argument/);
+    });
     it ('rejects an account mismatch and keeps named grants independent', async () => {
         const registry = new Registrations (new Storage ());
         await registry.Create (registration ()); await registry.Create (registration ('grant-b'));
@@ -90,6 +106,27 @@ describe ('MCP registration and isolation boundary', () => {
         now += 600001; await broker.Cleanup ();
         assert.equal ((await state.storage.list ({ prefix : 'used-window-code:' })).size, 0);
     });
+    it ('issues codes from the server and replaces them without changing existing pairings', async () => {
+        const state = State (), broker = new BrokerCore (state), socket = Socket ();
+        for (const id of ['grant-a', 'grant-b']) { await broker.registrations.Create (registration (id)); }
+        await broker.Attach ({ accountId : owner, sessionFingerprint : 'a'.repeat (64), expiresAt : Date.now () + 300000 }, socket);
+        await broker.Message (socket, JSON.stringify ({ type : 'hello', instanceId : 'server-code-window', windowLabel : 'Window A', sessions : [{ id : 'tab-a', name : 'Box', active : true }] }));
+        const issued = socket.sent.find (message => message.type === 'hello_ack');
+        assert.match (issued.windowCode, /^(?:[A-HJ-NP-Z2-9]{4}-){3}[A-HJ-NP-Z2-9]{4}$/);
+        assert.ok (issued.windowCodeExpiresAt > Date.now () + 590000); assert.equal (JSON.stringify (socket.data).includes (issued.windowCode), false);
+        assert.equal (JSON.stringify (await broker.List (owner)).includes (issued.windowCode), false);
+        await broker.PairWithCode ({ accountId : owner, grantId : 'grant-a', code : issued.windowCode, expiresAt : Date.now () + 60000 });
+        assert.ok (socket.sent.some (message => message.type === 'access_changed' && message.windowCodeUsed === issued.windowCodeId));
+        const paired = await state.storage.get ('pair:grant-a');
+        await broker.Message (socket, JSON.stringify ({ type : 'window_code', instanceId : 'server-code-window', requestId : 'new-code' }));
+        const renewed = socket.sent.find (message => message.type === 'window_code');
+        assert.equal (renewed.requestId, 'new-code'); assert.notEqual (renewed.windowCode, issued.windowCode); assert.notEqual (renewed.windowCodeId, issued.windowCodeId);
+        assert.deepEqual (await state.storage.get ('pair:grant-a'), paired);
+        await assert.rejects (broker.PairWithCode ({ accountId : owner, grantId : 'grant-b', code : issued.windowCode, expiresAt : Date.now () + 60000 }), /unavailable/);
+        await broker.PairWithCode ({ accountId : owner, grantId : 'grant-b', code : renewed.windowCode, expiresAt : Date.now () + 60000 });
+        assert.equal ((await state.storage.get ('pair:grant-b')).connectionId, issued.connectionId);
+        assert.equal (JSON.stringify (socket.data).includes (renewed.windowCode), false);
+    });
     it ('disconnects an idle pairing after one hour without revoking the agent registration', async () => {
         let now = Date.now (); const state = State (), broker = new BrokerCore (state, { now : () => now }), socket = Socket ();
         await broker.registrations.Create ({ ...registration (), expiresAt : now + 7200000 });
@@ -102,9 +139,12 @@ describe ('MCP registration and isolation boundary', () => {
     it ('enforces remote allowlists and strict string argument constraints', async () => {
         const broker = { AssertRegistration : async () => ({}) }, actor = { userId : owner, props : { registrationId : 'grant-a' }, scope : ['auto3d.read'], expiresAt : Date.now () / 1000 + 60 };
         const service = new PilotService (broker, [{ id : 'auth.sign_out', mutates : true }, { id : 'capture.image', mutates : false }]);
-        assert.equal (service.Tools (actor).length, 9); await assert.rejects (service.Call (actor, 'auth.sign_out', {}));
+        assert.equal (service.Tools (actor).length, 10); await assert.rejects (service.Call (actor, 'auth.sign_out', {}));
         // Write-gated tools name the missing scope so the transport can issue a step-up challenge.
         await assert.rejects (service.Call (actor, 'auto3d.commands.invoke', { command : 'auth.sign_out', arguments : {} }), error => error.requiredScope === 'auto3d.write' && ErrorCode (error) === 'permission_required');
+        for (const [name, args] of [['capture.image', {}], ['auto3d.commands.invoke', { command : 'capture.image', arguments : {} }]]) {
+            await assert.rejects (service.Call ({ ...actor, scope : ['auto3d.read', 'auto3d.write'] }, name, args), error => error.requiredScope === 'auto3d.capture' && ErrorCode (error) === 'permission_required');
+        }
         const tools = service.Tools ({ ...actor, scope : ['auto3d.read', 'auto3d.write'] }).map (tool => tool.id);
         for (const id of ['auto3d.design', 'auto3d.commands', 'auto3d.capture', 'auto3d.modules', 'auto3d.sessions', 'auto3d.settings', 'auto3d.commands.invoke']) { assert.ok (tools.includes (id)); }
         assert.throws (() => Validate ('abc', { type : 'string', maxLength : 2 })); assert.throws (() => Validate ('bad!', { type : 'string', pattern : '^[a-z]+$' }));

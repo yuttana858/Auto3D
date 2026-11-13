@@ -46,9 +46,10 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         const html = await response.text ();
         assert.ok (!html.includes ('<script>evil</script>')); assert.ok (html.includes ('&#60;script&#62;evil&#60;/script&#62;'));
         assert.ok (!html.includes ('name="appWindowCode"')); assert.ok (!html.includes ('name="harness"')); assert.ok (!html.includes ('name="name"'));
-        if (scope.includes ('auto3d.write')) { assert.match (html, /full Auto3D command catalog, including tools that change the app and account or administrator controls/); }
+        assert.match (html, /read and edit your selected workspace, use every Auto3D tool, and capture viewport or workspace screenshots/);
+        assert.ok (!html.includes ('type="checkbox"'));
         assert.ok (!html.includes ('approve-manual')); assert.match (html, /SW Auto3D/); assert.match (html, /mcp-consent\.css/);
-        const form = new URLSearchParams ({ handle : html.match (/name="handle" value="([^"]+)"/)[1], binding : html.match (/name="binding" value="([^"]+)"/)[1], name : 'My review agent', harness : 'chatgpt', appWindowCode, decision : 'approve' });
+        const form = new URLSearchParams ({ handle : html.match (/name="handle" value="([^"]+)"/)[1], binding : html.match (/name="binding" value="([^"]+)"/)[1], permissions : html.match (/name="permissions" value="([^"]+)"/)[1], name : 'My review agent', harness : 'chatgpt', appWindowCode, decision : 'approve' });
         if (!appWindowCode) { form.delete ('name'); form.delete ('harness'); }
         const cookies = [cookieFor (id), ...response.headers.getSetCookie ().map (value => value.split (';')[0])].join ('; ');
         return { verifier, form, cookies, fixtureSocket };
@@ -68,6 +69,14 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         const after = await (await fetch ('/api/agent/registrations', { headers : userHeaders (id) })).json ();
         const registration = after.registrations.find (record => !before.registrations.some (previous => previous.id === record.id));
         assert.ok (registration); return { ...tokens, registrationId : registration.id };
+    }
+    // Model already issued restricted credentials using the provider's supported downscoping.
+    // New approvals themselves always include the complete permission set.
+    async function restrictedToken (scope = 'auto3d.read offline_access')
+    {
+        const token = await grant ();
+        const response = await fetch ('/oauth/oauth/token', { method : 'POST', headers : { 'Content-Type' : 'application/x-www-form-urlencoded' }, body : new URLSearchParams ({ grant_type : 'refresh_token', client_id : clientId, refresh_token : token.refresh_token, resource : origin + '/mcp', scope }).toString () });
+        assert.equal (response.status, 200); return { ...await response.json (), registrationId : token.registrationId };
     }
     before (async () => {
         const outboundService = async request => {
@@ -100,10 +109,9 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
     it ('publishes OAuth/resource discovery and challenges unauthenticated MCP requests', async () => {
         const discovery = await fetch ('/.well-known/oauth-authorization-server/oauth'); assert.equal (discovery.status, 200); assert.equal ((await discovery.json ()).issuer, origin + '/oauth');
         const metadata = await (await fetch ('/.well-known/oauth-protected-resource/mcp')).json (); assert.equal (metadata.resource, origin + '/mcp');
-        // MCP clients request the advertised scopes, so write must be advertised or every grant is read-only.
-        assert.deepEqual (metadata.scopes_supported, ['auto3d.read', 'auto3d.write']);
+        assert.deepEqual (metadata.scopes_supported, ['auto3d.read', 'auto3d.write', 'auto3d.capture']);
         const response = await fetch ('/mcp'); assert.equal (response.status, 401); assert.match (response.headers.get ('WWW-Authenticate'), /oauth-protected-resource/);
-        assert.match (response.headers.get ('WWW-Authenticate'), /scope="auto3d\.read auto3d\.write"/);
+        assert.match (response.headers.get ('WWW-Authenticate'), /scope="auto3d\.read auto3d\.write auto3d\.capture"/);
     });
     it ('binds consent to its original browser and account', async () => {
         const unsigned = await fetch ('/oauth/authorize?client_id=' + encodeURIComponent (clientId));
@@ -131,7 +139,7 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         const hello = await ack;
         const initialized = await rpc (token.access_token, 'initialize', { protocolVersion : '2025-03-26', capabilities : {}, clientInfo : { name : 'test client', version : '1' } }); assert.equal (initialized.status, 200); const serverVersion = (await initialized.json ()).result.serverInfo.version; assert.equal (serverVersion.split ('+')[0], releaseVersion); assert.match (serverVersion.split ('+')[1], /^[a-f0-9]{16}$/);
         const listResponse = await rpc (token.access_token, 'tools/list'); assert.equal (listResponse.headers.get ('Cache-Control'), 'no-store');
-        const tools = await listResponse.json (); assert.ok (!tools.result.tools.some (tool => tool.name === 'capture.image' || tool.name === 'auth.sign_out'));
+        const tools = await listResponse.json (); assert.ok (tools.result.tools.some (tool => tool.name === 'capture.image')); assert.ok (!tools.result.tools.some (tool => tool.name === 'auth.sign_out'));
         if (other) { const otherList = await (await rpc (other.access_token, 'tools/call', { name : 'auto3d.sessions.list', arguments : {} })).json (); assert.deepEqual (JSON.parse (otherList.result.content[0].text), []); }
         const selected = await rpc (token.access_token, 'tools/call', { name : 'auto3d.sessions.select', arguments : { connectionId : hello.connectionId, sessionId : 'tab-a' } }); assert.equal (selected.status, 200);
         const waiting = message (socket); // access_changed from pairing is sent before dispatch
@@ -181,11 +189,13 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         socket.send (JSON.stringify ({ type : 'hello', instanceId : 'retry-window', windowLabel : 'Retry window', windowCode : correct, sessions : [{ id : 'tab-a', name : 'Box', active : true }] })); await ack;
         flow.form.set ('appWindowCode', correct); const approved = await approve (flow); assert.equal (approved.status, 302);
     });
-    it ('pairs a user-supplied window code after OAuth login without returning the code', async () => {
-        const token = await grant (); const code = 'WXYZ-2345-6789-ABCD';
+    it ('pairs a server-issued window code after OAuth login without returning it to an unpaired agent', async () => {
+        const token = await grant ();
         const upgrade = await fetch ('/api/agent/connect', { headers : { Cookie : cookieFor (userA), Origin : origin, Upgrade : 'websocket' } }); assert.equal (upgrade.status, 101);
         socket = upgrade.webSocket; socket.accept (); const ack = message (socket);
-        socket.send (JSON.stringify ({ type : 'hello', instanceId : 'agent-code-window', windowLabel : 'Agent code window', allowSelect : true, windowCode : code, sessions : [{ id : 'tab-a', name : 'Box', active : true }] })); await ack;
+        socket.send (JSON.stringify ({ type : 'hello', instanceId : 'agent-code-window', windowLabel : 'Agent code window', allowSelect : true, sessions : [{ id : 'tab-a', name : 'Box', active : true }] })); const issued = await ack, code = issued.windowCode;
+        assert.match (code, /^(?:[A-HJ-NP-Z2-9]{4}-){3}[A-HJ-NP-Z2-9]{4}$/); assert.ok (issued.windowCodeExpiresAt > Date.now () + 590000);
+        const windows = await (await rpc (token.access_token, 'tools/call', { name : 'auto3d.sessions.list', arguments : {} })).json (); assert.equal (JSON.stringify (windows).includes (code), false);
         const tools = await (await rpc (token.access_token, 'tools/list')).json (); assert.ok (tools.result.tools.some (tool => tool.name === 'auto3d.sessions.pair_code'));
         if (!live) { const other = await grant (userB); const wrong = await (await rpc (other.access_token, 'tools/call', { name : 'auto3d.sessions.pair_code', arguments : { code } })).json (); assert.equal (wrong.result.isError, true); }
         const paired = await (await rpc (token.access_token, 'tools/call', { name : 'auto3d.sessions.pair_code', arguments : { code } })).json ();
@@ -203,7 +213,7 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         const token = await grant (); const records = await (await fetch ('/api/agent/registrations', { headers : userHeaders (userA) })).json ();
         const record = records.registrations.find (item => item.id === token.registrationId); assert.ok (record.expiresAt > Date.now () + 365 * 86400000); assert.ok (token.refresh_token);
         const response = await fetch ('/oauth/oauth/token', { method : 'POST', headers : { 'Content-Type' : 'application/x-www-form-urlencoded' }, body : new URLSearchParams ({ grant_type : 'refresh_token', client_id : clientId, refresh_token : token.refresh_token, resource : origin + '/mcp' }).toString () });
-        assert.equal (response.status, 200); assert.ok ((await response.json ()).refresh_token);
+        assert.equal (response.status, 200); const refreshed = await response.json (); assert.ok (refreshed.refresh_token); assert.deepEqual (refreshed.scope.split (' ').sort (), ['auto3d.capture', 'auto3d.read', 'auto3d.write', 'offline_access']);
         await post ('/api/agent/registrations', { action : 'revoke', id : token.registrationId });
     });
     it ('creates and reads an isolated headless CAD draft without a browser connection', async () => {
@@ -215,33 +225,39 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         assert.equal (inspected.result.structuredContent.result.draft.basis, 'score-to-score');
         const saved = await (await rpc (writer.access_token, 'tools/call', { name : 'auto3d.headless.projects', arguments : { action : 'save', name : 'Test box' } })).json ();
         const project = saved.result.structuredContent.result.project; assert.equal (project.revision, 1);
-        const reader = await grant (); const denied = await rpc (reader.access_token, 'tools/call', { name : 'auto3d.headless.fefco', arguments : parameters });
+        const reader = await restrictedToken (); const denied = await rpc (reader.access_token, 'tools/call', { name : 'auto3d.headless.fefco', arguments : parameters });
         // A read-only grant gets an MCP step-up challenge naming the complete scope set it needs.
         assert.equal (denied.status, 403); assert.equal ((await denied.json ()).error, 'insufficient_scope');
         const challenge = denied.headers.get ('WWW-Authenticate'); assert.match (challenge, /error="insufficient_scope"/); assert.match (challenge, /oauth-protected-resource\/mcp/);
-        assert.deepEqual (challenge.match (/scope="([^"]+)"/)[1].split (' ').sort (), ['auto3d.read', 'auto3d.write', 'offline_access']);
+        assert.deepEqual (challenge.match (/scope="([^"]+)"/)[1].split (' ').sort (), ['auto3d.capture', 'auto3d.read', 'auto3d.write', 'offline_access']);
         const readerTools = (await (await rpc (reader.access_token, 'tools/list')).json ()).result.tools.map (tool => tool.name); assert.ok (readerTools.includes ('scene.inspect')); assert.ok (!readerTools.includes ('auto3d.commands.invoke'));
         const listed = await (await rpc (reader.access_token, 'tools/call', { name : 'auto3d.headless.projects', arguments : { action : 'list' } })).json (); assert.ok (listed.result.structuredContent.result.projects.some (item => item.id === project.id));
         const deleteDenied = await rpc (reader.access_token, 'tools/call', { name : 'auto3d.headless.projects', arguments : { action : 'delete', projectId : project.id, expectedRevision : 1 } }); assert.equal (deleteDenied.status, 403);
         const kept = await (await rpc (writer.access_token, 'tools/call', { name : 'auto3d.headless.projects', arguments : { action : 'get', projectId : project.id } })).json (); assert.equal (kept.result.structuredContent.result.project.revision, 1);
     });
-    it ('lets the consent form grant full access and screenshots to a read-only request, or narrow a write request', async () => {
+    it ('uses one approval for every tool and screenshots even when the client requests only read access', async () => {
         const page = await (await fetch ('/oauth/authorize?' + new URLSearchParams ({ client_id : clientId, response_type : 'code', redirect_uri : 'https://client.example/callback', resource : origin + '/mcp', scope : 'auto3d.read offline_access', state : 's', code_challenge : 'x'.repeat (43), code_challenge_method : 'S256' }), { headers : userHeaders (userA) })).text ();
-        assert.match (page, /name="permissions" value="1"/); assert.match (page, /<input type="checkbox" name="write" value="1" checked><span><strong>Full access:/); assert.match (page, /<input type="checkbox" name="capture" value="1" checked><span><strong>Screenshots/); assert.match (page, /client requested read-only access/);
-        const full = await grant (userA, 'auto3d.read offline_access', null, { permissions : '1', write : '1', capture : '1' });
+        assert.match (page, /name="permissions" value="full-access-v1"/); assert.ok (!page.includes ('type="checkbox"')); assert.match (page, /One approval includes read, write and screenshot access/);
+        const full = await grant (userA, 'auto3d.read offline_access');
         assert.deepEqual (full.scope.split (' ').sort (), ['auto3d.capture', 'auto3d.read', 'auto3d.write', 'offline_access']);
         const fullTools = (await (await rpc (full.access_token, 'tools/list')).json ()).result.tools.map (tool => tool.name);
-        for (const name of ['auto3d.commands.invoke', 'auto3d.commands.list', 'capture.image', 'auto3d.headless.fefco']) { assert.ok (fullTools.includes (name), name); }
+        for (const name of ['auto3d.capabilities.inspect', 'auto3d.commands.invoke', 'auto3d.commands.list', 'capture.image', 'auto3d.headless.fefco']) { assert.ok (fullTools.includes (name), name); }
+        const capabilities = (await (await rpc (full.access_token, 'tools/call', { name : 'auto3d.capabilities.inspect', arguments : {} })).json ()).result.structuredContent.result;
+        assert.deepEqual (capabilities.permissions, { read : true, write : true, screenshots : true }); assert.equal (capabilities.reauthorizationRequired, false);
         const registrations = (await (await fetch ('/api/agent/registrations', { headers : userHeaders (userA) })).json ()).registrations;
         assert.deepEqual ([...registrations.find (record => record.id === full.registrationId).scopes].sort (), ['auto3d.capture', 'auto3d.read', 'auto3d.write', 'offline_access']);
-        const narrowed = await grant (userA, 'auto3d.read auto3d.write offline_access', null, { permissions : '1' });
-        assert.deepEqual (narrowed.scope.split (' ').sort (), ['auto3d.read', 'offline_access']);
-        assert.ok (!(await (await rpc (narrowed.access_token, 'tools/list')).json ()).result.tools.some (tool => tool.name === 'auto3d.commands.invoke'));
-        const flow = await begin (userA, 'auto3d.read offline_access'); flow.form.set ('permissions', '1'); flow.form.set ('write', 'yes');
-        assert.equal ((await approve (flow)).status, 400);
+        const write = await grant (userA, 'auto3d.read auto3d.write'); assert.deepEqual (write.scope.split (' ').sort (), ['auto3d.capture', 'auto3d.read', 'auto3d.write']);
+    });
+    it ('rejects old or altered consent forms before creating a new full-access registration', async () => {
+        const before = (await (await fetch ('/api/agent/registrations', { headers : userHeaders (userA) })).json ()).registrations.length;
+        for (const change of [form => form.delete ('permissions'), form => form.set ('permissions', '1'), form => form.append ('permissions', 'full-access-v1'), form => form.set ('write', '1'), form => form.set ('capture', '1')]) {
+            const flow = await begin (); change (flow.form); assert.equal ((await approve (flow)).status, 400); flow.fixtureSocket?.close ();
+        }
+        const after = (await (await fetch ('/api/agent/registrations', { headers : userHeaders (userA) })).json ()).registrations.length;
+        assert.equal (after, before);
     });
     it ('exposes the generated full command catalog only with write consent', async () => {
-        const reader = await grant (), readerList = await (await rpc (reader.access_token, 'tools/list')).json ();
+        const reader = await restrictedToken (), readerList = await (await rpc (reader.access_token, 'tools/list')).json ();
         assert.ok (!readerList.result.tools.some (tool => tool.name.startsWith ('auto3d.commands.')));
         const writer = await grant (userA, 'auto3d.read auto3d.write auto3d.capture offline_access'), response = await rpc (writer.access_token, 'tools/list');
         assert.equal (response.status, 200);
@@ -279,10 +295,13 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
             assert.equal ((await fetch ('/api/agent/connect', { headers : { ...userHeaders (userB), Origin : origin, Upgrade : 'websocket' } })).status, 403);
         }
     });
-    it ('keeps separate grants for one harness independently revocable and denies screenshots without scope', async () => {
-        const first = await grant (), second = await grant ();
+    it ('keeps grants independently revocable and gives restricted credentials one complete reconnect challenge', async () => {
+        const first = await grant (), second = await restrictedToken ();
         assert.equal ((await rpc (first.access_token, 'tools/list')).status, 200);
-        const denied = await (await rpc (second.access_token, 'tools/call', { name : 'capture.image', arguments : {} })).json (); assert.equal (denied.result.isError, true);
+        const capabilities = (await (await rpc (second.access_token, 'tools/call', { name : 'auto3d.capabilities.inspect', arguments : {} })).json ()).result.structuredContent.result;
+        assert.deepEqual (capabilities.permissions, { read : true, write : false, screenshots : false }); assert.equal (capabilities.reauthorizationRequired, true);
+        const denied = await rpc (second.access_token, 'tools/call', { name : 'capture.image', arguments : {} }); assert.equal (denied.status, 403);
+        assert.match (denied.headers.get ('WWW-Authenticate'), /scope="auto3d.read auto3d.write auto3d.capture offline_access"/);
         await post ('/api/agent/registrations', { id : first.registrationId, action : 'revoke' });
         assert.equal ((await rpc (first.access_token, 'tools/list')).status, 401); assert.equal ((await rpc (second.access_token, 'tools/list')).status, 200);
     });

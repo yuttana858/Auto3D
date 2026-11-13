@@ -9,15 +9,36 @@ function Fixture ()
     website.commands.Register ({ id : 'scene.inspect', mutates : false, inputSchema : { type : 'object', properties : {} } }, async () => ({ objects : [] }));
     website.commands.Register ({ id : 'capture.image', mutates : false, inputSchema : { type : 'object', properties : {} } }, async () => ({ image : true }));
     website.commands.Register ({ id : 'objects.delete', mutates : true, inputSchema : { type : 'object', properties : {} } }, async () => ({ deleted : true }));
-    const access = new AgentAccess (website); access.accountId = 'owner'; access.socket = { sent : [], send (data) { this.sent.push (JSON.parse (data)); } };
+    const access = new AgentAccess (website); access.accountId = 'owner'; access.socket = { readyState : 1, sent : [], send (data) { this.sent.push (JSON.parse (data)); }, close () {} };
     const request = (command, writeAuthorized = false) => ({ data : JSON.stringify ({ type : 'request', command, requestId : 'request-a', sessionId : 'tab-a', arguments : {}, writeAuthorized }) });
     return { website, access, request };
 }
 describe ('Browser-side MCP guards', () => {
+    it ('tracks server-issued codes, renewal, use, expiry and disconnect without leaking codes in inspection', async () => {
+        const { access } = Fixture (), socket = access.socket;
+        const message = value => access.Message ({ data : JSON.stringify (value) }, socket, 0);
+        const fields = { windowCode : 'ABCD-EFGH-JKLM-NPQR', windowCodeExpiresAt : Date.now () + 600000, windowCodeId : 'code-a' };
+        try {
+            await message ({ type : 'hello_ack', connectionId : 'connection-a', ...fields });
+            assert.equal (access.CodeState (), 'available'); assert.equal (JSON.stringify (access.Inspect ()).includes (fields.windowCode), false);
+            const pending = access.RefreshCode (); assert.equal (access.CodeState (), 'pending');
+            const request = socket.sent.at (-1); assert.equal (request.type, 'window_code');
+            await message ({ type : 'window_code', requestId : 'stale-request', ...fields }); assert.equal (access.CodeState (), 'pending');
+            const renewed = { ...fields, windowCode : 'QRST-UVWX-YZ23-4567', windowCodeId : 'code-b' };
+            await message ({ type : 'window_code', requestId : request.requestId, ...renewed });
+            assert.equal ((await pending).windowCode, renewed.windowCode); assert.equal (access.CodeState (), 'available');
+            await message ({ type : 'access_changed', windowCodeUsed : 'code-a' }); assert.equal (access.CodeState (), 'available');
+            await message ({ type : 'access_changed', windowCodeUsed : 'code-b' }); assert.equal (access.CodeState (), 'used');
+            await assert.rejects (access.CopyCode (), /Generate a new window code/);
+            access.ReceiveCode ({ ...fields, windowCodeExpiresAt : Date.now () - 1 }); assert.equal (access.CodeState (), 'expired');
+            const waiting = access.RefreshCode (), rejected = assert.rejects (waiting, /disconnected/); access.Disconnect (); await rejected;
+            assert.equal (access.CodeState (), 'disconnected'); assert.equal (access.windowCode, null);
+        } finally { access.Disconnect (); }
+    });
     it ('retries an unexpected connection loss and stops after explicit disconnect or account change', () => {
-        const { access, website } = Fixture (); const scheduled = []; access.socket.close = () => {}; access.reconnectEnabled = true; access.screenshots = true;
-        access.ScheduleReconnect = (owner, screenshots) => scheduled.push ({ owner, screenshots });
-        access.ConnectionLost (); assert.deepEqual (scheduled, [{ owner : 'owner', screenshots : true }]); assert.equal (access.reconnectEnabled, true);
+        const { access, website } = Fixture (); const scheduled = []; access.socket.close = () => {}; access.reconnectEnabled = true; access.allowSelect = true;
+        access.ScheduleReconnect = (owner, allowSelect) => scheduled.push ({ owner, allowSelect });
+        access.ConnectionLost (); assert.deepEqual (scheduled, [{ owner : 'owner', allowSelect : true }]); assert.equal (access.reconnectEnabled, true);
         access.Disconnect (); access.ConnectionLost (); assert.equal (scheduled.length, 1);
         access.reconnectEnabled = true; access.accountId = 'owner'; website.auth.user = { id : 'other' }; access.ConnectionLost (); assert.equal (scheduled.length, 1); assert.equal (access.reconnectEnabled, false);
     });
@@ -26,7 +47,7 @@ describe ('Browser-side MCP guards', () => {
         globalThis.setTimeout = (callback, delay) => { const id = ++next; timers.set (id, { callback, delay }); return id; };
         globalThis.clearTimeout = id => timers.delete (id);
         try {
-            access.socket.close = () => {}; access.reconnectEnabled = true; access.screenshots = false;
+            access.socket.close = () => {}; access.reconnectEnabled = true;
             let attempts = 0; access.Connect = async () => { attempts++; throw new Error ('offline'); };
             access.ConnectionLost (); let timer = [...timers.values ()][0]; assert.equal (timer.delay, 1000); await timer.callback ();
             timer = [...timers.values ()].at (-1); assert.equal (timer.delay, 2000); assert.equal (attempts, 1);
@@ -34,14 +55,15 @@ describe ('Browser-side MCP guards', () => {
             await timer.callback (); assert.equal (attempts, 1);
         } finally { globalThis.setTimeout = oldSet; globalThis.clearTimeout = oldClear; }
     });
-    it ('executes only the read allowlist and returns structured denials without disconnecting', async () => {
+    it ('includes screenshots automatically while retaining write authorization and structured denials', async () => {
         const { access, request } = Fixture (); let lost = 0; access.ConnectionLost = () => { lost++; };
         await access.Message (request ('scene.inspect'), access.socket, 0); assert.equal (access.socket.sent[0].result.ok, true);
         await access.Message (request ('auth.sign_out'), access.socket, 0); assert.equal (access.socket.sent[1].error.code, 'permission_required');
-        await access.Message (request ('capture.image'), access.socket, 0); assert.equal (access.socket.sent[2].error.code, 'permission_required');
+        assert.equal (access.Inspect ().screenshots, true);
+        assert.equal (access.Inspect ().permissionPolicy, 'full-access-v1');
+        await access.Message (request ('capture.image'), access.socket, 0); assert.equal (access.socket.sent[2].result.ok, true);
         await access.Message (request ('objects.delete'), access.socket, 0); assert.equal (access.socket.sent[3].error.code, 'permission_required');
         await access.Message (request ('objects.delete', true), access.socket, 0); assert.equal (access.socket.sent[4].result.ok, true);
-        access.screenshots = true; await access.Message (request ('capture.image'), access.socket, 0); assert.equal (access.socket.sent[5].result.ok, true);
         assert.equal (lost, 0); assert.ok (access.socket.sent.every (message => message.requestId === 'request-a' && message.sessionId === 'tab-a'));
     });
     it ('reports command failures and invalid arguments as results', async () => {

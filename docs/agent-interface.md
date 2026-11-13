@@ -56,7 +56,9 @@ The paper-packaging knowledge base separates box structure, board/material const
 
 ## MCP / plugin adapter contract
 
-The MCP pilot bridge at `/mcp` relays authorized commands to a specifically paired live viewer session; a remote server cannot directly reach a browser's `window` object. OAuth grants require explicit read access, with `auto3d.write` for command-catalog discovery and execution. MCP exposes a compact tool list, then category/search results with schemas and pagination, followed by validated command invocation. The bridge preserves schemas/results, account/session identity, existing authorization and read-only checks, and explicit server-side authorization for account/admin actions. Never expose arbitrary JavaScript execution or credentials as a command.
+The MCP bridge at `/mcp` relays authorized commands to a specifically paired live viewer session. One OAuth approval includes `auto3d.read`, `auto3d.write` and `auto3d.capture`; Live Control includes screenshots without a separate preference. Existing restricted grants require reconnection to approve the new permission set. `auto3d.capabilities.inspect` reports effective permissions before pairing. MCP exposes a compact tool list, then category/search results with schemas and pagination, followed by validated command invocation. The bridge preserves schemas/results, account/session identity, existing authorization and read-only checks, and explicit server-side authorization for account/admin actions. Never expose arbitrary JavaScript execution or credentials as a command.
+
+Live Control receives a server-issued, account/window-bound pairing code shown in the app header, Preferences and MCP connections. The user can copy it and provide it to the agent for `auto3d.sessions.pair_code`. `agent.access.code.refresh` issues a fresh single-use ten-minute code without changing existing pairings; `agent.access.code.copy` copies it when browser clipboard permission/user activation allows. `agent.access.inspect` reports code state/expiry without revealing the raw code. Workspace captures omit the code controls.
 
 ## Visual command workspace
 

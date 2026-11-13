@@ -3,7 +3,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { CaptureContent } from './service.js';
-import { ErrorCode, PublicError, ReadBytes } from './common.js';
+import { ErrorCode, PublicError, ReadBytes, ResourceScopes } from './common.js';
 import { DiscoveryVersion } from './discovery.js';
 import packageMetadata from '../package.json';
 
@@ -43,7 +43,7 @@ export async function HandleMcp (request, service, actor)
         // MCP step-up authorization: a valid grant lacking a scope gets a 403 insufficient_scope
         // challenge naming every scope it needs, so the client can re-authorize instead of
         // reporting a dead end. JSON responses are complete here, so the handler has run.
-        if (stepUp) { return insufficientScope (actor, [...new Set ([...actor.scope, stepUp])], 'Authorize again with ' + stepUp + '.'); }
+        if (stepUp) { return insufficientScope (actor, [...new Set ([...ResourceScopes, ...actor.scope])], 'Reconnect Auto3D and approve read, write and screenshots together.'); }
         const headers = new Headers (response.headers); headers.set ('Cache-Control', 'no-store');
         return new Response (response.body, { status : response.status, statusText : response.statusText, headers });
     } finally { await server.close (); }
