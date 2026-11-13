@@ -6,7 +6,8 @@ Packaging remains 1.10.7, Primary Products 0.15.0 and Molded Pulp 0.1.0. Stacked
 
 - **Model spec** (formerly *Model data*, module id `data`) is the default right panel. It opens at start when both docks fit (1100 px wide or more). Its Details section, with the preview and specs, starts expanded.
 - Modules (AI Generative, Packaging Gen, Primary Products, Molded Pulp) open only from their icons or commands. AI is never opened by default.
-- Closing a right module returns the right side to Model spec. Closing Model spec itself collapses the right side. Panels that close automatically to make room at narrow widths do not trigger the return.
+- **Module icons toggle.** Clicking the icon of the module that is already open (AI Generative, Packaging Gen, Primary Products, Molded Pulp) closes it and returns to Model spec. The icon shows as pressed while its module is open. Agents use `ui.module.toggle { module }`.
+- Closing a right module returns the right side to Model spec. Closing Model spec itself collapses the right side. Panels that close automatically to make room at narrow widths do not trigger the return, and neither does the Primary Products profile editor clearing panels while it is open (`ModulePanels.Set (id, 'closed', { returnToDefault : false })`).
 
 ## Model spec contents
 
@@ -27,7 +28,7 @@ Packaging remains 1.10.7, Primary Products 0.15.0 and Molded Pulp 0.1.0. Stacked
 - `ui.model_spec.inspect` returns whether the panel is open, whether the turntable is on, and the selection's name, W/L/H in display units, unit, scale, vertex and triangle counts, and packaging spec.
 - `ui.model_spec.preview { rotate }` turns the turntable on or off.
 - Update and Delete stay `ui.update_model` and `object.delete`. Scaling stays `object.dimension` and `object.scaling.percent`.
-- The catalog has 328 commands.
+- The catalog has 329 commands.
 
 ## Planned next phases
 

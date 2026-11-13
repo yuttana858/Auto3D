@@ -23,6 +23,13 @@ try {
     await page.getByRole ('button', { name : 'Close AI Generative panel', exact : true }).click ();
     for (let tries = 0; tries < 50 && !(await panels ()).data.visible; tries++) { await page.waitForTimeout (100); }
     state = await panels (); assert.equal (state.data.visible, true); assert.equal (state.ai.visible, false);
+    // Clicking an open module's icon again deselects it and returns to Model spec.
+    const aiIcon = page.getByRole ('toolbar', { name : 'Object tools' }).getByRole ('button', { name : 'AI Generative', exact : true });
+    await aiIcon.click (); for (let tries = 0; tries < 50 && !(await panels ()).ai.visible; tries++) { await page.waitForTimeout (100); } assert.equal (await aiIcon.getAttribute ('aria-pressed'), 'true');
+    await aiIcon.click (); for (let tries = 0; tries < 50 && !(await panels ()).data.visible; tries++) { await page.waitForTimeout (100); }
+    state = await panels (); assert.equal (state.ai.visible, false); assert.equal (state.data.visible, true); assert.equal (await aiIcon.getAttribute ('aria-pressed'), 'false');
+    assert.deepEqual (await call ('ui.module.toggle', { module : 'packaging' }), { panels : ['packaging'] }); assert.deepEqual (await call ('ui.module.toggle', { module : 'packaging' }), { panels : ['data'] });
+    assert.equal ((await page.evaluate (() => Auto3D.execute ('ui.module.toggle', { module : 'data' }))).ok, false);
     await call ('ui.module.mode', { module : 'data', mode : 'closed' }); state = await panels (); assert.equal (Object.values (state).some (panel => panel.side === 'right' && panel.visible), false);
     await call ('ui.module.mode', { module : 'data', mode : 'minimal' });
 
@@ -50,5 +57,5 @@ try {
     await call ('object.select', { objectId : box.id }); await spec.getByRole ('button', { name : 'Packaging Gen tools', exact : true }).click ();
     for (let tries = 0; tries < 50 && !(await panels ()).packaging.visible; tries++) { await page.waitForTimeout (100); }
     assert.equal ((await panels ()).packaging.visible, true);
-    assert.deepEqual (errors, []); console.log ('Model spec default, return on module close, preview Rotate/Update/Delete, packaging spec and tools passed.');
+    assert.deepEqual (errors, []); console.log ('Model spec default, return on module close, module icon toggle, preview Rotate/Update/Delete, packaging spec and tools passed.');
 } finally { await browser.close (); }

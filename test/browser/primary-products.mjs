@@ -52,14 +52,16 @@ try {
     await page.screenshot ({ path : 'work/primary-products-review/can-draft.png' });
     await page.getByRole ('button', { name : 'Close Primary Products panel', exact : true }).click ();
     assert.ok (await panel.evaluate (node => node.getAnimations ().some (animation => animation.playState === 'running')), 'Exit must animate before the panel is hidden');
-    await page.waitForFunction (() => document.getElementById ('main_right_container').dataset.panelMode === 'closed');
+    /* Closing a module returns the right side to Model spec (0.70.0). */
+    await page.waitForFunction (() => document.getElementById ('main_right_container').dataset.panelMode === 'minimal' && !document.getElementById ('data_panel_content').hidden);
     await call ('ui.primary_products'); assert.equal ((await call ('primary.inspect')).heightMm, 150); assert.equal ((await call ('primary.inspect')).family, 'can');
     await call ('preferences.units', { units : 'standard' }); assert.ok (Math.abs (Number (await height.inputValue ()) - 150 / 25.4) < .001);
     await call ('preferences.units', { units : 'metric' });
     const invalid = await page.evaluate (() => Auto3D.execute ('primary.configure', { heightMm : 0 })); assert.equal (invalid.ok, false); assert.equal ((await call ('primary.inspect')).heightMm, 150);
     // Rapid UI transitions must honor the latest action: open and close issued back to back end closed.
     await page.evaluate (() => { Auto3D.execute ('ui.primary_products'); return Auto3D.execute ('ui.module.mode', { module : 'primary-products', mode : 'closed' }); });
-    await page.waitForFunction (() => document.getElementById ('main_right_container').dataset.panelMode === 'closed');
+    /* Closing a module returns the right side to Model spec (0.70.0). */
+    await page.waitForFunction (() => document.getElementById ('main_right_container').dataset.panelMode === 'minimal' && !document.getElementById ('data_panel_content').hidden);
     await page.emulateMedia ({ reducedMotion : 'reduce' }); await call ('ui.primary_products');
     assert.equal (await panel.evaluate (node => node.getAnimations ().length), 0);
     await page.setViewportSize ({ width : 390, height : 844 }); await call ('ui.module.mode', { module : 'primary-products', mode : 'minimal' });

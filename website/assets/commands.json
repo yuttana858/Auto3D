@@ -2518,6 +2518,34 @@
       }
     },
     {
+      "id": "ui.module.toggle",
+      "title": "Toggle a module from its icon",
+      "category": "Panels",
+      "description": "Same as clicking a module icon in the tool strip: open the module, or close it when it is already showing, which returns the right side to the default Model spec. Use ui.module.mode to set an exact mode.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "module": {
+            "type": "string",
+            "enum": [
+              "ai",
+              "packaging",
+              "primary-products",
+              "molded-pulp"
+            ]
+          }
+        },
+        "required": [
+          "module"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "module": "ai"
+      }
+    },
+    {
       "id": "ui.model_spec.inspect",
       "title": "Read Model spec",
       "category": "Panels",
