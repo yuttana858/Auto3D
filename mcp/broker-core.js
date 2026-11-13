@@ -1,5 +1,5 @@
 import { CommandIds } from './command-catalog.js';
-import { AgentError, AgentName, ErrorCode, Identifier, ReadTools, SafeText } from './common.js';
+import { AgentError, AgentName, ErrorCode, Identifier, MissingScopeError, ReadTools, SafeText } from './common.js';
 import { Registrations } from './registrations.js';
 import { FefcoProfile, ValidateFefco } from '../modules/packaging/src/fefco.js';
 
@@ -147,7 +147,7 @@ export class BrokerCore
         if (!ToolIds.has (command) || !args || typeof args !== 'object' || Array.isArray (args)) { throw AgentError ('unknown_command'); }
         const registration = await this.registrations.Assert ({ accountId, id : grantId });
         if (!ReadTools.includes (command) && !registration.scopes.includes ('auto3d.write')) { throw AgentError ('permission_required', 'Write permission required. Authorize again with auto3d.write.'); }
-        if (command === 'capture.image' && !registration.scopes.includes ('auto3d.capture')) { throw AgentError ('permission_required', 'Screenshot permission required. Authorize auto3d.capture and allow screenshots in the window.'); }
+        if (command === 'capture.image' && !registration.scopes.includes ('auto3d.capture')) { throw MissingScopeError ('auto3d.capture', 'Screenshot permission required. Reconnect Auto3D to approve all tools and screenshots together.'); }
         const now = this.now (); this.recent = this.recent.filter (time => now - time < RateWindowMs);
         if (this.recent.length >= RateLimit) { throw AgentError ('rate_limited', 'Too many requests for this account. Wait a minute and retry.'); }
         const { pair, target } = await this.Resolve ({ accountId, grantId });

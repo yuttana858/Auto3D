@@ -1,5 +1,5 @@
 import { WorkspaceDialog } from './modellibrary.js';
-import { ReadTools } from '../../mcp/common.js';
+import { ConnectionPolicy, ConnectionScopes, ReadTools } from '../../mcp/common.js';
 
 const WindowCodeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function CreateWindowCode ()
@@ -70,12 +70,7 @@ export class AgentAccess
         if (!response.ok) { throw new Error ('Agent access unavailable. Check staging setup and permissions.'); }
         const result = await response.json (); if (this.Account () !== owner) { throw new Error ('Account changed.'); } return result;
     }
-    SetScreenshots (allowed)
-    {
-        if (typeof allowed !== 'boolean') { throw new Error ('Invalid screenshot preference.'); }
-        this.screenshots = allowed; return { screenshots : allowed, connected : this.socket?.readyState === 1 };
-    }
-    Inspect () { return { status : this.status, connected : this.socket?.readyState === 1, screenshots : this.screenshots === true, allowSelect : this.allowSelect === true, connectionId : this.connectionId || null }; }
+    Inspect () { const connected = this.socket?.readyState === 1; return { status : this.status, connected, screenshots : connected, permissionPolicy : ConnectionPolicy, allowSelect : this.allowSelect === true, connectionId : this.connectionId || null }; }
     Sessions () { return this.website.sessionEditor.sessions.Inspect ().tabs.map (tab => ({ id : tab.id, name : tab.name.slice (0, 100), active : tab.active })); }
     Disconnect ({ preserveRetry = false } = {})
     {
@@ -87,12 +82,12 @@ export class AgentAccess
     }
     ConnectionLost ()
     {
-        const retry = this.reconnectEnabled, owner = this.accountId, screenshots = this.screenshots, allowSelect = this.allowSelect, attempts = this.reconnectAttempts;
+        const retry = this.reconnectEnabled, owner = this.accountId, allowSelect = this.allowSelect, attempts = this.reconnectAttempts;
         this.Disconnect ();
         if (!retry || !owner || this.website.auth?.user?.id !== owner) { return; }
-        this.reconnectEnabled = true; this.reconnectAttempts = attempts; this.ScheduleReconnect (owner, screenshots, allowSelect);
+        this.reconnectEnabled = true; this.reconnectAttempts = attempts; this.ScheduleReconnect (owner, allowSelect);
     }
-    ScheduleReconnect (owner, screenshots, allowSelect = true)
+    ScheduleReconnect (owner, allowSelect = true)
     {
         if (!this.reconnectEnabled || this.reconnectTimer) { return; }
         const delay = Math.min (30000, 1000 * 2 ** Math.min (this.reconnectAttempts++, 5));
@@ -100,20 +95,21 @@ export class AgentAccess
         this.reconnectTimer = setTimeout (async () => {
             this.reconnectTimer = null;
             if (!this.reconnectEnabled || this.website.auth?.user?.id !== owner) { this.Disconnect (); return; }
-            try { await this.Connect ({ screenshots, allowSelect, retry : true }); }
-            catch { if (this.reconnectEnabled && this.website.auth?.user?.id === owner) { this.ScheduleReconnect (owner, screenshots, allowSelect); } }
+            try { await this.Connect ({ allowSelect, retry : true }); }
+            catch { if (this.reconnectEnabled && this.website.auth?.user?.id === owner) { this.ScheduleReconnect (owner, allowSelect); } }
         }, delay);
     }
-    async Connect ({ screenshots = false, allowSelect = true, retry = false } = {})
+    async Connect ({ screenshots, allowSelect = true, retry = false } = {})
     {
-        if (typeof screenshots !== 'boolean' || typeof allowSelect !== 'boolean') { throw new Error ('Invalid connection preference.'); }
+        // Retain the old argument for saved macros; the unified approval always includes capture.
+        if (screenshots !== undefined && typeof screenshots !== 'boolean' || typeof allowSelect !== 'boolean') { throw new Error ('Invalid connection preference.'); }
         const initialGeneration = this.generation;
         const windowCode = CreateWindowCode ();
         const owner = this.Account (), config = await this.Request ('config');
         if (retry && (!this.reconnectEnabled || this.generation !== initialGeneration)) { throw new Error ('Reconnect cancelled.'); }
         if (!config.pilot || !['https://auto3d-mcp-pilot.pages.dev', 'https://auto3d-5av.pages.dev'].includes (location.origin) || config.mcpUrl !== location.origin + '/mcp') { throw new Error ('MCP access is unavailable here.'); }
         // A reconnect keeps the window identity so an existing pairing resumes.
-        this.Disconnect ({ preserveRetry : retry }); if (!retry) { this.instanceId = crypto.randomUUID (); } this.accountId = owner; this.screenshots = screenshots; this.allowSelect = allowSelect; this.windowCode = windowCode; this.status = 'Connecting'; const generation = this.generation;
+        this.Disconnect ({ preserveRetry : retry }); if (!retry) { this.instanceId = crypto.randomUUID (); } this.accountId = owner; this.allowSelect = allowSelect; this.windowCode = windowCode; this.status = 'Connecting'; const generation = this.generation;
         const socket = new WebSocket (location.origin.replace ('https:', 'wss:') + '/api/agent/connect'); this.socket = socket;
         // Only protocol violations end the connection; command failures are returned as results.
         socket.addEventListener ('message', event => { this.Message (event, socket, generation).catch (() => { if (this.socket === socket) { this.ConnectionLost (); } }); });
@@ -174,7 +170,6 @@ export class AgentAccess
         const allowed = () => connected () && (tabCommand || this.website.sessionEditor.sessions.active === current && this.website.sessionEditor.sessions.revision === revision && !this.website.sessionEditor.sessions.switching);
         if (message.sessionId !== current) { throw Coded ('session_changed', 'The paired tab is not active in this window.'); }
         if (!ReadTools.includes (message.command) && message.writeAuthorized !== true) { throw Coded ('permission_required', 'Write permission required.'); }
-        if (message.command === 'capture.image' && !this.screenshots) { throw Coded ('permission_required', 'Screenshots are not allowed for this window. Enable them in Agent access.'); }
         const metadata = this.website.commands.Catalog ().find (tool => tool.id === message.command);
         if (!metadata) { throw Coded ('unknown_command', 'Tool unavailable.'); }
         // Cancellation must not wait behind the macro it cancels.
@@ -194,11 +189,9 @@ export class AgentAccess
         await this.Request ('config');
         const dialog = WorkspaceDialog ('MCP connections'); dialog.dataset.capturePrivate = '';
         const form = document.createElement ('div'); form.className = 'workspace_save_form';
-        const captureLabel = document.createElement ('label'), capture = document.createElement ('input'); capture.type = 'checkbox'; capture.checked = this.screenshots === true; captureLabel.append (capture, 'Allow screenshots from this window');
-        // Applies at once to the live connection (the screenshot gate runs in this window), and to the next Live Control.
-        capture.addEventListener ('change', () => { this.SetScreenshots (capture.checked); });
+        const access = document.createElement ('p'); access.textContent = 'Live Control shares this window with your approved agents, including read, write and screenshot access.';
         const status = document.createElement ('p'); status.setAttribute ('role', 'status'); status.textContent = this.status; this.statusElement = status;
-        const connect = document.createElement ('button'); connect.textContent = 'Live Control'; connect.onclick = () => { this.Connect ({ screenshots : capture.checked }).then (() => { status.textContent = 'Connected'; }).catch (error => { this.Disconnect (); status.textContent = error.message; }); };
+        const connect = document.createElement ('button'); connect.textContent = 'Live Control'; connect.onclick = () => { this.Connect ().then (() => { status.textContent = 'Connected'; }).catch (error => { this.Disconnect (); status.textContent = error.message; }); };
         const disconnect = document.createElement ('button'); disconnect.textContent = 'Disconnect'; disconnect.onclick = () => { this.Disconnect (); status.textContent = this.status; };
         const list = document.createElement ('div');
         const refresh = async () => {
@@ -207,11 +200,12 @@ export class AgentAccess
             const active = result.registrations.filter (record => record.revokedAt === null && record.expiresAt > Date.now ());
             if (!active.length) { const empty = document.createElement ('p'); empty.textContent = 'No active connections.'; list.appendChild (empty); }
             for (const record of active) {
-                const row = document.createElement ('p'); row.textContent = record.name + ' · Active';
+                const full = ConnectionScopes.every (scope => record.scopes?.includes (scope));
+                const row = document.createElement ('p'); row.textContent = record.name + (full ? ' · Full access' : ' · Reconnect this agent to enable all tools and screenshots');
                 { const revoke = document.createElement ('button'); revoke.textContent = 'Revoke'; revoke.onclick = () => { this.Request ('registrations', { action : 'revoke', id : record.id }).then (refresh).catch (error => { status.textContent = error.message; }); }; row.appendChild (revoke); } list.appendChild (row);
             }
         };
-        form.append (captureLabel, connect, disconnect, status, list); dialog.appendChild (form); await refresh (); return { opened : true };
+        form.append (access, connect, disconnect, status, list); dialog.appendChild (form); await refresh (); return { opened : true };
     }
     async OpenAdmin ()
     {

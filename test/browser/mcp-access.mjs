@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright-core';
 
@@ -19,6 +19,7 @@ await new Promise (resolve => server.listen (0, '127.0.0.1', resolve));
 const browser = await chromium.launch ({ executablePath : process.env.BROWSER_EXECUTABLE || (process.env.CI ? chromium.executablePath () : '/usr/bin/chromium'), args : ['--no-sandbox', '--enable-unsafe-swiftshader'] });
 try {
     const page = await browser.newPage ({ viewport : { width : 1280, height : 900 } }), errors = [], results = []; let nextResult;
+    let registrationScopes = ['auto3d.read', 'auto3d.write', 'auto3d.capture'];
     page.on ('pageerror', error => errors.push (error.message));
     await page.route (origin + '/**', async route => {
         const url = new URL (route.request ().url ());
@@ -28,7 +29,7 @@ try {
             if (url.pathname === '/api/preferences') { json = { preferences : {}, folders : [] }; }
             if (url.pathname.startsWith ('/api/accounts/')) { json = { isAdmin : live }; }
             if (url.pathname === '/api/agent/config') { json = { pilot : true, mode : live ? 'live-admin' : 'staging', mcpUrl : origin + '/mcp' }; }
-            if (url.pathname === '/api/agent/registrations') { json = route.request ().method () === 'POST' ? { revoked : true } : { registrations : [{ id : 'grant-a', name : 'Named review agent', harness : 'chatgpt', expiresAt : Date.now () + 60000, revokedAt : null }] }; }
+            if (url.pathname === '/api/agent/registrations') { json = route.request ().method () === 'POST' ? { revoked : true } : { registrations : [{ id : 'grant-a', name : 'Named review agent', harness : 'chatgpt', scopes : registrationScopes, expiresAt : Date.now () + 60000, revokedAt : null }] }; }
             if (url.pathname.startsWith ('/api/agent/admin')) { json = { disabled : false, registrations : [] }; }
             await route.fulfill ({ json }); return;
         }
@@ -46,15 +47,31 @@ try {
     const call = async (id, args = {}) => { const result = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (result.ok, true, JSON.stringify (result)); return result.result; };
     await page.getByRole ('button', { name : 'Preferences', exact : true }).click (); await page.getByRole ('button', { name : 'Agent access', exact : true }).click ();
     const dialog = page.getByRole ('dialog', { name : 'MCP connections', exact : true }); await dialog.waitFor (); await dialog.getByText ('Named review agent', { exact : false }).first ().waitFor (); /* registrations load after the dialog opens */ assert.ok (await dialog.getByText ('Named review agent', { exact : false }).count ()); assert.equal (await dialog.getByText ('chatgpt', { exact : false }).count (), 0);
-    assert.equal (await dialog.locator ('input[type=checkbox]').isChecked (), false);
+    assert.equal (await dialog.locator ('input[type=checkbox]').count (), 0);
+    assert.match (await dialog.innerText (), /including read, write and screenshot access/);
+    assert.match (await dialog.innerText (), /Named review agent · Full access/);
     assert.equal (await dialog.getByLabel ('App window code').count (), 0);
     assert.equal (await dialog.getByRole ('button', { name : 'Copy', exact : true }).count (), 0);
     await dialog.getByRole ('button', { name : 'Live Control' }).click (); await dialog.getByRole ('status').filter ({ hasText : 'Connected' }).waitFor ();
     await hello; /* the status can update before Playwright runs the WebSocket route handler */
+    assert.equal ((await call ('agent.access.inspect')).screenshots, true);
     const tab = await call ('session.tabs.inspect');
-    const received = new Promise (resolve => { nextResult = resolve; });
-    wire.send (JSON.stringify ({ type : 'request', requestId : 'inspect-a', command : 'scene.inspect', sessionId : tab.activeId, arguments : {} }));
-    await received; assert.equal (results[0]?.requestId, 'inspect-a'); assert.equal (results[0].result.ok, true);
+    const remote = async (command, args = {}, writeAuthorized = false) => {
+        const requestId = 'request-' + results.length, received = new Promise (resolve => { nextResult = resolve; });
+        wire.send (JSON.stringify ({ type : 'request', requestId, command, sessionId : tab.activeId, arguments : args, writeAuthorized }));
+        await received; const response = results.at (-1); assert.equal (response.requestId, requestId); assert.equal (response.result?.ok, true, JSON.stringify (response.error)); return response.result.result;
+    };
+    const initial = await remote ('scene.inspect');
+    // Exercise real generation through the live bridge, then capture the box without a screenshot switch.
+    const generated = await remote ('packaging.fefco.preset', { code : '0201', basis : 'inside', length : 304.8, width : 304.8, height : 304.8, thickness : 3, closure : 'closed' }, true);
+    assert.equal (generated.code, '0201'); assert.ok (generated.objectId);
+    const scene = await remote ('scene.inspect'); assert.equal (scene.objects.length, initial.objects.length + 1); assert.equal (scene.selectedObjectId, generated.objectId);
+    const dimensions = await remote ('packaging.dimensions.inspect', {}, true);
+    for (const axis of ['length', 'width', 'height']) { assert.ok (Math.abs (dimensions.inside[axis] - 304.8) < 0.000001, axis); }
+    const capture = await remote ('capture.image', { scope : 'viewport', maxSize : 800 });
+    assert.equal (capture.content[0].type, 'image'); assert.equal (capture.content[0].mimeType, 'image/png'); assert.match (capture.content[0].data, /^iVBORw0KGgo/);
+    assert.ok (capture.width <= 800 && capture.height <= 800);
+    await mkdir ('work', { recursive : true }); await writeFile ('work/unified-agent-rsc-' + (live ? 'live-assets' : 'pilot-assets') + '.png', Buffer.from (capture.content[0].data, 'base64'));
     // While an agent is connected, command bar text that is not a command is sent to the agent, which can read it and reply above the box.
     const input = page.getByRole ('textbox', { name : 'Command or macro' }); await page.evaluate (() => document.querySelectorAll ('dialog[open]').forEach (open => open.close ()));
     await page.waitForFunction (() => !document.querySelector ('dialog[open]')); /* modal dialogs block the command bar until they fade out */
@@ -64,11 +81,13 @@ try {
     const message = bar.entries.find (entry => entry.kind === 'message'); assert.equal (message?.text, 'make the box taller please');
     await call ('ui.command_bar.respond', { message : 'Working on it.', replyTo : message.id });
     assert.equal (await page.locator ('.scene_command_bar .scene_status').textContent (), 'Agent: Working on it.');
+    registrationScopes = ['auto3d.read'];
     await call ('agent.access.open'); await dialog.waitFor ();
+    await dialog.getByText ('Named review agent · Reconnect this agent to enable all tools and screenshots', { exact : false }).waitFor ();
     await dialog.getByRole ('button', { name : 'Disconnect', exact : true }).click (); assert.equal ((await call ('agent.access.inspect')).connected, false);
     await dialog.getByRole ('button', { name : 'Revoke', exact : true }).click ();
     await page.evaluate (() => document.querySelector ('dialog[aria-label="MCP connections"]').close ());
     await call ('admin.agents.open'); const admin = page.getByRole ('dialog', { name : 'Agent administration', exact : true }); await admin.getByLabel ('Pilot account ID').fill ('test-owner'); await admin.getByRole ('button', { name : 'Inspect account' }).click ();
     await admin.getByRole ('status').filter ({ hasText : 'Agent access enabled' }).waitFor ();
-    assert.deepEqual (errors, []); console.log ('MCP browser controls, explicit connection, safe remote read, command bar messages and agent replies, disconnect, revoke and admin UI passed on generated staging assets.');
+    assert.deepEqual (errors, []); console.log ('Unified agent access, real 12-inch RSC generation and PNG capture through the browser bridge, restricted-grant guidance, command bar replies, disconnect, revoke and admin UI passed on generated assets.');
 } finally { await browser.close (); await new Promise (resolve => server.close (resolve)); }

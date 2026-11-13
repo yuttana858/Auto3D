@@ -22,6 +22,8 @@ The landing fade-and-pause release is Auto3D 0.66.1 / Packaging 1.10.7 / Primary
 
 # Agent-accessible features
 
+The unified agent approval release is Auto3D 0.67.0 / Packaging 1.10.7 / Primary Products 0.15.0. One OAuth approval grants read, write and screenshots; Live Control has no separate screenshot preference. Existing restricted credentials require reconnection. Use `auto3d.capabilities.inspect` to inspect effective grant permissions. See docs/release-0670.md.
+
 For every new PR, report the application version and PR number to the user. Keep the app version, package version and release notes aligned when preparing a release.
 
 Every new user-facing action must have a stable command in `source/website/agentcommands.js` using the shared `CommandRegistry`. Include category, description, strict input schema, example, mutation flag and structured result. Keep UI actions and agent commands on shared underlying functions. Do not make agents depend on DOM selectors, arbitrary evaluation, or simulated clicks.

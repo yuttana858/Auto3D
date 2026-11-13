@@ -1,5 +1,11 @@
 # Auto3D development log and handoff
 
+## Unified agent tool and screenshot approval — Auto3D 0.67.0 / Packaging 1.10.7 / Primary Products 0.15.0
+
+Combines read, write and screenshot permissions into one agent connection approval, advertises the complete scope set, and removes the Agent preferences screenshot toggle. Adds effective grant inspection and actionable reconnection guidance for restricted credentials. Old consent forms require a restart; existing tokens are not silently elevated. See [release-0670.md](release-0670.md).
+
+Local validation: 861 application/module tests, 70 MCP tests and 11 backend tests passed; application/MCP lint, production license checks and audit (zero vulnerabilities) passed. Engine, engine-module, website, Pages and isolated MCP builds passed, including 99-package MCP license verification. Browser checks passed for OAuth consent/callback/token exchange; live-mode and isolated-pilot assets with actual 304.8 mm inside-dimension RSC generation, dimension verification and PNG capture through the browser bridge; workspace capture privacy/logout; command bar/registration UI; and desktop/mobile artwork/outro playback. An initial new UI assertion used exact text on a row containing its Revoke button; its selector was corrected and both access flows passed. The preceding release's CI artwork test could overshoot the brief kraft-only hold while waiting for a protocol round trip; it now pauses in the browser, and desktop/mobile checks passed. Hosted CI, production rollout and real-client reconnection remain pending.
+
 ## Landing fade and loop pause — Auto3D 0.66.1 / Packaging 1.10.7 / Primary Products 0.15.0
 
 Adds a one-second fade after the complete material study, followed by a two-second empty hold before the introduction restarts. The full loop is 44 seconds. Reduced motion and stage selection retain a visible completed pack. See [release-0661.md](release-0661.md).

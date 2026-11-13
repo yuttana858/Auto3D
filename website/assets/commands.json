@@ -19,7 +19,7 @@
       "id": "agent.access.inspect",
       "title": "Inspect browser agent connection",
       "category": "Account",
-      "description": "Read this browser window connection state without credentials.",
+      "description": "Read this browser window connection state and unified permission policy without credentials. Effective OAuth permissions are reported by auto3d.capabilities.inspect.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -33,7 +33,7 @@
       "id": "agent.access.connect",
       "title": "Connect this browser window",
       "category": "Account",
-      "description": "Same as the Live Control button. Explicitly share this browser window with this account's authorized MCP agents, which can then select it with auto3d.sessions.select. Also returns a short-lived single-use code for auto3d.sessions.pair_code. Set allowSelect false to require that code. Screenshots need a separate opt-in and OAuth scope.",
+      "description": "Same as Live Control. Share this window with this account's approved MCP agents, including read, write and screenshot access. Agents select it with auto3d.sessions.select. Returns a short-lived single-use code for auto3d.sessions.pair_code; allowSelect false requires that code. Legacy screenshots argument is accepted but no longer changes access.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -49,7 +49,6 @@
         "additionalProperties": false
       },
       "example": {
-        "screenshots": false,
         "allowSelect": true
       }
     },
