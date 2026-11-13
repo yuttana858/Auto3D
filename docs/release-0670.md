@@ -24,7 +24,7 @@ Generated objects carry `_auto3dMoldedPulp` userData (schema 1), validated on ar
 
 ## Validation
 
-- `npm test`: 875 passing, including 15 Molded Pulp tests (sensing, sheet sizing, pockets, draft, wall thickness, watertight shell, DFM rules).
+- `npm test`: 876 passing, including 15 Molded Pulp tests (sensing, sheet sizing, pockets, draft, wall thickness, watertight shell, DFM rules).
 - `npm run lint`: clean.
 - `test/browser/molded-pulp.mjs`: six generated cans → sense → sheet → form depth → form tray → live depth change → Undo, plus lazy loading and no horizontal overflow in the minimal dock.
 - Updated Generation-module button lists in the packaging-cleanup, packaging-presets and primary-products browser tests.

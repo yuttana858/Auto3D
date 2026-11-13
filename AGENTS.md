@@ -18,6 +18,8 @@ The Meshy Workers fetch fix is Auto3D 0.65.3 / Packaging 1.10.7 / Primary Produc
 
 The printed hero and material callouts release is Auto3D 0.65.4 / Packaging 1.10.7 / Primary Products 0.14.0, based on main after #117. See docs/release-0654.md.
 
+The landing fade-and-pause release is Auto3D 0.66.1 / Packaging 1.10.7 / Primary Products 0.15.0, based on main after #116. See docs/release-0661.md.
+
 The Molded Pulp candidate is Auto3D 0.67.0 / Packaging 1.10.7 / Primary Products 0.15.0 / Molded Pulp 0.1.0: an independent `modules/molded-pulp` package (sense selected products, sheet under the group, form depth, form tray, DFM checks) integrated through `moldedpulppanel.js` and `MoldedPulpWorkspace` with the same boundary as Primary Products. See docs/release-0670.md.
 
 # Agent-accessible features

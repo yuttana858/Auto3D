@@ -36,6 +36,9 @@
 
 .entry_agent[data-placement="corner"][data-phase="complete"] .entry_agent_execution, .entry_agent[data-placement="corner"][data-phase="reviewing"] .entry_agent_execution { display: none; }
 
+/* Fade the complete visual, then hold its background before the shared clock loops. */
+.entry_canvas_wrap, .entry_visual_heading { opacity: var(--entry-loop-opacity, 1); }
+
 /* Projected material leaders share the presentation clock, including pause and replay. */
 .entry_materials { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
 .entry_material_leaders { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
