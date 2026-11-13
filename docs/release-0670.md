@@ -28,3 +28,4 @@ Generated objects carry `_auto3dMoldedPulp` userData (schema 1), validated on ar
 - `npm run lint`: clean.
 - `test/browser/molded-pulp.mjs`: six generated cans → sense → sheet → form depth → form tray → live depth change → Undo, plus lazy loading and no horizontal overflow in the minimal dock.
 - Updated Generation-module button lists in the packaging-cleanup, packaging-presets and primary-products browser tests.
+- `test/browser/primary-products.mjs` follows the 0.66.0 expand behavior: Expand opens Edit model (the full-viewport modal it waited for no longer exists), so draft edits stay in the docked panel and the pouch step verifies Edit model opens and closes on the selected product.
