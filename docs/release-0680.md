@@ -14,6 +14,8 @@ Validation covers consent, PKCE, token refresh, old-form rejection, restricted c
 
 The existing landing artwork/outro regression now pauses within the browser task that observes each frame. This avoids skipping the short kraft-only hold while waiting for a protocol round trip on software-rendered CI runners; presentation code and timing are unchanged.
 
+The login alignment regression measures its panel and buttons in a single browser task. Separate protocol round trips could compare different scales during the landing entrance and fail despite aligned controls; its existing alignment tolerance and login/logout checks remain in place.
+
 Integrates main through PR #121, retaining the Molded Pulp module from #120 and the compact material drawer. Molded Pulp commands are included in the Modules discovery family. The agent release notes use 0.68.0 so the existing Molded Pulp 0.67.0 release notes remain intact.
 
 The initial approval repair passed 861 application/module tests, 70 MCP tests, 11 backend tests, application/MCP lint, license checks and a production dependency audit with zero vulnerabilities. Engine/module, website, Pages and isolated MCP builds passed. Chromium checks passed for consent/callback/token exchange, both live-mode and pilot browser bridges, RSC dimensions and capture, workspace privacy/logout, command-bar controls, and desktop/mobile artwork/outro playback. The window-code follow-up adds server issuance, renewal, used/expired states and account/window isolation coverage; final validation and deployment verification are recorded in the development log. Real-client reconnection remains necessary.
