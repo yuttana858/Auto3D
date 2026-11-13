@@ -23,7 +23,7 @@ try {
     if (typeof client.client_id !== 'string' || !client.client_id) { throw new Error ('Client registration failed.'); }
     const verifier = randomBytes (32).toString ('base64url'), challenge = createHash ('sha256').update (verifier).digest ('base64url'), state = randomBytes (32).toString ('base64url');
     const url = new URL (metadata.authorization_endpoint);
-    url.search = new URLSearchParams ({ client_id : client.client_id, response_type : 'code', redirect_uri : callback, resource, scope : 'auto3d.read auto3d.write', state, code_challenge : challenge, code_challenge_method : 'S256' }).toString ();
+    url.search = new URLSearchParams ({ client_id : client.client_id, response_type : 'code', redirect_uri : callback, resource, scope : 'auto3d.read auto3d.write auto3d.capture', state, code_challenge : challenge, code_challenge_method : 'S256' }).toString ();
     const result = new Promise ((resolve, reject) => {
         const timeout = setTimeout (() => reject (new Error ('Authorization timed out.')), 600000);
         listener.on ('request', (request, response) => {

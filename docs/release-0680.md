@@ -1,48 +1,23 @@
-# Auto3D 0.68.0 — mode-first AI Create panel
+# Auto3D 0.68.0 / Packaging 1.10.7 / Primary Products 0.15.0 / Molded Pulp 0.1.0
 
-Primary Products remains 0.15.0, Packaging remains 1.10.7 and Molded Pulp remains 0.1.0. Based on main after #121 (0.67.1).
+Connecting an agent now uses one Allow/Deny approval for every Auto3D read/write tool and viewport/workspace screenshots. The OAuth resource advertises all three permissions, and the approval grants them together even when a client originally requests only read access. Agent preferences no longer contain a screenshot checkbox. Live Control includes screenshots whenever the approved agent uses the shared window.
 
-## Change
+The account's connection server now issues a window code when Live Control connects. The current code is visible in the app header, Preferences and MCP connections, with Copy code and New code controls. Codes last ten minutes, can be used once and are bound to the authenticated account and window. The server retains only a digest; ordinary inspections/window lists omit the raw code, and the code controls are excluded from workspace captures. Using or expiring a code updates its visible state. New code invalidates the prior code without disturbing existing pairings; disconnect/account changes clear it. Older app windows that already generate codes remain supported until reloaded.
 
-- **Choose the generation type first.** The Create panel opens with five type buttons: **Text to 3D**, **Image to 3D**, **Multi-image to 3D**, **Text to image** and **Texture**. Below them it shows only the inputs that type uses, and the Generate button says what it will make.
+`agent.access.code.refresh` uses the same server issuance flow as New code. `agent.access.code.copy` reports clipboard/user-gesture availability. `agent.access.inspect` includes code state and expiry without returning the credential. Agents pair with a code supplied by the user through `auto3d.sessions.pair_code`; account authentication is still required.
 
-| Type | Inputs | Button |
-| --- | --- | --- |
-| Text to 3D | Prompt; texture prompt (used when you texture the preview); 3D detail; PBR and texture resolution | Generate 3D preview |
-| Image to 3D | One reference image (or the selected generated image); supporting text; 3D detail; PBR and texture resolution | Generate 3D model |
-| Multi-image to 3D | Optional prompt and image model to generate reference views; up to 4 reference views from uploads and generated views; supporting text; 3D detail; PBR and texture resolution | Generate 3D model |
-| Text to image | Prompt; image model; aspect ratio; remove background | Generate image |
-| Texture | Selected 3D model; texture prompt or style image; PBR and texture resolution | Generate texture |
+The consent signature includes the current permission policy. Old or altered consent forms are rejected before creating a registration, so a cached form cannot inadvertently approve the expanded policy. Already issued restricted credentials keep their previous permissions until the user reconnects the agent and approves the new screen. Refreshes do not silently elevate those credentials. Account, administrator, window/session, revocation and read-only workspace checks remain enforced.
 
-- **Uploading no longer switches the type.** Before, an uploaded image silently switched generation to Image to 3D or Multi-image to 3D.
-- **Revise** keeps working from any type: it shows the prompt and a Submit revision button.
-- **Model scale** moves to a *Selected model scale* row at the bottom of the panel.
+`auto3d.capabilities.inspect` reports effective read/write/screenshot permissions and whether reauthorization is needed without requiring a paired window. Agent preferences identify old restricted registrations and explain reconnection. Missing write or screenshot scope produces an MCP step-up challenge for the complete permission set. `agent.access.inspect` reports the window's unified policy and capture availability; its result does not claim to describe an individual agent's OAuth grant. The retired `screenshots` connection argument remains accepted for saved-macro compatibility and no longer changes permissions.
 
-## Reference views replace the "4-view image" checkbox
+Validation covers consent, PKCE, token refresh, old-form rejection, restricted credentials, command discovery, account/window isolation, revocation and PNG transport in the Workers runtime. Browser regressions exercise a 304.8 mm inside-dimension RSC through the window bridge, inspect the resulting dimensions, capture a PNG without a separate checkbox, and verify the command bar and permission UI. Real-client reconnection and retesting against the deployed release remain necessary to refresh the client's tool catalog.
 
-The Text to image **4-view image** checkbox is removed. Meshy's multi-view option returns *"one URL per view, usually three"* (front, side, back). It does not return four. On symmetrical objects such as mugs, those views can look like copies.
+The existing landing artwork/outro regression now pauses within the browser task that observes each frame. This avoids skipping the short kraft-only hold while waiting for a protocol round trip on software-rendered CI runners; presentation code and timing are unchanged.
 
-Multi-view is now always used for reference views, in **Multi-image to 3D**:
-- **Generate reference views from prompt** runs Meshy's multi-view Text to image and fills the reference slots.
-- You can add uploads beside them, up to **4 reference views** in total, so a 4th view can be uploaded. Each slot shows a thumbnail with remove (×) and **Clear** controls, and the views also open in the AI image viewer.
-- **How views are sent to Meshy:** views from one generated task go by task ID. Uploads, or uploads mixed with generated views, go as image URLs (uploads as data URIs, generated views as Meshy asset URLs).
+The login alignment regression measures its panel and buttons in a single browser task. Separate protocol round trips could compare different scales during the landing entrance and fail despite aligned controls; its existing alignment tolerance and login/logout checks remain in place.
 
-Text to image is now always a single image, with the aspect ratio and remove-background options.
+The Primary Products live-resize browser regression applies its existing 120-second rebuild allowance to the Enter key actions as well as the resulting dimensions/status checks. A software-rendered CI run exhausted Playwright's default 30-second keypress limit while the rectangular bottle rebuilt. Geometry, dimension, identity, Undo and validation assertions remain in place; application behavior is unchanged.
 
-## Agent commands
+Integrates main through PR #121, retaining the Molded Pulp module from #120 and the compact material drawer. Molded Pulp commands are included in the Modules discovery family. The agent release notes use 0.68.0 so the existing Molded Pulp 0.67.0 release notes remain intact.
 
-New:
-- `ai.mode.set { mode }` selects the generation type.
-- `ai.reference.generate_views { prompt, imageModel? }` is a paid submission.
-- `ai.reference.clear` removes all references.
-
-`ai.workspace.inspect` reports `mode` and the total reference count. `ai.generate` still accepts `multiView` for compatibility. `website/assets/commands.json` and the MCP catalog are regenerated.
-
-## Validation
-
-- 877 unit tests, lint and 66 MCP tests pass. New tests cover:
-  - Generate enabling only when the chosen type has its inputs;
-  - that an upload does not change the type;
-  - generating views, then sending them by task ID, or mixed with an upload as image URLs;
-  - the 4-reference limit.
-- The browser test `ai-extended.mjs` passes. It now checks that each type shows only its fields, that the 4-view checkbox is gone, and the generate, show and clear flow for reference views.
+The initial approval repair passed 861 application/module tests, 70 MCP tests, 11 backend tests, application/MCP lint, license checks and a production dependency audit with zero vulnerabilities. Engine/module, website, Pages and isolated MCP builds passed. Chromium checks passed for consent/callback/token exchange, both live-mode and pilot browser bridges, RSC dimensions and capture, workspace privacy/logout, command-bar controls, and desktop/mobile artwork/outro playback. The window-code follow-up adds server issuance, renewal, used/expired states and account/window isolation coverage; final validation and deployment verification are recorded in the development log. Real-client reconnection remains necessary.

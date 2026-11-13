@@ -22,9 +22,11 @@ The landing fade-and-pause release is Auto3D 0.66.1 / Packaging 1.10.7 / Primary
 
 The Molded Pulp candidate is Auto3D 0.67.0 / Packaging 1.10.7 / Primary Products 0.15.0 / Molded Pulp 0.1.0: an independent `modules/molded-pulp` package (sense selected products, sheet under the group, form depth, form tray, DFM checks) integrated through `moldedpulppanel.js` and `MoldedPulpWorkspace` with the same boundary as Primary Products. See docs/release-0670.md.
 
-The mode-first AI Create panel is Auto3D 0.68.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0, based on main after #121 (0.67.1). See docs/release-0680.md.
+The mode-first AI Create panel is Auto3D 0.69.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0, based on main after #123 (0.68.0). See docs/release-0690.md.
 
 # Agent-accessible features
+
+The unified agent approval release in PR #123 is Auto3D 0.68.0 / Packaging 1.10.7 / Primary Products 0.15.0 / Molded Pulp 0.1.0. One OAuth approval grants read, write and screenshots; Live Control has no separate screenshot preference. Server-issued window codes are visible in the header, Preferences and MCP connections; Copy code/New code use `agent.access.code.copy/refresh`, and agents pair with a user-supplied code through `auto3d.sessions.pair_code`. Existing restricted credentials require reconnection. Use `auto3d.capabilities.inspect` for effective grant permissions. See docs/release-0680.md.
 
 For every new PR, report the application version and PR number to the user. Keep the app version, package version and release notes aligned when preparing a release.
 

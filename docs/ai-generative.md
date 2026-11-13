@@ -21,9 +21,9 @@ Checked against Meshy's published OpenAPI contract (`docs.meshy.ai/openapi.json`
 
 Meshy also documents remesh, conversion, resize, UV unwrap, 3D-print and relief APIs; these are not wired. Multi-image to 3D has no Smart Topology model, so Smart detail presets use the standard pipeline at the same face budget there. Supported details vary by the provider's current model/plan; errors remain visible. Calls consume Meshy credits. No generation occurs merely by opening the workspace, changing fields, choosing reference images or previewing.
 
-## Create panel (0.68.0)
+## Create panel (0.69.0)
 
-The Create panel starts with the generation type and shows only its inputs; see [release-0680.md](release-0680.md). Multi-image to 3D holds up to 4 reference views, from uploads and from **Generate reference views from prompt**.
+The Create panel starts with the generation type and shows only its inputs; see [release-0690.md](release-0690.md). Multi-image to 3D holds up to 4 reference views, from uploads and from **Generate reference views from prompt**.
 
 ## Revisions
 

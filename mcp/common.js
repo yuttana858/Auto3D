@@ -1,10 +1,10 @@
 export const ReadTools = Object.freeze (['scene.inspect', 'camera.current.inspect', 'packaging.measurements.inspect', 'render.queue.inspect', 'session.tabs.inspect', 'capture.image']);
-export const Scopes = Object.freeze (['auto3d.read', 'auto3d.write', 'auto3d.capture', 'offline_access']);
-// Scopes the MCP resource advertises in its metadata and 401 challenge. MCP clients request
-// exactly these, so advertising only auto3d.read left every client on a read-only grant.
-// Read-only tokens remain valid (PilotService.Assert only requires auto3d.read); screenshot
-// access stays an explicit opt-in requested through a step-up challenge.
-export const ResourceScopes = Object.freeze (['auto3d.read', 'auto3d.write']);
+export const ConnectionPolicy = 'full-access-v1';
+export const ConnectionScopes = Object.freeze (['auto3d.read', 'auto3d.write', 'auto3d.capture']);
+export const Scopes = Object.freeze ([...ConnectionScopes, 'offline_access']);
+// Every new connection approval grants the complete tool set, including screenshots.
+// Existing restricted tokens stay restricted until the user approves the new policy.
+export const ResourceScopes = ConnectionScopes;
 export function LiveMcpPath (pathname)
 {
     return pathname === '/mcp' || pathname.startsWith ('/oauth/') || ['/.well-known/oauth-protected-resource/mcp', '/.well-known/oauth-authorization-server/oauth', '/api/agent/config', '/api/agent/connect', '/api/agent/renew', '/api/agent/registrations', '/api/agent/admin'].includes (pathname);
@@ -23,14 +23,9 @@ export function ValidScopes (scopes)
 {
     return Array.isArray (scopes) && scopes.includes ('auto3d.read') && scopes.length <= Scopes.length && new Set (scopes).size === scopes.length && scopes.every (scope => Scopes.includes (scope));
 }
-// Scopes the user approves on the consent form. The form offers full access (write) and
-// screenshots whatever the client requested, so a client that only asks for auto3d.read can
-// still be granted every tool. Forms without the permissions marker keep the requested scopes.
-export function GrantedScopes (requested, form)
+export function GrantedScopes (requested)
 {
-    if (!form.has ('permissions')) { return [...requested]; }
-    const chosen = { 'auto3d.write' : form.get ('write') === '1', 'auto3d.capture' : form.get ('capture') === '1' };
-    return Scopes.filter (scope => Object.hasOwn (chosen, scope) ? chosen[scope] : requested.includes (scope));
+    return [...ConnectionScopes, ...(requested.includes ('offline_access') ? ['offline_access'] : [])];
 }
 export function Json (data, status = 200)
 {

@@ -71,16 +71,17 @@ try {
 
     // MCP connections lists only usable registrations and names the connect action Live Control.
     assert.equal ((await page.evaluate (() => window.Auto3D.execute ('agent.access.open', {}))).ok, true);
-    const dialog = page.getByRole ('dialog', { name : 'MCP connections', exact : true }); await dialog.getByText ('Active agent · Active', { exact : false }).waitFor ();
+    const dialog = page.getByRole ('dialog', { name : 'MCP connections', exact : true }); await dialog.getByText ('Active agent · Reconnect this agent to enable all tools and screenshots', { exact : false }).waitFor ();
     assert.equal (await dialog.getByText ('Revoked agent').count (), 0); assert.equal (await dialog.getByText ('Expired agent').count (), 0);
     assert.equal (await dialog.getByRole ('button', { name : 'Live Control', exact : true }).count (), 1);
-    // The screenshot checkbox shows and changes the live setting without reconnecting.
-    const screenshots = dialog.getByRole ('checkbox', { name : 'Allow screenshots from this window' }); assert.equal (await screenshots.isChecked (), false);
-    await screenshots.check (); assert.equal ((await page.evaluate (() => window.Auto3D.execute ('agent.access.inspect', {}))).result.screenshots, true); assert.equal (await dialog.getByRole ('button', { name : 'Connect this window' }).count (), 0);
+    // Screenshots are included by the unified connection policy; there is no separate preference.
+    assert.equal (await dialog.getByRole ('checkbox').count (), 0);
+    assert.match (await dialog.innerText (), /including read, write and screenshot access/);
+    assert.equal ((await page.evaluate (() => window.Auto3D.execute ('agent.access.inspect', {}))).result.permissionPolicy, 'full-access-v1'); assert.equal (await dialog.getByRole ('button', { name : 'Connect this window' }).count (), 0);
     registrations.splice (2, 1); await dialog.getByRole ('button', { name : 'Close MCP connections' }).click ();
     await page.waitForFunction (() => !document.querySelector ('dialog[aria-label="MCP connections"]')); /* closing dialogs fade out before removal */
     await page.evaluate (() => window.Auto3D.execute ('agent.access.open', {})); const reopened = page.getByRole ('dialog', { name : 'MCP connections', exact : true }); await reopened.getByText ('No active connections.', { exact : true }).waitFor ();
-    assert.equal (await reopened.getByRole ('checkbox', { name : 'Allow screenshots from this window' }).isChecked (), true);
+    assert.equal (await reopened.getByRole ('checkbox').count (), 0);
 
-    assert.deepEqual (errors, []); console.log ('Command bar close/reopen, agent messages and replies, selection.clear, ui.command_bar, live screenshot setting and MCP active-connection list passed.');
+    assert.deepEqual (errors, []); console.log ('Command bar close/reopen, agent messages and replies, selection.clear, ui.command_bar, unified access messaging and MCP active-connection list passed.');
 } finally { await browser.close (); }

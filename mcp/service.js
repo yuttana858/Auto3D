@@ -1,5 +1,7 @@
 import { Validate } from '../source/website/commandregistry.js';
-import { AgentError, ErrorCode, Identifier, MissingScopeError, ReadTools } from './common.js';
+import { AgentError, ConnectionPolicy, ConnectionScopes, ErrorCode, Identifier, MissingScopeError, ReadTools } from './common.js';
+
+const CapabilitiesTool = Object.freeze ({ id : 'auto3d.capabilities.inspect', title : 'Inspect agent permissions', description : 'Read effective read, write and screenshot permissions without a connected window. Reports whether this connection needs the unified approval again to enable every tool.', mutates : false, inputSchema : { type : 'object', properties : {}, additionalProperties : false } });
 
 const CatalogTools = Object.freeze ([
     { id : 'auto3d.commands.categories', title : 'List command categories', description : 'List command catalog categories and command counts. Requires auto3d.write.', mutates : false, inputSchema : { type : 'object', properties : {}, additionalProperties : false } },
@@ -13,7 +15,7 @@ const Families = Object.freeze ({
     design : { title : 'Design', categories : ['Scene', 'Objects', 'Materials', 'Lighting', 'View', 'Camera', 'Rendering', 'Animation', 'History'] },
     commands : { title : 'Commands & Macros', categories : ['Commands', 'Macros'] },
     capture : { title : 'Screen capture', categories : ['Capture'] },
-    modules : { title : 'Modules', categories : ['Packaging', 'Primary Products', 'AI', 'Panels', 'Knowledge'] },
+    modules : { title : 'Modules', categories : ['Packaging', 'Primary Products', 'Molded Pulp', 'AI', 'Panels', 'Knowledge'] },
     sessions : { title : 'Sessions & Library', categories : ['Sessions', 'Library'] },
     settings : { title : 'Settings & Administration', categories : ['Account', 'Administration', 'Preferences', 'Diagnostics'] }
 });
@@ -35,7 +37,7 @@ const HeadlessTools = [
 
 function RequireWrite (actor)
 {
-    if (!actor.scope.includes ('auto3d.write')) { throw MissingScopeError ('auto3d.write', 'Write permission required. Authorize again with auto3d.write.'); }
+    if (!actor.scope.includes ('auto3d.write')) { throw MissingScopeError ('auto3d.write', 'Write permission required. Reconnect Auto3D and approve read, write and screenshots together.'); }
 }
 function ValidateInvocation (value)
 {
@@ -52,7 +54,7 @@ export class PilotService
     Tools (actor)
     {
         const basic = this.tools.filter (tool => ReadTools.includes (tool.id) && (tool.id !== 'capture.image' || actor.scope.includes ('auto3d.capture')));
-        return actor.scope.includes ('auto3d.write') ? [...basic, ...FamilyTools, ...HeadlessTools, ...CatalogTools] : [...basic, ...FamilyToolsFor (false), ...HeadlessTools.slice (0, 2), HeadlessTools[3]];
+        return [CapabilitiesTool, ...(actor.scope.includes ('auto3d.write') ? [...basic, ...FamilyTools, ...HeadlessTools, ...CatalogTools] : [...basic, ...FamilyToolsFor (false), ...HeadlessTools.slice (0, 2), HeadlessTools[3]])];
     }
     Categories ()
     {
@@ -97,7 +99,12 @@ export class PilotService
     {
         const registration = await this.Assert (actor);
         let result;
-        if (name === 'auto3d.sessions.list') {
+        if (name === 'auto3d.capabilities.inspect') {
+            Check (args, CapabilitiesTool.inputSchema);
+            const scopes = actor.scope.filter (scope => !registration.scopes || registration.scopes.includes (scope));
+            const reauthorizationRequired = !ConnectionScopes.every (scope => scopes.includes (scope));
+            result = { permissionPolicy : ConnectionPolicy, permissions : { read : scopes.includes ('auto3d.read'), write : scopes.includes ('auto3d.write'), screenshots : scopes.includes ('auto3d.capture') }, reauthorizationRequired, hint : reauthorizationRequired ? 'Reconnect Auto3D and approve the single read, write and screenshot permission set. Existing restricted credentials keep their original permissions until you reconnect.' : 'Every Auto3D tool and screenshots are authorized. Share a window with Live Control and select its session for live commands.' };
+        } else if (name === 'auto3d.sessions.list') {
             Check (args, { type : 'object', properties : {} }); result = await this.broker.List (actor.userId);
         } else if (name === 'auto3d.sessions.select') {
             Check (args, { type : 'object', properties : { connectionId : { type : 'string', pattern : '^[A-Za-z0-9_-]{1,128}$' }, sessionId : { type : 'string', pattern : '^[A-Za-z0-9_-]{1,128}$' } }, required : ['connectionId', 'sessionId'] });
@@ -143,12 +150,14 @@ export class PilotService
         } else if (name === 'auto3d.commands.invoke') {
             RequireWrite (actor);
             ValidateInvocation (args);
+            if (args.command === 'capture.image' && !actor.scope.includes ('auto3d.capture')) { throw MissingScopeError ('auto3d.capture', 'Screenshot permission required. Reconnect Auto3D to approve all tools and screenshots together.'); }
             const tool = this.tools.find (item => item.id === args.command); if (!tool) { throw AgentError ('unknown_command', 'Unknown command. List the command catalog to find an available ID.'); }
             Check (args.arguments, tool.inputSchema);
             result = await this.broker.Dispatch ({ accountId : actor.userId, grantId : actor.props.registrationId, requestId, command : tool.id, arguments : args.arguments });
             if (result?.ok !== true || result.command !== tool.id) { throw AgentError ('command_failed', 'Unexpected result from the app window.'); }
             result = result.result;
         } else {
+            if (name === 'capture.image' && !actor.scope.includes ('auto3d.capture')) { throw MissingScopeError ('auto3d.capture', 'Screenshot permission required. Reconnect Auto3D to approve all tools and screenshots together.'); }
             const tool = this.Tools (actor).find (item => item.id === name); if (!tool) { throw AgentError ('unknown_command', 'Tool unavailable for this grant.'); }
             Check (args, tool.inputSchema);
             result = await this.broker.Dispatch ({ accountId : actor.userId, grantId : actor.props.registrationId, requestId, command : name, arguments : args });

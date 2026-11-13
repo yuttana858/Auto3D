@@ -79,3 +79,11 @@ Other external origins are first-party: HDRI environments come from the account'
 ## Out of scope for this release (roadmap)
 
 Headless rendering/scene editing/import-export, Entra ID, SMTP delivery, glass rendering and label artwork, mobile share variants, and splitting `sessioneditor.js`/`agentcommands.js`/`packagingworkspace.js` are feature or refactor projects already listed in `project-status.md`; they are not repairs and are not executed here.
+
+## Follow-up repair queue — agent visibility (2026-11-13)
+
+| ID | Issue | Repair | Status |
+|---|---|---|---|
+| A6 | The connected chat has inspection tools but lacks generation and screenshot tools, and separate permission controls obscure the cause. | Use one approval for read, write and screenshots, remove the screenshot preference, advertise every scope, report effective grant capabilities and guide old restricted connections through reauthorization. Validate RSC generation and image capture through the browser bridge, then retest with the real connected client. | ☐ |
+
+Requested by the user on 2026-11-13 and expanded to a single read/write/screenshot approval. The old setting was reported both on and off while capture remained unavailable. The repair is implemented in the 0.68.0 candidate; automated validation and a live-client reconnection must establish the actual result. Existing restricted credentials require the new approval rather than being silently expanded. See [release-0680.md](release-0680.md).

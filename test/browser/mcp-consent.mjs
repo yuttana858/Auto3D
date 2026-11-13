@@ -30,11 +30,12 @@ try {
     assert.equal (await page.getByLabel ('App window code').count (), 0);
     assert.equal (await page.locator ('.agent-brand').innerText (), 'SW Auto3D');
     assert.equal (await page.locator ('.agent-card').evaluate (el => getComputedStyle (el).borderRadius), '12px');
-    // Full access and screenshots are preselected even though the client requested read-only access.
-    assert.equal (await page.getByRole ('checkbox', { name : /Full access/ }).isChecked (), true); assert.equal (await page.getByRole ('checkbox', { name : /Screenshots/ }).isChecked (), true);
-    assert.equal ((await page.getByRole ('checkbox', { name : /Full access/ }).boundingBox ()).width <= 24, true);
+    // One approval includes every tool and screenshots, even for a read-only client request.
+    assert.equal (await page.getByRole ('checkbox').count (), 0);
+    assert.match (await page.locator ('.agent-card').innerText (), /One approval includes read, write and screenshot access/);
     await Promise.all ([page.waitForURL (url => url.origin === new URL (callback).origin && url.pathname === new URL (callback).pathname), page.getByRole ('button', { name : 'Allow', exact : true }).click ()]);
     assert.equal (posted.origin, origin); assert.match (posted.form.get ('binding'), /^\d+\.[a-f0-9]{64}$/);
+    assert.equal (posted.form.get ('permissions'), 'full-access-v1'); assert.equal (posted.form.has ('write'), false); assert.equal (posted.form.has ('capture'), false);
     assert.equal (callbackUrl.searchParams.get ('state'), 'browser-fixture-state'); assert.equal (callbackUrl.searchParams.get ('iss'), origin + '/oauth');
     assert.ok (callbackUrl.searchParams.get ('code'));
     assert.equal (errors.some (message => message.includes ('Content Security Policy')), false, 'CSP must allow the validated OAuth callback after the form POST.');

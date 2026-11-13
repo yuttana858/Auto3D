@@ -191,7 +191,9 @@ try {
     for (const end = Date.now () + 120000; ; await page.waitForTimeout (100)) { const r = await page.evaluate (() => Auto3D.execute ('camera.current.inspect')); if (r.ok && Math.hypot (r.result.center[0] - can.position[0], r.result.center[1] - (can.position[1] + halfHeight), r.result.center[2] - can.position[2]) < halfHeight * .01) { break; } assert.ok (Date.now () < end, 'camera did not frame the new product: ' + JSON.stringify (r.result?.center)); }
     assert.equal ((await calloutsFor (can.id)).length, 3); await page.waitForFunction (() => ['W · 66 mm', 'L · 66 mm', 'H · 122 mm'].every (label => [...document.querySelectorAll ('[data-dimension-id] text')].some (node => node.textContent === label)), null, { timeout : 120000 });
     const designHeight = drawer.getByRole ('spinbutton', { name : 'Design height', exact : true }); assert.equal (await designHeight.inputValue (), '122');
-    await designHeight.fill ('150'); await designHeight.press ('Enter');
+    // Enter starts a full scene rebuild; software-GPU runners can spend more than the default 30s in its event task.
+    // Use the same 120s limit for the key press as for the resulting dimensions/status checks below.
+    await designHeight.fill ('150'); await designHeight.press ('Enter', { timeout : 120000 });
     await page.waitForFunction (() => document.querySelector ('.pp_design_drawer .pp_status')?.textContent.startsWith ('Resized selected product to 66 × 66 × 150 mm'), null, { timeout : 120000 });
     assert.equal ((await call ('scene.inspect')).objects.at (-1).id, can.id); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 150);
     await page.waitForFunction (() => [...document.querySelectorAll ('[data-dimension-id] text')].some (node => node.textContent === 'H · 150 mm'), null, { timeout : 120000 }); /* callouts follow the live resize */
@@ -214,7 +216,7 @@ try {
     let rect = await call ('primary.inspect'); assert.equal (rect.bottleSection.shape, 'rectangle'); assert.equal (rect.bottleSection.depthMm, 48); assert.equal (await panel.getByRole ('spinbutton', { name : 'Product length', exact : true }).inputValue (), '48');
     const corner = panel.getByRole ('spinbutton', { name : 'Corner radius', exact : true }); await corner.fill ('6'); await corner.press ('Tab'); assert.equal ((await call ('primary.inspect')).bottleSection.cornerRadiusMm, 6);
     const rectangular = await call ('primary.generate'); assert.equal ((await calloutsFor (rectangular.objectId)).find (d => d.axis === 'length').lengthMm, 48);
-    const productLength = panel.getByRole ('spinbutton', { name : 'Product length', exact : true }); await productLength.fill ('55'); await productLength.press ('Enter');
+    const productLength = panel.getByRole ('spinbutton', { name : 'Product length', exact : true }); await productLength.fill ('55'); await productLength.press ('Enter', { timeout : 120000 });
     for (const end = Date.now () + 120000; (await calloutsFor (rectangular.objectId)).find (d => d.axis === 'length').lengthMm !== 55; await page.waitForTimeout (100)) { assert.ok (Date.now () < end, 'depth did not update live'); }
     await call ('primary.selected.load'); assert.deepEqual ((await call ('primary.inspect')).bottleSection, { shape : 'rectangle', depthMm : 55, cornerRadiusMm : 6 }); assert.equal ((await call ('primary.inspect')).diameterMm, 80);
     const ovalDesign = await call ('primary.designs.generate', { id : 'oval-shampoo' }); assert.equal ((await calloutsFor (ovalDesign.objectId)).find (d => d.axis === 'length').lengthMm, 42);
@@ -225,7 +227,7 @@ try {
     assert.equal (await panel.getByRole ('combobox', { name : 'Pouch construction', exact : true }).inputValue (), 'standup');
     const gusset = panel.getByRole ('spinbutton', { name : 'Gusset height', exact : true }); assert.equal (await gusset.inputValue (), '40'); await gusset.fill ('30'); await gusset.press ('Tab');
     assert.equal ((await call ('primary.inspect')).pouchShape.gussetMm, 30);
-    const pouchLength = panel.getByRole ('spinbutton', { name : 'Product length', exact : true }); await pouchLength.fill ('24'); await pouchLength.press ('Enter');
+    const pouchLength = panel.getByRole ('spinbutton', { name : 'Product length', exact : true }); await pouchLength.fill ('24'); await pouchLength.press ('Enter', { timeout : 120000 });
     for (const end = Date.now () + 120000; (await calloutsFor (standup.objectId)).find (d => d.axis === 'length').lengthMm !== 24; await page.waitForTimeout (100)) { assert.ok (Date.now () < end, 'pouch depth did not update live'); }
     await call ('primary.selected.load'); assert.deepEqual ((await call ('primary.inspect')).pouchShape, { style : 'standup', gussetMm : 24 }); /* the gusset is clamped to the new depth */
     const badGusset = await page.evaluate (() => Auto3D.execute ('primary.configure', { pouchShape : { style : 'standup', gussetMm : 500 } })); assert.equal (badGusset.ok, false);

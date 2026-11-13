@@ -15,28 +15,26 @@ try {
         const inspect = async () => (await command ('landing.inspect')).result;
         const playback = action => command ('landing.demo.playback', { action });
         assert.equal ((await inspect ()).sequence.outro.opacity, 1, 'reduced motion starts on the visible material study');
-        // Wait and pause inside the page on the same animation frame. Separate poll and pause round trips let a
-        // slow CI runner overshoot a phase (ink ends at 0.9 s, white starts at 2.2 s; the blank hold is short).
-        const pauseWhen = (condition, label, timeout) => page.evaluate (async ([condition, label, timeout]) => {
+        // Pause in the same browser task that observes the frame. A protocol round trip
+        // can otherwise miss the short kraft-only hold on software-rendered CI runners.
+        const until = (key, threshold) => page.evaluate (async ({ key, threshold }) => {
             const started = Date.now ();
-            for (;;) {
-                const sequence = (await window.Auto3D.execute ('landing.inspect')).result.sequence;
-                if (condition.outro ? sequence.outro.phase === condition.outro : sequence.finish[condition.key] >= condition.threshold) { break; }
-                if (Date.now () - started > timeout) { throw new Error ('Timed out waiting for ' + label); }
+            while (true) {
+                const state = (await window.Auto3D.execute ('landing.inspect')).result.sequence;
+                if (state.finish[key] >= threshold) { await window.Auto3D.execute ('landing.demo.playback', { action : 'pause' }); return; }
+                if (Date.now () - started > 20000) { throw new Error ('Timed out waiting for ' + key); }
                 await new Promise (resolve => requestAnimationFrame (resolve));
             }
-            await window.Auto3D.execute ('landing.demo.playback', { action : 'pause' });
-        }, [condition, label, timeout]);
-        const untilThenPause = (key, threshold) => pauseWhen ({ key, threshold }, key, 20000);
-        await command ('landing.demo.stage', { stage : 2 }); await playback ('play'); await untilThenPause ('ink', 1);
+        }, { key, threshold });
+        await command ('landing.demo.stage', { stage : 2 }); await playback ('play'); await until ('ink', 1); await playback ('pause');
         const kraft = await inspect (); assert.equal (kraft.artwork.ink, 1); assert.equal (kraft.artwork.white, 0); assert.equal (kraft.artwork.exteriorPanels, 6);
         await page.locator ('.entry_canvas_wrap').screenshot ({ path : `work/artwork-${width}-kraft.png` });
-        await playback ('play'); await untilThenPause ('white', 0.4);
+        await playback ('play'); await until ('white', 0.4); await playback ('pause');
         const wipe = await inspect (); assert.ok (wipe.artwork.white > 0 && wipe.artwork.white < 1);
         await page.locator ('.entry_canvas_wrap').screenshot ({ path : `work/artwork-${width}-wipe.png` });
-        await playback ('play'); await untilThenPause ('white', 1);
+        await playback ('play'); await until ('white', 1); await playback ('pause');
         await page.locator ('.entry_canvas_wrap').screenshot ({ path : `work/artwork-${width}-white.png` });
-        await playback ('play'); await untilThenPause ('callouts', 1);
+        await playback ('play'); await until ('callouts', 1); await playback ('pause');
         const complete = await inspect (); assert.equal (complete.sequence.finish.turn, 1); assert.ok (complete.rotation - kraft.rotation > 1.2);
         assert.ok (Math.abs (Math.max (...complete.framing.extent) - 0.96) < 0.002); assert.ok (complete.framing.screenCenter.every (v => Math.abs (v) < 0.002));
         assert.equal (await page.locator ('.entry_material_label:visible').count (), 3);
@@ -50,14 +48,22 @@ try {
         await page.setViewportSize ({ width : width + 40, height : 1000 }); await page.waitForTimeout (150);
         const resized = await inspect (); assert.ok (resized.materials.width > 0); assert.ok (resized.framing.screenCenter.every (v => Math.abs (v) < 0.002));
         await command ('landing.demo.stage', { stage : 3 }); await playback ('play');
-        const outroThenPause = phase => pauseWhen ({ outro : phase }, 'outro ' + phase, 10000);
-        await outroThenPause ('fading');
+        const untilOutro = phase => page.evaluate (async phase => {
+            const started = Date.now ();
+            while (true) {
+                const state = (await window.Auto3D.execute ('landing.inspect')).result.sequence;
+                if (state.outro.phase === phase) { await window.Auto3D.execute ('landing.demo.playback', { action : 'pause' }); return; }
+                if (Date.now () - started > 10000) { throw new Error ('Timed out waiting for outro ' + phase); }
+                await new Promise (resolve => requestAnimationFrame (resolve));
+            }
+        }, phase);
+        await untilOutro ('fading'); await playback ('pause');
         const fading = await inspect ();
         assert.ok (fading.sequence.outro.opacity > 0 && fading.sequence.outro.opacity < 1);
         const fadeOpacity = await page.locator ('.entry_canvas_wrap').evaluate (e => Number (getComputedStyle (e).opacity));
         assert.ok (Math.abs (fadeOpacity - fading.sequence.outro.opacity) < 0.001);
         await page.waitForTimeout (160); assert.equal ((await inspect ()).sequence.sequenceTime, fading.sequence.sequenceTime);
-        await playback ('play'); await outroThenPause ('holding');
+        await playback ('play'); await untilOutro ('holding'); await playback ('pause');
         assert.equal (await page.locator ('.entry_canvas_wrap').evaluate (e => Number (getComputedStyle (e).opacity)), 0);
         assert.equal (await page.locator ('.entry_visual_heading').evaluate (e => Number (getComputedStyle (e).opacity)), 0);
         assert.equal (await page.locator ('.entry_login').evaluate (e => Number (getComputedStyle (e).opacity)), 1);
