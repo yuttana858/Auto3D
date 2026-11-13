@@ -95,7 +95,7 @@ try {
     await call ('primary.update'); assert.ok ((await call ('material.list')).some (m => m.transmission === 1 && m.ior === 1.5));
     await call ('primary.materials.open');
     const opticalEditor = page.locator ('#material_drawer_content');
-    assert.equal (await opticalEditor.getByRole ('spinbutton', { name : 'Index of refraction', exact : true }).inputValue (), '1.5');
+    assert.equal (await opticalEditor.getByRole ('spinbutton', { name : 'IRO', exact : true }).inputValue (), '1.5');
     await page.screenshot ({ path : 'work/primary-products-review/clear-glass-materials.png' });
     await page.locator ('#material_drawer_close').click ();
     assert.equal ((await call ('scene.inspect')).objects.length, 2); assert.deepEqual (errors, []);
