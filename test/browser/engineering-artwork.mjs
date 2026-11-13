@@ -14,6 +14,7 @@ try {
         const command = (id, args = {}) => page.evaluate (([id, args]) => window.Auto3D.execute (id, args), [id, args]);
         const inspect = async () => (await command ('landing.inspect')).result;
         const playback = action => command ('landing.demo.playback', { action });
+        assert.equal ((await inspect ()).sequence.outro.opacity, 1, 'reduced motion starts on the visible material study');
         const until = async (key, threshold) => {
             const started = Date.now ();
             while ((await inspect ()).sequence.finish[key] < threshold) {
@@ -42,9 +43,47 @@ try {
         const held = (await inspect ()).sequence.sequenceTime; await page.waitForTimeout (180); assert.equal ((await inspect ()).sequence.sequenceTime, held);
         await page.setViewportSize ({ width : width + 40, height : 1000 }); await page.waitForTimeout (150);
         const resized = await inspect (); assert.ok (resized.materials.width > 0); assert.ok (resized.framing.screenCenter.every (v => Math.abs (v) < 0.002));
+        await command ('landing.demo.stage', { stage : 3 }); await playback ('play');
+        const untilOutro = async phase => {
+            const started = Date.now ();
+            while ((await inspect ()).sequence.outro.phase !== phase) {
+                if (Date.now () - started > 10000) { throw new Error ('Timed out waiting for outro ' + phase); }
+                await page.waitForTimeout (30);
+            }
+        };
+        await untilOutro ('fading'); await playback ('pause');
+        const fading = await inspect ();
+        assert.ok (fading.sequence.outro.opacity > 0 && fading.sequence.outro.opacity < 1);
+        const fadeOpacity = await page.locator ('.entry_canvas_wrap').evaluate (e => Number (getComputedStyle (e).opacity));
+        assert.ok (Math.abs (fadeOpacity - fading.sequence.outro.opacity) < 0.001);
+        await page.waitForTimeout (160); assert.equal ((await inspect ()).sequence.sequenceTime, fading.sequence.sequenceTime);
+        await playback ('play'); await untilOutro ('holding'); await playback ('pause');
+        assert.equal (await page.locator ('.entry_canvas_wrap').evaluate (e => Number (getComputedStyle (e).opacity)), 0);
+        assert.equal (await page.locator ('.entry_visual_heading').evaluate (e => Number (getComputedStyle (e).opacity)), 0);
+        assert.equal (await page.locator ('.entry_login').evaluate (e => Number (getComputedStyle (e).opacity)), 1);
+        await page.locator ('.entry_visual').screenshot ({ path : `work/outro-hold-${width}.png` });
+        // Observe and pause on the loop boundary in-page, without a protocol round trip.
+        const { samples, restarted } = await page.evaluate (async () => {
+            const hold = (await window.Auto3D.execute ('landing.inspect')).result.sequence, samples = [], started = Date.now ();
+            await window.Auto3D.execute ('landing.demo.playback', { action : 'play' });
+            while (true) {
+                const frame = (await window.Auto3D.execute ('landing.inspect')).result.sequence;
+                if (frame.cycle > hold.cycle) {
+                    await window.Auto3D.execute ('landing.demo.playback', { action : 'pause' });
+                    return { samples, restarted : frame };
+                }
+                samples.push (frame);
+                if (Date.now () - started > 10000) { throw new Error ('The outro did not loop'); }
+                await new Promise (resolve => requestAnimationFrame (resolve));
+            }
+        });
+        assert.ok (samples.length > 2 && samples.at (-1).sequenceTime - samples[0].sequenceTime > 1, 'hold remains blank before the loop');
+        assert.ok (samples.every (frame => frame.outro.opacity === 0)); assert.equal (restarted.phase, 'logo');
+        assert.equal ((await inspect ()).sequence.phase, 'logo');
+        assert.equal (await page.locator ('.entry_canvas_wrap').evaluate (e => Number (getComputedStyle (e).opacity)), 1);
         await command ('landing.demo.stage', { stage : 0 }); const reset = await inspect ();
         assert.equal (reset.artwork.ink, 0); assert.equal (reset.artwork.white, 0); assert.equal (await page.locator ('.entry_materials').isVisible (), false);
         assert.deepEqual (errors, []); await page.close ();
-        console.log (`Kraft print, white color wipe, right turn, material leaders, centered fit, pause and reset passed at ${width}px`);
+        console.log (`Printed finishes, material leaders, centered fit, fade, blank hold, automatic loop and pause passed at ${width}px`);
     }
 } finally { await browser.close (); }

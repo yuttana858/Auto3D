@@ -19,7 +19,8 @@ export const EngineeringTiming = EngineeringPrompts.map (prompt => {
     offset = complete + prompt.hold; return Object.freeze ({ start, dock, reply, execute, complete, end : offset });
 });
 export const EngineeringReviewStart = offset;
-export const EngineeringSequenceDuration = offset + EngineeringFinishDuration;
+export const EngineeringOutro = Object.freeze ({ fadeStart : offset + EngineeringFinishDuration, fadeEnd : offset + EngineeringFinishDuration + 1, pauseDuration : 2 });
+export const EngineeringSequenceDuration = EngineeringOutro.fadeEnd + EngineeringOutro.pauseDuration;
 export const EngineeringStagePositions = [...EngineeringTiming.map (item => item.complete + 0.05), offset + 8.8];
 const ramp = (value, from, to) => Math.max (0, Math.min (1, (value - from) / (to - from)));
 const ease = value => value * value * (3 - 2 * value);
@@ -49,6 +50,7 @@ export function EngineeringSequenceState (seconds)
     const greetingText = greetingWords.slice (0, Math.ceil (greetingWords.length * ramp (t, intro.logoEnd + 0.2, intro.logoEnd + 1.7))).join (' ');
     return {
         sequenceTime, cycle, stage, step, phase, progress, sceneTime, finish, prompt : item.prompt, inputMode : item.inputMode,
+        outro : { opacity : 1 - ease (ramp (t, EngineeringOutro.fadeStart, EngineeringOutro.fadeEnd)), phase : t < EngineeringOutro.fadeStart ? 'visible' : t < EngineeringOutro.fadeEnd ? 'fading' : 'holding' },
         micActive : drafting && item.inputMode === 'speech', displayPrompt,
         sceneVisible : t >= EngineeringTiming[0].execute,
         dockProgress : ease (ramp (t, EngineeringTiming[0].dock, EngineeringTiming[0].reply)),
