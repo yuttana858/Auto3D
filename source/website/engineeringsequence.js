@@ -1,4 +1,5 @@
 // Visual storytelling only: no prompt submission, speech synthesis or microphone access.
+import { EngineeringFinishDuration, EngineeringFinishState } from './engineeringfinish.js';
 export const EngineeringIntroduction = Object.freeze ({
     drawStart : 0.15, drawEnd : 2.3, colorStart : 2.1, colorEnd : 2.9,
     landStart : 2.4, landEnd : 3.25, sloganStart : 2.9, sloganEnd : 3.8,
@@ -18,8 +19,8 @@ export const EngineeringTiming = EngineeringPrompts.map (prompt => {
     offset = complete + prompt.hold; return Object.freeze ({ start, dock, reply, execute, complete, end : offset });
 });
 export const EngineeringReviewStart = offset;
-export const EngineeringSequenceDuration = offset + 4.4;
-export const EngineeringStagePositions = [...EngineeringTiming.map (item => item.complete + 0.05), offset + 2.5];
+export const EngineeringSequenceDuration = offset + EngineeringFinishDuration;
+export const EngineeringStagePositions = [...EngineeringTiming.map (item => item.complete + 0.05), offset + 8.8];
 const ramp = (value, from, to) => Math.max (0, Math.min (1, (value - from) / (to - from)));
 const ease = value => value * value * (3 - 2 * value);
 
@@ -27,11 +28,12 @@ export function EngineeringSequenceState (seconds)
 {
     const sequenceTime = Math.max (0, seconds) % EngineeringSequenceDuration, cycle = Math.floor (Math.max (0, seconds) / EngineeringSequenceDuration);
     const intro = EngineeringIntroduction, t = sequenceTime;
+    const finish = EngineeringFinishState (t - EngineeringReviewStart);
     let step = EngineeringTiming.findIndex (item => t < item.end), stage = step, phase, progress = 0, sceneTime;
     if (t < intro.logoEnd) { step = 0; stage = 0; phase = 'logo'; progress = t / intro.logoEnd; sceneTime = 0.1; }
     else if (t < intro.greetingEnd) { step = 0; stage = 0; phase = 'greeting'; progress = (t - intro.logoEnd) / (intro.greetingEnd - intro.logoEnd); sceneTime = 0.1; }
     else if (step === -1) {
-        step = 2; stage = 3; progress = Math.min ((t - EngineeringReviewStart) / 3.4, 1);
+        step = 2; stage = 3; progress = Math.min ((t - EngineeringReviewStart) / (EngineeringFinishDuration - 0.8), 1);
         phase = progress < 1 ? 'reviewing' : 'complete'; sceneTime = 16.4 + (21 - 16.4) * progress;
     } else {
         const timing = EngineeringTiming[step], item = EngineeringPrompts[step];
@@ -46,7 +48,7 @@ export function EngineeringSequenceState (seconds)
     const displayPrompt = welcome ? '' : !drafting ? item.prompt : item.inputMode === 'typing' ? item.prompt.slice (0, Math.floor (item.prompt.length * progress)) : words.slice (0, Math.floor (words.length * progress)).join (' ');
     const greetingText = greetingWords.slice (0, Math.ceil (greetingWords.length * ramp (t, intro.logoEnd + 0.2, intro.logoEnd + 1.7))).join (' ');
     return {
-        sequenceTime, cycle, stage, step, phase, progress, sceneTime, prompt : item.prompt, inputMode : item.inputMode,
+        sequenceTime, cycle, stage, step, phase, progress, sceneTime, finish, prompt : item.prompt, inputMode : item.inputMode,
         micActive : drafting && item.inputMode === 'speech', displayPrompt,
         sceneVisible : t >= EngineeringTiming[0].execute,
         dockProgress : ease (ramp (t, EngineeringTiming[0].dock, EngineeringTiming[0].reply)),
@@ -57,7 +59,7 @@ export function EngineeringSequenceState (seconds)
             land : ease (ramp (t, intro.landStart, intro.landEnd)), slogan : ramp (t, intro.sloganStart, intro.sloganEnd),
             opacity : ease (ramp (t, 0, 0.2)) * (1 - ease (ramp (t, intro.fadeStart, intro.logoEnd)))
         },
-        reply : welcome ? greetingText : step === 0 && (drafting || phase === 'docking') ? intro.greeting : drafting ? 'Voice request becoming text…' : phase === 'complete' || phase === 'reviewing' ? item.complete : item.reply,
+        reply : stage === 3 ? finish.reply : welcome ? greetingText : step === 0 && (drafting || phase === 'docking') ? intro.greeting : drafting ? 'Voice request becoming text…' : phase === 'complete' ? item.complete : item.reply,
         execution : welcome ? 'AUTO3D / ENGINEERING ASSISTANT' : phase === 'docking' ? 'Request received' : drafting ? item.inputMode === 'speech' ? 'VOICE → TEXT' : 'GLEN IS TYPING' : phase === 'replying' ? 'Agent response' : phase === 'reviewing' ? 'Inspecting every layer' : phase === 'complete' ? 'Complete' : item.tasks[Math.min (item.tasks.length - 1, Math.floor (progress * item.tasks.length))]
     };
 }

@@ -2,6 +2,7 @@ import { CreateEngineeringHero, EngineeringStages } from './engineeringhero.js';
 import { EngineeringSequenceState, EngineeringSequenceDuration } from './engineeringsequence.js';
 import { EngineeringIntroMarkup, CreateEngineeringIntroduction } from './engineeringintro.js';
 import { CreateEngineeringEntrance } from './engineeringentrance.js';
+import { EngineeringMaterialsMarkup, CreateEngineeringMaterials } from './engineeringmaterials.js';
 
 export function CreateEngineeringLanding (root, { panel, onSignIn, version = '' })
 {
@@ -24,8 +25,9 @@ export function CreateEngineeringLanding (root, { panel, onSignIn, version = '' 
                         <div class="entry_visual_heading"><span>PACKAGING DESIGN STUDY / 001</span><span><span class="entry_scene_number">04 /</span><strong class="entry_scene_title">See every layer</strong></span></div>
                         <div class="entry_canvas_wrap">
                             <div class="entry_webgl_fallback" hidden>Product → protection → structure<br><small>The animated study needs WebGL. Sign-in is available alongside.</small></div>
-                            <canvas role="img" aria-label="A mechanical assembly protected by thin ribbed brown molded-pulp shells and a kraft paper box, with hand holes, folding flaps, locking tabs and a blue CAD cutaway"></canvas>
+                            <canvas role="img" aria-label="A motor protected by molded pulp and a folding kraft box, followed by black artwork, a white multicolor print wipe, a rightward turn and material callouts"></canvas>
                             ${EngineeringIntroMarkup ()}
+                            ${EngineeringMaterialsMarkup ()}
                             <div class="entry_agent" role="img" aria-label="Animated glass prompt with a greeting to Glen, typed and spoken requests, agent replies and execution" data-phase="complete" data-running="false" data-mic-active="false">
                                 <div class="entry_prompt_shell"><span class="entry_prompt_chevron" aria-hidden="true">›</span><span class="entry_prompt_line"><span class="entry_prompt_text"></span><i class="entry_typing_cursor" aria-hidden="true"></i></span><span class="entry_prompt_mic" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11v1a6 6 0 0 0 12 0v-1M12 18v3M9 21h6"/></svg></span><span class="entry_prompt_send" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></span></div>
                                 <div class="entry_agent_response"><span aria-hidden="true">✦</span><p class="entry_agent_reply"></p></div>
@@ -53,12 +55,13 @@ export function CreateEngineeringLanding (root, { panel, onSignIn, version = '' 
     const agent = root.querySelector ('.entry_agent');
     const introduction = CreateEngineeringIntroduction (root);
     const entrance = CreateEngineeringEntrance (root);
+    const materials = CreateEngineeringMaterials (root);
     const setText = (selector, text) => { const element = root.querySelector (selector); if (element.textContent !== text) { element.textContent = text; } };
     const update = value => {
         state = value; const stage = EngineeringStages[value.stage];
         const sequence = value.sequence || EngineeringSequenceState (EngineeringSequenceDuration - 1);
         const welcoming = sequence.phase === 'logo' || sequence.phase === 'greeting';
-        setText ('.entry_scene_number', welcoming ? '00 /' : '0' + (value.stage + 1) + ' /'); setText ('.entry_scene_title', welcoming ? 'An idea starts here' : stage.title);
+        setText ('.entry_scene_number', welcoming ? '00 /' : '0' + (value.stage + 1) + ' /'); setText ('.entry_scene_title', welcoming ? 'An idea starts here' : value.stage === 3 ? sequence.finish.title : stage.title);
         const pause = root.querySelector ('[data-action="pause"]'); pause.textContent = value.playing ? 'Ⅱ' : '▷'; pause.setAttribute ('aria-label', value.playing ? 'Pause animation' : 'Play animation'); pause.title = pause.getAttribute ('aria-label');
         root.querySelectorAll ('[data-stage]').forEach (item => item.setAttribute ('aria-pressed', String (Number (item.dataset.stage) === value.stage)));
         root.querySelector ('.entry_webgl_fallback').hidden = value.available; root.querySelector ('.entry_canvas_wrap canvas').hidden = !value.available; agent.hidden = !value.available;
@@ -70,6 +73,8 @@ export function CreateEngineeringLanding (root, { panel, onSignIn, version = '' 
         const progress = ['logo', 'greeting', 'drafting', 'docking', 'replying'].includes (sequence.phase) ? 0 : sequence.phase === 'executing' ? sequence.progress : 1;
         root.querySelector ('.entry_execution_track i').style.transform = 'scaleX(' + progress + ')';
         introduction.update (sequence); entrance.update (value);
+        agent.style.opacity = String (sequence.promptOpacity * sequence.finish.promptOpacity);
+        materials.update (value);
     };
     function resume () { if (hero) { return; } suspended = false; hero = CreateEngineeringHero (root.querySelector ('canvas'), { onState : update }); }
     function show (view, focus = true) {

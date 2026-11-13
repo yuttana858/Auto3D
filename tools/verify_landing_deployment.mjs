@@ -7,12 +7,12 @@ const version = await (await request ('/version.json?landing=' + Date.now ())).j
 const expected = JSON.parse (await readFile (new URL ('../package.json', import.meta.url), 'utf8')).version;
 assert.equal (version.version, expected);
 const script = await (await request (version.script)).text ();
-for (const marker of ['entry_frame_flash', 'entry_heading_ink', 'entry_login', 'entry_intro_mark', 'entry_agent', 'Engineering intelligence.', 'Flat pulp sheet', 'visiblePoints', 'landing.demo.playback', 'auth.continue', '/api/auth/']) {
+for (const marker of ['entry_frame_flash', 'entry_heading_ink', 'entry_login', 'entry_intro_mark', 'entry_agent', 'Engineering intelligence.', 'Flat pulp sheet', 'visiblePoints', 'engineering-print-v1', 'entry_materials', 'Printed liner', 'Corrugated core', 'landing.demo.playback', 'auth.continue', '/api/auth/']) {
     assert.ok (script.includes (marker), 'Missing landing/login feature: ' + marker);
 }
 assert.ok (!script.includes ('Sign-in fields are disabled here.'), 'Preview credentials must not ship');
 const css = await (await request ('/o3dv/o3dv.website.min.css?v=' + version.assetDigest)).text ();
-for (const marker of ['entry_frame_flash', '--entry-login-flash', 'entry_heading_ink', 'entry_agent']) { assert.ok (css.includes (marker), 'Missing presentation style: ' + marker); }
+for (const marker of ['entry_frame_flash', '--entry-login-flash', 'entry_heading_ink', 'entry_agent', 'entry_material_label']) { assert.ok (css.includes (marker), 'Missing presentation style: ' + marker); }
 const session = await request ('/api/auth/session');
 assert.equal (session.status, 200); assert.deepEqual (await session.json (), { user : null });
 assert.ok ((session.headers.get ('cache-control') || '').includes ('no-store'));
@@ -23,4 +23,4 @@ assert.ok (!invalid.headers.get ('set-cookie'));
 const protectedResource = await request ('/api/personal/items');
 assert.equal (protectedResource.status, 401);
 assert.ok ((protectedResource.headers.get ('cache-control') || '').includes ('no-store'));
-console.log ('Landing release verified: ' + expected + '; full card entrance, packaging sequence and existing account routes present; unsigned workspace access denied.');
+console.log ('Landing release verified: ' + expected + '; full card entrance, packaging sequence, printed finishes, material leaders and existing account routes present; unsigned workspace access denied.');

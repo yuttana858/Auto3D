@@ -21,7 +21,7 @@ function roundedOpening (x, y, width, height, radius)
 export function CreateEngineeringPack ({ block, mesh, surface, edge })
 {
     const d = PresentationPack;
-    const group = new THREE.Group (), walls = [], lids = [], returns = [], locks = [], slots = [], handHoles = [];
+    const group = new THREE.Group (), walls = [], lids = [], returns = [], locks = [], slots = [], handHoles = [], printPanels = [];
     block (group, [d.width, d.board, d.depth], surface, [0, d.bottom, d.centerZ]);
     function plate (shape) {
         const geometry = new THREE.ExtrudeGeometry (shape, { depth : d.board, bevelEnabled : false, steps : 1, curveSegments : 8 });
@@ -51,9 +51,11 @@ export function CreateEngineeringPack ({ block, mesh, surface, edge })
         const wallShape = new THREE.Shape ([new THREE.Vector2 (Math.min (0, side * d.height), -d.depth / 2), new THREE.Vector2 (Math.max (0, side * d.height), -d.depth / 2), new THREE.Vector2 (Math.max (0, side * d.height), d.depth / 2), new THREE.Vector2 (Math.min (0, side * d.height), d.depth / 2)]);
         wallShape.holes.push (roundedOpening (side * d.handRise, 0, d.handHeight, d.handWidth, d.handRadius));
         const sidePanel = mesh (wall, plate (wallShape), surface, [0, 0, 0]);
+        printPanels.push ({ mesh : sidePanel, face : 'side', side });
         handHoles.push ({ group : wall, panel : sidePanel, side, center : new THREE.Vector3 (side * d.handRise, 0, 0) });
         const lid = new THREE.Group (); lid.position.x = side * d.height; wall.add (lid);
-        mesh (lid, outerLid (side), surface, [0, 0, 0]);
+        const lidPanel = mesh (lid, outerLid (side), surface, [0, 0, 0]);
+        printPanels.push ({ mesh : lidPanel, face : 'lid', side });
         for (const endSide of [-1, 1]) {
             const flap = new THREE.Group (); flap.position.z = endSide * (d.depth / 2 - 0.065); wall.add (flap);
             // The opposing full-width returns meet at x=0 after both folds.
@@ -67,13 +69,14 @@ export function CreateEngineeringPack ({ block, mesh, surface, edge })
         block (wall, [d.height, 0.018, 0.018], edge, [side * d.height / 2, 0.035, d.depth / 2]);
         walls.push ({ group : wall, axis : 'z', side }); lids.push ({ group : lid, axis : 'z', side, minor : false });
         const end = new THREE.Group (); end.position.set (0, d.bottom, d.centerZ + side * d.depth / 2); group.add (end);
-        block (end, [d.width, d.board, d.height], surface, [0, 0, side * d.height / 2]);
+        const endPanel = block (end, [d.width, d.board, d.height], surface, [0, 0, side * d.height / 2]);
+        printPanels.push ({ mesh : endPanel, face : 'front', side });
         const inner = new THREE.Group (); inner.position.z = side * (d.height - d.innerLidDrop); end.add (inner);
         const panel = mesh (inner, receiver (side), surface, [0, 0, 0]);
         for (const xSide of [-1, 1]) { slots.push ({ group : inner, panel, side : xSide, endSide : side, center : new THREE.Vector3 (xSide * d.width / 4, 0, side * d.tabInset) }); }
         walls.push ({ group : end, axis : 'x', side : -side }); lids.push ({ group : inner, axis : 'x', side : -side, minor : true });
     }
-    return { group, walls, lids, returns, locks, slots, handHoles };
+    return { group, walls, lids, returns, locks, slots, handHoles, printPanels };
 }
 
 export function PoseEngineeringPack (pack, t)

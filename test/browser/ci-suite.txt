@@ -20,6 +20,7 @@ corrugate-review
 dimensions
 engineering-landing
 engineering-prompts
+engineering-artwork
 errorlogs-panel
 feedback
 fefco
