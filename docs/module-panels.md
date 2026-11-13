@@ -42,3 +42,7 @@ The shared application header and toolbar are temporarily placed at the top of t
 The right-side `primary-products` module sits below Packaging in the same outlined Generation modules group. Its independently built content lives in `modules/primary-products`; `primaryproductspanel.js` owns only lazy loading, account-scoped draft state and host callbacks. `ui.primary_products` opens it and the existing `ui.module.mode` command controls Minimal/Extended/Close.
 
 Registrations can set `animated: true` to opt into shared entry/exit motion. Primary Products does so: exit completes before hiding/restoring the DOM, superseded transitions are cancelled, and reduced-motion preference skips motion. Draft state remains owned by the module host and is not reset by layout transitions. Existing registrations retain their prior behavior.
+
+## Molded Pulp (0.67.0)
+
+The right-side `molded-pulp` module sits below Primary Products in the Generation modules group. Its independently built content lives in `modules/molded-pulp`; `moldedpulppanel.js` owns only lazy loading, the account-scoped draft and host callbacks, and `moldedpulpworkspace.js` owns scene changes (one Undo step each, in-place replacement of the current sheet/tray). `ui.molded_pulp` opens it; `ui.module.mode` controls Minimal/Extended/Close. It registers with `animated : true`.

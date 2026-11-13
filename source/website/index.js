@@ -135,5 +135,6 @@ export function StartEmbed ()
 }
 
 import './css/primaryproducts.css';
+import './css/moldedpulp.css';
 
 import './css/dimensions.css';
