@@ -367,7 +367,7 @@ export class MaterialPanel
         });
         this.Control (properties, 'Opacity', 'range', material.opacity, { min : 0, max : 1, step : 0.01 }, (value) => {
             material.opacity = Number (value);
-            material.transparent = material.opacity < 1;
+            material.transparent = material.opacity < 1 && !entry.original.transmissionBackground;
             entry.original.opacity = material.opacity;
             entry.original.transparent = material.transparent;
         });

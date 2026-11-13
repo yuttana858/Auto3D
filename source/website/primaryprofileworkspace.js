@@ -25,10 +25,12 @@ export class PrimaryProfileWorkspace
         this.panel.catalogOpen = false;
         for (const p of this.restore) { await panels.Set (p.id, 'closed'); }
         if (document !== editor.document || owner !== this.website.auth?.user?.id || this.panel.Blocked ()) { throw new Error ('The session changed before the model editor opened.'); }
+        await panels.Set ('upload', 'minimal');
         const viewer = this.website.parameters.viewerDiv; this.wrapper = globalThis.document.createElement ('div'); this.wrapper.className = 'pp_viewport_split'; viewer.parentNode.insertBefore (this.wrapper, viewer);
         this.root = globalThis.document.createElement ('section'); this.wrapper.append (this.root, viewer);
-        this.ui = new this.panel.module.ProductProfileEditor ({ inspect : () => this.Inspect (), blocked : () => this.panel.Blocked (), update : (changes, objectId) => this.panel.UpdateProfile (changes, objectId), close : () => this.Close () }, this.root);
-        this.open = true; this.website.layouter.primaryProfile = this; this.Sync (); this.website.layouter.Resize (); editor.Focus ();
+        this.ui = new this.panel.module.ProductProfileEditor ({ inspect : () => this.Inspect (), blocked : () => this.panel.Blocked (), update : (changes, objectId) => this.panel.UpdateProfile (changes, objectId), close : () => this.Close (), refreshLabels : () => this.panel.workspace.SetDisabled () }, this.root);
+        this.ui.labelsRoot.appendChild (this.panel.workspace.artworkRoot);
+        this.open = true; globalThis.document.body.classList.add ('primary_profile_open'); this.website.layouter.primaryProfile = this; this.Sync (); this.website.layouter.Resize (); editor.Focus ();
         this.website.viewer.navigation.FinishCameraMovement ();
         return this.Inspect ();
     }
@@ -38,6 +40,7 @@ export class PrimaryProfileWorkspace
         const vertical = width < 720; this.wrapper.classList.toggle ('pp_vertical', vertical); this.wrapper.style.width = width + 'px'; this.wrapper.style.height = height + 'px';
         const profileWidth = vertical ? width : Math.floor (width / 2), profileHeight = vertical ? Math.max (180, Math.floor (height * .55)) : height;
         this.root.style.width = profileWidth + 'px'; this.root.style.height = profileHeight + 'px';
+        globalThis.document.body.style.setProperty ('--primary-drawer-left', (this.website.parameters.leftContainerDiv.getBoundingClientRect ().right + profileWidth) + 'px');
         return { width : vertical ? width : width - profileWidth, height : vertical ? Math.max (1, height - profileHeight) : height };
     }
     Sync ()
@@ -47,14 +50,21 @@ export class PrimaryProfileWorkspace
         if (this.committing || this.website.sessionEditor.busy || this.panel.products.active) { this.ui.SetDisabled (true); return; }
         const state = this.Inspect ();
         if (!state.available) { this.Close (false); return; }
+        const definitionKey = state.objectId + JSON.stringify (this.panel.products.Selected ().definition);
+        if (this.labelKey !== definitionKey && !this.panel.Blocked ()) {
+            this.labelKey = definitionKey; this.panel.artworkTarget = state.objectId;
+            this.panel.products.LoadSelected ();
+        }
         this.ui.Refresh (state);
     }
     async Close (restore = true)
     {
         if (!this.open) { return { open : false }; }
-        this.open = false; this.website.layouter.primaryProfile = null;
+        this.open = false; globalThis.document.body.classList.remove ('primary_profile_open'); globalThis.document.body.style.removeProperty ('--primary-drawer-left'); this.labelKey = null; this.website.layouter.primaryProfile = null;
+        if (this.root.contains (this.panel.workspace.artworkRoot)) { this.panel.workspace.artworkRoot.remove (); }
         const viewer = this.website.parameters.viewerDiv; this.wrapper.before (viewer); this.wrapper.remove (); this.ui = null; this.website.layouter.Resize ();
         if (restore && this.owner === this.website.auth?.user?.id && this.document === this.website.sessionEditor.document) {
+            if (!(this.restore || []).some (p => p.side === 'left' && p.id === 'upload')) { await this.website.modulePanels.Set ('upload', 'closed'); }
             for (const p of this.restore || []) { const active = this.website.modulePanels.Inspect ().find (m => m.side === p.side && m.visible); if (!active) { await this.website.modulePanels.Set (p.id, p.mode); } }
         }
         this.panel.Refresh (); return { open : false };

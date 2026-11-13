@@ -1,3 +1,4 @@
+import { BottleFill } from './fillmesh.js';
 import { AddInnerWall, SmoothMesh, CapMesh, DetailCan } from './detailmesh.js';
 import { ProductMaterials } from './materials.js';
 import { CreateClamshell } from './clamshell.js';
@@ -99,6 +100,7 @@ export function CreatePrimaryProduct (input, options = {})
             components.push (Revolve ('neck-ring', 'closure', [[neck * .97, capBottom - shape.neckHeightMm * .18], [neck * 1.04, capBottom - shape.neckHeightMm * .18], [neck * 1.04, capBottom - shape.neckHeightMm * .04], [neck * .97, capBottom - shape.neckHeightMm * .04], [neck * .97, capBottom - shape.neckHeightMm * .18]], segments));
             if (detailed.closure === 'fliptop') { const seam = Revolve ('cap-seam', 'closure', [[neck * 1.075, h - shape.capHeightMm * .32], [neck * 1.08, h - shape.capHeightMm * .32], [neck * 1.08, h - shape.capHeightMm * .30], [neck * 1.075, h - shape.capHeightMm * .30], [neck * 1.075, h - shape.capHeightMm * .32]], segments); components.push (seam); }
         }
+        const fill = BottleFill (components[0], definition.contents, wallMm); if (fill) { components.push (fill); }
         const depth = section.depthMm / 2;
         return { apiVersion : 1, generatorVersion : 1, units : 'mm', definition, components, bounds : { min : [-r, 0, -depth], max : [r, h, depth] }, artworkZones : GetArtworkZones (definition), quality : { construction : 'closed-solid-presentation', section : section.shape, hollowWalls : clear || Boolean (detailed), wallMm, closure : detailed?.closure || 'smooth', cavity : clear || detailed ? 'closed-presentation-cavity' : null, threads : false, pullTab : false } };
     } else if (definition.details) { components.push (...DetailCan (definition, segments)); } else {

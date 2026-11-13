@@ -1,7 +1,7 @@
 // Optional versioned presentation detail; legacy definitions keep their original envelope.
 export function DefaultProductDetails (d, category)
 {
-    return { wallMm : d.family === 'pouch' ? .1 : d.family === 'can' ? .25 : d.family === 'clamshell' ? .6 : d.material === 'glass' ? 1.5 : .8, textureStrength : .5, textureScaleMm : 12,
+    return { wallMm : d.family === 'pouch' ? .1 : d.family === 'can' ? .25 : d.family === 'clamshell' ? .6 : /glass/i.test (d.material) ? 1.5 : .8, textureStrength : .5, textureScaleMm : 12,
         ...(d.family === 'bottle' ? { shoulder : 'rounded', closure : 'ribbed' } : {}),
         ...(d.family === 'can' ? { canStyle : category === 'beverages' || d.material === 'aluminum' ? 'beverage' : d.heightMm < 50 ? 'tin' : 'food' } : {}),
         ...(d.family === 'clamshell' ? { shellStyle : category === 'clamshell-retail' ? 'retail' : 'food' } : {}) };
@@ -9,6 +9,10 @@ export function DefaultProductDetails (d, category)
 export function WallLimit (d)
 {
     const width = d.widthMm || d.diameterMm, depth = d.depthMm || d.bottleSection?.depthMm || width;
+    if (d.family === 'bottle' && /glass/i.test (d.material)) {
+        const neck = d.bottleShape?.neckDiameterMm || Math.min (width, depth) * .42;
+        return Math.min (10, Math.min (width, depth, d.heightMm) * .08, neck * .2, (d.bottleShape?.neckHeightMm || d.heightMm * .08) * .45, (d.bottleShape?.shoulderHeightMm || d.heightMm * .17) * .35, d.bottleSection?.shape === 'rectangle' ? d.bottleSection.cornerRadiusMm * .8 : Infinity);
+    }
     return Math.min (d.family === 'pouch' ? depth * .008 : Math.min (width, depth, d.heightMm) * .04, d.family === 'bottle' ? (d.bottleShape?.neckDiameterMm || Math.min (width, depth) * .42) * .08 : 10);
 }
 export function ValidateProductDetails (d, input, explicit = true)

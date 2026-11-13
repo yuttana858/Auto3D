@@ -77,6 +77,8 @@ function ReadMaterial (data)
             if (!value || ![value.r, value.g, value.b].every ((component) => Number.isFinite (component) && component >= 0 && component <= 255)) { throw new Error ('Invalid material color.'); }
             material[key] = new RGBColor (value.r, value.g, value.b);
         }
+        else if (key === 'transmissionBackground' && typeof value !== 'boolean') { throw new Error ('Invalid transmission background setting.'); }
+        else if (key === 'attenuationDistance' && (!Number.isFinite (value) || value < 0 || value > 1e6)) { throw new Error ('Invalid attenuation distance.'); }
         else if (['clearcoat', 'clearcoatRoughness'].includes (key) && (!Number.isFinite (value) || value < 0 || value > 1)) { throw new Error ('Invalid clearcoat value.'); }
         else if (['transmission', 'ior', 'thickness'].includes (key) && (!Number.isFinite (value) || value < (key === 'ior' ? 1 : 0) || value > (key === 'transmission' ? 1 : key === 'ior' ? 3 : 1e6))) { throw new Error ('Invalid optical material value.'); }
         else if (typeof material[key] === 'number' && !Number.isFinite (value)) { throw new Error ('Invalid material value.'); }
@@ -244,7 +246,9 @@ export function ReadSession (data)
         if (data.userData && typeof data.userData === 'object' && !Array.isArray (data.userData)) {
             for (const [key, value] of Object.entries (data.userData).slice (0, 100)) {
                 const name = String (key).trim ().slice (0, 100);
-                const text = String (value).slice (0, 2000);
+                const limit = name === '_auto3dPrimaryProduct' ? 262144 : 2000;
+                if (name === '_auto3dPrimaryProduct' && String (value).length > limit) { throw new Error ('Primary Products definition is too large.'); }
+                const text = String (value).slice (0, limit);
                 if (name && !['__proto__', 'prototype', 'constructor'].includes (name)) { object.userData[name] = text; }
             }
         }

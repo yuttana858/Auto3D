@@ -1,4 +1,4 @@
-# Primary Products 0.14.0
+# Primary Products 0.15.0
 
 Independent bottle/can/pouch/closed-clamshell UI and neutral geometry package, API 1. No Auto3D engine, account or Packaging imports. Auto3D integrates its lazy module bundle through separate host adapter/workspace services.
 
@@ -39,3 +39,9 @@ See [0.62.0](../../docs/release-0620.md) and [reference research and follow-up g
 ## Live profile editor (0.14.0)
 
 `ProductProfileEditor(host, root)` renders actual-geometry front/top projections and editable callouts. The neutral host supplies `inspect`, `blocked`, `update` and `close`; the panel supplies `openProfile`. `ProfileChanges(draft, changes)` validates atomic product-space edits shared by UI and commands. Dimension inputs commit on Enter and honor metric/standard units. Bottle shape controls use fixed closure dimensions while overall-height edits resize the straight body. The host owns the split layout, existing canvas, scene replacement, material/artwork preservation and Undo. See [0.65.0](../../docs/release-0650.md).
+
+## Walls, contents and editable labels (0.15.0)
+
+The live profile accepts `wallMm`, `material`, `color`, `roughness`, optional `optics { color, opacity, ior, tintDistanceMm }` and optional `contents { type, fillPercent, color, opacity, viscosity }`. `ContentPresets`, `ValidateContents` and `ValidateOptics` are neutral exports. `BottleFill` clips the generated inner cavity, keeps a small wall clearance and closes the free surface. Viscosity is metadata for this static presentation. The host maps glass absorption/refraction and smoothly composites contents into the transmission background.
+
+Artwork optionally carries `source { kind: svg, svg }` or `source { kind: text, ... }`. `ValidateLabelSource` and `TextLabelSVG` retain neutral authoring data; the browser host sanitizes/rasterizes SVG and supplies the PNG material resource. The panel's `artworkText` callback shares the host's live artwork transaction. Profile options expose the module's existing artwork UI; the host mounts it and restores its availability when the editor closes. CAD schema/layers remain separate. See [0.66.0](../../docs/release-0660.md) for supported SVG features, command units and rendering limits.

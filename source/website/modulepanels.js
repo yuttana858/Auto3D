@@ -47,9 +47,9 @@ export class ModulePanels
             this.Render ();
         });
     }
-    Register (id, { side = 'right', title, body, mode = 'closed', onOpen, onMode, animated = false })
+    Register (id, { side = 'right', title, body, mode = 'closed', onOpen, onMode, onExtended, animated = false })
     {
-        this.state.Register (id, side, title, mode); body.id ||= 'module_panel_' + id; body.hidden = mode === 'closed'; body.dataset.module = id; body.classList.add ('module_panel_body'); this.entries.set (id, { body, onOpen, onMode, animated });
+        this.state.Register (id, side, title, mode); body.id ||= 'module_panel_' + id; body.hidden = mode === 'closed'; body.dataset.module = id; body.classList.add ('module_panel_body'); this.entries.set (id, { body, onOpen, onMode, onExtended, animated });
     }
     Inspect () { return [...this.state.modules.keys ()].map (id => this.state.Inspect (id)); }
     async Open (id) { const panel = this.state.modules.get (id); if (!panel) { throw new Error ('Unknown module panel.'); } return this.Set (id, panel.mode === 'closed' ? panel.preferred : panel.mode); }
@@ -68,6 +68,7 @@ export class ModulePanels
     {
         const panel = this.state.modules.get (id);
         if (!panel || !['minimal', 'extended', 'closed'].includes (mode) || panel.side === 'left' && mode === 'extended') { throw new Error ('Choose a supported mode for an existing module panel.'); }
+        if (mode === 'extended' && this.entries.get (id).onExtended) { return this.entries.get (id).onExtended (); }
         const generation = ++this.transitionGeneration; this.motion.forEach (animation => animation.cancel ()); this.motion = [];
         const outgoing = this.Inspect ().find (entry => entry.visible && entry.side === panel.side);
         if (outgoing && (outgoing.id !== id || outgoing.mode !== mode)) { await this.Animate (outgoing.id, false, outgoing.mode === 'extended'); }

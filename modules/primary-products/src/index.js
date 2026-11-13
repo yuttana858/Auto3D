@@ -12,3 +12,6 @@ export { ProductCategories, ProductCategoryFilters, ListProductDesigns, ProductD
 
 export { ProductProfileEditor } from './profileeditor.js';
 export { ProfileChanges } from './profilechanges.js';
+
+export { ContentPresets, ValidateContents, ValidateOptics } from './contents.js';
+export { ValidateLabelSource, TextLabelSVG } from './labelsource.js';

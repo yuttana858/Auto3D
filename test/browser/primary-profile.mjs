@@ -24,6 +24,13 @@ try {
     const canvas = await page.locator ('#main_viewer canvas').elementHandle ();
     await page.getByRole ('button', { name : 'Edit model', exact : true }).click ();
     const profile = page.getByRole ('region', { name : 'Live product profile', exact : true }); await profile.waitFor ();
+    assert.equal (await page.locator ('#upload_panel_content').isVisible (), true);
+    assert.equal (await page.locator ('.scene_command_bar').isVisible (), false);
+    await call ('ui.materials'); await page.locator ('#material_drawer.open').waitFor ();
+    const drawer = await page.locator ('#material_drawer').boundingBox (), editorBox = await profile.boundingBox ();
+    assert.ok (drawer.x >= editorBox.x + editorBox.width - 2);
+    assert.equal (await profile.getByRole ('region', { name : 'Product label artwork' }).isVisible (), true);
+    await page.locator ('#material_drawer_close').click ();
     const initial = await call ('primary.profile.inspect'); assert.equal (initial.available, true);
     const objectId = initial.objectId;
     await call ('primary.profile.open'); assert.equal ((await call ('primary.profile.inspect')).objectId, objectId);
@@ -53,8 +60,10 @@ try {
     await page.screenshot ({ path : 'work/primary-profile-review/mobile.png' }); await page.setViewportSize ({ width : 1500, height : 1000 });
     await profile.getByRole ('button', { name : 'Close model editor' }).click (); await profile.waitFor ({ state : 'detached' });
     assert.equal (await canvas.evaluate (el => el === document.querySelector ('#main_viewer canvas')), true); assert.ok ((await page.locator ('#main_viewer').boundingBox ()).width > right.width);
+    await page.getByRole ('button', { name : 'Extended Primary Products panel' }).click (); await profile.waitFor ();
+    await profile.getByRole ('button', { name : 'Close model editor' }).click (); await profile.waitFor ({ state : 'detached' });
     await call ('primary.designs.select', { id : 'standard-beverage' }); const can = await call ('primary.generate');
-    await call ('primary.profile.open'); assert.equal (await profile.locator ('select').count (), 1); assert.equal (await profile.locator ('select').isVisible (), false);
+    await call ('primary.profile.open'); assert.equal (await profile.locator ('select[aria-label="Profile cross-section"]').count (), 1); assert.equal (await profile.locator ('select[aria-label="Profile cross-section"]').isVisible (), false);
     await call ('object.select', { objectId }); await poll (async () => await shoulder.isVisible ());
     await call ('object.select', { objectId : can.objectId }); await call ('object.delete', { objectId : can.objectId }); await profile.waitFor ({ state : 'detached' });
     assert.deepEqual (errors, []); console.log ('Live profile: create-on-open, same canvas, Enter updates, Undo/Redo, validation, inches, orbit/zoom, mobile, close and selection passed.');

@@ -56,6 +56,7 @@ primary-products
 primary-materials
 primary-realism
 primary-profile
+primary-contents
 render-workspace
 rendercore-state
 rendering

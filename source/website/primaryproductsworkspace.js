@@ -1,7 +1,7 @@
 import { CloneSurface } from './scenedocument.js';
 import { Unit } from '../engine/model/unit.js';
 import { ProductDefinition, ValidateProductDefinition } from '../../modules/primary-products/src/definition.js';
-import { PrimaryProductModel } from './primaryproductsadapter.js';
+import { PrimaryProductModel, ApplyProductOptics } from './primaryproductsadapter.js';
 import { ProductCalloutRecords, ValidateDimensions } from './dimensioncore.js';
 
 export const PrimaryProductDataKey = '_auto3dPrimaryProduct';
@@ -20,7 +20,7 @@ export class PrimaryProductsWorkspace
         if (this.panel.Blocked ()) { throw new Error ('Open an editable, idle session.'); }
         const { object, definition } = this.Selected (); this.panel.artwork?.Load (definition, this.panel.website.sessionEditor.document.CompactModel ([object], true)); this.panel.draft = definition.draft; this.panel.Refresh (); return this.panel.Inspect ();
     }
-    async Generate (update = false, preserveMaterials = false)
+    async Generate (update = false, preserveMaterials = false, surfaceChanges = {})
     {
         const panel = this.panel; const editor = panel.website.sessionEditor;
         if (this.active || panel.Blocked ()) { throw new Error ('Open an editable, idle session.'); }
@@ -37,16 +37,24 @@ export class PrimaryProductsWorkspace
         try {
             const module = await this.load (); unchanged ();
             const unit = target.objects.length ? previousUnit : Unit.Millimeter;
-            const model = PrimaryProductModel (module.CreatePrimaryProduct (definition.draft), unit, definition.artwork || [], panel.artwork?.resources);
+            const geometry = module.CreatePrimaryProduct (definition.draft);
+            const model = PrimaryProductModel (geometry, unit, definition.artwork || [], panel.artwork?.resources);
             if (source && preserveMaterials) {
                 const previousModel = target.CompactModel ([source], true);
                 for (const mesh of model.meshes) {
-                    if (mesh.GetName ().startsWith ('label-')) { continue; }
+                    if (mesh.GetName ().startsWith ('label-') || mesh.GetName () === 'contents' || mesh.GetName () === 'body' && surfaceChanges.material !== undefined) { continue; }
                     const previousMesh = previousModel.meshes.find (m => m.GetName () === mesh.GetName ());
                     if (previousMesh?.TriangleCount () && mesh.TriangleCount ()) {
                         const copy = CloneSurface (previousModel.materials[previousMesh.GetTriangle (0).mat]);
                         const old = this.Selected ().definition.draft, next = definition.draft;
                         for (const value of Object.values (copy)) { if (value?.name?.startsWith ('primary-') && value.scale) { value.scale.x *= (next.diameterMm || next.widthMm) / (old.diameterMm || old.widthMm); value.scale.y *= next.heightMm / old.heightMm; } }
+                        if (mesh.GetName () === 'body') {
+                            const generated = model.materials[mesh.GetTriangle (0).mat];
+                            if (surfaceChanges.optics === null) { for (const key of ['color', 'transmission', 'ior', 'attenuationColor', 'attenuationDistance', 'opacity', 'transparent', 'transmissionBackground']) { copy[key] = generated[key]; } }
+                            if (surfaceChanges.color !== undefined) { copy.color = generated.color; }
+                            if (surfaceChanges.roughness !== undefined) { copy.roughness = generated.roughness; }
+                            ApplyProductOptics (copy, surfaceChanges.optics !== undefined || surfaceChanges.color !== undefined ? next : { ...next, optics : undefined }, geometry.quality.wallMm || 0, unit);
+                        }
                         model.materials[mesh.GetTriangle (0).mat] = copy;
                     }
                 }

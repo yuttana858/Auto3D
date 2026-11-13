@@ -2,7 +2,7 @@
 
 ## Development and release process
 
-1. Keep the active integration PR in **Draft**. Add related commits to that branch, or keep dependent PRs draft and consolidate them before release. PR #110 is the current integration batch. Draft pushes allocate no CI runner jobs; small skipped workflow records may still appear.
+1. Keep the active integration PR in **Draft**. Add related commits to that branch, or keep dependent PRs draft and consolidate them before release. PR #116 is the current integration batch; #110 reached main through #109. Draft pushes allocate no CI runner jobs; small skipped workflow records may still appear.
 2. Run relevant checks locally after each change. For a release batch, run the full local validation below and record the commit, commands, results and any unexecuted checks in the PR. Do not rerun unchanged checks without a reason.
 3. When the batch is stable and Actions quota is available, mark the integration PR **Ready for review** once. This runs complete validation and all three browser shards. A later push to a ready PR also reruns the gate; return it to draft before iterative work. Converting to draft cancels an in-flight CI run through the existing concurrency group.
 4. Require results for the final commit before merging. A quota error, skipped job or old green commit is not a test pass. Required-check rules remain unchanged. Merge one batch to avoid triggering a production deployment for every intermediate feature.

@@ -191,6 +191,8 @@ export class ThreeMaterialHandler
 				threeMaterial.metalness = material.metalness;
 				threeMaterial.roughness = material.roughness;
                 threeMaterial.specularIntensity = material.specularIntensity;
+                threeMaterial.attenuationColor = ConvertColorToThreeColor (material.attenuationColor);
+                threeMaterial.attenuationDistance = material.attenuationDistance > 0 ? material.attenuationDistance : Infinity;
                 for (const key of ['transmission', 'ior', 'thickness', 'clearcoat', 'clearcoatRoughness']) { threeMaterial[key] = material[key]; }
                 this.LoadFaceTexture (threeMaterial, material.specularMap, (threeTexture) => {
                     threeMaterial.specularColorMap = threeTexture;
@@ -203,6 +205,15 @@ export class ThreeMaterialHandler
             if (material.roughnessMap) { this.LoadFaceTexture (threeMaterial, material.roughnessMap, texture => { threeMaterial.roughnessMap = texture; }); }
 		}
 
+        if (material.transmissionBackground) {
+            // Blend static contents after ordinary opaque geometry so refractive shells
+            // can sample it in Three's opaque transmission buffer as well as the main pass.
+            threeMaterial.transparent = false; threeMaterial.depthWrite = false;
+            threeMaterial.blending = THREE.CustomBlending; threeMaterial.blendEquation = THREE.AddEquation;
+            threeMaterial.blendSrc = THREE.SrcAlphaFactor; threeMaterial.blendDst = THREE.OneMinusSrcAlphaFactor;
+            threeMaterial.blendSrcAlpha = THREE.OneFactor; threeMaterial.blendDstAlpha = THREE.OneMinusSrcAlphaFactor;
+            threeMaterial.userData.transmissionBackground = true;
+        }
 		let emissiveColor = ConvertColorToThreeColor (material.emissive);
 		threeMaterial.emissive = emissiveColor;
 
@@ -451,6 +462,7 @@ export function ConvertModelToThreeObject (model, conversionParams, conversionOu
 
 		let threeMesh = new THREE.Mesh (threeGeometry, meshMaterialHandler.meshThreeMaterials);
 		threeMesh.name = mesh.GetName ();
+        if (meshMaterialHandler.meshThreeMaterials.some (m => m.userData.transmissionBackground)) { threeMesh.renderOrder = 1; }
 		threeMesh.userData = {
 			originalMeshInstance : meshInstance,
 			originalMaterials : meshMaterialHandler.meshOriginalMaterials,
@@ -519,7 +531,7 @@ export function ConvertModelToThreeObject (model, conversionParams, conversionOu
 
         const cached = meshTemplates.get (meshInstance.mesh);
         if (cached) {
-            cached.forEach ((template) => { const copy = new template.constructor (template.geometry, Array.isArray (template.material) ? [...template.material] : template.material); copy.position.copy (template.position); copy.quaternion.copy (template.quaternion); copy.scale.copy (template.scale); copy.userData = { ...template.userData, originalMeshInstance : meshInstance, originalMaterials : [...template.userData.originalMaterials], threeMaterials : null }; threeObject.add (copy); });
+            cached.forEach ((template) => { const copy = new template.constructor (template.geometry, Array.isArray (template.material) ? [...template.material] : template.material); copy.position.copy (template.position); copy.quaternion.copy (template.quaternion); copy.scale.copy (template.scale); copy.renderOrder = template.renderOrder; copy.userData = { ...template.userData, originalMeshInstance : meshInstance, originalMaterials : [...template.userData.originalMaterials], threeMaterials : null }; threeObject.add (copy); });
             return;
         }
         const templates = [];

@@ -15,7 +15,7 @@ export class PrimaryProductsPanel
     {
         this.website = website; this.artwork = new PrimaryProductsArtwork (this); this.products = new PrimaryProductsWorkspace (this, async () => { await this.Ensure (); return this.module; }); this.draft = UpdateProductDraft (DefaultProductDraft (), { details : {} }); this.profileEditor = new PrimaryProfileWorkspace (this); this.callouts = true; this.owner = website.auth?.user?.id || null;
         this.panel = document.createElement ('section'); this.panel.id = 'primary_products_module_panel'; this.panel.className = 'primary_products_module_panel'; this.panel.hidden = true; this.panel.setAttribute ('aria-label', 'Primary Products'); website.parameters.rightContainerDiv.appendChild (this.panel);
-        website.modulePanels.Register ('primary-products', { title : 'Primary Products', body : this.panel, animated : true, onOpen : () => this.Ensure (), onMode : () => this.Refresh () });
+        website.modulePanels.Register ('primary-products', { title : 'Primary Products', body : this.panel, animated : true, onOpen : () => this.Ensure (), onMode : () => this.Refresh (), onExtended : () => this.profileEditor.Open () });
         website.auth?.Subscribe?.(user => { const owner = user?.id || null; if (owner !== this.owner) { this.owner = owner; this.artworkTarget = null; this.catalogOpen = false; this.artwork.Clear (); this.draft = UpdateProductDraft (DefaultProductDraft (), { details : {} }); this.Refresh (); } });
     }
     Blocked () { return !this.website.auth?.user || this.website.accountReady === false || this.website.sessionEditor.readOnly || this.website.sessionEditor.busy || this.products?.active; }
@@ -114,7 +114,7 @@ export class PrimaryProductsPanel
         this.profileEditor.committing = true;
         try {
             this.artwork.Load (selected.definition, this.website.sessionEditor.document.CompactModel ([selected.object], true)); this.draft = next;
-            const result = await this.products.Generate (true, true);
+            const result = await this.products.Generate (true, true, changes);
             return { ...result, message : 'Model updated. Undo restores the previous dimensions.' };
         } catch (error) { this.draft = previous.draft; this.artwork.entries = previous.entries; this.artwork.resources = previous.resources; throw error; }
         finally { this.profileEditor.committing = false; this.Refresh (); }
@@ -128,12 +128,26 @@ export class PrimaryProductsPanel
     }
     async MountArtwork (parent)
     {
+        if (this.profileEditor.open) { return false; }
         let selected;
         try { selected = this.products.Selected (); } catch { return; }
         const id = selected.object.id; await this.Ensure ();
         if (!parent.isConnected || this.website.sessionEditor.selected?.id !== id) { return; }
         if (this.artworkTarget !== id) { this.products.LoadSelected (); this.artworkTarget = id; }
         parent.appendChild (this.workspace.artworkRoot); this.Refresh (); return true;
+    }
+    async ChangeArtwork (action)
+    {
+        const live = this.profileEditor?.open === true, selectedId = this.website.sessionEditor.selected?.id, document = this.website.sessionEditor.document, owner = this.website.auth?.user?.id;
+        const previous = { entries : this.artwork.entries, resources : new Map (this.artwork.resources) };
+        try {
+            const result = await action ();
+            if (live) {
+                if (!this.profileEditor.open || this.website.sessionEditor.selected?.id !== selectedId) { throw new Error ('The label target changed. Reopen the selected product.'); }
+                this.artworkTarget = selectedId; await this.ApplyArtwork ();
+            }
+            return result;
+        } catch (error) { if (document === this.website.sessionEditor.document && owner === this.website.auth?.user?.id && selectedId === this.website.sessionEditor.selected?.id) { this.artwork.entries = previous.entries; this.artwork.resources = previous.resources; this.Refresh (); } throw error; }
     }
     async ApplyArtwork ()
     {
@@ -155,7 +169,7 @@ export class PrimaryProductsPanel
                 }
                 const url = new URL (moduleUrl); if (this.attempts) { url.searchParams.set ('retry', String (this.attempts)); } this.attempts = (this.attempts || 0) + 1;
                 const module = await import (url.href); if (module.PrimaryProductsAPIVersion !== 1) { throw new Error ('Unsupported Primary Products module.'); } this.module = module; this.panel.replaceChildren ();
-                this.workspace = new module.PrimaryProductsPanel ({ openProfile : () => this.profileEditor.Open (), setDetails : changes => this.Details (changes), scaleProduct : args => this.Scale (args), openMaterials : () => this.OpenMaterials (), applyArtwork : () => this.ApplyArtwork (), catalog : (category, open) => this.Catalog (category, open), selectDesign : id => this.SelectDesign (id), generateDesign : id => this.GenerateDesign (id), setCallouts : visible => this.SetCallouts (visible), setDimensions : dimensions => this.SetDimensions (dimensions), inspect : () => this.Inspect (), configure : changes => this.Configure (changes), reset : () => this.Reset (), generate : () => this.products.Generate (), update : () => this.products.Generate (true), loadSelected : () => this.products.LoadSelected (), artworkOpen : () => this.artwork.Open (), artworkRemove : zone => this.artwork.Remove ({ zone }), artworkMapping : args => this.artwork.Mapping (args), artworkPreview : zone => { if (this.previewUrl) { URL.revokeObjectURL (this.previewUrl); this.previewUrl = null; } const a = this.artwork.entries.find (a => a.zone === zone), r = a && this.artwork.resources.get (a.resourceId); if (r) { this.previewUrl = URL.createObjectURL (new Blob ([r.buffer], { type : a.mime })); } return this.previewUrl; }, units : () => this.website.preferences.units, blocked : () => this.Blocked () }, this.panel);
+                this.workspace = new module.PrimaryProductsPanel ({ openProfile : () => this.profileEditor.Open (), setDetails : changes => this.Details (changes), scaleProduct : args => this.Scale (args), openMaterials : () => this.OpenMaterials (), applyArtwork : () => this.ApplyArtwork (), catalog : (category, open) => this.Catalog (category, open), selectDesign : id => this.SelectDesign (id), generateDesign : id => this.GenerateDesign (id), setCallouts : visible => this.SetCallouts (visible), setDimensions : dimensions => this.SetDimensions (dimensions), inspect : () => this.Inspect (), configure : changes => this.Configure (changes), reset : () => this.Reset (), generate : () => this.products.Generate (), update : () => this.products.Generate (true), loadSelected : () => this.products.LoadSelected (), artworkOpen : () => this.artwork.Open (), artworkText : args => this.ChangeArtwork (() => this.artwork.Text (args)), artworkRemove : zone => this.ChangeArtwork (() => this.artwork.Remove ({ zone })), artworkMapping : args => this.ChangeArtwork (() => this.artwork.Mapping (args)), artworkPreview : zone => { if (this.previewUrl) { URL.revokeObjectURL (this.previewUrl); this.previewUrl = null; } const a = this.artwork.entries.find (a => a.zone === zone), r = a && this.artwork.resources.get (a.resourceId); if (r) { this.previewUrl = URL.createObjectURL (new Blob ([r.buffer], { type : a.mime })); } return this.previewUrl; }, units : () => this.website.preferences.units, blocked : () => this.Blocked () }, this.panel);
             })().catch (error => { this.loading = null; this.panel.textContent = error.message; throw error; });
         }
         await this.loading; this.Refresh ();

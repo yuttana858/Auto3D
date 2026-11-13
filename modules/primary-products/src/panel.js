@@ -151,8 +151,17 @@ export class PrimaryProductsPanel
         for (const type of ['keydown', 'keyup']) { artwork.addEventListener (type, event => event.stopPropagation ()); } Element ('h3', '', 'Label art', artwork); const zones = Element ('div', 'pp_zone_buttons', undefined, artwork); this.zones = new Map ();
         for (const [zone, label] of [['front', 'Front label'], ['wrap', 'Wrap label'], ['back', 'Back label']]) { const button = Element ('button', '', label, zones); button.type = 'button'; button.addEventListener ('click', () => this.Change ({ labelZone : zone })); this.zones.set (zone, button); }
         this.artImage = Element ('img', 'pp_art_image', undefined, artwork); this.artImage.alt = 'Imported label artwork'; this.artImage.hidden = true;
-        this.artName = Element ('p', 'pp_draft_note', 'Import a PNG, JPEG or WebP label (up to 4 MiB).', artwork);
+        this.artName = Element ('p', 'pp_draft_note', 'Import PNG/JPEG/WebP (4 MiB) or self-contained SVG (64 KiB).', artwork);
         const importButton = Element ('button', 'pp_art_import', 'Import label image', artwork); importButton.type = 'button'; importButton.addEventListener ('click', () => this.Action (() => host.artworkOpen ()));
+        const textBox = Element ('details', 'pp_text_label', undefined, artwork); Element ('summary', '', 'Create or edit text label', textBox);
+        this.textFields = new Map ();
+        for (const [key, title, type] of [['text', 'Label text', 'textarea'], ['color', 'Text color', 'color'], ['background', 'Text background', 'text'], ['fontSize', 'Text size', 'number'], ['fontFamily', 'Text font', 'select'], ['align', 'Text alignment', 'select']]) {
+            const label = Element ('label', 'pp_field', title, textBox), input = Element (['textarea', 'select'].includes (type) ? type : 'input', '', undefined, label); if (input.tagName === 'INPUT') { input.type = type; } input.setAttribute ('aria-label', title);
+            if (key === 'text') { input.maxLength = 500; } if (key === 'background') { input.placeholder = '#ffffff or transparent'; }
+            if (type === 'select') { for (const value of key === 'fontFamily' ? ['sans-serif', 'serif', 'monospace'] : ['left', 'center', 'right']) { Element ('option', '', value, input).value = value; } }
+            this.textFields.set (key, input);
+        }
+        const textButton = Element ('button', 'pp_art_import', 'Create / update text label', textBox); textButton.type = 'button'; textButton.addEventListener ('click', () => this.Action (() => host.artworkText (Object.fromEntries ([...this.textFields].map (([key, input]) => [key, key === 'fontSize' ? input.valueAsNumber : input.value])))));
         this.artDimensions = Element ('div', 'pp_art_dimensions', undefined, artwork); this.artInputs = new Map ();
         for (const [key, label] of [['widthMm', 'Label width'], ['heightMm', 'Label height'], ['offsetXmm', 'Label horizontal offset'], ['offsetYmm', 'Label vertical offset']]) { const field = Element ('label', 'pp_field', label, this.artDimensions), input = Element ('input', '', undefined, field); input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', label); input.addEventListener ('change', () => { const current = this.host.inspect ().artwork.find (a => a.zone === this.host.inspect ().labelZone); if (current) { this.Action (() => host.artworkMapping ({ zone : current.zone, widthMm : current.widthMm, heightMm : current.heightMm, [key] : input.valueAsNumber * this.Factor () })); } }); this.artInputs.set (key, input); }
         const finishLabel = Element ('label', 'pp_field', 'Label finish', artwork); this.labelFinish = Element ('select', '', undefined, finishLabel); this.labelFinish.setAttribute ('aria-label', 'Label finish');
@@ -160,7 +169,7 @@ export class PrimaryProductsPanel
         this.labelFinish.addEventListener ('change', () => this.Action (() => host.artworkMapping ({ zone : this.host.inspect ().labelZone, finish : this.labelFinish.value })));
         Element ('p', 'pp_draft_note', 'Clear film uses the image alpha channel. Use surface masks for spot varnish or relief effects.', artwork);
         this.artRemove = Element ('button', 'pp_reset', 'Remove label image', artwork); this.artRemove.type = 'button'; this.artRemove.addEventListener ('click', () => this.Action (() => host.artworkRemove (this.host.inspect ().labelZone)));
-        this.artApply = Element ('button', 'pp_art_import', 'Apply label artwork', artwork); this.artApply.type = 'button'; this.artApply.addEventListener ('click', () => this.Action (() => host.applyArtwork ()));
+        this.artApply = Element ('button', 'pp_art_import pp_art_apply', 'Apply label artwork', artwork); this.artApply.type = 'button'; this.artApply.addEventListener ('click', () => this.Action (() => host.applyArtwork ()));
         this.artStatus = Element ('p', 'pp_status', '', artwork); this.artStatus.setAttribute ('role', 'status');
         const footer = Element ('div', 'pp_footer', undefined, controls); this.add = Element ('button', 'pp_add', 'Generate', footer); this.add.type = 'button'; this.add.addEventListener ('click', () => this.Action (() => host.generate ()));
         this.load = Element ('button', 'pp_reset', 'Load selected product', footer); this.load.type = 'button'; this.load.addEventListener ('click', () => this.Action (() => host.loadSelected ()));
@@ -210,7 +219,7 @@ export class PrimaryProductsPanel
     SetDisabled ()
     {
         const draft = this.host.inspect (), disabled = this.host.blocked ();
-        for (const input of [...this.root.querySelectorAll ('input, select, button'), ...(this.artworkRoot?.querySelectorAll ('input, select, button') || [])]) { input.disabled = disabled; }
+        for (const input of [...this.root.querySelectorAll ('input, select, textarea, button'), ...(this.artworkRoot?.querySelectorAll ('input, select, textarea, button') || [])]) { input.disabled = disabled; }
         if (this.drawerClose) { this.drawerClose.disabled = false; }
         this.add.disabled = disabled || !draft.generationAvailable; this.apply.disabled = disabled || !draft.generationAvailable;
         this.add.textContent = draft.generating ? 'Generating…' : 'Generate';
@@ -261,7 +270,12 @@ export class PrimaryProductsPanel
         this.material.value = draft.material; this.material.disabled = disabled; this.color.value = draft.color; this.color.disabled = disabled; this.roughness.value = String (draft.roughness); this.roughness.disabled = disabled; this.reset.disabled = disabled;
         const art = draft.artwork?.find (a => a.zone === draft.labelZone), preview = this.host.artworkPreview?.(draft.labelZone);
         this.artImage.hidden = !preview; if (preview) { this.artImage.src = preview; } else { this.artImage.removeAttribute ('src'); }
-        this.artName.textContent = art ? art.name + ' · label size in ' + unit : 'Import a PNG, JPEG or WebP label (up to 4 MiB).';
+        const sourceKey = JSON.stringify ([draft.labelZone, art?.source]);
+        if (this.textSourceKey !== sourceKey) {
+            this.textSourceKey = sourceKey; const values = art?.source?.kind === 'text' ? art.source : { text : '', color : '#123740', background : '#ffffff', fontSize : 72, fontFamily : 'sans-serif', align : 'center' };
+            for (const [key, input] of this.textFields) { input.value = values[key]; }
+        }
+        this.artName.textContent = art ? art.name + ' · label size in ' + unit : 'Import PNG/JPEG/WebP (4 MiB) or self-contained SVG (64 KiB).';
         this.detailsPanel?.Refresh (); this.labelFinish.disabled = !art || disabled; this.labelFinish.value = art?.finish || 'paperMatte';
         this.artDimensions.hidden = !art; this.artRemove.hidden = !art;
         if (art) { for (const [key, input] of this.artInputs) { input.value = String (Math.round ((art[key] || 0) / factor * 1000) / 1000); } }

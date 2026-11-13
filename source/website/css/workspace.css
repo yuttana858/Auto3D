@@ -172,3 +172,7 @@ div.main_viewer.hdri_background_visible .viewer_empty { background: transparent;
 .scene_object_group { border: 1px solid var(--ov_border_color); border-radius: 4px; margin: 5px 0; padding: 6px; }
 .scene_object_group summary { cursor: pointer; overflow-wrap: anywhere; padding: 4px 0; }
 .scene_object_group .session_object_row { margin-left: 8px; }
+
+/* Keep the materials drawer beside the model materials sidebar while editing a product. */
+.primary_profile_open .material_drawer { left: var(--primary-drawer-left, 0px); }
+@media (max-width: 720px) { .primary_profile_open .material_drawer { left: 0; } }
