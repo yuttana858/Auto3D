@@ -2,7 +2,11 @@
 
 ## Bottle contents, optical walls and editable labels — Auto3D 0.66.0 / Primary Products 0.15.0 / Packaging 1.10.7
 
-Stacked in draft #116, following #110 (merged through #109). Adds wall callouts, synchronized glass refraction/absorption, cavity-conforming static contents, and live image/SVG/text label authoring in Edit model. CAD layers remain untouched. Includes main through #117 (`772d313`), preserving the #115 folding closeup and #117 Meshy Workers fix alongside the earlier agent command bar. Latest conflict-resolution checks: 858 unit/integration tests, lint and production/Pages builds passed. Earlier validation includes 66 MCP tests, engine/module builds and profile/contents plus command-bar browser regressions; see [release-0660.md](release-0660.md) for commit scope. Hosted full-suite results remain outstanding while Actions quota is exhausted. Not deployed.
+Stacked in draft #116, following #110 (merged through #109). Adds wall callouts, synchronized glass refraction/absorption, cavity-conforming static contents, and live image/SVG/text label authoring in Edit model. CAD layers remain untouched. Includes main through #118 (`d3d1a47`), preserving the printed-packaging landing, folding closeup, Meshy Workers fix and agent command bar. Latest conflict-resolution checks: 858 unit/integration tests, lint and production/Pages builds passed. Earlier validation includes 66 MCP tests, engine/module builds and profile/contents plus command-bar browser regressions; see [release-0660.md](release-0660.md) for commit scope. Hosted full-suite results remain outstanding while Actions quota is exhausted. Not deployed.
+
+## Printed packaging and material review — Auto3D 0.65.4 / Packaging 1.10.7 / Primary Products 0.14.0
+
+After folding, the hero applies black technical artwork to kraft, wipes into a white multicolor liner, turns the carton to the right and draws material leaders for the liner, fluted core and visible molded pulp. The large centered fit and compact banner remain; the shared loop is now 41 seconds. See [release-0654.md](release-0654.md).
 
 ## Meshy calls work on Cloudflare — Auto3D 0.65.3 / Primary Products 0.14.0 / Packaging 1.10.7 (2026-11-12)
 
