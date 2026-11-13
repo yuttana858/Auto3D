@@ -24,6 +24,8 @@ try {
         let settled = null; for (let retry = 0; retry < 60; retry++) { const next = await call ('camera.current.inspect'); if (settled && Math.abs (settled.distance - next.distance) < 1e-6) { break; } settled = next; await page.waitForTimeout (100); }
         return { samples, final : settled };
     };
+    /* The distance limits assume the full-width viewer; Model spec opens by default since 0.70.0, so close it first. */
+    await call ('ui.module.mode', { module : 'data', mode : 'closed' });
     await call ('packaging.fefco.preset', { code : '0201', length : 300, width : 200, height : 150, thickness : 3, closure : 'closed' }); await call ('view.fit');
     const unfold = await play (); const fold = await play ();
     // A closed 300 × 200 × 150 box fits within roughly 700; the flat blank needs more room but far less than its bounding sphere.

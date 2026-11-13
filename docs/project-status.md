@@ -1,5 +1,13 @@
 # Auto3D development log and handoff
 
+## Model spec default right panel — Auto3D 0.70.0 / Primary Products 0.15.0 / Packaging 1.10.7 (2026-11-13)
+
+Phase 1 of the Model spec redesign: Model data is renamed Model spec and is the default right panel (modules open only from their icons; closing one returns to Model spec). The preview gets Rotate/Update/× actions, generated boxes show a Packaging section with Open in CAD Studio, Fold/Unfold and Packaging Gen tools, and agents use `ui.model_spec.inspect` / `ui.model_spec.preview`. Next: Assign facing placement visual, other module sections, live preview. See [release-0700.md](release-0700.md).
+
+## Movable Object transform panel — Auto3D 0.69.2 / Primary Products 0.15.0 / Packaging 1.10.7 (2026-11-13)
+
+The floating Object transform panel moves by its title (drag or arrow keys), stays inside the viewer, is remembered per device and resets on double-click/Home; agents use `ui.transform_panel.position`. See [release-0692.md](release-0692.md).
+
 ## Decimal size entry and AI progress — Auto3D 0.69.1 / Primary Products 0.15.0 / Packaging 1.10.7 (2026-11-13)
 
 Transform Size/Position/Rotation fields keep a typed decimal point (the live update no longer rewrites the focused field). AI Generative shows Sending request → Request processing · NN% → Complete or failed under Generate, scrolls once to the new creation and highlights it while it runs; `ai.workspace.inspect` reports the progress. See [release-0691.md](release-0691.md).

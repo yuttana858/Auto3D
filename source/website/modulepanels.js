@@ -18,6 +18,8 @@ export class ModulePanelState
         return { id, side : panel.side, title : panel.title, mode : panel.mode, visible : this.active[panel.side] === id && panel.mode !== 'closed' };
     }
 }
+const DefaultRightPanel = 'data';
+
 export class ModulePanels
 {
     constructor (website)
@@ -40,7 +42,8 @@ export class ModulePanels
         // Native modal inertness blocks background pointer/focus; stop bubbled scene shortcuts as well.
         for (const type of ['keydown', 'keyup', 'wheel', 'pointerdown', 'pointerup', 'click', 'contextmenu']) { this.overlay.addEventListener (type, event => event.stopPropagation ()); }
         this.Register ('upload', { side : 'left', title : 'Model upload', body : document.getElementById ('upload_panel_content'), mode : 'minimal' });
-        this.Register ('data', { side : 'right', title : 'Model data', body : document.getElementById ('data_panel_content'), onOpen : () => website.sessionEditor.UpdateDetails () });
+        // Model spec is the default right panel: open at start when both docks fit, and shown again when another right module closes.
+        this.Register ('data', { side : 'right', title : 'Model spec', body : document.getElementById ('data_panel_content'), mode : window.innerWidth >= 1100 ? 'minimal' : 'closed', onOpen : () => website.sessionEditor.UpdateDetails () });
         window.addEventListener ('resize', () => {
             const left = this.state.modules.get (this.state.active.left), right = this.state.modules.get (this.state.active.right);
             if (left.mode !== 'closed' && right.mode !== 'closed' && (window.innerWidth < 800 || window.innerWidth < 1100 && [left.mode, right.mode].includes ('extended'))) { this.state.Set (this.state.active[this.lastSide === 'left' ? 'right' : 'left'], 'closed'); }
@@ -52,6 +55,8 @@ export class ModulePanels
         this.state.Register (id, side, title, mode); body.id ||= 'module_panel_' + id; body.hidden = mode === 'closed'; body.dataset.module = id; body.classList.add ('module_panel_body'); this.entries.set (id, { body, onOpen, onMode, onExtended, animated });
     }
     Inspect () { return [...this.state.modules.keys ()].map (id => this.state.Inspect (id)); }
+    // Module icons toggle: open the module, or close it when it is already showing (which returns to Model spec).
+    async Toggle (id, open = () => this.Open (id)) { if (this.state.modules.get (id) && this.state.Inspect (id).visible) { return this.Set (id, 'closed'); } return open (); }
     async Open (id) { const panel = this.state.modules.get (id); if (!panel) { throw new Error ('Unknown module panel.'); } return this.Set (id, panel.mode === 'closed' ? panel.preferred : panel.mode); }
     async Animate (id, entering, extended)
     {
@@ -64,7 +69,8 @@ export class ModulePanels
         this.motion = animations; await Promise.allSettled (animations.map (animation => animation.finished));
         if (this.motion === animations) { this.motion = []; }
     }
-    async Set (id, mode)
+    // returnToDefault: an explicit close of a right module shows Model spec; layout code that clears panels temporarily passes false.
+    async Set (id, mode, { returnToDefault = true } = {})
     {
         const panel = this.state.modules.get (id);
         if (!panel || !['minimal', 'extended', 'closed'].includes (mode) || panel.side === 'left' && mode === 'extended') { throw new Error ('Choose a supported mode for an existing module panel.'); }
@@ -78,6 +84,9 @@ export class ModulePanels
         const other = this.state.active[panel.side === 'left' ? 'right' : 'left'];
         if (mode !== 'closed' && (window.innerWidth < 800 || mode === 'extended' || this.state.modules.get (other).mode === 'extended')) { this.state.Set (other, 'closed'); }
         this.Render (); if (mode !== 'closed') { await this.entries.get (id).onOpen?.(); }
+        if (returnToDefault && mode === 'closed' && panel.side === 'right' && id !== DefaultRightPanel && this.state.modules.has (DefaultRightPanel) && !this.Inspect ().some (entry => entry.side === 'right' && entry.visible) && window.innerWidth >= 800) {
+            await this.Set (DefaultRightPanel, 'minimal'); return result ();
+        }
         if (generation === this.transitionGeneration && this.state.Inspect (id).visible && (outgoing?.id !== id || outgoing?.mode !== mode)) { await this.Animate (id, true, mode === 'extended'); }
         return result ();
     }

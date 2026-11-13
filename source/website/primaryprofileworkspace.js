@@ -23,7 +23,7 @@ export class PrimaryProfileWorkspace
         this.panel.products.LoadSelected (); this.document = editor.document; this.owner = owner;
         const panels = this.website.modulePanels; this.restore = panels.Inspect ().filter (p => p.visible).map (p => ({ id : p.id, side : p.side, mode : p.mode === 'extended' ? 'minimal' : p.mode }));
         this.panel.catalogOpen = false;
-        for (const p of this.restore) { await panels.Set (p.id, 'closed'); }
+        for (const p of this.restore) { await panels.Set (p.id, 'closed', { returnToDefault : false }); } // Restored when the editor closes.
         if (document !== editor.document || owner !== this.website.auth?.user?.id || this.panel.Blocked ()) { throw new Error ('The session changed before the model editor opened.'); }
         await panels.Set ('upload', 'minimal');
         const viewer = this.website.parameters.viewerDiv; this.wrapper = globalThis.document.createElement ('div'); this.wrapper.className = 'pp_viewport_split'; viewer.parentNode.insertBefore (this.wrapper, viewer);

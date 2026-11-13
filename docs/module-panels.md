@@ -46,3 +46,7 @@ Registrations can set `animated: true` to opt into shared entry/exit motion. Pri
 ## Molded Pulp (0.67.0)
 
 The right-side `molded-pulp` module sits below Primary Products in the Generation modules group. Its independently built content lives in `modules/molded-pulp`; `moldedpulppanel.js` owns only lazy loading, the account-scoped draft and host callbacks, and `moldedpulpworkspace.js` owns scene changes (one Undo step each, in-place replacement of the current sheet/tray). `ui.molded_pulp` opens it; `ui.module.mode` controls Minimal/Extended/Close. It registers with `animated : true`.
+
+## Model spec default (0.70.0)
+
+The right-side module `data` is titled **Model spec** and is the default right panel. It opens at start when the window is at least 1100 px wide. Other right modules open only from their icons or commands. When one is closed explicitly (`ModulePanels.Set (id, 'closed')`) and nothing else is visible on the right, Model spec returns. Closing Model spec collapses the right side. Automatic closes for narrow layouts use the state directly and do not trigger the return. Model-specific sections, such as the Packaging section for generated boxes, render inside Model spec rather than switching modules.

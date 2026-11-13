@@ -2518,6 +2518,101 @@
       }
     },
     {
+      "id": "ui.module.toggle",
+      "title": "Toggle a module from its icon",
+      "category": "Panels",
+      "description": "Same as clicking a module icon in the tool strip: open the module, or close it when it is already showing, which returns the right side to the default Model spec. Use ui.module.mode to set an exact mode.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "module": {
+            "type": "string",
+            "enum": [
+              "ai",
+              "packaging",
+              "primary-products",
+              "molded-pulp"
+            ]
+          }
+        },
+        "required": [
+          "module"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "module": "ai"
+      }
+    },
+    {
+      "id": "ui.model_spec.inspect",
+      "title": "Read Model spec",
+      "category": "Panels",
+      "description": "Read what the default right Model spec panel shows for the selection: name, W/L/H in display units, scale, vertex and triangle counts, the packaging spec for a generated box (FEFCO code, score size, caliper, closure, folded state), whether the panel is open, and whether the preview turntable is on. Scale with object.dimension or object.scaling.percent; Update is ui.update_model and Delete is object.delete.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ui.model_spec.preview",
+      "title": "Rotate the Model spec preview",
+      "category": "Panels",
+      "description": "Turn the Model spec preview turntable on or off, the same as its Rotate button. The choice carries over to the next selected model. Does not change the scene.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "rotate": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "rotate"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "rotate": true
+      }
+    },
+    {
+      "id": "ui.transform_panel.position",
+      "title": "Move the Object transform panel",
+      "category": "Panels",
+      "description": "Read, move or reset the floating Object transform panel (Position/Rotation/Size) over the viewer, the same as dragging its title, arrow keys, or double-click to reset. x/y are pixels from the viewer top-left and are kept on screen; the position is remembered on this device. Omit x/y to read. Does not change the scene.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "y": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "reset": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "x": 40,
+        "y": 40
+      }
+    },
+    {
       "id": "selection.clear",
       "title": "Clear selection",
       "category": "Objects",

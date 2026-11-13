@@ -280,7 +280,7 @@ export class Website
         if (formats) { formats.textContent = SupportedFormatsText; }
         document.getElementById ('workspace_upload').addEventListener ('click', () => this.OpenFileBrowserDialog ());
         this.modulePanels.Render ();
-        this.sidebar.detailsPanel.SetCollapsed (true);
+        this.sidebar.detailsPanel.SetCollapsed (false); // Model spec is the default right panel, so its preview and specs start expanded.
         this.sidebar.detailsPanel.contentDiv.textContent = 'Load a model to view geometry, dimensions, materials and properties.';
     }
 
