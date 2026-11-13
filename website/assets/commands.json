@@ -8401,10 +8401,92 @@
       "example": {}
     },
     {
+      "id": "ai.mode.set",
+      "title": "Choose AI generation type",
+      "category": "AI",
+      "description": "Select the generation type at the top of the Create panel (text3d, image3d, multiimage3d, textimage or texture). Shows only the inputs that type uses. Does not submit anything.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "text3d",
+              "image3d",
+              "multiimage3d",
+              "textimage",
+              "texture"
+            ]
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "mode": "multiimage3d"
+      }
+    },
+    {
+      "id": "ai.reference.generate_views",
+      "title": "Generate AI reference views",
+      "category": "AI",
+      "description": "Explicit paid-provider submission: Meshy multi-view Text to image for Multi-image to 3D. Meshy returns usually 3 views (front, side, back); when done they fill the reference slots (up to 4 with uploads) and the Multi-image to 3D type is selected.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 800
+          },
+          "imageModel": {
+            "type": "string",
+            "enum": [
+              "nano-banana",
+              "nano-banana-2",
+              "nano-banana-2-lite",
+              "nano-banana-2-1",
+              "nano-banana-pro",
+              "gpt-image-2",
+              "gpt-image-2-5-flare",
+              "gpt-image-2-5-sunburst",
+              "gpt-image-2-6-flare",
+              "gpt-image-2-6-sunburst"
+            ]
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "prompt": "A ceramic coffee mug with a handle"
+      }
+    },
+    {
+      "id": "ai.reference.clear",
+      "title": "Clear AI reference images",
+      "category": "AI",
+      "description": "Remove all uploaded and generated reference images from the Create panel. Does not delete provider tasks.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
       "id": "ai.reference.open",
       "title": "Choose AI reference images",
       "category": "AI",
-      "description": "Open the interactive PNG/JPEG/WebP reference picker for 1–4 images (20 MB total; two or more enable Multi-image to 3D). Selected images show in the AI viewer. Does not upload or generate until an explicit submission. Requires a user gesture; otherwise returns requiresUserGesture.",
+      "description": "Open the interactive PNG/JPEG/WebP reference picker for the selected generation type: one image for Image to 3D, a style image for Texture, or added views (up to 4 with generated views, 20 MB of uploads) for Multi-image to 3D. Selected images show in the AI viewer. Does not upload or generate until an explicit submission. Requires a user gesture; otherwise returns requiresUserGesture.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -8540,7 +8622,7 @@
       "id": "ai.generate",
       "title": "Generate with Meshy",
       "category": "AI",
-      "description": "Explicit paid-provider submission: text/image/multi-image to 3D, text to image (optionally 4-view or background removed), texture, humanoid rigging or animation. Image actions use the references selected interactively or the selected generated image; multiimage3d needs 2–4 uploaded views or a selected generated image. texturePrompt guides image/multi-image model textures. Returns queued task; progress appears in history.",
+      "description": "Explicit paid-provider submission: text/image/multi-image to 3D, text to image (optionally with the background removed; multiView is kept for compatibility, use ai.reference.generate_views for reference views), texture, humanoid rigging or animation. Image actions use the references selected interactively or the selected generated image; multiimage3d needs 2–4 uploaded views or a selected generated image. texturePrompt guides image/multi-image model textures. Returns queued task; progress appears in history.",
       "mutates": true,
       "inputSchema": {
         "type": "object",

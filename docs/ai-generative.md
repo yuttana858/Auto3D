@@ -11,7 +11,7 @@ Checked against Meshy's published OpenAPI contract (`docs.meshy.ai/openapi.json`
 | Text to 3D | Preview with detail budget, then **Texture** (refine) with PBR, resolution and an optional texture prompt; GLB output | [Text to 3D](https://docs.meshy.ai/en/api/text-to-3d) |
 | Image to 3D | PNG/JPEG/WebP reference or selected generated image; textured GLB; optional texture prompt | [Image to 3D](https://docs.meshy.ai/en/api/image-to-3d) |
 | Multi-image to 3D | 2–4 uploaded views of one object (20 MB total) or a selected generated image task (for example a 4-view image); textured GLB; optional texture prompt | [Multi-Image to 3D](https://docs.meshy.ai/en/api/multi-image-to-3d) |
-| Text to Image | Ten current image models; aspect ratios filtered per model (3:2 and 2:3 only on GPT Image); optional 4-view image or background removal | [Text to Image](https://docs.meshy.ai/en/api/text-to-image) |
+| Text to Image | Ten current image models; aspect ratios filtered per model (3:2 and 2:3 only on GPT Image); optional background removal. Multi-view reference views are generated inside Multi-image to 3D (usually 3 views) | [Text to Image](https://docs.meshy.ai/en/api/text-to-image) |
 | Image revision | Revise a generated image with an edit prompt (Image to Image from the original task) | [Image to Image](https://docs.meshy.ai/en/api/image-to-image) |
 | Retexture | Selected completed model, text or image style, PBR and texture resolution, original UVs | [Retexture](https://docs.meshy.ai/en/api/retexture) |
 | Rigging | Selected textured humanoid, character height in meters | [Rigging](https://docs.meshy.ai/en/api/rigging) |
@@ -20,6 +20,10 @@ Checked against Meshy's published OpenAPI contract (`docs.meshy.ai/openapi.json`
 **Assisted prompts are not available through the API.** Meshy retired its Prompt Helper; prompt writing help now lives in the Meshy web app's 3D Agent, which has no public API. Auto3D does not imitate it.
 
 Meshy also documents remesh, conversion, resize, UV unwrap, 3D-print and relief APIs; these are not wired. Multi-image to 3D has no Smart Topology model, so Smart detail presets use the standard pipeline at the same face budget there. Supported details vary by the provider's current model/plan; errors remain visible. Calls consume Meshy credits. No generation occurs merely by opening the workspace, changing fields, choosing reference images or previewing.
+
+## Create panel (0.68.0)
+
+The Create panel starts with the generation type and shows only its inputs; see [release-0680.md](release-0680.md). Multi-image to 3D holds up to 4 reference views, from uploads and from **Generate reference views from prompt**.
 
 ## Revisions
 

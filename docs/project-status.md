@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Mode-first AI Create panel — Auto3D 0.68.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0 (2026-11-13)
+
+The AI Create panel starts with the generation type (Text to 3D, Image to 3D, Multi-image to 3D, Text to image, Texture) and shows only that type's inputs. The "4-view image" checkbox is removed. Meshy multi-view returns usually 3 views, so reference views are now always multi-view inside Multi-image to 3D, with up to 4 reference slots shared with uploads. See [release-0680.md](release-0680.md).
+
 ## Compact material drawer — Auto3D 0.67.1 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0
 
 Shortens the advanced material drawer and labels the refraction setting IRO. The drawer content remains scrollable. After merging main through #120 at code commit 9845f03, lint, 876 unit/integration tests and production website/Pages builds pass. Earlier desktop/mobile material browser coverage passed for the unchanged drawer. Candidate, not deployed.

@@ -47,7 +47,19 @@ try {
  await call ('ai.creation.preview', { id : 'generated-1' }); const imageView = (await call ('ai.workspace.inspect')).viewer; assert.equal (imageView.mode, 'image'); assert.ok ((await call ('ai.viewer.control', { action : 'zoomIn', value : 2 })).zoom > imageView.zoom); await call ('ai.viewer.control', { action : 'fit' });
  await call ('ai.generate', { action : 'multiimage3d' }); assert.equal (submitted.at (-1).route, 'multi-image-to-3d'); assert.equal (submitted.at (-1).body.input_task_id, 'generated-1');
  await call ('ai.creation.revise', { id : 'generated-1', prompt : 'Make it green' }); assert.deepEqual (submitted.at (-1), { route : 'image-to-image', body : { ai_model : 'nano-banana', input_task_id : 'generated-1', prompt : 'Make it green' } });
- await page.locator ('.ai_recent_card[data-task-id="sample"] button', { hasText : 'Revise' }).click (); assert.equal (await page.locator ('.ai_generate_button').textContent (), 'Submit revision'); await page.getByRole ('button', { name : 'Cancel revision' }).click (); assert.equal (await page.locator ('.ai_generate_button').textContent (), 'Generate');
+ await page.locator ('.ai_recent_card[data-task-id="sample"] button', { hasText : 'Revise' }).click (); assert.equal (await page.locator ('.ai_generate_button').textContent (), 'Submit revision'); await page.getByRole ('button', { name : 'Cancel revision' }).click (); assert.equal (await page.locator ('.ai_generate_button').textContent (), 'Generate 3D preview');
+ // Mode-first Create panel: each generation type shows only its inputs; there is no 4-view checkbox.
+ const create = page.locator ('.ai_input_section'); assert.equal (await create.getByText ('4-view image').count (), 0);
+ const visible = label => create.getByLabel (label, { exact : true }).isVisible ();
+ for (const [mode, prompt, texture, upload, views] of [['Text to 3D', true, true, false, false], ['Image to 3D', false, true, true, false], ['Multi-image to 3D', true, true, true, true], ['Text to image', true, false, false, false], ['Texture', false, true, true, false]]) {
+  await create.getByRole ('radio', { name : mode, exact : true }).click (); assert.equal (await create.getByRole ('radio', { name : mode, exact : true }).getAttribute ('aria-checked'), 'true');
+  assert.equal (await visible ('AI generation prompt'), prompt, mode + ' prompt'); assert.equal (await visible ('Texture prompt'), texture, mode + ' texture');
+  assert.equal (await create.locator ('.ai_reference_field').isVisible (), upload, mode + ' references'); assert.equal (await create.locator ('.ai_views_button').isVisible (), views, mode + ' views');
+ }
+ await call ('ai.mode.set', { mode : 'multiimage3d' }); await call ('ai.reference.generate_views', { prompt : 'Red bottle' });
+ assert.deepEqual (submitted.at (-1).body, { prompt : 'Red bottle', ai_model : 'nano-banana', generate_multi_view : true });
+ await expectEventually (async () => (await call ('ai.workspace.inspect')).references, 1, 'generated reference views'); assert.equal (await create.locator ('.ai_reference_item').count (), 1);
+ await call ('ai.reference.clear'); assert.equal ((await call ('ai.workspace.inspect')).references, 0); await call ('ai.mode.set', { mode : 'text3d' });
  await call ('ai.creation.preview', { id : 'sample' }); const modelView = await call ('ai.viewer.control', { action : 'zoomOut', value : 2 }); assert.equal (modelView.mode, '3d'); assert.equal (modelView.lighting.toneMapping, 'ACESFilmic');
  const prompt = page.getByLabel ('AI generation prompt', { exact : true }); await prompt.fill ('Keyboard generated concept');
  const generationRequest = page.waitForRequest (request => request.url ().endsWith ('/api/ai/text-to-3d') && request.method () === 'POST');

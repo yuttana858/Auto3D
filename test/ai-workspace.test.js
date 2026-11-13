@@ -2,7 +2,7 @@ import { FinalizeModel } from '../source/engine/model/modelfinalization.js';
 import { Model } from '../source/engine/model/model.js';
 import { PhysicalMaterial } from '../source/engine/model/material.js';
 import assert from 'node:assert/strict';
-import { AIWorkspace, MatchAISceneUnits, PlaceAIModel, AIImageModels, AIAspectRatios, AIGenerationActions } from '../source/website/aiworkspace.js';
+import { AIWorkspace, MatchAISceneUnits, PlaceAIModel, AIImageModels, AIAspectRatios, AIGenerationActions, AIModes } from '../source/website/aiworkspace.js';
 import { ReleasePreviewDrag } from '../source/website/aipreview.js';
 import * as THREE from 'three';
 import { Unit } from '../source/engine/model/unit.js';
@@ -51,13 +51,35 @@ describe ('Extended AI workspace services', () => {
    if (action === 'image3d') { assert.equal (body.input_task_id, 'model'); assert.equal (body.target_polycount, 30000); }
   }
  });
- it ('Chooses text-to-3D by default and image-to-3D for an uploaded or selected image', () => {
-  const { workspace } = Workspace (); Object.assign (workspace, { prompt : { value : 'A red bottle' }, imageFile : null });
-  assert.equal (workspace.PrimaryGenerationAction (), 'text3d');
-  workspace.prompt.value = ''; workspace.recent[0].imageUrl = 'https://assets.meshy.ai/reference.png';
-  assert.equal (workspace.PrimaryGenerationAction (), 'image3d');
-  workspace.recent[0].imageUrl = null; workspace.imageFile = { type : 'image/png' };
-  assert.equal (workspace.PrimaryGenerationAction (), 'image3d');
+ it ('Uses the chosen generation type and enables Generate only when that type has its inputs', () => {
+  const { workspace } = Workspace (); const button = { disabled : false, textContent : '' };
+  Object.assign (workspace, { mode : 'text3d', imageFiles : [], remoteReferences : [], imageFile : null, prompt : { value : '' }, texturePrompt : { value : '' }, generateButton : button, detailSelect : { value : 'standard:30000' }, pbrCheckbox : { checked : true }, textureResolution : { value : '2k' }, imageModel : { value : 'nano-banana' }, aspect : { value : '1:1' } });
+  assert.equal (workspace.PrimaryGenerationAction (), 'text3d'); assert.throws (() => workspace.SetMode ('rig'), /Unknown generation type/);
+  const check = (mode, setup, ready) => { workspace.SetMode (mode); setup (); AIWorkspace.prototype.RefreshActions.call (workspace); assert.equal (button.disabled, !ready, mode + ' ready=' + ready); assert.equal (button.textContent, AIModes[mode].button); };
+  check ('text3d', () => { workspace.prompt.value = ''; }, false); check ('text3d', () => { workspace.prompt.value = 'A red bottle'; }, true);
+  // An uploaded image alone never switches the type: Image to 3D needs to be chosen.
+  check ('text3d', () => { workspace.prompt.value = ''; workspace.imageFiles = [{ type : 'image/png' }]; workspace.imageFile = workspace.imageFiles[0]; }, false); assert.equal (workspace.PrimaryGenerationAction (), 'text3d');
+  check ('image3d', () => {}, true);
+  check ('multiimage3d', () => {}, false); check ('multiimage3d', () => { workspace.remoteReferences = [{ url : 'https://assets.meshy.ai/v1.png', taskId : 'views' }]; }, true);
+  workspace.imageFiles = []; workspace.imageFile = null; workspace.remoteReferences = [];
+  workspace.recent[0].imageUrl = null; check ('texture', () => {}, false); check ('texture', () => { workspace.texturePrompt.value = 'brushed steel'; }, true);
+  check ('textimage', () => { workspace.prompt.value = 'A mug'; }, true);
+  assert.equal (workspace.UIOptions ('texture').prompt, 'brushed steel'); assert.equal (workspace.UIOptions ('texture').texturePrompt, '');
+ });
+ it ('Generates multi-view reference views and sends them, alone or mixed with uploads, to Multi-image to 3D', async () => {
+  let { workspace, requests } = Workspace (); let finish; workspace.PollTask = () => new Promise (resolve => { finish = resolve; });
+  Object.assign (workspace, { mode : 'multiimage3d', imageFiles : [], remoteReferences : [], RenderReferences () {}, SetMode (mode) { this.mode = mode; } });
+  await assert.rejects (() => workspace.GenerateReferenceViews ({ prompt : ' ' }), /Describe the object/);
+  const queued = await workspace.GenerateReferenceViews ({ prompt : 'a mug', imageModel : 'nano-banana-2' });
+  assert.deepEqual (requests[0], ['/api/ai/text-to-image', { prompt : 'a mug', ai_model : 'nano-banana-2', generate_multi_view : true }]); assert.equal (queued.route, 'text-to-image');
+  finish ({ id : 'views', imageUrls : ['https://assets.meshy.ai/0.png', 'https://assets.meshy.ai/1.png', 'https://assets.meshy.ai/2.png'] }); await new Promise (resolve => setTimeout (resolve));
+  assert.equal (workspace.remoteReferences.length, 3); assert.match (workspace.status.textContent, /3 reference views ready.*4th view/);
+  await workspace.Generate ({ action : 'multiimage3d' }); assert.equal (requests[1][1].input_task_id, 'views'); assert.equal (requests[1][1].image_urls, undefined);
+  // An uploaded 4th view mixes data and Meshy URLs, so the views are sent as image URLs.
+  workspace.imageFiles = [{ type : 'image/png', size : 10 }]; workspace.imageFile = workspace.imageFiles[0]; workspace.ReadDataURL = async () => 'data:image/png;base64,QQ==';
+  await workspace.Generate ({ action : 'multiimage3d' }); assert.deepEqual (requests[2][1].image_urls, ['data:image/png;base64,QQ==', 'https://assets.meshy.ai/0.png', 'https://assets.meshy.ai/1.png', 'https://assets.meshy.ai/2.png']);
+  await assert.rejects (() => workspace.GenerateReferenceViews ({ prompt : 'a mug' }), /Remove a reference/);
+  await assert.rejects (() => workspace.SetReferenceFiles ([{ type : 'image/png', size : 1 }], { append : true }), /up to 4/);
  });
  it ('Rejects unavailable references, invalid rigs, read-only work and strict command extras before submission', async () => {
   const { workspace, requests } = Workspace (); for (const options of [{ action : 'image3d' }, { action : 'animations' }, { action : 'text3d' }, { action : 'rigging', height : -1 }, { action : 'texture', prompt : 'x'.repeat (801) }]) { await assert.rejects (() => workspace.Generate (options)); } assert.deepEqual (requests, []);

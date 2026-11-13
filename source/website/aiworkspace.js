@@ -11,6 +11,14 @@ export const AIImageModels = ['nano-banana', 'nano-banana-2', 'nano-banana-2-lit
 export const AIAspectRatios = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'];
 export const AIGenerationActions = ['text3d', 'image3d', 'multiimage3d', 'textimage', 'texture', 'rigging', 'animations'];
 const ReferenceImageLimit = 20 * 1024 * 1024, ReferenceImageCount = 4;
+// Generation types in the order shown at the top of the Create panel. Each lists only the inputs it uses.
+export const AIModes = {
+    text3d : { label : 'Text to 3D', button : 'Generate 3D preview', prompt : 'Describe the 3D object', texture : 'Texture prompt (used when you texture the preview)', hint : 'Creates an untextured preview. Use Texture on the result to add materials.' },
+    image3d : { label : 'Image to 3D', button : 'Generate 3D model', reference : 'Reference image', texture : 'Supporting text (texture guidance, optional)', hint : 'Upload one image, or select a generated image below.' },
+    multiimage3d : { label : 'Multi-image to 3D', button : 'Generate 3D model', prompt : 'Describe the object to generate reference views (optional)', reference : 'Reference views (2–4 of the same object)', texture : 'Supporting text (texture guidance, optional)', hint : 'Upload 2–4 views, generate views from a prompt, or both. Meshy multi-view returns usually 3 views; upload a 4th if needed.' },
+    textimage : { label : 'Text to image', button : 'Generate image', prompt : 'Describe the image', hint : 'Creates one image you can use as an Image to 3D reference.' },
+    texture : { label : 'Texture', button : 'Generate texture', reference : 'Style image (optional)', texture : 'Texture prompt', hint : 'Re-textures the selected 3D model with a prompt or a style image.' }
+};
 const ImageRouteTypes = new Set (['text-to-image', 'image-to-image']);
 function AspectAllowed (model, aspect) { return AIAspectRatios.includes (aspect) && (model.startsWith ('gpt-image') || !['3:2', '2:3'].includes (aspect)); }
 const RouteLabels = { 'text-to-3d' : 'Text to 3D', 'image-to-3d' : 'Image to 3D', 'multi-image-to-3d' : 'Multi-image to 3D', 'text-to-image' : 'Text to image', 'image-to-image' : 'Image revision', retexture : 'Texture', rigging : 'Rig', animations : 'Animation' };
@@ -56,7 +64,7 @@ export class AIWorkspace
     constructor (website)
     {
         this.website = website;
-        this.imageFile = null; this.imageFiles = []; this.revising = null;
+        this.imageFile = null; this.imageFiles = []; this.remoteReferences = []; this.referenceUrls = []; this.revising = null; this.mode = 'text3d';
         this.recent = []; this.assets = new Map (); this.selectedTask = null; this.previewSequence = 0;
         this.settings = this.LoadSettings ();
         this.CreateHeaderButton ();
@@ -124,18 +132,43 @@ export class AIWorkspace
             button.addEventListener ('click', () => this.Run (() => this.ViewerControl (action)));
         }
         Element ('span', 'ai_viewer_hint', 'Drag to orbit · right-drag or Shift+drag to pan · scroll to zoom', this.previewHost);
-        const inputSection = Element ('div', 'ai_workspace_section ai_input_section', undefined, this.aiPane);
+        // Mode first: the selected generation type decides which inputs are shown (see AIModes).
+        const inputSection = Element ('div', 'ai_workspace_section ai_input_section', undefined, this.aiPane); this.inputSection = inputSection;
         Element ('strong', null, 'Create', inputSection);
-        this.prompt = Element ('textarea', 'ai_prompt', undefined, inputSection); this.prompt.rows = 4; this.prompt.maxLength = 800; this.prompt.placeholder = 'Describe the object, image, or texture you want to create…'; this.prompt.setAttribute ('aria-label', 'AI generation prompt'); this.prompt.addEventListener ('input', () => this.RefreshActions ());
-        this.generateButton = Element ('button', 'ai_generate_button', 'Generate', inputSection); this.generateButton.type = 'button'; this.generateButton.setAttribute ('aria-keyshortcuts', 'Enter');
-        this.generateButton.addEventListener ('click', () => this.Run (() => this.revising ? this.Revise (this.revising, this.prompt.value.trim ()) : this.Generate (this.UIOptions (this.PrimaryGenerationAction ()))));
-        this.prompt.addEventListener ('keydown', event => {
-            if (event.key !== 'Enter' || event.shiftKey || event.isComposing || event.repeat || this.generateButton.disabled) { return; }
-            event.preventDefault (); this.generateButton.click ();
-        });
+        this.modeBar = Element ('div', 'ai_mode_bar', undefined, inputSection); this.modeBar.setAttribute ('role', 'radiogroup'); this.modeBar.setAttribute ('aria-label', 'Generation type');
+        this.modeButtons = new Map ();
+        for (const [mode, { label }] of Object.entries (AIModes)) {
+            const button = Element ('button', 'ai_mode_button', label, this.modeBar); button.type = 'button'; button.setAttribute ('role', 'radio'); button.dataset.mode = mode;
+            button.addEventListener ('click', () => this.Run (() => this.SetMode (mode))); this.modeButtons.set (mode, button);
+        }
+        this.modeHint = Element ('p', 'section_hint ai_mode_hint', '', inputSection);
+        this.reviseBanner = Element ('div', 'ai_revise_banner', undefined, inputSection); this.reviseBanner.hidden = true; this.reviseText = Element ('span', null, '', this.reviseBanner);
+        const cancelRevision = Element ('button', null, 'Cancel revision', this.reviseBanner); cancelRevision.type = 'button'; cancelRevision.addEventListener ('click', () => this.CancelRevision ());
+        const field = (modes, className = 'ai_field') => { const element = Element ('div', className, undefined, inputSection); element.dataset.modes = modes; return element; };
 
-        const generationOptions = Element ('div', 'ai_generation_options', undefined, inputSection);
-        const detailLabel = Element ('label', null, '3D detail', generationOptions);
+        const promptField = field ('text3d textimage multiimage3d revise'); this.promptLabel = Element ('label', 'ai_field_label', 'Prompt', promptField);
+        this.prompt = Element ('textarea', 'ai_prompt', undefined, promptField); this.prompt.rows = 4; this.prompt.maxLength = 800; this.prompt.setAttribute ('aria-label', 'AI generation prompt'); this.prompt.addEventListener ('input', () => this.RefreshActions ());
+        this.promptLabel.htmlFor = this.prompt.id = 'ai_prompt_input';
+        const imageField = field ('textimage multiimage3d', 'ai_field ai_generation_options');
+        const imageLabel = Element ('label', null, 'Image model', imageField); this.imageModel = Element ('select', null, undefined, imageLabel); for (const name of AIImageModels) { this.imageModel.add (new Option (name, name)); } this.imageModel.addEventListener ('change', () => this.RefreshImageOptions ());
+        this.viewsButton = Element ('button', 'ai_views_button', 'Generate reference views from prompt', field ('multiimage3d')); this.viewsButton.type = 'button'; this.viewsButton.title = 'Meshy Text to image multi-view: usually 3 views (front, side, back). Add a 4th view by uploading it.';
+        this.viewsButton.addEventListener ('click', () => this.Run (() => this.GenerateReferenceViews ({ prompt : this.prompt.value.trim (), imageModel : this.imageModel.value })));
+
+        const referenceField = field ('image3d multiimage3d texture', 'ai_field ai_reference_field'); this.referenceLabel = Element ('span', 'ai_field_label', 'Reference image', referenceField);
+        this.imageInput = Element ('input', null, undefined, referenceField); this.imageInput.type = 'file'; this.imageInput.accept = 'image/png,image/jpeg,image/webp'; this.imageInput.hidden = true;
+        const referenceActions = Element ('div', 'ai_reference_actions', undefined, referenceField);
+        this.imageButton = Element ('button', null, 'Upload image', referenceActions); this.imageButton.type = 'button'; this.imageButton.addEventListener ('click', () => this.OpenReferencePicker ());
+        this.clearReferencesButton = Element ('button', null, 'Clear', referenceActions); this.clearReferencesButton.type = 'button'; this.clearReferencesButton.addEventListener ('click', () => this.Run (() => this.ClearReferences ()));
+        this.referenceList = Element ('div', 'ai_reference_list', undefined, referenceField); this.referenceList.setAttribute ('aria-label', 'Reference images');
+        this.imageName = Element ('span', 'ai_image_name', 'No image selected', referenceField);
+        this.imageInput.addEventListener ('change', () => this.Run (async () => { const files = [...this.imageInput.files]; this.imageInput.value = ''; if (files.length) { await this.SetReferenceFiles (files, { append : this.mode === 'multiimage3d' }); } }));
+
+        const textureField = field ('text3d image3d multiimage3d texture'); this.textureLabel = Element ('label', 'ai_field_label', 'Texture prompt (optional)', textureField);
+        this.texturePrompt = Element ('textarea', 'ai_texture_prompt', undefined, textureField); this.texturePrompt.rows = 2; this.texturePrompt.maxLength = 800; this.texturePrompt.placeholder = 'Glazed white ceramic, matte black rim…'; this.texturePrompt.setAttribute ('aria-label', 'Texture prompt');
+        this.textureLabel.htmlFor = this.texturePrompt.id = 'ai_texture_prompt_input'; this.texturePrompt.addEventListener ('input', () => this.RefreshActions ());
+
+        const detailField = field ('text3d image3d multiimage3d', 'ai_field ai_generation_options ai_full_width');
+        const detailLabel = Element ('label', null, '3D detail', detailField);
         this.detailSelect = Element ('select', null, undefined, detailLabel);
         for (const [label, value] of [
             ['Smart · 4k faces', 'smart:4000'],
@@ -145,37 +178,30 @@ export class AIWorkspace
             ['High · 150k faces', 'standard:150000']
         ]) { this.detailSelect.add (new Option (label, value)); }
         this.detailSelect.value = 'standard:30000';
-        const pbrLabel = Element ('label', 'ai_checkbox_label', undefined, generationOptions);
+        const surfaceField = field ('text3d image3d multiimage3d texture', 'ai_field ai_generation_options');
+        const pbrLabel = Element ('label', 'ai_checkbox_label', undefined, surfaceField);
         this.pbrCheckbox = Element ('input', null, undefined, pbrLabel); this.pbrCheckbox.type = 'checkbox'; this.pbrCheckbox.checked = true;
         pbrLabel.appendChild (document.createTextNode (' PBR textures'));
-        const textureLabel0 = Element ('label', 'ai_texture_prompt_label', 'Texture prompt (optional)', inputSection);
-        this.texturePrompt = Element ('textarea', 'ai_texture_prompt', undefined, textureLabel0); this.texturePrompt.rows = 2; this.texturePrompt.maxLength = 800; this.texturePrompt.placeholder = 'Glazed white ceramic, matte black rim…'; this.texturePrompt.setAttribute ('aria-label', 'Texture prompt');
-        this.reviseBanner = Element ('div', 'ai_revise_banner', undefined, inputSection); this.reviseBanner.hidden = true; this.reviseText = Element ('span', null, '', this.reviseBanner);
-        const cancelRevision = Element ('button', null, 'Cancel revision', this.reviseBanner); cancelRevision.type = 'button'; cancelRevision.addEventListener ('click', () => this.CancelRevision ());
+        const resolutionLabel = Element ('label', null, 'Texture resolution', surfaceField); this.textureResolution = Element ('select', null, undefined, resolutionLabel); for (const res of ['2k', '4k']) { this.textureResolution.add (new Option (res.toUpperCase (), res)); }
 
-        const imageRow = Element ('div', 'ai_image_row', undefined, inputSection);
-        this.imageInput = Element ('input', null, undefined, imageRow); this.imageInput.type = 'file'; this.imageInput.accept = 'image/png,image/jpeg,image/webp'; this.imageInput.multiple = true; this.imageInput.hidden = true;
-        this.imageButton = Element ('button', null, 'Upload reference images (1–4)', imageRow); this.imageButton.addEventListener ('click', () => this.OpenReferencePicker ());
-        this.imageName = Element ('span', 'ai_image_name', 'No image selected', imageRow);
-        this.imageInput.addEventListener ('change', () => this.Run (() => this.SetReferenceFiles ([...this.imageInput.files])));
-
-        const actions = Element ('div', 'ai_generation_actions', undefined, inputSection);
-        this.actionButtons = new Map ();
-        for (const [id, label] of [['text3d', 'Text to 3D'], ['image3d', 'Image to 3D'], ['multiimage3d', 'Multi-image to 3D'], ['textimage', 'Text to image'], ['texture', 'Texture generation']]) {
-            const button = Element ('button', 'ai_generation_action', label, actions);
-            button.addEventListener ('click', () => this.Run (() => this.Generate (this.UIOptions (id))));
-            this.actionButtons.set (id, button);
-        }
-        const scaleLabel = Element ('label', null, 'Model scale', inputSection); this.scaleInput = Element ('input', null, undefined, scaleLabel); this.scaleInput.type = 'number'; this.scaleInput.min = '.001'; this.scaleInput.max = '1000'; this.scaleInput.step = '.01'; this.scaleInput.value = '1'; this.scaleInput.setAttribute ('aria-label', 'AI model scale'); this.scaleInput.addEventListener ('change', () => this.Run (() => this.SetScale (Number (this.scaleInput.value))));
-        const imageLabel = Element ('label', null, 'Image model', inputSection); this.imageModel = Element ('select', null, undefined, imageLabel); for (const name of AIImageModels) { this.imageModel.add (new Option (name, name)); } this.imageModel.addEventListener ('change', () => this.RefreshImageOptions ());
-        const aspectLabel = Element ('label', null, 'Image aspect ratio', inputSection); this.aspect = Element ('select', null, undefined, aspectLabel); for (const ratio of AIAspectRatios) { this.aspect.add (new Option (ratio, ratio)); }
-        const imageFlags = Element ('div', 'ai_generation_options', undefined, inputSection);
-        const multiLabel = Element ('label', 'ai_checkbox_label', undefined, imageFlags); this.multiView = Element ('input', null, undefined, multiLabel); this.multiView.type = 'checkbox'; multiLabel.appendChild (document.createTextNode (' 4-view image')); multiLabel.title = 'Generate front/side/back views for Multi-image to 3D. Ignores aspect ratio.';
-        const cutoutLabel = Element ('label', 'ai_checkbox_label', undefined, imageFlags); this.removeBackground = Element ('input', null, undefined, cutoutLabel); this.removeBackground.type = 'checkbox'; cutoutLabel.appendChild (document.createTextNode (' Remove background'));
-        this.multiView.addEventListener ('change', () => this.RefreshImageOptions ());
-        const textureLabel = Element ('label', null, 'Texture resolution', inputSection); this.textureResolution = Element ('select', null, undefined, textureLabel); for (const res of ['2k', '4k']) { this.textureResolution.add (new Option (res.toUpperCase (), res)); }
+        const aspectField = field ('textimage', 'ai_field ai_generation_options');
+        const aspectLabel = Element ('label', null, 'Aspect ratio', aspectField); this.aspect = Element ('select', null, undefined, aspectLabel); for (const ratio of AIAspectRatios) { this.aspect.add (new Option (ratio, ratio)); }
+        const cutoutLabel = Element ('label', 'ai_checkbox_label', undefined, aspectField); this.removeBackground = Element ('input', null, undefined, cutoutLabel); this.removeBackground.type = 'checkbox'; cutoutLabel.appendChild (document.createTextNode (' Remove background'));
+        this.selectedHint = Element ('p', 'section_hint ai_selected_hint', '', field ('image3d multiimage3d texture'));
         this.RefreshImageOptions ();
+
+        this.generateButton = Element ('button', 'ai_generate_button', 'Generate', inputSection); this.generateButton.type = 'button'; this.generateButton.setAttribute ('aria-keyshortcuts', 'Enter');
+        this.generateButton.addEventListener ('click', () => this.Run (() => this.revising ? this.Revise (this.revising, this.prompt.value.trim ()) : this.Generate (this.UIOptions (this.mode))));
+        for (const input of [this.prompt, this.texturePrompt]) {
+            input.addEventListener ('keydown', event => {
+                if (event.key !== 'Enter' || event.shiftKey || event.isComposing || event.repeat || this.generateButton.disabled) { return; }
+                event.preventDefault (); this.generateButton.click ();
+            });
+        }
         this.status = Element ('p', 'section_hint ai_status', 'Connect a provider in Preferences to enable the generation workspace.', inputSection);
+        const selectedSection = Element ('div', 'ai_field ai_scale_field', undefined, inputSection);
+        const scaleLabel = Element ('label', null, 'Selected model scale', selectedSection); this.scaleInput = Element ('input', null, undefined, scaleLabel); this.scaleInput.type = 'number'; this.scaleInput.min = '.001'; this.scaleInput.max = '1000'; this.scaleInput.step = '.01'; this.scaleInput.value = '1'; this.scaleInput.setAttribute ('aria-label', 'AI model scale'); this.scaleInput.addEventListener ('change', () => this.Run (() => this.SetScale (Number (this.scaleInput.value))));
+        this.SetMode (this.mode);
 
         const recentSection = Element ('div', 'ai_workspace_section ai_recent_section', undefined, this.aiPane);
         const recentHeader = Element ('div', 'ai_recent_header', undefined, recentSection); Element ('strong', null, 'Latest creations', recentHeader); const refresh = Element ('button', null, 'Refresh', recentHeader); refresh.addEventListener ('click', () => this.Run (() => this.RefreshRecent ()));
@@ -247,28 +273,46 @@ export class AIWorkspace
         this.RefreshActions ();
     }
 
+    ReferenceCount () { return (this.imageFiles?.length || 0) + (this.remoteReferences?.length || 0); }
     RefreshActions ()
     {
-        if (!this.actionButtons) { return; }
+        if (!this.generateButton) { return; }
         const connected = this.settings.provider === 'meshy';
         const selected = this.recent.find (item => item.id === this.selectedTask);
-        const hasPrompt = !!this.prompt?.value.trim ();
-        const hasImage = !!this.imageFile || !!selected?.imageUrl;
-        const hasViews = (this.imageFiles?.length || 0) > 1 || (!this.imageFiles?.length && ImageRouteTypes.has (selected?.route) && selected?.status === 'SUCCEEDED');
+        const hasPrompt = !!this.prompt?.value.trim (), hasTexturePrompt = !!this.texturePrompt?.value.trim ();
+        const references = this.ReferenceCount ();
+        const selectedImage = ImageRouteTypes.has (selected?.route) && selected?.status === 'SUCCEEDED';
+        const selectedModel = selected?.status === 'SUCCEEDED' && (!!selected.modelUrl || this.assets.has (selected.id));
         const busy = !!this.submitting;
-        if (this.generateButton) {
-            const primary = this.PrimaryGenerationAction ();
-            this.generateButton.disabled = !connected || busy || (this.revising ? !hasPrompt : primary === 'text3d' ? !hasPrompt : primary === 'multiimage3d' ? !hasViews : !hasImage);
-            this.generateButton.textContent = this.revising ? 'Submit revision' : 'Generate';
+        const ready = { text3d : hasPrompt, textimage : hasPrompt, image3d : references > 0 || !!selected?.imageUrl, multiimage3d : references > 1 || (!references && selectedImage), texture : selectedModel && (hasTexturePrompt || !!this.imageFile) };
+        this.generateButton.disabled = !connected || busy || (this.revising ? !hasPrompt : !ready[this.mode]);
+        this.generateButton.textContent = this.revising ? 'Submit revision' : AIModes[this.mode].button;
+        if (this.viewsButton) { this.viewsButton.disabled = !connected || busy || !hasPrompt || references >= ReferenceImageCount; }
+        if (this.clearReferencesButton) { this.clearReferencesButton.disabled = !references; }
+        if (this.selectedHint) {
+            const name = selected ? '“' + (selected.name || 'creation') + '”' : '';
+            this.selectedHint.textContent = this.mode === 'texture' ? (selectedModel ? 'Selected model: ' + name : 'Select a completed 3D model below.') : !references && (this.mode === 'image3d' ? selected?.imageUrl : selectedImage) ? 'Using selected image ' + name + '.' : '';
         }
-        this.actionButtons.get ('text3d').disabled = !connected || busy || !hasPrompt;
-        this.actionButtons.get ('image3d').disabled = !connected || busy || !hasImage;
-        this.actionButtons.get ('multiimage3d').disabled = !connected || busy || !hasViews;
-        this.actionButtons.get ('textimage').disabled = !connected || busy || !hasPrompt;
-        this.actionButtons.get ('texture').disabled = !connected || busy || (!selected?.modelUrl && !this.assets.has (selected?.id)) || (!hasPrompt && !this.imageFile);
         if (this.addButton) { this.addButton.disabled = !this.assets.has (this.selectedTask); }
     }
-
+    // Shared by the generation-type buttons and ai.mode.set: shows only the inputs this type uses.
+    SetMode (mode)
+    {
+        if (!Object.hasOwn (AIModes, mode)) { throw new Error ('Unknown generation type.'); }
+        const config = AIModes[mode]; this.mode = mode; if (!this.inputSection) { return { mode }; }
+        this.inputSection.dataset.mode = mode;
+        for (const [id, button] of this.modeButtons) { button.setAttribute ('aria-checked', String (id === mode)); button.classList.toggle ('selected', id === mode); }
+        for (const element of this.inputSection.querySelectorAll ('[data-modes]')) { element.hidden = !element.dataset.modes.split (' ').includes (this.revising ? 'revise' : mode); }
+        this.modeHint.textContent = this.revising ? '' : config.hint;
+        if (config.prompt) { this.promptLabel.textContent = config.prompt; } if (config.texture) { this.textureLabel.textContent = config.texture; } if (config.reference) { this.referenceLabel.textContent = config.reference; }
+        this.prompt.placeholder = mode === 'textimage' ? 'A ceramic coffee mug, product photo, plain background…' : mode === 'multiimage3d' ? 'A ceramic coffee mug with a handle…' : 'A ceramic coffee mug with a curved handle…';
+        this.imageButton.textContent = mode === 'multiimage3d' ? 'Add images' : mode === 'texture' ? 'Upload style image' : 'Upload image';
+        this.imageInput.multiple = mode === 'multiimage3d';
+        // Single-image types keep only one reference; generated views belong to Multi-image to 3D.
+        if (mode !== 'multiimage3d' && this.ReferenceCount () > 1) { this.imageFiles = this.imageFiles.slice (0, 1); this.imageFile = this.imageFiles[0] || null; this.remoteReferences = this.imageFile ? [] : this.remoteReferences.slice (0, 1); }
+        if (mode === 'texture') { this.remoteReferences = []; }
+        this.RenderReferences (); this.RefreshActions (); return { mode };
+    }
     TextTo3DOptions ()
     {
         const [mode, countText] = this.detailSelect.value.split (':');
@@ -329,9 +373,9 @@ export class AIWorkspace
     {
         this.AssertEditable (); const item = this.recent.find (task => task.id === id); const plan = this.RevisionPlan (item);
         this.revising = id; this.prompt.value = plan.prompt; this.reviseText.textContent = 'Revising “' + (item.name || 'creation') + '” · ' + plan.label;
-        this.reviseBanner.hidden = false; this.prompt.focus (); this.RefreshActions (); return { revising : id, kind : plan.kind, prompt : plan.prompt };
+        this.reviseBanner.hidden = false; this.SetMode (this.mode); this.prompt.focus (); return { revising : id, kind : plan.kind, prompt : plan.prompt };
     }
-    CancelRevision () { this.revising = null; if (this.reviseBanner) { this.reviseBanner.hidden = true; } this.RefreshActions (); return { revising : null }; }
+    CancelRevision () { this.revising = null; if (this.reviseBanner) { this.reviseBanner.hidden = true; } if (this.inputSection) { this.SetMode (this.mode); } else { this.RefreshActions (); } return { revising : null }; }
     async Revise (id, prompt)
     {
         this.AssertEditable ();
@@ -397,16 +441,16 @@ export class AIWorkspace
 
     async Run (action) { try { return await action (); } catch (error) { this.status.textContent = error.message; return null; } }
     AssertEditable () { if (this.website.sessionEditor.readOnly || !this.website.auth?.user?.id) { throw new Error ('Sign in to an editable workspace.'); } }
-    Inspect () { return { selected : this.selectedTask, revising : this.revising || null, references : this.imageFiles?.length || 0, viewer : this.previewHost?.classList.contains ('showing_image') ? this.imageViewer?.State () : this.preview?.root ? this.preview.State () : null, tasks : this.recent.map (item => ({ ...item, loaded : this.assets.has (item.id), scale : this.assets.get (item.id)?.scale || 1 })), models : this.assets.size }; }
+    Inspect () { return { mode : this.mode, selected : this.selectedTask, revising : this.revising || null, references : this.ReferenceCount (), viewer : this.previewHost?.classList.contains ('showing_image') ? this.imageViewer?.State () : this.preview?.root ? this.preview.State () : null, tasks : this.recent.map (item => ({ ...item, loaded : this.assets.has (item.id), scale : this.assets.get (item.id)?.scale || 1 })), models : this.assets.size }; }
     UIOptions (action)
     {
-        return { action, prompt : this.prompt.value.trim (), texturePrompt : this.texturePrompt?.value.trim () || '', detail : this.detailSelect.value, pbr : this.pbrCheckbox.checked, textureResolution : this.textureResolution.value, imageModel : this.imageModel.value, aspect : this.aspect.value, multiView : !!this.multiView?.checked, removeBackground : !!this.removeBackground?.checked, taskId : this.selectedTask };
+        const texturePrompt = this.texturePrompt?.value.trim () || '';
+        // Texture mode reads its prompt from the texture field; other types read the main prompt.
+        return { action, prompt : action === 'texture' ? texturePrompt : this.prompt.value.trim (), texturePrompt : action === 'texture' ? '' : texturePrompt, detail : this.detailSelect.value, pbr : this.pbrCheckbox.checked, textureResolution : this.textureResolution.value, imageModel : this.imageModel.value, aspect : this.aspect.value, removeBackground : !!this.removeBackground?.checked, taskId : this.selectedTask };
     }
     PrimaryGenerationAction ()
     {
-        const selected = this.recent.find (item => item.id === this.selectedTask);
-        if ((this.imageFiles?.length || 0) > 1) { return 'multiimage3d'; }
-        return this.imageFile || (!this.prompt.value.trim () && selected?.imageUrl) ? 'image3d' : 'text3d';
+        return this.mode;
     }
     ValidateReferenceFiles (files)
     {
@@ -415,31 +459,77 @@ export class AIWorkspace
         // Requests are bounded at 28 MiB; base64 adds a third, so keep the originals within 20 MB in total.
         if (files.reduce ((sum, file) => sum + file.size, 0) > ReferenceImageLimit) { throw new Error ('Reference images must total 20 MB or less.'); }
     }
-    SetReferenceFiles (files)
+    async SetReferenceFiles (files, { append = false } = {})
     {
-        this.ValidateReferenceFiles (files);
-        this.imageFiles = files; this.imageFile = files[0] || null;
-        this.imageName.textContent = files.length ? files.length + (files.length === 1 ? ' image · ' : ' images · ') + files.map (file => file.name).join (', ') : 'No image selected';
-        if (files.length) { this.ShowImages (files.map (file => URL.createObjectURL (file)), files.length > 1 ? 'Reference views for Multi-image to 3D' : 'Reference image', true); }
-        this.RefreshActions (); return { images : files.length };
+        const next = append ? [...this.imageFiles, ...files] : files;
+        if (next.length + (append ? this.remoteReferences.length : 0) > ReferenceImageCount) { throw new Error ('Use up to ' + ReferenceImageCount + ' reference images in total.'); }
+        this.ValidateReferenceFiles (next);
+        this.imageFiles = next; this.imageFile = next[0] || null; if (!append) { this.remoteReferences = []; }
+        this.RenderReferences (true); this.RefreshActions (); return { images : this.ReferenceCount () };
+    }
+    ClearReferences () { this.imageFiles = []; this.imageFile = null; this.remoteReferences = []; this.RenderReferences (); this.HideImages (); this.RefreshActions (); return { images : 0 }; }
+    RemoveReference (index)
+    {
+        const files = this.imageFiles.length;
+        if (index < files) { this.imageFiles = this.imageFiles.filter ((file, i) => i !== index); this.imageFile = this.imageFiles[0] || null; }
+        else { this.remoteReferences = this.remoteReferences.filter ((item, i) => i !== index - files); }
+        this.RenderReferences (true); this.RefreshActions (); return { images : this.ReferenceCount () };
+    }
+    // Thumbnails in the Create panel plus the 2D viewer, for uploaded files and generated views alike.
+    RenderReferences (show = false)
+    {
+        if (!this.referenceList) { return; }
+        this.referenceUrls.forEach (url => URL.revokeObjectURL (url));
+        this.referenceUrls = this.imageFiles.map (file => URL.createObjectURL (file));
+        const urls = [...this.referenceUrls, ...this.remoteReferences.map (item => item.url)];
+        this.referenceList.replaceChildren ();
+        urls.forEach ((url, index) => {
+            const item = Element ('div', 'ai_reference_item', undefined, this.referenceList); const image = Element ('img', null, undefined, item); image.src = url; image.alt = 'Reference ' + (index + 1); image.referrerPolicy = 'no-referrer';
+            const remove = Element ('button', null, '×', item); remove.type = 'button'; remove.setAttribute ('aria-label', 'Remove reference ' + (index + 1)); remove.addEventListener ('click', () => this.Run (() => this.RemoveReference (index)));
+        });
+        const names = [...this.imageFiles.map (file => file.name), ...this.remoteReferences.map ((item, index) => 'generated view ' + (index + 1))];
+        this.imageName.textContent = names.length ? names.length + ' of ' + (this.mode === 'multiimage3d' ? ReferenceImageCount : 1) + ' · ' + names.join (', ') : 'No image selected';
+        if (show && urls.length) { this.ShowImages (urls, urls.length > 1 ? 'Reference views for Multi-image to 3D' : 'Reference image', false); }
     }
     ReadDataURL (file) { return new Promise ((resolve, reject) => { const reader = new FileReader (); reader.onload = () => resolve (reader.result); reader.onerror = () => reject (new Error ('Cannot read reference image.')); reader.readAsDataURL (file); }); }
     async ReferenceImage ()
     {
-        if (!this.imageFile) { return null; }
-        this.ValidateReferenceFiles ([this.imageFile]); return this.ReadDataURL (this.imageFile);
+        if (this.imageFile) { this.ValidateReferenceFiles ([this.imageFile]); return this.ReadDataURL (this.imageFile); }
+        return this.remoteReferences?.[0]?.url || null;
     }
+    // Uploaded files become data URIs; generated views are Meshy asset URLs.
     async ReferenceImages ()
     {
         const files = this.imageFiles?.length ? this.imageFiles : this.imageFile ? [this.imageFile] : [];
-        this.ValidateReferenceFiles (files); return Promise.all (files.map (file => this.ReadDataURL (file)));
+        this.ValidateReferenceFiles (files); return [...await Promise.all (files.map (file => this.ReadDataURL (file))), ...(this.remoteReferences || []).map (item => item.url)];
+    }
+    // Reference views always use Meshy's multi-view Text to image (usually 3 views: front, side, back).
+    async GenerateReferenceViews ({ prompt, imageModel = 'nano-banana' } = {})
+    {
+        this.AssertEditable (); if (this.submitting) { throw new Error ('A generation is already being submitted.'); }
+        if (typeof prompt !== 'string' || !prompt.trim () || prompt.length > 800) { throw new Error ('Describe the object to generate reference views.'); }
+        if (!AIImageModels.includes (imageModel)) { throw new Error ('Choose a supported image model.'); }
+        if (this.ReferenceCount () >= ReferenceImageCount) { throw new Error ('Remove a reference before generating views.'); }
+        const owner = this.website.auth.user.id; this.submitting = true; this.RefreshActions (); let result;
+        try { ({ result } = await this.RequestJSON (this.settings.baseUrl + '/text-to-image', { method : 'POST', headers : this.Headers (true), body : JSON.stringify ({ prompt : prompt.trim (), ai_model : imageModel, generate_multi_view : true }) })); }
+        finally { this.submitting = false; this.RefreshActions (); }
+        if (typeof result.result !== 'string' || !result.result) { throw new Error ('Provider did not return a task ID.'); }
+        const task = { id : result.result, route : 'text-to-image', type : 'text-to-image', name : prompt.trim () + ' · views', status : 'PENDING', progress : 0, createdAt : Date.now (), provider : 'Meshy', views : true }; this.UpsertTask (task);
+        this.status.textContent = 'Generating reference views…';
+        this.PollTask ('text-to-image', task.id, owner).then (done => {
+            if (owner !== this.website.auth?.user?.id) { return; }
+            const urls = (done.imageUrls || []).slice (0, ReferenceImageCount - this.imageFiles.length);
+            this.remoteReferences = urls.map (url => ({ url, taskId : done.id })); if (this.mode !== 'multiimage3d') { this.SetMode ('multiimage3d'); }
+            this.RenderReferences (true); this.RefreshActions ();
+            this.status.textContent = urls.length + ' reference view' + (urls.length === 1 ? '' : 's') + ' ready.' + (this.ReferenceCount () < ReferenceImageCount ? ' Add another image for a 4th view if needed.' : '');
+        }).catch (error => { if (owner === this.website.auth?.user?.id) { this.status.textContent = error.message; } });
+        return { queued : task.id, route : 'text-to-image' };
     }
     RefreshImageOptions ()
     {
         if (!this.aspect) { return; }
         const model = this.imageModel.value; for (const option of this.aspect.options) { option.disabled = !AspectAllowed (model, option.value); }
         if (this.aspect.selectedOptions[0]?.disabled) { this.aspect.value = '1:1'; }
-        this.aspect.disabled = !!this.multiView?.checked; if (this.removeBackground) { this.removeBackground.disabled = !!this.multiView?.checked; if (this.multiView.checked) { this.removeBackground.checked = false; } }
     }
     async Generate (options)
     {
@@ -455,10 +545,14 @@ export class AIWorkspace
         if (action === 'textimage') { if (!prompt.trim () || !AIImageModels.includes (imageModel) || (!multiView && !AspectAllowed (imageModel, aspect))) { throw new Error ('Choose an image model, a supported aspect ratio and a prompt.'); } route = 'text-to-image'; payload = { prompt, ai_model : imageModel, ...(multiView ? { generate_multi_view : true } : { aspect_ratio : aspect, ...(removeBackground ? { remove_background : true } : {}) }) }; }
         if (action === 'image3d') { const image = reuseInput ? null : await this.ReferenceImage (); if (!image && !selected?.imageUrl && !(reuseInput && selected?.status === 'SUCCEEDED')) { throw new Error ('Upload an image or select a generated image.'); } route = 'image-to-3d'; payload = { ...(image ? { image_url : image } : { input_task_id : selected.id }), ...topology, should_texture : true, enable_pbr : pbr, texture_resolution : textureResolution, target_formats : ['glb'], ...textureGuide }; }
         if (action === 'multiimage3d') {
-            const images = !reuseInput && this.imageFiles?.length > 1 ? await this.ReferenceImages () : [];
-            if (images.length < 2 && !((reuseInput || ImageRouteTypes.has (selected?.route)) && selected?.status === 'SUCCEEDED')) { throw new Error ('Upload 2–4 views of the same object or select a generated image.'); }
+            const count = reuseInput ? 0 : this.ReferenceCount ();
+            // Views that all come from one generated task are sent by task ID; mixed or uploaded views as image URLs.
+            const viewsTask = !this.imageFiles?.length && count > 1 && new Set (this.remoteReferences.map (item => item.taskId)).size === 1 ? this.remoteReferences[0].taskId : null;
+            const images = count > 1 && !viewsTask ? await this.ReferenceImages () : [];
+            const source = viewsTask ? { input_task_id : viewsTask } : images.length > 1 ? { image_urls : images } : (reuseInput || ImageRouteTypes.has (selected?.route)) && selected?.status === 'SUCCEEDED' ? { input_task_id : selected.id } : null;
+            if (!source) { throw new Error ('Add 2–4 views of the same object, generate views from a prompt, or select a generated image.'); }
             // Multi-image does not offer Smart Topology; keep the selected face budget on the standard pipeline.
-            route = 'multi-image-to-3d'; payload = { ...(images.length > 1 ? { image_urls : images } : { input_task_id : selected.id }), ai_model : 'latest', topology : 'triangle', should_remesh : true, target_polycount : Number (faces), should_texture : true, enable_pbr : pbr, texture_resolution : textureResolution, target_formats : ['glb'], ...textureGuide };
+            route = 'multi-image-to-3d'; payload = { ...source, ai_model : 'latest', topology : 'triangle', should_remesh : true, target_polycount : Number (faces), should_texture : true, enable_pbr : pbr, texture_resolution : textureResolution, target_formats : ['glb'], ...textureGuide };
         }
         if (['texture', 'rigging', 'animations'].includes (action) && (!selected || selected.status !== 'SUCCEEDED' || (!selected.modelUrl && !this.assets.has (selected.id)))) { throw new Error ('Select a completed 3D model.'); }
         if (action === 'texture') { const image = reuseInput ? null : await this.ReferenceImage (); if (!image && !prompt.trim ()) { throw new Error ('Enter a texture prompt or reference image.'); } route = 'retexture'; payload = { input_task_id : selected.id, ...(image ? { image_style_url : image } : { text_style_prompt : prompt }), enable_original_uv : true, enable_pbr : pbr, texture_resolution : textureResolution }; }
