@@ -6,7 +6,7 @@ import { CreatePresentationPulpSide } from './engineeringpulp.js';
 import { CreateEngineeringArtwork } from './engineeringartwork.js';
 import { CollectEngineeringFitPoints, CreateEngineeringCamera } from './engineeringcamera.js';
 import { ReleaseWebGLRenderer } from './webglcleanup.js';
-import { EngineeringSequenceState, EngineeringStagePositions, EngineeringSequenceDuration, EngineeringTiming } from './engineeringsequence.js';
+import { EngineeringSequenceState, EngineeringStagePositions, EngineeringTiming } from './engineeringsequence.js';
 
 // An illustrative assembly, deliberately separate from manufacturing CAD and session geometry.
 export const EngineeringStages = [
@@ -106,7 +106,7 @@ export function CreateEngineeringHero (canvas, { onState = () => {} } = {})
     const grid = new THREE.GridHelper (18, 36, 0x304555, 0x192933); grid.position.y = -1.46; grid.material.transparent = true; grid.material.opacity = 0.09; scene.add (grid); resources.add (grid.geometry); resources.add (grid.material);
     const smooth = (t, a, b) => { const v = THREE.MathUtils.clamp ((t - a) / (b - a), 0, 1); return v * v * (3 - 2 * v); };
     const reduced = window.matchMedia ('(prefers-reduced-motion: reduce)');
-    let seconds = reduced.matches ? EngineeringSequenceDuration - 1 : 0, playing = !reduced.matches, active = true, disposed = false, previous, stage = -1, viewportWidth = 1, heightPx = 1, stamp = -1;
+    let seconds = reduced.matches ? EngineeringStagePositions[3] : 0, playing = !reduced.matches, active = true, disposed = false, previous, stage = -1, viewportWidth = 1, heightPx = 1, stamp = -1;
     // Preserve the motor shots, and capture the closed pack for the folding closeup.
     const motorTime = EngineeringStages[0].time;
     function placeAssembly (t, turn = 0) { assembly.rotation.y = 0.15 + Math.sin (t * 0.22) * 0.16 + turn * Math.PI / 2; assembly.position.y = Math.sin (t * 0.45) * 0.07; }
@@ -156,7 +156,7 @@ export function CreateEngineeringHero (canvas, { onState = () => {} } = {})
             fitPoint.copy (item.point).applyMatrix4 (assembly.matrixWorld).project (camera);
             return { id : item.id, x : (fitPoint.x + 1) / 2, y : (1 - fitPoint.y) / 2 };
         }) };
-        const nextStamp = Math.floor (seconds * (sequence.sequenceTime < EngineeringTiming[0].execute ? 60 : 10));
+        const nextStamp = Math.floor (seconds * (sequence.sequenceTime < EngineeringTiming[0].execute || sequence.outro.phase === 'fading' ? 60 : 10));
         if (sequence.stage !== stage || nextStamp !== stamp) { stage = sequence.stage; stamp = nextStamp; onState (inspect ()); }
     }
     function draw () { pose (); renderer.render (scene, camera); }
@@ -186,7 +186,7 @@ export function CreateEngineeringHero (canvas, { onState = () => {} } = {})
         else { throw new Error ('Unknown demo action.'); }
         schedule (); draw (); onState (inspect ()); return inspect ();
     }
-    const motion = () => { playing = !reduced.matches; if (reduced.matches) { seconds = EngineeringSequenceDuration - 1; } schedule (); draw (); onState (inspect ()); };
+    const motion = () => { playing = !reduced.matches; if (reduced.matches) { seconds = EngineeringStagePositions[3]; } schedule (); draw (); onState (inspect ()); };
     const visibility = () => { schedule (); onState (inspect ()); };
     const observer = new ResizeObserver (resize); observer.observe (canvas); reduced.addEventListener ('change', motion); document.addEventListener ('visibilitychange', visibility);
     resize (); schedule (); onState (inspect ());

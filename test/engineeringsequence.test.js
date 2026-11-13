@@ -1,14 +1,29 @@
 import assert from 'node:assert/strict';
-import { EngineeringIntroduction, EngineeringPrompts, EngineeringTiming, EngineeringStagePositions, EngineeringSequenceState as state, EngineeringSequenceDuration } from '../source/website/engineeringsequence.js';
+import { EngineeringIntroduction, EngineeringPrompts, EngineeringTiming, EngineeringStagePositions, EngineeringSequenceState as state, EngineeringSequenceDuration, EngineeringOutro } from '../source/website/engineeringsequence.js';
 import { CreateAgentCommands } from '../source/website/agentcommands.js';
 
 describe ('Animated packaging conversation', function () {
-    it ('adds a print and material review to a 41-second loop while preserving fast processing', function () {
-        assert.ok (Math.abs (EngineeringSequenceDuration - 41) < 1e-8);
+    it ('preserves the full study and adds a fade and pause to a 44-second loop', function () {
+        assert.ok (Math.abs (EngineeringSequenceDuration - 44) < 1e-8);
         assert.ok (EngineeringPrompts.every (item => item.executing <= 5.8));
         let previous = 0;
         for (let time = 0; time < EngineeringSequenceDuration; time += 0.05) { const frame = state (time); assert.ok (frame.sceneTime >= previous - 1e-8); previous = frame.sceneTime; }
         assert.equal (state (EngineeringSequenceDuration).stage, 0);
+    });
+    it ('fades for one second, holds empty for two, and restarts with a visible introduction', function () {
+        assert.equal (EngineeringOutro.fadeEnd - EngineeringOutro.fadeStart, 1);
+        assert.equal (EngineeringSequenceDuration - EngineeringOutro.fadeEnd, 2);
+        assert.equal (state (EngineeringOutro.fadeStart).outro.opacity, 1);
+        const midpoint = state (EngineeringOutro.fadeStart + 0.5);
+        assert.equal (midpoint.outro.phase, 'fading'); assert.equal (midpoint.outro.opacity, 0.5);
+        for (const delta of [0, 0.5, 1, 1.999]) {
+            const frame = state (EngineeringOutro.fadeEnd + delta);
+            assert.equal (frame.outro.phase, 'holding'); assert.equal (frame.outro.opacity, 0); assert.equal (frame.sceneTime, 21);
+        }
+        const loop = state (EngineeringSequenceDuration + 0.1);
+        assert.equal (loop.cycle, 1); assert.equal (loop.phase, 'logo'); assert.equal (loop.outro.opacity, 1);
+        assert.equal (loop.sceneVisible, false);
+        assert.ok (EngineeringStagePositions.every (time => state (time).outro.opacity === 1), 'stage selection and reduced-motion stills stay visible');
     });
     it ('drafts, colorizes and holds the logo before greeting Glen and docking his request', function () {
         const drafting = state (1), colored = state (3.2), held = state (4.3), fading = state (4.9);
