@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Printed packaging and material review — Auto3D 0.65.4 / Packaging 1.10.7 / Primary Products 0.14.0
+
+After folding, the hero applies black technical artwork to kraft, wipes into a white multicolor liner, turns the carton to the right and draws material leaders for the liner, fluted core and visible molded pulp. The large centered fit and compact banner remain; the shared loop is now 41 seconds. See [release-0654.md](release-0654.md).
+
 ## Meshy calls work on Cloudflare — Auto3D 0.65.3 / Primary Products 0.14.0 / Packaging 1.10.7 (2026-11-12)
 
 Fixes the long-standing production Meshy failure. Cloudflare Workers reject `fetch(..., { redirect: 'error' })`, so every proxied Meshy call and key test threw before reaching Meshy. That surfaced as "Could not reach Meshy" and "Submission response was lost". Calls now use `redirect: 'manual'` and refuse redirects. Reproduced and verified in `workerd`. See [release-0653.md](release-0653.md).

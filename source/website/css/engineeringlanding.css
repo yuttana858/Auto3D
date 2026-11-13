@@ -36,6 +36,20 @@
 
 .entry_agent[data-placement="corner"][data-phase="complete"] .entry_agent_execution, .entry_agent[data-placement="corner"][data-phase="reviewing"] .entry_agent_execution { display: none; }
 
+/* Projected material leaders share the presentation clock, including pause and replay. */
+.entry_materials { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.entry_material_leaders { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.entry_material_leaders path { fill: none; stroke: #93c6f2; stroke-width: 1; stroke-dasharray: 1; }
+.entry_material_leaders circle { fill: #d7edff; stroke: #4383b9; stroke-width: 1; }
+.entry_material_label { position: absolute; display: flex; gap: 7px; align-items: center; min-height: 38px; padding: 6px 7px; border-bottom: 1px solid #87bcec99; border-radius: 4px 4px 0 0; background: linear-gradient(110deg, #0c1725ee, #111f30d9); box-shadow: 0 3px 16px #0003; }
+.entry_material_label strong { display: block; font: 500 10px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #e0edfa; }
+.entry_material_label small { display: block; white-space: nowrap; font: 6.5px/1.8 monospace; letter-spacing: .25px; color: #91acc9; }
+.entry_material_swatch { display: block; flex: 0 0 16px; height: 22px; border: 1px solid #ffffff30; border-radius: 2px; box-shadow: inset 1px 1px 2px #fff3; }
+.entry_material_swatch.liner { background: linear-gradient(135deg, #eff3f5 0 40%, #2c73cf 40% 60%, #22b8d3 60% 80%, #f79554 80%); }
+.entry_material_swatch.core { background: repeating-linear-gradient(90deg, #b58a50 0 3px, #6b4a27 3px 4px, #d6ae76 4px 7px); }
+.entry_material_swatch.pulp { background: repeating-radial-gradient(ellipse at 25% 40%, #b8a17a 0 1px, #a08b69 1px 3px); }
+@media(max-width:760px) { .entry_material_label { padding: 5px; gap: 5px; }.entry_material_label strong { font-size: 10px; }.entry_material_label small { font-size: 6.5px; letter-spacing: 0; }.entry_material_swatch { flex-basis: 13px; height: 20px; } }
+
 /* A brief entrance shares the hero clock and never repeats while someone signs in. */
 .entry_frame_flash { position: absolute; z-index: 5; pointer-events: none; inset: -1px; border-radius: inherit; border: 1px solid #bedbff; opacity: var(--entry-frame-flash, 0); box-shadow: 0 0 18px #65abff80, inset 0 0 15px #8dc3ff30; }
 .entry_heading_type { display: inline-grid; grid-template-columns: 1fr; vertical-align: top; }

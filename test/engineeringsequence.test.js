@@ -3,8 +3,8 @@ import { EngineeringIntroduction, EngineeringPrompts, EngineeringTiming, Enginee
 import { CreateAgentCommands } from '../source/website/agentcommands.js';
 
 describe ('Animated packaging conversation', function () {
-    it ('adds the opening to a 35-second loop while preserving fast processing', function () {
-        assert.ok (Math.abs (EngineeringSequenceDuration - 35) < 1e-8);
+    it ('adds a print and material review to a 41-second loop while preserving fast processing', function () {
+        assert.ok (Math.abs (EngineeringSequenceDuration - 41) < 1e-8);
         assert.ok (EngineeringPrompts.every (item => item.executing <= 5.8));
         let previous = 0;
         for (let time = 0; time < EngineeringSequenceDuration; time += 0.05) { const frame = state (time); assert.ok (frame.sceneTime >= previous - 1e-8); previous = frame.sceneTime; }
