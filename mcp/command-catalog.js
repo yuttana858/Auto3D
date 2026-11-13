@@ -247,6 +247,8 @@ export const CommandIds = Object.freeze ([
     'ui.library',
     'ui.save',
     'commands.text',
+    'ui.messenger',
+    'ui.messenger.voice',
     'ui.command_bar',
     'ui.command_bar.inspect',
     'ui.command_bar.respond',

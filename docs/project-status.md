@@ -27,6 +27,9 @@ Edit model opens a split profile/3D workspace. Dimension callouts commit on Ente
 ## Staged hero pullbacks — Auto3D 0.64.3 / Packaging 1.10.7 / Primary Products 0.13.0
 
 Preserves the close motor opening, eases back to half its apparent size as molded pulp appears, then to 35% when the carton appears. Both moves use the presentation clock and the motor as the framing reference; the box view holds through folding and cutaway. See [release-0643.md](release-0643.md).
+## Messenger foundation — Auto3D 0.66.1 / Packaging 1.10.7 / Primary Products 0.15.0
+
+A movable shell with Messages and AI tabs, local draft identity, browser dictation and an opt-in playback hook. Sending, storage and Messenger AI transport are not connected. The separate command bar has an in-memory agent channel. See [messenger-plan.md](messenger-plan.md).
 
 ## Fixed motor-scale hero — Auto3D 0.64.2 / Packaging 1.10.7 / Primary Products 0.13.0
 
@@ -565,4 +568,8 @@ Validation: 464 unit tests, lint and website/Pages build; Chromium covers clean 
 Read `AGENTS.md`, this log and the architecture overview first. Treat the live deployment commit and tests as evidence; do not infer release success from a merged PR or the old version label. Keep the current batch in one release PR. Preserve unrelated local files and development screenshots under work/. Publish only reviewed changes on the current main tree.
 
 Use shared application services and strict registry commands for new user actions; synchronize the catalog. Respect login, account isolation and read-only sessions. Never put credentials in documents, browser code, screenshots or logs. Do not replay SQL from `database/history/pr16/`. Update this log after each release with version, commit, deployment result, meaningful tests and remaining issues.
+
+# Messenger voice foundation (local work in progress)
+
+The floating Messenger foundation includes a user-initiated browser dictation button, privacy disclosure, opt-in browser speech playback hook and `ui.messenger.voice` command. Dictation adds editable draft text only. The AI reply transport and persistence are not implemented, so live agent TTS is not yet connected. Browser speech support and audio processing vary; see [Messenger plan](messenger-plan.md).
 
