@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Compact material drawer — Auto3D 0.66.2 / Primary Products 0.15.0 / Packaging 1.10.7
+
+Shortens the advanced material drawer and labels the refraction setting IRO. The drawer content remains scrollable. Lint, website/Pages builds, 13 material tests and the desktop/mobile material browser regression pass. Candidate, not deployed.
+
 ## Bottle contents, optical walls and editable labels — Auto3D 0.66.0 / Primary Products 0.15.0 / Packaging 1.10.7
 
 Stacked in draft #116, following #110 (merged through #109). Adds wall callouts, synchronized glass refraction/absorption, cavity-conforming static contents, and live image/SVG/text label authoring in Edit model. CAD layers remain untouched. Includes main through #118 (`d3d1a47`), preserving the printed-packaging landing, folding closeup, Meshy Workers fix and agent command bar. Latest conflict-resolution checks: 860 unit/integration tests, lint and production/Pages builds passed. Earlier validation includes 66 MCP tests, engine/module builds and profile/contents plus command-bar browser regressions; see [release-0660.md](release-0660.md) for commit scope. Hosted full-suite results remain outstanding while Actions quota is exhausted. Not deployed.
