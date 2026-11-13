@@ -5,6 +5,7 @@ import { CapturePresentationBackground } from './sharedpresentation.js';
 import { Theme } from './settings.js';
 import { PreparePackagingPresentations } from './packagingadapter.js';
 import { SceneGroups } from './scenegroups.js';
+import { FloatingPanel } from './floatingpanel.js';
 import { CommandBar } from './commandbar.js';
 import { ProcessingFeedback } from './processingfeedback.js';
 import { ArrayPlacement, ArrayCellSize, ArrayObjectBounds } from './arraylayout.js';
@@ -262,7 +263,9 @@ export class SessionEditor
             button.addEventListener ('click', async () => { if (['undo', 'redo'].includes (key)) { button.setAttribute ('aria-busy', 'true'); button.disabled = true; try { await this.Run (action); } finally { button.removeAttribute ('aria-busy'); this.RefreshButtons (); } } else { await this.Run (action); } }); this.buttons.set (key, button);
         }
         this.transformPanel = Element ('div', 'scene_transform_panel', undefined, this.website.parameters.viewerDiv); this.transformPanel.hidden = true;
-        Element ('strong', null, 'Object transform', this.transformPanel); this.inputs = [];
+        const transformHeader = Element ('div', 'scene_transform_header', undefined, this.transformPanel); Element ('strong', null, 'Object transform', transformHeader);
+        Element ('span', 'floating_panel_grip', '⠿', transformHeader).setAttribute ('aria-hidden', 'true');
+        this.transformFloat = new FloatingPanel (this.transformPanel, transformHeader, 'auto3d.transformPanelPosition', 'Object transform panel'); this.inputs = [];
         for (const [key, title] of [['position', 'Position'], ['rotation', 'Rotation (°)'], ['scale', 'Size']]) {
             const group = Element ('div', 'transform_group', undefined, this.transformPanel); const heading = Element ('span', null, title, group);
             if (key === 'scale') { this.scaleHeading = heading; }
@@ -648,7 +651,7 @@ export class SessionEditor
         const selection = this.SelectedObjects ();
         if (selection.length > 1 && this.mode !== 'select' && !this.readOnly) { const bounds = new THREE.Box3 (); selection.forEach ((item) => { if (item.threeObject) { bounds.union (new THREE.Box3 ().setFromObject (item.threeObject)); } }); this.selectionPivot.position.copy (bounds.getCenter (new THREE.Vector3 ())); this.selectionPivot.rotation.set (0, 0, 0); this.selectionPivot.scale.set (1, 1, 1); this.selectionPivot.updateMatrix (); this.controls.setMode (this.mode); this.controls.attach (this.selectionPivot); }
         else if (this.selected?.threeObject && this.selected.visible && this.mode !== 'select') { this.controls.setMode (this.mode); this.controls.attach (this.selected.threeObject); }
-        this.transformPanel.hidden = !this.selected || this.mode === 'select';
+        this.transformPanel.hidden = !this.selected || this.mode === 'select'; this.transformFloat?.Apply ();
         if (!fromNavigator && this.selected) {
             let first = null; this.document.model.EnumerateMeshInstances ((instance) => { if (!first && this.document.Owner (instance) === this.selected) { first = instance.id; } });
             const current = this.website.navigator.GetSelectedMeshId (); if (first && (!current || !current.IsEqual (first))) { this.selecting = true; try { this.website.navigator.SetSelection (new Selection (SelectionType.Mesh, first)); } finally { this.selecting = false; } }

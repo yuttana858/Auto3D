@@ -69,6 +69,7 @@ selected-orbit
 session-cameras
 shadow-controls
 surface-relief
+transform-panel-move
 viewer-performance
 viewport-preferences
 viewport-quality

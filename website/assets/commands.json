@@ -2518,6 +2518,37 @@
       }
     },
     {
+      "id": "ui.transform_panel.position",
+      "title": "Move the Object transform panel",
+      "category": "Panels",
+      "description": "Read, move or reset the floating Object transform panel (Position/Rotation/Size) over the viewer, the same as dragging its title, arrow keys, or double-click to reset. x/y are pixels from the viewer top-left and are kept on screen; the position is remembered on this device. Omit x/y to read. Does not change the scene.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "y": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "reset": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "x": 40,
+        "y": 40
+      }
+    },
+    {
       "id": "selection.clear",
       "title": "Clear selection",
       "category": "Objects",

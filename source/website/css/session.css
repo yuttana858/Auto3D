@@ -28,6 +28,11 @@
 .scene_status { position: absolute; bottom: 12px; left: 110px; right: 62px; z-index: 3; color: var(--sw_axis_text, var(--ov_foreground_color)); font-size: 13px; pointer-events: none; line-height: 1.4; padding: 6px 10px; border-radius: 6px; background: var(--ov_background_color); overflow-wrap: anywhere; }
 .scene_transform_panel { position: absolute; z-index: 5; top: 12px; right: 55px; width: 210px; padding: 12px; background: var(--ov_background_color); color: var(--ov_foreground_color); border: 1px solid var(--ov_border_color); border-radius: 6px; font-size: 9.33px; box-shadow: 0 3px 14px #0002; }
 .scene_transform_panel[hidden] { display: none; }
+.scene_transform_header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -4px -4px 0; padding: 4px; border-radius: 4px; }
+.floating_panel_handle { cursor: move; user-select: none; touch-action: none; }
+.floating_panel_handle:hover, .floating_panel_handle:focus-visible { background: var(--ov_hover_color); }
+.floating_panel_grip { opacity: .55; font-size: 12px; line-height: 1; }
+.floating_panel_dragging { box-shadow: 0 8px 26px #0004; opacity: .96; }
 .transform_group { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; margin-top: 10px; }
 .transform_group > span { grid-column: 1/-1; }
 .transform_group label { display: flex; align-items: center; gap: 3px; font-size: 7.33px; }
