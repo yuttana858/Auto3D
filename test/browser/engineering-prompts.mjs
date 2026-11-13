@@ -38,13 +38,20 @@ try {
         assert.equal ((await execute ('landing.prompt.voice', { enabled : true })).result.enabled, false);
         assert.equal ((await inspect ()).sequence.sequenceTime, before);
 
+        // Wait and pause inside the page on the same animation frame. A separate pause round trip let a slow CI runner
+        // overshoot short phases (for example 'replying' had already ended, so its glow read opacity 0). The landing
+        // pause action toggles, so it is sent exactly once (see engineering-artwork.mjs).
+        const pauseWhen = async condition => {
+            await page.waitForFunction (`(() => { const ok = (${condition.toString ()}) (); if (ok && !window.__landingPause) { window.__landingPause = window.Auto3D.execute ('landing.demo.playback', { action : 'pause' }); } return ok; }) ()`);
+            const result = await page.evaluate (async () => { const result = await window.__landingPause; window.__landingPause = null; return result; });
+            assert.equal (result?.ok, true, 'landing pause: ' + JSON.stringify (result));
+        };
         await page.emulateMedia ({ reducedMotion : 'no-preference' });
         await execute ('landing.demo.playback', { action : 'restart' });
-        await page.waitForFunction (() => {
+        await pauseWhen (() => {
             const ink = document.querySelector ('.entry_heading_ink');
             return ink.textContent.length >= 4 && ink.textContent.length < 16;
         });
-        await execute ('landing.demo.playback', { action : 'pause' });
         const entering = (await inspect ()).entrance;
         assert.equal (entering.complete, false);
         assert.ok ('Engineering intelligence.'.startsWith (entering.text));
@@ -54,18 +61,16 @@ try {
         await page.waitForTimeout (120); assert.equal (await page.locator ('.entry_banner').innerHTML (), entranceFrozen);
         await page.locator ('.entry_banner').screenshot ({ path : `work/card-entrance-${width}.png` });
         await execute ('landing.demo.playback', { action : 'play' });
-        await page.waitForFunction (() => {
+        await pauseWhen (() => {
             const first = document.querySelector ('.entry_logo_letter');
             return document.querySelector ('.entry_agent').dataset.phase === 'logo' && Number (first.style.strokeDashoffset) < 0.5;
         });
-        await execute ('landing.demo.playback', { action : 'pause' });
         assert.equal (await page.locator ('.entry_canvas_wrap').getAttribute ('data-scene-visible'), 'false');
         assert.equal (Number (await agent.evaluate (e => getComputedStyle (e).opacity)), 0);
         const logoFrozen = await page.locator ('.entry_intro').innerHTML ();
         await page.waitForTimeout (140); assert.equal (await page.locator ('.entry_intro').innerHTML (), logoFrozen);
         await execute ('landing.demo.playback', { action : 'play' });
-        await page.waitForFunction (() => document.querySelector ('.entry_agent').dataset.phase === 'greeting' && document.querySelector ('.entry_agent_reply').textContent === 'Hi Glen, what would you like to create today?');
-        await execute ('landing.demo.playback', { action : 'pause' });
+        await pauseWhen (() => document.querySelector ('.entry_agent').dataset.phase === 'greeting' && document.querySelector ('.entry_agent_reply').textContent === 'Hi Glen, what would you like to create today?');
         const centered = await agent.boundingBox ();
         assert.equal ((await inspect ()).entrance.complete, true);
         assert.ok (Math.abs (centered.x + centered.width / 2 - canvas.x - canvas.width / 2) < 2);
@@ -74,11 +79,10 @@ try {
         assert.match (await agent.evaluate (e => getComputedStyle (e).backdropFilter), /blur/);
         assert.equal (await page.locator ('.entry_canvas_wrap').getAttribute ('data-scene-visible'), 'false');
         await execute ('landing.demo.playback', { action : 'play' });
-        await page.waitForFunction (() => {
+        await pauseWhen (() => {
             const e = document.querySelector ('.entry_agent');
             return e.dataset.phase === 'drafting' && e.dataset.input === 'typing' && e.querySelector ('.entry_prompt_text').textContent.length > 3;
         });
-        await execute ('landing.demo.playback', { action : 'pause' });
         const typed = await agent.locator ('.entry_prompt_text').textContent ();
         assert.ok (EngineeringPrompts[0].prompt.startsWith (typed) && typed.length < EngineeringPrompts[0].prompt.length);
         const held = (await inspect ()).sequence.sequenceTime;
@@ -86,13 +90,11 @@ try {
         assert.equal ((await inspect ()).sequence.sequenceTime, held);
         assert.equal (await agent.locator ('.entry_prompt_text').textContent (), typed);
         await execute ('landing.demo.playback', { action : 'play' });
-        await page.waitForFunction (() => document.querySelector ('.entry_agent').dataset.phase === 'docking');
-        await execute ('landing.demo.playback', { action : 'pause' });
+        await pauseWhen (() => document.querySelector ('.entry_agent').dataset.phase === 'docking');
         assert.equal (await agent.locator ('.entry_prompt_text').textContent (), EngineeringPrompts[0].prompt);
         assert.equal (await page.locator ('.entry_canvas_wrap').getAttribute ('data-scene-visible'), 'false');
         await execute ('landing.demo.playback', { action : 'play' });
-        await page.waitForFunction (() => document.querySelector ('.entry_canvas_wrap').dataset.sceneVisible === 'true');
-        await execute ('landing.demo.playback', { action : 'pause' });
+        await pauseWhen (() => document.querySelector ('.entry_canvas_wrap').dataset.sceneVisible === 'true');
         assert.equal (await agent.getAttribute ('data-placement'), 'corner');
         assert.ok ((await agent.boundingBox ()).width < centered.width || width <= 760);
 
@@ -113,15 +115,13 @@ try {
         assert.equal (await mic.evaluate (e => getComputedStyle (e).animationPlayState), 'paused');
         await page.screenshot ({ path : `work/compact-verified-${width}.png` });
         await execute ('landing.demo.playback', { action : 'play' });
-        await page.waitForFunction (() => document.querySelector ('.entry_agent').dataset.phase === 'replying');
-        await execute ('landing.demo.playback', { action : 'pause' });
+        await pauseWhen (() => document.querySelector ('.entry_agent').dataset.phase === 'replying');
         assert.equal (await agent.getAttribute ('data-mic-active'), 'false');
         assert.equal (await agent.locator ('.entry_prompt_text').textContent (), EngineeringPrompts[1].prompt);
         assert.ok (Number (await agent.evaluate (e => getComputedStyle (e, '::before').opacity)) > 0);
         assert.equal (await agent.evaluate (e => getComputedStyle (e, '::before').animationPlayState), 'paused');
         await execute ('landing.demo.playback', { action : 'play' });
-        await page.waitForFunction (() => document.querySelector ('.entry_agent').dataset.phase === 'executing');
-        await execute ('landing.demo.playback', { action : 'pause' });
+        await pauseWhen (() => document.querySelector ('.entry_agent').dataset.phase === 'executing');
         assert.match (await agent.locator ('.entry_execution_percent').textContent (), /\d+%/);
         const frames = [];
         for (const stage of [0, 1, 2, 3]) {
