@@ -2,7 +2,7 @@
 
 ## Compact material drawer — Auto3D 0.67.1 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0
 
-Shortens the advanced material drawer and labels the refraction setting IRO. The drawer content remains scrollable. Lint, website/Pages builds, 13 material tests and the desktop/mobile material browser regression pass. Candidate, not deployed.
+Shortens the advanced material drawer and labels the refraction setting IRO. The drawer content remains scrollable. After merging main through #120 at code commit 9845f03, lint, 876 unit/integration tests and production website/Pages builds pass. Earlier desktop/mobile material browser coverage passed for the unchanged drawer. Candidate, not deployed.
 
 ## Landing fade and loop pause — Auto3D 0.66.1 / Packaging 1.10.7 / Primary Products 0.15.0
 
