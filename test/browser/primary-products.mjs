@@ -19,7 +19,7 @@ try {
     await page.goto ('https://auto3d.test/'); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
     const call = async (id, args = {}) => { if (process.env.PRIMARY_TEST_PROGRESS) { console.log (id); } const response = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (response.ok, true, JSON.stringify (response)); return response.result; };
     const group = page.getByRole ('group', { name : 'Generation modules', exact : true });
-    assert.deepEqual (await group.getByRole ('button').evaluateAll (nodes => nodes.map (node => node.getAttribute ('aria-label'))), ['AI Generative', 'Packaging design', 'Primary Products']);
+    assert.deepEqual (await group.getByRole ('button').evaluateAll (nodes => nodes.map (node => node.getAttribute ('aria-label'))), ['AI Generative', 'Packaging design', 'Primary Products', 'Molded Pulp']);
     assert.notEqual (await group.evaluate (node => getComputedStyle (node).borderTopStyle), 'none');
     assert.equal (requests.some (url => url.includes ('primary-products.module')), false);
     await page.locator ('#open_file').setInputFiles ('test/testfiles/gltf/BoxTextured/glTF-Binary/BoxTextured.glb');
@@ -46,12 +46,10 @@ try {
     await call ('primary.configure', { labelZone : 'wrap' }); await mkdir ('work/primary-products-review', { recursive : true });
     await panel.evaluate (node => { node.scrollTop = 0; });
     await page.screenshot ({ path : 'work/primary-products-review/minimal.png' });
-    await page.getByRole ('button', { name : 'Extended Primary Products panel', exact : true }).click ();
-    const extended = page.getByRole ('dialog', { name : 'Primary Products extended workspace' }); await extended.waitFor ({ state : 'visible' });
-    assert.deepEqual (await extended.evaluate (node => [node.clientWidth, node.clientHeight]), [1500, 1000]);
+    // Since 0.66.0 the expand control opens Edit model (covered by primary-profile.mjs), which creates a product when
+    // none is selected; this draft-only flow therefore edits in the docked panel and keeps the scene unchanged.
     await panel.getByRole ('button', { name : 'Choose can' }).click (); await call ('primary.designs.open', { category : 'cans', open : false }); await height.fill ('150'); await height.press ('Tab');
-    await page.screenshot ({ path : 'work/primary-products-review/extended.png' });
-    await page.getByRole ('button', { name : 'Minimal Primary Products panel', exact : true }).click (); await extended.waitFor ({ state : 'hidden' });
+    await page.screenshot ({ path : 'work/primary-products-review/can-draft.png' });
     await page.getByRole ('button', { name : 'Close Primary Products panel', exact : true }).click ();
     assert.ok (await panel.evaluate (node => node.getAnimations ().some (animation => animation.playState === 'running')), 'Exit must animate before the panel is hidden');
     await page.waitForFunction (() => document.getElementById ('main_right_container').dataset.panelMode === 'closed');
@@ -59,13 +57,12 @@ try {
     await call ('preferences.units', { units : 'standard' }); assert.ok (Math.abs (Number (await height.inputValue ()) - 150 / 25.4) < .001);
     await call ('preferences.units', { units : 'metric' });
     const invalid = await page.evaluate (() => Auto3D.execute ('primary.configure', { heightMm : 0 })); assert.equal (invalid.ok, false); assert.equal ((await call ('primary.inspect')).heightMm, 150);
-    // Rapid UI transitions must honor the latest action and not resurrect the modal.
-    await page.getByRole ('button', { name : 'Extended Primary Products panel', exact : true }).click ();
-    await page.getByRole ('button', { name : 'Close Primary Products panel', exact : true }).click ();
-    await page.waitForFunction (() => document.getElementById ('main_right_container').dataset.panelMode === 'closed'); assert.equal (await extended.isVisible (), false);
+    // Rapid UI transitions must honor the latest action: open and close issued back to back end closed.
+    await page.evaluate (() => { Auto3D.execute ('ui.primary_products'); return Auto3D.execute ('ui.module.mode', { module : 'primary-products', mode : 'closed' }); });
+    await page.waitForFunction (() => document.getElementById ('main_right_container').dataset.panelMode === 'closed');
     await page.emulateMedia ({ reducedMotion : 'reduce' }); await call ('ui.primary_products');
     assert.equal (await panel.evaluate (node => node.getAnimations ().length), 0);
-    await page.setViewportSize ({ width : 390, height : 844 }); await call ('ui.module.mode', { module : 'primary-products', mode : 'extended' });
+    await page.setViewportSize ({ width : 390, height : 844 }); await call ('ui.module.mode', { module : 'primary-products', mode : 'minimal' });
     assert.equal (await panel.evaluate (node => node.scrollWidth > node.clientWidth + 1), false); assert.equal (await page.evaluate (() => document.documentElement.scrollWidth > innerWidth), false);
     await page.screenshot ({ path : 'work/primary-products-review/mobile.png' });
     await call ('ui.module.mode', { module : 'primary-products', mode : 'closed' }); await call ('ui.module.mode', { module : 'data', mode : 'minimal' });
@@ -98,7 +95,7 @@ try {
     await call ('primary.update'); assert.ok ((await call ('material.list')).some (m => m.transmission === 1 && m.ior === 1.5));
     await call ('primary.materials.open');
     const opticalEditor = page.locator ('#material_drawer_content');
-    assert.equal (await opticalEditor.getByRole ('spinbutton', { name : 'Index of refraction', exact : true }).inputValue (), '1.5');
+    assert.equal (await opticalEditor.getByRole ('spinbutton', { name : 'IRO', exact : true }).inputValue (), '1.5');
     await page.screenshot ({ path : 'work/primary-products-review/clear-glass-materials.png' });
     await page.locator ('#material_drawer_close').click ();
     assert.equal ((await call ('scene.inspect')).objects.length, 2); assert.deepEqual (errors, []);
@@ -136,8 +133,12 @@ try {
     await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).artwork[0].name, 'texture.png');
     const beforeBad = (await call ('primary.inspect')).widthMm;
     const invalidResize = await page.evaluate (() => Auto3D.execute ('primary.configure', { widthMm : 10, depthMm : 2 })); assert.equal (invalidResize.ok, false); assert.equal ((await call ('primary.inspect')).widthMm, beforeBad);
-    await call ('ui.module.mode', { module : 'primary-products', mode : 'extended' });
+    // Expanding with a generated pouch selected opens Edit model on that product.
+    await page.getByRole ('button', { name : 'Extended Primary Products panel', exact : true }).click ();
+    const profile = page.getByRole ('region', { name : 'Live product profile', exact : true }); await profile.waitFor ();
     await page.screenshot ({ path : 'work/primary-products-review/pouch-extended.png' });
+    await profile.getByRole ('button', { name : 'Close model editor' }).click (); await profile.waitFor ({ state : 'detached' });
+    await call ('ui.module.mode', { module : 'primary-products', mode : 'minimal' });
     await page.setViewportSize ({ width : 390, height : 844 });
     assert.equal (await panel.evaluate (node => node.scrollWidth > node.clientWidth + 1), false);
     await page.screenshot ({ path : 'work/primary-products-review/pouch-mobile.png' });
@@ -250,5 +251,5 @@ try {
     console.log ('W × L × H, material swatch, local image import, rendered labels and physical-fit validation passed.');
     console.log ('Generate readiness and pillow-pouch generation/layout passed.');
     console.log ('Primary Products scene flow passed: UI generation, strict update/load, identity, Undo/Redo and clear glass generation.');
-    console.log ('Primary Products desktop/mobile passed: module order/outline, lazy loading, draft controls, minimal/extended/close motion, rapid transitions, reduced motion, unit conversion and unchanged scene/camera.');
+    console.log ('Primary Products desktop/mobile passed: module order/outline, lazy loading, draft controls, minimal/close motion, Edit model expand, rapid transitions, reduced motion, unit conversion and unchanged scene/camera.');
 } finally { await browser.close (); }

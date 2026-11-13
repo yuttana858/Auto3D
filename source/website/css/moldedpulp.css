@@ -1,0 +1,5 @@
+.molded_pulp_module_panel { flex: 1; margin-left: 40px; width: calc(100% - 40px); box-sizing: border-box; padding: 14px 12px; overflow: auto; color: var(--ov_foreground_color); background: var(--ov_background_color); }
+/* This module uses the shared controller's WAAPI motion; avoid overlapping it
+   with the legacy modal CSS entrance animation. */
+.module_extended_view[data-module="molded-pulp"] > .module_panel_header,
+.module_extended_view[data-module="molded-pulp"] > .module_panel_body { animation: none; }

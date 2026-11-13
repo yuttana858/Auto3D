@@ -15,6 +15,8 @@ const packaging = await context ({ absWorkingDir : ModuleRoot, entryPoints : ['s
 await packaging.rebuild (); await packaging.watch ();
 const primaryProducts = await context ({ entryPoints : ['modules/primary-products/src/index.js'], bundle : true, format : 'esm', minify : true, outfile : path.join (root, 'build/website_dev/primary-products/primary-products.module.js'), plugins : [{ name : 'primary-products-css', setup : bundler => { bundler.onLoad ({ filter : /index\.js$/ }, async args => { if (args.path !== path.join (root, 'modules/primary-products/src/index.js')) { return; } return { contents : await readFile (args.path, 'utf8'), loader : 'js', watchFiles : [path.join (root, 'modules/primary-products/src/primary-products.css')] }; }); bundler.onEnd (async () => { await copyFile (path.join (root, 'modules/primary-products/src/primary-products.css'), path.join (root, 'build/website_dev/primary-products/primary-products.module.css')); }); } }], logLevel : 'info' });
 await primaryProducts.rebuild (); await primaryProducts.watch ();
+const moldedPulp = await context ({ entryPoints : ['modules/molded-pulp/src/index.js'], bundle : true, format : 'esm', minify : true, outfile : path.join (root, 'build/website_dev/molded-pulp/molded-pulp.module.js'), plugins : [{ name : 'molded-pulp-css', setup : bundler => { bundler.onLoad ({ filter : /index\.js$/ }, async args => { if (args.path !== path.join (root, 'modules/molded-pulp/src/index.js')) { return; } return { contents : await readFile (args.path, 'utf8'), loader : 'js', watchFiles : [path.join (root, 'modules/molded-pulp/src/molded-pulp.css')] }; }); bundler.onEnd (async () => { await copyFile (path.join (root, 'modules/molded-pulp/src/molded-pulp.css'), path.join (root, 'build/website_dev/molded-pulp/molded-pulp.module.css')); }); } }], logLevel : 'info' });
+await moldedPulp.rebuild (); await moldedPulp.watch ();
 const types = { '.html' : 'text/html', '.js' : 'text/javascript', '.css' : 'text/css', '.json' : 'application/json', '.svg' : 'image/svg+xml', '.png' : 'image/png', '.jpg' : 'image/jpeg', '.webp' : 'image/webp', '.woff' : 'font/woff', '.ttf' : 'font/ttf', '.wasm' : 'application/wasm', '.glb' : 'model/gltf-binary', '.gltf' : 'model/gltf+json' };
 const server = createServer (async (request, response) => {
     response.setHeader ('Cache-Control', 'no-store');
@@ -29,5 +31,5 @@ const server = createServer (async (request, response) => {
 });
 server.on ('error', async (error) => { console.error (error.message); await build.dispose (); process.exit (1); });
 server.listen (8080, '127.0.0.1', () => console.log ('SW Auto3D development server: http://localhost:8080/website/index.html — source watching, no browser cache. Refresh after a successful rebuild.'));
-async function stop () { server.close (); await Promise.all ([build.dispose (), packaging.dispose (), primaryProducts.dispose ()]); process.exit (0); }
+async function stop () { server.close (); await Promise.all ([build.dispose (), packaging.dispose (), primaryProducts.dispose (), moldedPulp.dispose ()]); process.exit (0); }
 process.on ('SIGINT', stop); process.on ('SIGTERM', stop);

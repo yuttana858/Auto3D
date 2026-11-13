@@ -7900,6 +7900,217 @@
       "example": {}
     },
     {
+      "id": "ui.molded_pulp",
+      "title": "Open Molded Pulp",
+      "category": "Panels",
+      "description": "Open the Molded Pulp tray panel. Does not sense products or change the scene.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "pulp.inspect",
+      "title": "Inspect molded pulp draft",
+      "category": "Molded Pulp",
+      "description": "Read the canonical-mm pulp draft (type, thickness, additional length/width, form depth, clearance, draft), the sensed products, and the last sheet/tray metrics and design-for-manufacture checks.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "pulp.types.list",
+      "title": "List molded pulp types",
+      "category": "Molded Pulp",
+      "description": "List Type 1 thick-wall, Type 2 transfer-molded and Type 3 wet/dry-pressed presets with reported wall thickness ranges, draft, tolerance and indicative density from the MP knowledge base.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "pulp.configure",
+      "title": "Configure molded pulp draft",
+      "category": "Molded Pulp",
+      "description": "Validate and update the pulp draft in canonical mm. Changing pulpType resets thickness, draft and colour to that type unless set in the same call. extraLengthMm/extraWidthMm grow the sheet beyond the exact product footprint (split evenly on both sides). Does not change the scene; Generate sheet or Form tray applies it.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pulpType": {
+            "type": "string",
+            "enum": [
+              "type1",
+              "type2",
+              "type3wet",
+              "type3dry"
+            ]
+          },
+          "thicknessMm": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 12
+          },
+          "extraLengthMm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "extraWidthMm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "formDepthMm": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 300
+          },
+          "clearanceMm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 20
+          },
+          "draftDeg": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 15
+          },
+          "resolutionMm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.25,
+                "maximum": 10
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[a-fA-F0-9]{6}$"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "pulpType": "type2",
+        "thicknessMm": 2.5,
+        "extraLengthMm": 40,
+        "extraWidthMm": 40
+      }
+    },
+    {
+      "id": "pulp.sense",
+      "title": "Sense selected products",
+      "category": "Molded Pulp",
+      "description": "Sense the selected products or group: world-space surfaces in mm, the grouped footprint (L × W × H) and the primary (first selected) product. Generated pulp objects and hidden objects are ignored. Does not change the scene.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "pulp.sheet.generate",
+      "title": "Generate pulp sheet",
+      "category": "Molded Pulp",
+      "description": "Place a flat pulp sheet directly under the sensed products, sized to the exact footprint plus the additional length/width, at the draft thickness. One Undo step; replaces the current pulp sheet/tray for these products in place.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "pulp.form_depth.set",
+      "title": "Set form depth",
+      "category": "Molded Pulp",
+      "description": "Set how far up the mold forms the pulp, in mm above the sheet. If a formed tray is current it is re-formed live in one Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formDepthMm": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 300
+          }
+        },
+        "required": [
+          "formDepthMm"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "formDepthMm": 40
+      }
+    },
+    {
+      "id": "pulp.tray.form",
+      "title": "Form pulp tray",
+      "category": "Molded Pulp",
+      "description": "Form the sheet over the sensed products: pockets follow each product bottom, the rest rises to the form depth, with clearance, draft and true wall thickness. Returns metrics and DFM checks. One Undo step; replaces the current sheet in place.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "pulp.selected.load",
+      "title": "Load selected pulp object",
+      "category": "Molded Pulp",
+      "description": "Load a selected generated pulp sheet or tray back into the draft and sensed products without changing scene geometry.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "pulp.reset",
+      "title": "Reset molded pulp draft",
+      "category": "Molded Pulp",
+      "description": "Reset the pulp draft and sensed products. Does not remove or change scene objects.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
       "id": "ui.packaging",
       "title": "Open Packaging panel",
       "category": "Panels",

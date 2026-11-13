@@ -20,9 +20,11 @@ The printed hero and material callouts release is Auto3D 0.65.4 / Packaging 1.10
 
 The landing fade-and-pause release is Auto3D 0.66.1 / Packaging 1.10.7 / Primary Products 0.15.0, based on main after #116. See docs/release-0661.md.
 
+The Molded Pulp candidate is Auto3D 0.67.0 / Packaging 1.10.7 / Primary Products 0.15.0 / Molded Pulp 0.1.0: an independent `modules/molded-pulp` package (sense selected products, sheet under the group, form depth, form tray, DFM checks) integrated through `moldedpulppanel.js` and `MoldedPulpWorkspace` with the same boundary as Primary Products. See docs/release-0670.md.
+
 # Agent-accessible features
 
-The unified agent approval release in PR #123 is Auto3D 0.68.0 / Packaging 1.10.7 / Primary Products 0.15.0. One OAuth approval grants read, write and screenshots; Live Control has no separate screenshot preference. Server-issued window codes are visible in the header, Preferences and MCP connections; Copy code/New code use `agent.access.code.copy/refresh`, and agents pair with a user-supplied code through `auto3d.sessions.pair_code`. Existing restricted credentials require reconnection. Use `auto3d.capabilities.inspect` for effective grant permissions. See docs/release-0680.md.
+The unified agent approval release in PR #123 is Auto3D 0.68.0 / Packaging 1.10.7 / Primary Products 0.15.0 / Molded Pulp 0.1.0. One OAuth approval grants read, write and screenshots; Live Control has no separate screenshot preference. Server-issued window codes are visible in the header, Preferences and MCP connections; Copy code/New code use `agent.access.code.copy/refresh`, and agents pair with a user-supplied code through `auto3d.sessions.pair_code`. Existing restricted credentials require reconnection. Use `auto3d.capabilities.inspect` for effective grant permissions. See docs/release-0680.md.
 
 For every new PR, report the application version and PR number to the user. Keep the app version, package version and release notes aligned when preparing a release.
 
@@ -36,7 +38,7 @@ Agent-facing failures use the coded errors in `mcp/common.js` (`AgentError`, `Pu
 
 # Packaging module boundary
 
-FEFCO generators, extrusion, textures, catalog UI and module styles belong in modules/packaging. Its neutral API and independent tests/build/preview must work without imports from source/engine or source/website. Auto3D integrates through source/website/packagingadapter.js and PackagingWorkspace. Load geometry/UI on demand; archive-safe pure profile validation may be shared at startup. Preserve this boundary when adding packaging features and report both app and module versions in release PRs. The Primary Products module (`modules/primary-products`, integrated through `primaryproductsadapter.js` and `PrimaryProductsWorkspace`) follows the same boundary.
+FEFCO generators, extrusion, textures, catalog UI and module styles belong in modules/packaging. Its neutral API and independent tests/build/preview must work without imports from source/engine or source/website. Auto3D integrates through source/website/packagingadapter.js and PackagingWorkspace. Load geometry/UI on demand; archive-safe pure profile validation may be shared at startup. Preserve this boundary when adding packaging features and report both app and module versions in release PRs. The Primary Products module (`modules/primary-products`, integrated through `primaryproductsadapter.js` and `PrimaryProductsWorkspace`) and the Molded Pulp module (`modules/molded-pulp`, integrated through `moldedpulpadapter.js` and `MoldedPulpWorkspace`) follow the same boundary.
 
 # Module panels and design consistency
 

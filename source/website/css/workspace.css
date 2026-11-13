@@ -129,7 +129,7 @@ div.intro div.intro_dragdrop_text { font-size: 13.33px; line-height: 1.5; margin
 div.main_viewer.hdri_background_visible .viewer_empty { background: transparent; }
 
 /* Compact shared Surface + Texture editor. */
-.material_drawer { height: min(225px, 32vh); }
+.material_drawer { height: min(170px, 25vh); }
 .surface_tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 7px; font-size: 10px; }
 .surface_tools select { background: var(--ov_background_color); color: inherit; border: 1px solid var(--ov_border_color); border-radius: 4px; font-size: 10px; padding: 3px; }
 .surface_uv_info { background: transparent; border: 0; color: inherit; cursor: pointer; font: inherit; opacity: .75; padding: 0; }

@@ -32,9 +32,10 @@ try {
     await call ('primary.designs.select', { id : 'food-deli' }); await call ('primary.configure', { material : 'petClear' });
     await call ('primary.designs.open', { category : 'clamshells', open : false });
     const shell = await call ('primary.generate'); await call ('primary.materials.open');
+    assert.ok ((await page.locator ('#material_drawer').boundingBox ()).height <= 171);
     const editor = page.locator ('#material_drawer_content'), art = page.getByRole ('region', { name : 'Product label artwork', exact : true }); await art.waitFor ();
     assert.equal (await panel.getByRole ('button', { name : 'Import label image', exact : true }).count (), 0);
-    assert.equal (await editor.getByRole ('spinbutton', { name : 'Index of refraction', exact : true }).inputValue (), '1.575');
+    assert.equal (await editor.getByRole ('spinbutton', { name : 'IRO', exact : true }).inputValue (), '1.575');
     const roughness = editor.getByRole ('slider', { name : 'Roughness', exact : true }); await roughness.fill ('0.22'); await roughness.dispatchEvent ('change');
     const chooser = page.waitForEvent ('filechooser'); await art.getByRole ('button', { name : 'Import label image', exact : true }).click (); await (await chooser).setFiles ('test/testfiles/obj/texture.png');
     let imported = false; for (let i = 0; i < 100; i++) { if ((await call ('primary.inspect')).artwork.length === 1) { imported = true; break; } await page.waitForTimeout (100); } assert.equal (imported, true);

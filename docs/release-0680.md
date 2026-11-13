@@ -1,4 +1,4 @@
-# Auto3D 0.68.0 / Packaging 1.10.7 / Primary Products 0.15.0
+# Auto3D 0.68.0 / Packaging 1.10.7 / Primary Products 0.15.0 / Molded Pulp 0.1.0
 
 Connecting an agent now uses one Allow/Deny approval for every Auto3D read/write tool and viewport/workspace screenshots. The OAuth resource advertises all three permissions, and the approval grants them together even when a client originally requests only read access. Agent preferences no longer contain a screenshot checkbox. Live Control includes screenshots whenever the approved agent uses the shared window.
 
@@ -13,5 +13,7 @@ The consent signature includes the current permission policy. Old or altered con
 Validation covers consent, PKCE, token refresh, old-form rejection, restricted credentials, command discovery, account/window isolation, revocation and PNG transport in the Workers runtime. Browser regressions exercise a 304.8 mm inside-dimension RSC through the window bridge, inspect the resulting dimensions, capture a PNG without a separate checkbox, and verify the command bar and permission UI. Real-client reconnection and retesting against the deployed release remain necessary to refresh the client's tool catalog.
 
 The existing landing artwork/outro regression now pauses within the browser task that observes each frame. This avoids skipping the short kraft-only hold while waiting for a protocol round trip on software-rendered CI runners; presentation code and timing are unchanged.
+
+Integrates main through PR #121, retaining the Molded Pulp module from #120 and the compact material drawer. Molded Pulp commands are included in the Modules discovery family. The agent release notes use 0.68.0 so the existing Molded Pulp 0.67.0 release notes remain intact.
 
 The initial approval repair passed 861 application/module tests, 70 MCP tests, 11 backend tests, application/MCP lint, license checks and a production dependency audit with zero vulnerabilities. Engine/module, website, Pages and isolated MCP builds passed. Chromium checks passed for consent/callback/token exchange, both live-mode and pilot browser bridges, RSC dimensions and capture, workspace privacy/logout, command-bar controls, and desktop/mobile artwork/outro playback. The window-code follow-up adds server issuance, renewal, used/expired states and account/window isolation coverage; final validation and deployment verification are recorded in the development log. Real-client reconnection remains necessary.

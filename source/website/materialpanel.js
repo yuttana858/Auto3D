@@ -392,7 +392,7 @@ export class MaterialPanel
             });
         }
         if (physical) {
-            for (const [key, title, min, max, step] of [['clearcoat', 'Clearcoat', 0, 1, .01], ['clearcoatRoughness', 'Coat roughness', 0, 1, .01], ['transmission', 'Transmission', 0, 1, .01], ['ior', 'Index of refraction', 1, 3, .01], ['thickness', 'Optical thickness (scene units)', 0, 1e6, .01]]) {
+            for (const [key, title, min, max, step] of [['clearcoat', 'Clearcoat', 0, 1, .01], ['clearcoatRoughness', 'Coat roughness', 0, 1, .01], ['transmission', 'Transmission', 0, 1, .01], ['ior', 'IRO', 1, 3, .01], ['thickness', 'Optical thickness (scene units)', 0, 1e6, .01]]) {
                 this.Control (properties, title, key === 'transmission' ? 'range' : 'number', material[key], { min, max, step }, value => {
                     const n = Number (value); if (!Number.isFinite (n) || n < min || n > max) { return; }
                     material[key] = n; entry.original[key] = n; material.needsUpdate = true;
@@ -616,7 +616,7 @@ export class MaterialPanel
     ShowSurfaceMapCards (parent, entry, properties)
     {
         const cards = document.createElement ('div'); cards.className = 'surface_map_cards'; parent.appendChild (cards);
-        const assignments = { map : ['Base color', 'Opacity'], roughnessMap : ['Glossy', 'Roughness'], specularMap : ['Reflective', 'Clearcoat', 'Coat roughness', 'Transmission', 'Index of refraction', 'Optical thickness (scene units)'], metalnessMap : ['Metalness'], bumpMap : ['Bump'], normalMap : ['Normal strength'], aoMap : ['AO intensity'], displacementMap : ['Displacement'], emissiveMap : ['Emission'] };
+        const assignments = { map : ['Base color', 'Opacity'], roughnessMap : ['Glossy', 'Roughness'], specularMap : ['Reflective', 'Clearcoat', 'Coat roughness', 'Transmission', 'IRO', 'Optical thickness (scene units)'], metalnessMap : ['Metalness'], bumpMap : ['Bump'], normalMap : ['Normal strength'], aoMap : ['AO intensity'], displacementMap : ['Displacement'], emissiveMap : ['Emission'] };
         for (const [key, title] of TextureSlots) {
             if (key === 'displacementMap') { continue; }
             if (key === 'emissiveMap' && !TextureForSlot (entry, key)) { continue; }
