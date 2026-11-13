@@ -6615,6 +6615,58 @@
       }
     },
     {
+      "id": "ui.messenger",
+      "title": "Open or close Messenger",
+      "category": "Panels",
+      "description": "Show or hide the Messenger window and optionally choose its Messages or AI tab. This UI foundation cannot send, receive or read conversations yet.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "visible": {
+            "type": "boolean"
+          },
+          "tab": {
+            "type": "string",
+            "enum": [
+              "people",
+              "ai"
+            ]
+          }
+        },
+        "required": [
+          "visible"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "visible": true,
+        "tab": "people"
+      }
+    },
+    {
+      "id": "ui.messenger.voice",
+      "title": "Set Messenger speech playback",
+      "category": "Panels",
+      "description": "Enable or disable reading future authenticated AI replies aloud. It does not start the microphone, speak arbitrary text, or connect an AI service.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "enabled": true
+      }
+    },
+    {
       "id": "ui.command_bar",
       "title": "Show or hide the command bar",
       "category": "Panels",
