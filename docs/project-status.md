@@ -27,9 +27,9 @@ Edit model opens a split profile/3D workspace. Dimension callouts commit on Ente
 ## Staged hero pullbacks — Auto3D 0.64.3 / Packaging 1.10.7 / Primary Products 0.13.0
 
 Preserves the close motor opening, eases back to half its apparent size as molded pulp appears, then to 35% when the carton appears. Both moves use the presentation clock and the motor as the framing reference; the box view holds through folding and cutaway. See [release-0643.md](release-0643.md).
-## Messenger foundation — local work in progress
+## Messenger foundation — Auto3D 0.66.1 / Packaging 1.10.7 / Primary Products 0.15.0
 
-A movable shell with Messages and AI tabs is in progress; sending, storage and AI transport are not connected. See [messenger-plan.md](messenger-plan.md).
+A movable shell with Messages and AI tabs, local draft identity, browser dictation and an opt-in playback hook. Sending, storage and Messenger AI transport are not connected. The separate command bar has an in-memory agent channel. See [messenger-plan.md](messenger-plan.md).
 
 ## Fixed motor-scale hero — Auto3D 0.64.2 / Packaging 1.10.7 / Primary Products 0.13.0
 

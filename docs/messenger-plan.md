@@ -1,6 +1,6 @@
 # Auto3D Messenger: product and implementation outline
 
-Status: interface foundation only. The floating window is not connected to a messaging service, an AI model, conversation storage, or agent message tools. The Send button is disabled. The existing bottom command bar executes typed Auto3D commands; it does not currently provide a persistent AI chat service. No account data or messages have been migrated.
+Status: interface foundation only. The floating window is not connected to a messaging service, an AI model, conversation storage, or agent message tools. The Send button is disabled. The bottom command bar executes typed Auto3D commands and keeps an in-memory channel for connected agents; it does not currently provide a persistent AI chat service, and Messenger is not yet connected to that channel. No account data or messages have been migrated.
 
 ## Voice service research and foundation
 
