@@ -193,6 +193,75 @@
     min-height: 2.8em;
 }
 
+.ai_progress
+{
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 6px 8px;
+    margin-top: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--ov_border_color);
+    border-radius: 6px;
+    font-size: var(--workspace-help-font-size);
+}
+
+.ai_progress[hidden]
+{
+    display: none;
+}
+
+.ai_progress_spinner
+{
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--ov_border_color);
+    border-top-color: var(--ov_button_color);
+    border-radius: 50%;
+    animation: ai-progress-spin .8s linear infinite;
+}
+
+.ai_progress[data-phase="complete"] .ai_progress_spinner,
+.ai_progress[data-phase="failed"] .ai_progress_spinner
+{
+    animation: none;
+    border-top-color: var(--ov_border_color);
+}
+
+.ai_progress[data-phase="failed"]
+{
+    border-color: #d9534f;
+}
+
+.ai_progress_bar
+{
+    grid-column: 1 / -1;
+    width: 100%;
+    height: 6px;
+    accent-color: var(--ov_button_color);
+}
+
+.ai_progress_bar[hidden]
+{
+    display: none;
+}
+
+.ai_recent_card.ai_recent_active
+{
+    outline: 2px solid var(--ov_button_color);
+    outline-offset: -2px;
+}
+
+@keyframes ai-progress-spin
+{
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce)
+{
+    .ai_progress_spinner { animation: none; }
+}
+
 .ai_recent_grid
 {
     display: grid;
