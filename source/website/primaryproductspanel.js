@@ -15,7 +15,7 @@ export class PrimaryProductsPanel
     {
         this.website = website; this.artwork = new PrimaryProductsArtwork (this); this.products = new PrimaryProductsWorkspace (this, async () => { await this.Ensure (); return this.module; }); this.draft = UpdateProductDraft (DefaultProductDraft (), { details : {} }); this.profileEditor = new PrimaryProfileWorkspace (this); this.callouts = true; this.owner = website.auth?.user?.id || null;
         this.panel = document.createElement ('section'); this.panel.id = 'primary_products_module_panel'; this.panel.className = 'primary_products_module_panel'; this.panel.hidden = true; this.panel.setAttribute ('aria-label', 'Primary Products'); website.parameters.rightContainerDiv.appendChild (this.panel);
-        website.modulePanels.Register ('primary-products', { title : 'Primary Products', body : this.panel, animated : true, onOpen : () => this.Ensure (), onMode : () => this.Refresh () });
+        website.modulePanels.Register ('primary-products', { title : 'Primary Products', body : this.panel, animated : true, onOpen : () => this.Ensure (), onMode : () => this.Refresh (), onExtended : () => this.profileEditor.Open () });
         website.auth?.Subscribe?.(user => { const owner = user?.id || null; if (owner !== this.owner) { this.owner = owner; this.artworkTarget = null; this.catalogOpen = false; this.artwork.Clear (); this.draft = UpdateProductDraft (DefaultProductDraft (), { details : {} }); this.Refresh (); } });
     }
     Blocked () { return !this.website.auth?.user || this.website.accountReady === false || this.website.sessionEditor.readOnly || this.website.sessionEditor.busy || this.products?.active; }
@@ -128,6 +128,7 @@ export class PrimaryProductsPanel
     }
     async MountArtwork (parent)
     {
+        if (this.profileEditor.open) { return false; }
         let selected;
         try { selected = this.products.Selected (); } catch { return; }
         const id = selected.object.id; await this.Ensure ();

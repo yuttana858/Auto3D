@@ -7904,7 +7904,7 @@
       "id": "ui.module.mode",
       "title": "Set module panel mode",
       "category": "Panels",
-      "description": "Set a registered module to minimal or closed; right-side modules also support extended. Opening does not generate content.",
+      "description": "Set a registered module to minimal or closed; right-side modules also support extended. Use primary.profile.open for the Primary Products expanded editor, which can generate a product. Opening other panels does not generate content.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
