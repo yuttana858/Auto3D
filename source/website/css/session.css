@@ -7,6 +7,13 @@
 .preferences_button { padding: 4px; border: 0; background: transparent; color: var(--ov_foreground_color); cursor: pointer; }
 .header_library_button { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; padding: 5px 8px; background: transparent; color: var(--ov_foreground_color); border: 1px solid var(--ov_border_color); border-radius: 4px; font-size: 9.33px; cursor: pointer; }
 .header_library_button:hover { background: var(--ov_hover_color); }
+.agent_connection_badge { font-family: ui-monospace, monospace; border-color: var(--ov_button_color); white-space: nowrap; }
+.agent_connection_badge[hidden] { display: none; }
+.agent_window_code { display: grid; gap: 8px; min-width: 0; margin-top: 12px; }
+.workspace_dialog .agent_window_code input { font-family: ui-monospace, monospace; font-size: var(--workspace-menu-font-size, 12px); letter-spacing: .06em; text-align: center; }
+.agent_code_actions { display: flex; gap: 8px; }
+.agent_code_actions button { flex: 1; }
+.agent_window_code .section_hint { margin: 0; line-height: 1.5; }
 .header_share_download { display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; padding: 5px 8px; background: transparent; color: var(--ov_foreground_color); border: 1px solid var(--ov_border_color); border-radius: 4px; font-size: 9.33px; cursor: pointer; }
 .header_share_download:hover { background: var(--ov_hover_color); }
 .library_source_tabs { display: flex; gap: 8px; flex-wrap: wrap; }

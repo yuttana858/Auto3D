@@ -1,12 +1,7 @@
 import { WorkspaceDialog } from './modellibrary.js';
 import { ConnectionPolicy, ConnectionScopes, ReadTools } from '../../mcp/common.js';
 
-const WindowCodeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-function CreateWindowCode ()
-{
-    const bytes = crypto.getRandomValues (new Uint8Array (16));
-    return [...bytes].map (byte => WindowCodeAlphabet[byte & 31]).join ('').match (/.{4}/g).join ('-');
-}
+const WindowCodePattern = /^(?:[A-HJ-NP-Z2-9]{4}-){3}[A-HJ-NP-Z2-9]{4}$/;
 
 const TabCommands = /^session\.tabs\.(?:new|switch|close)$/;
 const ResultLimit = 65536, CaptureLimit = 2050000;
@@ -55,7 +50,7 @@ export class AgentAccess
 {
     constructor (website)
     {
-        this.website = website; this.socket = null; this.instanceId = crypto.randomUUID (); this.generation = 0; this.status = 'Disconnected'; this.codeInput = null; this.copyButton = null; this.statusElement = null; this.reconnectEnabled = false; this.reconnectAttempts = 0; this.allowSelect = false; this.running = new Map ();
+        this.website = website; this.socket = null; this.instanceId = crypto.randomUUID (); this.generation = 0; this.status = 'Disconnected'; this.statusElement = null; this.reconnectEnabled = false; this.reconnectAttempts = 0; this.allowSelect = false; this.running = new Map (); this.codeViews = new Set ();
         website.auth.Subscribe (user => { if (!user || this.accountId && user.id !== this.accountId) { this.Disconnect (); } });
     }
     Account ()
@@ -70,14 +65,87 @@ export class AgentAccess
         if (!response.ok) { throw new Error ('Agent access unavailable. Check staging setup and permissions.'); }
         const result = await response.json (); if (this.Account () !== owner) { throw new Error ('Account changed.'); } return result;
     }
-    Inspect () { const connected = this.socket?.readyState === 1; return { status : this.status, connected, screenshots : connected, permissionPolicy : ConnectionPolicy, allowSelect : this.allowSelect === true, connectionId : this.connectionId || null }; }
+    Inspect () { const connected = this.socket?.readyState === 1; return { status : this.status, connected, screenshots : connected, permissionPolicy : ConnectionPolicy, allowSelect : this.allowSelect === true, connectionId : this.connectionId || null, windowCodeState : this.CodeState (), windowCodeExpiresAt : this.windowCodeExpiresAt || null }; }
+    CodeState ()
+    {
+        if (this.socket?.readyState !== 1) { return 'disconnected'; }
+        if (this.codeRequest) { return 'pending'; }
+        if (!this.windowCode) { return 'unavailable'; }
+        if (this.codeUsed) { return 'used'; }
+        return this.windowCodeExpiresAt > Date.now () ? 'available' : 'expired';
+    }
+    ReceiveCode (message)
+    {
+        if (!WindowCodePattern.test (message.windowCode) || !Number.isSafeInteger (message.windowCodeExpiresAt) || message.windowCodeExpiresAt <= 0 || typeof message.windowCodeId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test (message.windowCodeId)) { throw new Error ('Invalid window code.'); }
+        this.windowCode = message.windowCode; this.windowCodeExpiresAt = message.windowCodeExpiresAt; this.windowCodeId = message.windowCodeId; this.codeUsed = false;
+        clearTimeout (this.codeExpiryTimer); this.codeExpiryTimer = setTimeout (() => this.UpdateCodeViews (), Math.min (600000, Math.max (0, this.windowCodeExpiresAt - Date.now ())));
+        this.UpdateCodeViews ();
+    }
+    async RefreshCode ()
+    {
+        this.Account ();
+        if (this.socket?.readyState !== 1 || !this.connectionId) { throw Coded ('session_unavailable', 'Choose Live Control before requesting a window code.'); }
+        if (this.codeRequest) { return this.codeRequest.promise; }
+        const request = { id : crypto.randomUUID () };
+        request.promise = new Promise ((resolve, reject) => { request.resolve = resolve; request.reject = reject; });
+        request.timer = setTimeout (() => { if (this.codeRequest === request) { this.codeRequest = null; this.UpdateCodeViews (); request.reject (Coded ('timeout', 'The connection server did not return a new code. Try again.')); } }, 15000);
+        this.codeRequest = request; this.windowCode = null; this.windowCodeExpiresAt = null; this.windowCodeId = null; clearTimeout (this.codeExpiryTimer); this.UpdateCodeViews ();
+        try { this.socket.send (JSON.stringify ({ type : 'window_code', requestId : request.id, instanceId : this.instanceId })); }
+        catch { clearTimeout (request.timer); this.codeRequest = null; this.UpdateCodeViews (); request.reject (Coded ('session_unavailable', 'The window disconnected. Choose Live Control again.')); }
+        return request.promise;
+    }
+    async CopyCode ()
+    {
+        this.Account ();
+        if (this.CodeState () !== 'available') { throw Coded ('invalid_code', 'Generate a new window code before copying.'); }
+        try { if (!globalThis.navigator?.clipboard?.writeText) { return { copied : false, requiresUserGesture : true }; } await navigator.clipboard.writeText (this.windowCode); return { copied : true }; }
+        catch { return { copied : false, requiresUserGesture : true }; }
+    }
+    CodeControls ()
+    {
+        for (const view of this.codeViews) { if (!view.root.isConnected) { this.codeViews.delete (view); } }
+        const root = document.createElement ('div'); root.className = 'agent_window_code'; root.dataset.capturePrivate = '';
+        const label = document.createElement ('label'); label.textContent = 'App window code';
+        const input = document.createElement ('input'); input.type = 'text'; input.readOnly = true; input.autocomplete = 'off'; input.spellcheck = false; input.setAttribute ('aria-label', 'App window code'); label.appendChild (input);
+        const actions = document.createElement ('div'); actions.className = 'agent_code_actions';
+        const copy = document.createElement ('button'); copy.type = 'button'; copy.textContent = 'Copy code';
+        const renew = document.createElement ('button'); renew.type = 'button'; renew.textContent = 'New code';
+        const note = document.createElement ('p'); note.className = 'section_hint'; note.setAttribute ('aria-live', 'polite');
+        copy.onclick = () => { this.CopyCode ().then (result => { note.textContent = result.copied ? 'Window code copied. Share it with your agent.' : 'Select the window code and copy it.'; if (!result.copied) { input.focus (); input.select (); } }).catch (error => { note.textContent = error.message; }); };
+        renew.onclick = () => { this.RefreshCode ().catch (error => { note.textContent = error.message; }); };
+        actions.append (copy, renew); root.append (label, actions, note);
+        const view = { root, input, copy, renew, note }; this.codeViews.add (view); this.RenderCodeView (view); return root;
+    }
+    RenderCodeView (view)
+    {
+        const state = this.CodeState ();
+        view.input.value = state === 'available' ? this.windowCode : '';
+        view.input.placeholder = state === 'used' ? 'Code used' : state === 'expired' ? 'Code expired' : state === 'pending' ? 'Generating code…' : state === 'unavailable' ? 'Choose New code' : 'Connect with Live Control';
+        view.copy.disabled = state !== 'available'; view.renew.disabled = this.socket?.readyState !== 1 || Boolean (this.codeRequest);
+        view.note.textContent = state === 'available' ? 'Give this code to your agent to select this window. Valid for 10 minutes and one use.' : state === 'used' ? 'This code has been used. Choose New code to connect another agent.' : state === 'expired' ? 'This code expired. Choose New code to connect an agent.' : state === 'pending' ? 'Requesting a new window code…' : state === 'unavailable' ? 'Choose New code to request a window code.' : 'Choose Live Control to receive a window code.';
+    }
+    UpdateCodeViews ()
+    {
+        for (const view of this.codeViews) { if (!view.root.isConnected) { this.codeViews.delete (view); } else { this.RenderCodeView (view); } }
+        if (this.connectionBadge) {
+            this.connectionBadge.hidden = this.socket?.readyState !== 1;
+            this.connectionBadge.textContent = this.CodeState () === 'available' ? 'Window · ' + this.windowCode : this.CodeState () === 'expired' ? 'Window code expired' : 'Agent connected';
+        }
+    }
+    MountConnectionBadge (parent)
+    {
+        const button = document.createElement ('button'); button.type = 'button'; button.className = 'header_library_button agent_connection_badge'; button.setAttribute ('aria-label', 'Agent connection and window code'); button.dataset.capturePrivate = '';
+        button.onclick = () => { this.Open ().catch (error => this.website.sessionEditor.Status (error.message)); };
+        this.connectionBadge = button; parent.appendChild (button); this.UpdateCodeViews ();
+    }
     Sessions () { return this.website.sessionEditor.sessions.Inspect ().tabs.map (tab => ({ id : tab.id, name : tab.name.slice (0, 100), active : tab.active })); }
     Disconnect ({ preserveRetry = false } = {})
     {
         if (!preserveRetry) { this.reconnectEnabled = false; this.reconnectAttempts = 0; }
         clearTimeout (this.reconnectTimer); this.reconnectTimer = null;
-        this.generation++; clearInterval (this.poll); clearInterval (this.renew); clearTimeout (this.handshakeTimer); this.socket?.close (); this.socket = null; this.connectionId = null; this.windowCode = null;
-        if (this.codeInput) { this.codeInput.value = ''; } if (this.copyButton) { this.copyButton.disabled = true; }
+        this.generation++; clearInterval (this.poll); clearInterval (this.renew); clearTimeout (this.handshakeTimer); clearTimeout (this.codeExpiryTimer); this.socket?.close (); this.socket = null; this.connectionId = null; this.windowCode = null; this.windowCodeExpiresAt = null; this.windowCodeId = null; this.codeUsed = false;
+        if (this.codeRequest) { clearTimeout (this.codeRequest.timer); this.codeRequest.reject (Coded ('session_unavailable', 'The window disconnected before the code was returned.')); this.codeRequest = null; }
+        this.UpdateCodeViews ();
         this.status = 'Disconnected'; if (this.statusElement) { this.statusElement.textContent = this.status; } return this.Inspect ();
     }
     ConnectionLost ()
@@ -104,12 +172,11 @@ export class AgentAccess
         // Retain the old argument for saved macros; the unified approval always includes capture.
         if (screenshots !== undefined && typeof screenshots !== 'boolean' || typeof allowSelect !== 'boolean') { throw new Error ('Invalid connection preference.'); }
         const initialGeneration = this.generation;
-        const windowCode = CreateWindowCode ();
         const owner = this.Account (), config = await this.Request ('config');
         if (retry && (!this.reconnectEnabled || this.generation !== initialGeneration)) { throw new Error ('Reconnect cancelled.'); }
         if (!config.pilot || !['https://auto3d-mcp-pilot.pages.dev', 'https://auto3d-5av.pages.dev'].includes (location.origin) || config.mcpUrl !== location.origin + '/mcp') { throw new Error ('MCP access is unavailable here.'); }
         // A reconnect keeps the window identity so an existing pairing resumes.
-        this.Disconnect ({ preserveRetry : retry }); if (!retry) { this.instanceId = crypto.randomUUID (); } this.accountId = owner; this.allowSelect = allowSelect; this.windowCode = windowCode; this.status = 'Connecting'; const generation = this.generation;
+        this.Disconnect ({ preserveRetry : retry }); if (!retry) { this.instanceId = crypto.randomUUID (); } this.accountId = owner; this.allowSelect = allowSelect; this.status = 'Connecting'; const generation = this.generation;
         const socket = new WebSocket (location.origin.replace ('https:', 'wss:') + '/api/agent/connect'); this.socket = socket;
         // Only protocol violations end the connection; command failures are returned as results.
         socket.addEventListener ('message', event => { this.Message (event, socket, generation).catch (() => { if (this.socket === socket) { this.ConnectionLost (); } }); });
@@ -120,7 +187,7 @@ export class AgentAccess
             socket.addEventListener ('close', () => { clearTimeout (this.handshakeTimer); reject (new Error ('Connection ended.')); }, { once : true });
             socket.addEventListener ('open', () => {
                 if (this.Account () !== owner || generation !== this.generation) { reject (new Error ('Account changed.')); return; }
-                socket.send (JSON.stringify ({ type : 'hello', instanceId : this.instanceId, windowLabel : 'Auto3D window ' + this.instanceId.slice (0, 8), windowCode, allowSelect, sessions : this.Sessions () }));
+                socket.send (JSON.stringify ({ type : 'hello', instanceId : this.instanceId, windowLabel : 'Auto3D window ' + this.instanceId.slice (0, 8), allowSelect, sessions : this.Sessions () }));
             }, { once : true });
             this.onReady = () => { clearTimeout (this.handshakeTimer); resolve (); };
         });
@@ -132,16 +199,19 @@ export class AgentAccess
         }, 1000);
         this.renew = setInterval (() => { this.Request ('renew', { connectionId : this.connectionId, instanceId : this.instanceId }).catch (() => this.ConnectionLost ()); }, 60000);
         this.reconnectEnabled = true; this.reconnectAttempts = 0;
-        if (this.codeInput) { this.codeInput.value = windowCode; } if (this.copyButton) { this.copyButton.disabled = false; }
         if (this.statusElement) { this.statusElement.textContent = retry ? 'Reconnected. Existing agent pairings resume; a new code is available for new agents.' : 'Connected'; }
-        return { ...this.Inspect (), windowCode };
+        return { ...this.Inspect (), windowCode : this.windowCode };
     }
     async Message (event, socket, generation)
     {
         if (typeof event.data !== 'string' || event.data.length > 65536 || generation !== this.generation || this.Account () !== this.accountId) { throw new Error ('Stale connection.'); }
         const message = JSON.parse (event.data);
-        if (message.type === 'hello_ack') { this.connectionId = message.connectionId; this.status = 'Connected'; this.onReady?.(); return; }
-        if (message.type === 'access_changed') { return; }
+        if (message.type === 'hello_ack') { this.ReceiveCode (message); this.connectionId = message.connectionId; this.status = 'Connected'; this.onReady?.(); return; }
+        if (message.type === 'window_code') {
+            if (this.codeRequest?.id !== message.requestId) { return; }
+            this.ReceiveCode (message); const request = this.codeRequest; clearTimeout (request.timer); this.codeRequest = null; this.UpdateCodeViews (); request.resolve ({ windowCode : this.windowCode, expiresAt : this.windowCodeExpiresAt }); return;
+        }
+        if (message.type === 'access_changed') { if (message.windowCodeUsed && message.windowCodeUsed === this.windowCodeId) { this.codeUsed = true; this.UpdateCodeViews (); } return; }
         if (message.type === 'cancel') { if (this.running.get (message.requestId) === 'commands.text') { this.website.commands.Cancel (); } return; }
         if (message.type !== 'request' || typeof message.requestId !== 'string' || typeof message.sessionId !== 'string') { throw new Error ('Invalid message.'); }
         const reply = payload => {
@@ -205,7 +275,7 @@ export class AgentAccess
                 { const revoke = document.createElement ('button'); revoke.textContent = 'Revoke'; revoke.onclick = () => { this.Request ('registrations', { action : 'revoke', id : record.id }).then (refresh).catch (error => { status.textContent = error.message; }); }; row.appendChild (revoke); } list.appendChild (row);
             }
         };
-        form.append (access, connect, disconnect, status, list); dialog.appendChild (form); await refresh (); return { opened : true };
+        form.append (access, connect, disconnect, status, this.CodeControls (), list); dialog.appendChild (form); await refresh (); return { opened : true };
     }
     async OpenAdmin ()
     {

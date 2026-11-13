@@ -106,6 +106,27 @@ describe ('MCP registration and isolation boundary', () => {
         now += 600001; await broker.Cleanup ();
         assert.equal ((await state.storage.list ({ prefix : 'used-window-code:' })).size, 0);
     });
+    it ('issues codes from the server and replaces them without changing existing pairings', async () => {
+        const state = State (), broker = new BrokerCore (state), socket = Socket ();
+        for (const id of ['grant-a', 'grant-b']) { await broker.registrations.Create (registration (id)); }
+        await broker.Attach ({ accountId : owner, sessionFingerprint : 'a'.repeat (64), expiresAt : Date.now () + 300000 }, socket);
+        await broker.Message (socket, JSON.stringify ({ type : 'hello', instanceId : 'server-code-window', windowLabel : 'Window A', sessions : [{ id : 'tab-a', name : 'Box', active : true }] }));
+        const issued = socket.sent.find (message => message.type === 'hello_ack');
+        assert.match (issued.windowCode, /^(?:[A-HJ-NP-Z2-9]{4}-){3}[A-HJ-NP-Z2-9]{4}$/);
+        assert.ok (issued.windowCodeExpiresAt > Date.now () + 590000); assert.equal (JSON.stringify (socket.data).includes (issued.windowCode), false);
+        assert.equal (JSON.stringify (await broker.List (owner)).includes (issued.windowCode), false);
+        await broker.PairWithCode ({ accountId : owner, grantId : 'grant-a', code : issued.windowCode, expiresAt : Date.now () + 60000 });
+        assert.ok (socket.sent.some (message => message.type === 'access_changed' && message.windowCodeUsed === issued.windowCodeId));
+        const paired = await state.storage.get ('pair:grant-a');
+        await broker.Message (socket, JSON.stringify ({ type : 'window_code', instanceId : 'server-code-window', requestId : 'new-code' }));
+        const renewed = socket.sent.find (message => message.type === 'window_code');
+        assert.equal (renewed.requestId, 'new-code'); assert.notEqual (renewed.windowCode, issued.windowCode); assert.notEqual (renewed.windowCodeId, issued.windowCodeId);
+        assert.deepEqual (await state.storage.get ('pair:grant-a'), paired);
+        await assert.rejects (broker.PairWithCode ({ accountId : owner, grantId : 'grant-b', code : issued.windowCode, expiresAt : Date.now () + 60000 }), /unavailable/);
+        await broker.PairWithCode ({ accountId : owner, grantId : 'grant-b', code : renewed.windowCode, expiresAt : Date.now () + 60000 });
+        assert.equal ((await state.storage.get ('pair:grant-b')).connectionId, issued.connectionId);
+        assert.equal (JSON.stringify (socket.data).includes (renewed.windowCode), false);
+    });
     it ('disconnects an idle pairing after one hour without revoking the agent registration', async () => {
         let now = Date.now (); const state = State (), broker = new BrokerCore (state, { now : () => now }), socket = Socket ();
         await broker.registrations.Create ({ ...registration (), expiresAt : now + 7200000 });

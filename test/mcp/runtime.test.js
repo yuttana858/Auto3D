@@ -189,11 +189,13 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         socket.send (JSON.stringify ({ type : 'hello', instanceId : 'retry-window', windowLabel : 'Retry window', windowCode : correct, sessions : [{ id : 'tab-a', name : 'Box', active : true }] })); await ack;
         flow.form.set ('appWindowCode', correct); const approved = await approve (flow); assert.equal (approved.status, 302);
     });
-    it ('pairs a user-supplied window code after OAuth login without returning the code', async () => {
-        const token = await grant (); const code = 'WXYZ-2345-6789-ABCD';
+    it ('pairs a server-issued window code after OAuth login without returning it to an unpaired agent', async () => {
+        const token = await grant ();
         const upgrade = await fetch ('/api/agent/connect', { headers : { Cookie : cookieFor (userA), Origin : origin, Upgrade : 'websocket' } }); assert.equal (upgrade.status, 101);
         socket = upgrade.webSocket; socket.accept (); const ack = message (socket);
-        socket.send (JSON.stringify ({ type : 'hello', instanceId : 'agent-code-window', windowLabel : 'Agent code window', allowSelect : true, windowCode : code, sessions : [{ id : 'tab-a', name : 'Box', active : true }] })); await ack;
+        socket.send (JSON.stringify ({ type : 'hello', instanceId : 'agent-code-window', windowLabel : 'Agent code window', allowSelect : true, sessions : [{ id : 'tab-a', name : 'Box', active : true }] })); const issued = await ack, code = issued.windowCode;
+        assert.match (code, /^(?:[A-HJ-NP-Z2-9]{4}-){3}[A-HJ-NP-Z2-9]{4}$/); assert.ok (issued.windowCodeExpiresAt > Date.now () + 590000);
+        const windows = await (await rpc (token.access_token, 'tools/call', { name : 'auto3d.sessions.list', arguments : {} })).json (); assert.equal (JSON.stringify (windows).includes (code), false);
         const tools = await (await rpc (token.access_token, 'tools/list')).json (); assert.ok (tools.result.tools.some (tool => tool.name === 'auto3d.sessions.pair_code'));
         if (!live) { const other = await grant (userB); const wrong = await (await rpc (other.access_token, 'tools/call', { name : 'auto3d.sessions.pair_code', arguments : { code } })).json (); assert.equal (wrong.result.isError, true); }
         const paired = await (await rpc (token.access_token, 'tools/call', { name : 'auto3d.sessions.pair_code', arguments : { code } })).json ();

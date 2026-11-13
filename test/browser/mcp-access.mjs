@@ -18,8 +18,9 @@ const server = createServer (async (request, response) => {
 await new Promise (resolve => server.listen (0, '127.0.0.1', resolve));
 const browser = await chromium.launch ({ executablePath : process.env.BROWSER_EXECUTABLE || (process.env.CI ? chromium.executablePath () : '/usr/bin/chromium'), args : ['--no-sandbox', '--enable-unsafe-swiftshader'] });
 try {
-    const page = await browser.newPage ({ viewport : { width : 1280, height : 900 } }), errors = [], results = []; let nextResult;
+    const page = await browser.newPage ({ viewport : { width : 1280, height : 900 }, permissions : ['clipboard-read', 'clipboard-write'] }), errors = [], results = []; let nextResult;
     let registrationScopes = ['auto3d.read', 'auto3d.write', 'auto3d.capture'];
+    const windowCodes = ['ABCD-EFGH-JKLM-NPQR', 'QRST-UVWX-YZ23-4567', 'WXYZ-2345-6789-ABCD']; let codeIndex = 0;
     page.on ('pageerror', error => errors.push (error.message));
     await page.route (origin + '/**', async route => {
         const url = new URL (route.request ().url ());
@@ -39,7 +40,8 @@ try {
     await page.routeWebSocket (origin.replace ('https:', 'wss:') + '/api/agent/connect', ws => {
         wire = ws; ws.onMessage (text => {
             const message = JSON.parse (text);
-            if (message.type === 'hello') { ws.send (JSON.stringify ({ type : 'hello_ack', connectionId : 'connection-a', expiresAt : Date.now () + 300000 })); helloSeen (); }
+            if (message.type === 'hello') { assert.equal (message.windowCode, undefined); ws.send (JSON.stringify ({ type : 'hello_ack', connectionId : 'connection-a', expiresAt : Date.now () + 300000, windowCode : windowCodes[codeIndex], windowCodeExpiresAt : Date.now () + 600000, windowCodeId : 'code-' + codeIndex })); helloSeen (); }
+            if (message.type === 'window_code') { codeIndex++; ws.send (JSON.stringify ({ type : 'window_code', requestId : message.requestId, windowCode : windowCodes[codeIndex], windowCodeExpiresAt : Date.now () + 600000, windowCodeId : 'code-' + codeIndex })); }
             if (message.type === 'result') { results.push (message); nextResult?.(); }
         });
     });
@@ -50,11 +52,26 @@ try {
     assert.equal (await dialog.locator ('input[type=checkbox]').count (), 0);
     assert.match (await dialog.innerText (), /including read, write and screenshot access/);
     assert.match (await dialog.innerText (), /Named review agent · Full access/);
-    assert.equal (await dialog.getByLabel ('App window code').count (), 0);
-    assert.equal (await dialog.getByRole ('button', { name : 'Copy', exact : true }).count (), 0);
+    const codeInput = dialog.getByLabel ('App window code'); assert.equal (await codeInput.inputValue (), '');
+    assert.equal (await dialog.getByRole ('button', { name : 'Copy code', exact : true }).isDisabled (), true);
+    assert.equal (await dialog.getByRole ('button', { name : 'New code', exact : true }).isDisabled (), true);
     await dialog.getByRole ('button', { name : 'Live Control' }).click (); await dialog.getByRole ('status').filter ({ hasText : 'Connected' }).waitFor ();
     await hello; /* the status can update before Playwright runs the WebSocket route handler */
     assert.equal ((await call ('agent.access.inspect')).screenshots, true);
+    assert.equal (await codeInput.inputValue (), windowCodes[0]);
+    const badge = page.getByRole ('button', { name : 'Agent connection and window code', exact : true }); assert.match (await badge.textContent (), new RegExp (windowCodes[0]));
+    await dialog.getByRole ('button', { name : 'Copy code', exact : true }).click (); assert.equal (await page.evaluate (() => navigator.clipboard.readText ()), windowCodes[0]);
+    await dialog.getByRole ('button', { name : 'New code', exact : true }).click ();
+    await page.waitForFunction (code => document.querySelector ('dialog[aria-label="MCP connections"] input[aria-label="App window code"]').value === code, windowCodes[1]);
+    assert.match (await badge.textContent (), new RegExp (windowCodes[1]));
+    wire.send (JSON.stringify ({ type : 'access_changed', windowCodeUsed : 'code-1' }));
+    await page.waitForFunction (async () => (await Auto3D.execute ('agent.access.inspect', {})).result.windowCodeState === 'used');
+    assert.equal (await codeInput.inputValue (), ''); assert.equal (await dialog.getByRole ('button', { name : 'Copy code', exact : true }).isDisabled (), true);
+    await dialog.getByRole ('button', { name : 'New code', exact : true }).click ();
+    await page.waitForFunction (code => document.querySelector ('dialog[aria-label="MCP connections"] input[aria-label="App window code"]').value === code, windowCodes[2]);
+    assert.equal (await badge.getAttribute ('data-capture-private'), '');
+    assert.equal (await codeInput.evaluate (input => Boolean (input.closest ('[data-capture-private]'))), true);
+    await mkdir ('work', { recursive : true }); await dialog.screenshot ({ path : 'work/window-code-controls-' + (live ? 'live-assets' : 'pilot-assets') + '.png' });
     const tab = await call ('session.tabs.inspect');
     const remote = async (command, args = {}, writeAuthorized = false) => {
         const requestId = 'request-' + results.length, received = new Promise (resolve => { nextResult = resolve; });
@@ -75,6 +92,11 @@ try {
     // While an agent is connected, command bar text that is not a command is sent to the agent, which can read it and reply above the box.
     const input = page.getByRole ('textbox', { name : 'Command or macro' }); await page.evaluate (() => document.querySelectorAll ('dialog[open]').forEach (open => open.close ()));
     await page.waitForFunction (() => !document.querySelector ('dialog[open]')); /* modal dialogs block the command bar until they fade out */
+    await page.getByRole ('button', { name : 'Preferences', exact : true }).click ();
+    const preferences = page.getByRole ('dialog', { name : 'Preferences', exact : true }); assert.equal (await preferences.getByLabel ('App window code').inputValue (), windowCodes[2]);
+    await preferences.getByRole ('button', { name : 'Close Preferences', exact : true }).click (); await preferences.waitFor ({ state : 'detached' });
+    await page.setViewportSize ({ width : 390, height : 844 }); const rect = await badge.boundingBox (); assert.ok (rect.x >= 0 && rect.x + rect.width <= 391, JSON.stringify (rect));
+    await page.setViewportSize ({ width : 1280, height : 900 });
     await input.fill ('make the box taller please'); await input.press ('Enter');
     await page.waitForFunction (() => document.querySelector ('.scene_command_bar .scene_status').textContent === 'Sent to agent · waiting for a reply');
     const bar = await call ('ui.command_bar.inspect'); assert.equal (bar.agentConnected, true);
@@ -85,9 +107,10 @@ try {
     await call ('agent.access.open'); await dialog.waitFor ();
     await dialog.getByText ('Named review agent · Reconnect this agent to enable all tools and screenshots', { exact : false }).waitFor ();
     await dialog.getByRole ('button', { name : 'Disconnect', exact : true }).click (); assert.equal ((await call ('agent.access.inspect')).connected, false);
+    assert.equal (await codeInput.inputValue (), ''); assert.equal (await badge.isVisible (), false);
     await dialog.getByRole ('button', { name : 'Revoke', exact : true }).click ();
     await page.evaluate (() => document.querySelector ('dialog[aria-label="MCP connections"]').close ());
     await call ('admin.agents.open'); const admin = page.getByRole ('dialog', { name : 'Agent administration', exact : true }); await admin.getByLabel ('Pilot account ID').fill ('test-owner'); await admin.getByRole ('button', { name : 'Inspect account' }).click ();
     await admin.getByRole ('status').filter ({ hasText : 'Agent access enabled' }).waitFor ();
-    assert.deepEqual (errors, []); console.log ('Unified agent access, real 12-inch RSC generation and PNG capture through the browser bridge, restricted-grant guidance, command bar replies, disconnect, revoke and admin UI passed on generated assets.');
+    assert.deepEqual (errors, []); console.log ('Server-issued window codes in header/Preferences/connection controls, clipboard copy, renewal/used states, mobile fit, unified access, real 12-inch RSC generation, PNG capture, restricted-grant guidance, command bar replies, disconnect, revoke and admin UI passed.');
 } finally { await browser.close (); await new Promise (resolve => server.close (resolve)); }

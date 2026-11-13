@@ -3,6 +3,8 @@ export const CommandIds = Object.freeze ([
     'agent.access.inspect',
     'agent.access.connect',
     'agent.access.disconnect',
+    'agent.access.code.refresh',
+    'agent.access.code.copy',
     'agent.registrations.list',
     'agent.registrations.revoke',
     'admin.agents.open',

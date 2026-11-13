@@ -7,7 +7,7 @@ import { WorkspaceDialog } from './modellibrary.js';
 import { Unit } from '../engine/model/unit.js';
 import { OpenCommandPanel } from './commandpanel.js';
 
-export const AppVersion = '0.67.0';
+export const AppVersion = '0.68.0';
 
 export function AppBuildInfo ()
 {
@@ -84,6 +84,7 @@ export class Preferences
         const button = document.createElement ('button'); button.className = 'preferences_button'; button.title = 'Preferences'; button.setAttribute ('aria-label', 'Preferences');
         button.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m9 3-1 3-3 1 1 3-2 2 2 2-1 3 3 1 1 3h6l1-3 3-1-1-3 2-2-2-2 1-3-3-1-1-3Z"/><circle cx="12" cy="12" r="3"/></svg>';
         button.addEventListener ('click', () => this.Open ()); document.getElementById ('header_buttons').appendChild (button);
+        AgentAccessFor (website).MountConnectionBadge (document.getElementById ('header_buttons'));
     }
 
     Open ()
@@ -148,6 +149,7 @@ export class Preferences
         const recovery = document.createElement ('button'); recovery.textContent = 'Recover unsaved session'; recovery.addEventListener ('click', () => { dialog.close (); this.website.sessionEditor.OfferRecovery (true).catch (error => this.website.sessionEditor.Status (error.message)); });
         const agentControls = globalThis.location?.hostname === 'auto3d-mcp-pilot.pages.dev' || globalThis.location?.hostname === 'auto3d-5av.pages.dev' && this.website.accountAdmin?.isAdmin ? [agentAccess, agentAdmin] : [];
         toolActions.append (commands, errorLogs, recovery, ...agentControls); tools.appendChild (toolActions);
+        if (agentControls.length) { tools.appendChild (AgentAccessFor (this.website).CodeControls ()); }
         const aboutSection = section ('About'); aboutSection.appendChild (about);
         grid.append (display, ai, tools, aboutSection, adminArea); dialog.appendChild (form);
     }

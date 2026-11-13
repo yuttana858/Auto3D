@@ -19,7 +19,7 @@
       "id": "agent.access.inspect",
       "title": "Inspect browser agent connection",
       "category": "Account",
-      "description": "Read this browser window connection state and unified permission policy without credentials. Effective OAuth permissions are reported by auto3d.capabilities.inspect.",
+      "description": "Read this window connection state, unified permission policy and code availability/expiry without revealing the pairing code. Effective OAuth permissions are reported by auto3d.capabilities.inspect.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -58,6 +58,34 @@
       "category": "Account",
       "description": "End this browser window agent connection. Does not revoke independent OAuth registrations.",
       "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "agent.access.code.refresh",
+      "title": "Issue a new app window code",
+      "category": "Account",
+      "description": "Ask the authenticated connection server to issue a new single-use, ten-minute code for this shared window. Invalidates the previous code without changing current agent pairings. Returns the code for explicit sharing; requires Live Control.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "agent.access.code.copy",
+      "title": "Copy app window code",
+      "category": "Account",
+      "description": "Copy the available code for this shared window. Requires a focused secure browser and clipboard permission/user gesture; reports copied:false and requiresUserGesture when unavailable. Does not issue a code or change pairings.",
+      "mutates": false,
       "inputSchema": {
         "type": "object",
         "properties": {},
