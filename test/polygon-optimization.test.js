@@ -39,7 +39,7 @@ describe ('Quality-preserving polygon optimization and units', () => {
     });
     it ('forwards Ctrl-left-click modifiers from mouse release to selection', () => {
         const nav = Object.create (Navigation.prototype); nav.enabled = true; nav.canvas = {}; nav.mouse = { IsButtonDown : () => true, Up : () => {}, GetPosition : () => ({ x : 1, y : 2 }) }; nav.clickDetector = { End : () => {}, IsClick : () => true, Cancel : () => {} }; let picked;
-        nav.onMouseClick = (button, point, modifiers) => { picked = { button, point, modifiers }; }; nav.OnMouseUp ({ which : 1, ctrlKey : true, metaKey : false }); assert.deepEqual (picked.modifiers, { ctrlKey : true, metaKey : false }); assert.equal (picked.button, 1);
+        nav.onMouseClick = (button, point, modifiers) => { picked = { button, point, modifiers }; }; nav.OnMouseUp ({ which : 1, ctrlKey : true, metaKey : false, shiftKey : true }); assert.deepEqual (picked.modifiers, { ctrlKey : true, metaKey : false, shiftKey : true }); assert.equal (picked.button, 1);
     });
     it ('moves selected objects together and restores every placement through one undo', async () => {
         const editor = Object.create (SessionEditor.prototype); editor.document = new SceneDocument (); const model = new Model (); model.AddMaterial (new PhysicalMaterial ()); model.AddMaterial (new PhysicalMaterial ()); model.AddMeshToRootNode (GridMesh (2)); const first = editor.document.AddImported (model, 'First'); const second = editor.document.Instance (first); second.position = [20, 0, 0];

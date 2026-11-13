@@ -364,6 +364,8 @@ export class Website
             this.measureTool.Click (mouseCoordinates);
             return;
         }
+        // Assign facing consumes clicks on the model's bounds; other clicks still orbit and select normally.
+        if (this.sessionEditor.facing?.active && this.sessionEditor.facing.Click (mouseCoordinates, modifiers)) { return; }
 
         const meshUserData = this.viewer.GetMeshUserDataUnderMouse (IntersectionMode.MeshAndLine, mouseCoordinates);
         const additive = Boolean (modifiers.ctrlKey || modifiers.metaKey);

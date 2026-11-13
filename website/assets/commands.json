@@ -2546,6 +2546,145 @@
       }
     },
     {
+      "id": "object.facing.open",
+      "title": "Start Assign facing",
+      "category": "Objects",
+      "description": "Show the selected (or given) model footprint as a glowing blue ground rectangle with a blue Front arrow and a green Up arrow, the same as the Model spec Assign facing button. While active, clicking a face of the model bounds assigns it (Front mode, or Up mode / Shift+click). Does not change the scene by itself.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "object.facing.assign",
+      "title": "Assign front or up",
+      "category": "Objects",
+      "description": "Turn the model so the given side becomes the Front (toward the default camera) or the Up side, using the smallest rotation, about its bounds centre, then set it on the floor. Sides are named by the world axis they currently face (as the bounding-box faces show). Provide exactly one of front or up. Saves the model local front/up in userData._auto3dFacing. One Undo step. Requires object.facing.open.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "front": {
+            "type": "string",
+            "enum": [
+              "+x",
+              "-x",
+              "+y",
+              "-y",
+              "+z",
+              "-z"
+            ]
+          },
+          "up": {
+            "type": "string",
+            "enum": [
+              "+x",
+              "-x",
+              "+y",
+              "-y",
+              "+z",
+              "-z"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "front": "+x"
+      }
+    },
+    {
+      "id": "object.facing.turn",
+      "title": "Turn model about up",
+      "category": "Objects",
+      "description": "While Assign facing is active, turn the model about world up by 90, -90 or 180 degrees (changing which side faces front), then set it on the floor. One Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "degrees": {
+            "type": "number",
+            "enum": [
+              90,
+              -90,
+              180
+            ]
+          }
+        },
+        "required": [
+          "degrees"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "degrees": 90
+      }
+    },
+    {
+      "id": "object.facing.mode",
+      "title": "Choose Front or Up picking",
+      "category": "Objects",
+      "description": "Choose whether a clicked face becomes the Front or the Up side while Assign facing is active.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "front",
+              "up"
+            ]
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "mode": "up"
+      }
+    },
+    {
+      "id": "object.facing.inspect",
+      "title": "Inspect Assign facing",
+      "category": "Objects",
+      "description": "Read whether Assign facing is active, the model, picking mode, hovered face, world front/up axes and the saved local front/up of the model.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "object.facing.close",
+      "title": "Finish Assign facing",
+      "category": "Objects",
+      "description": "Hide the footprint and arrows, the same as Done or Escape.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
       "id": "ui.model_spec.inspect",
       "title": "Read Model spec",
       "category": "Panels",

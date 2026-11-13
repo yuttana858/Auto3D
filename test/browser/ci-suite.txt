@@ -6,6 +6,7 @@ ai-extended
 ai-progress
 animation
 array-spacing
+assign-facing
 auth
 board-appearance
 board-appearance-controls

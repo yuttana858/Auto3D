@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Assign facing — Auto3D 0.71.0 / Primary Products 0.15.0 / Packaging 1.10.7 (2026-11-13)
+
+Model spec phase 2. Assign facing shows the selected model's footprint as a glowing blue ground rectangle with Front and Up arrows. Clicking a face makes it the Front (Shift+click or Up mode makes it Up); the model turns by the smallest rotation, sets on the floor, saves `userData._auto3dFacing` and adds one Undo step. ⟲/⟳ 90° turns, Done/Escape. Agents use `object.facing.*`. Next: optional placement visual on import, and AI/Molded Pulp/Primary Products sections. See [release-0710.md](release-0710.md).
+
 ## Model spec default right panel — Auto3D 0.70.0 / Primary Products 0.15.0 / Packaging 1.10.7 (2026-11-13)
 
 Phase 1 of the Model spec redesign: Model data is renamed Model spec and is the default right panel (modules open only from their icons; closing one returns to Model spec). The preview gets Rotate/Update/× actions, generated boxes show a Packaging section with Open in CAD Studio, Fold/Unfold and Packaging Gen tools, and agents use `ui.model_spec.inspect` / `ui.model_spec.preview`. Next: Assign facing placement visual, other module sections, live preview. See [release-0700.md](release-0700.md).

@@ -508,7 +508,7 @@ export class Navigation
 
         if (wasDown && !this.panGesture && this.clickDetector.IsClick ()) {
 			let mouseCoords = this.mouse.GetPosition ();
-			this.Click (ev.which, mouseCoords, { ctrlKey : ev.ctrlKey, metaKey : ev.metaKey });
+			this.Click (ev.which, mouseCoords, { ctrlKey : ev.ctrlKey, metaKey : ev.metaKey, shiftKey : ev.shiftKey });
 		}
         this.clickDetector.Cancel ();
         this.panGesture = false; this.SetSpacePan (this.spacePan);

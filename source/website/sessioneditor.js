@@ -6,6 +6,7 @@ import { Theme } from './settings.js';
 import { PreparePackagingPresentations } from './packagingadapter.js';
 import { SceneGroups } from './scenegroups.js';
 import { FloatingPanel } from './floatingpanel.js';
+import { FacingTool } from './facingtool.js';
 import { CommandBar } from './commandbar.js';
 import { ProcessingFeedback } from './processingfeedback.js';
 import { ArrayPlacement, ArrayCellSize, ArrayObjectBounds } from './arraylayout.js';
@@ -91,7 +92,7 @@ export class SessionEditor
             this.selectionBox.material.transparent = true;
             this.selectionBox.material.opacity = 1;
         }
-        viewer.scene.add (this.selectionBox);
+        viewer.scene.add (this.selectionBox); this.facing = new FacingTool (this);
         this.controls = new TransformControls (viewer.camera, viewer.renderer.domElement); this.controls.setSize (0.8); this.helper = this.controls.getHelper (); viewer.scene.add (this.helper);
         viewer.renderer.domElement.addEventListener ('pointerdown', event => { this.shiftDragRequested = event.shiftKey && this.mode === 'translate'; }, true);
         viewer.navigation.onOrbitStart = () => this.OrbitSelected (false);
@@ -644,6 +645,7 @@ export class SessionEditor
     SelectedObjects () { return this.document.objects.filter ((object) => this.selectedIds?.has (object.id)); }
     Select (object, fromNavigator = false, additive = false, single = false)
     {
+        if (this.facing?.active && this.facing.object !== object) { this.facing.Stop (); }
         this.selected = object && this.document.objects.includes (object) ? object : null;
         if (!this.selectedIds) { this.selectedIds = new Set (); }
         if (!additive) { this.selectedIds.clear (); }
@@ -942,12 +944,14 @@ export class SessionEditor
         const element = Element ('div', 'scene_model_preview');
         const title = Element ('div', 'scene_model_preview_title', undefined, element); Element ('strong', null, 'Model preview', title); Element ('span', null, 'Drag X/Y · Shift+drag Z', title);
         const canvas = Element ('canvas', 'scene_model_preview_canvas', undefined, element); canvas.width = 300; canvas.height = 190; canvas.setAttribute ('aria-label', 'Interactive model preview'); canvas.setAttribute ('role', 'img');
-        // Actions attached to the preview window; Assign facing will join them once placement is built.
+        // Actions attached to the preview window.
         const actions = Element ('div', 'scene_model_preview_actions', undefined, element); actions.setAttribute ('role', 'toolbar'); actions.setAttribute ('aria-label', 'Selected model actions');
         const rotate = Element ('button', null, 'Rotate', actions); rotate.type = 'button'; rotate.title = 'Turn the preview continuously'; rotate.setAttribute ('aria-pressed', 'false');
         rotate.addEventListener ('click', () => this.SetPreviewRotation (!this.modelPreview?.rotating));
         const update = Element ('button', null, 'Update', actions); update.type = 'button'; update.title = 'Reload this model from a file'; update.disabled = this.readOnly;
         update.addEventListener ('click', () => this.Run (() => this.UpdateModel (object)));
+        const facing = Element ('button', null, 'Assign facing', actions); facing.type = 'button'; facing.title = 'Show the footprint with Front and Up arrows and choose which side is the front and which is up'; facing.disabled = this.readOnly;
+        facing.addEventListener ('click', () => this.Run (() => this.facing.active ? this.facing.Stop () : this.facing.Start (object)));
         const remove = Element ('button', 'scene_model_preview_delete', '×', actions); remove.type = 'button'; remove.title = 'Delete this model (Undo restores it)'; remove.setAttribute ('aria-label', 'Delete selected model'); remove.disabled = this.readOnly;
         remove.addEventListener ('click', () => this.Run (() => this.Delete ()));
         panel.contentDiv.insertBefore (element, panel.contentDiv.firstChild);
