@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## AI creations: delete, multi-select, Add/New, thumbnail size — Auto3D 0.71.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0 (2026-11-14)
+
+Latest creations gains per-card delete (confirmed; removed at Meshy, own tasks only with the shared key), multi-select with Delete selected, hover **Add** / **New** on 3D models, an animated download and add message over the main viewer, and a thumbnail size slider in the extended view. The header is about half its previous height. Generate reference views was verified against live Meshy. See [release-0710.md](release-0710.md).
+
 ## Model spec default right panel — Auto3D 0.70.0 / Primary Products 0.15.0 / Packaging 1.10.7 (2026-11-13)
 
 Phase 1 of the Model spec redesign: Model data is renamed Model spec and is the default right panel (modules open only from their icons; closing one returns to Model spec). The preview gets Rotate/Update/× actions, generated boxes show a Packaging section with Open in CAD Studio, Fold/Unfold and Packaging Gen tools, and agents use `ui.model_spec.inspect` / `ui.model_spec.preview`. Next: Assign facing placement visual, other module sections, live preview. See [release-0700.md](release-0700.md).

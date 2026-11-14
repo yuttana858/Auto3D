@@ -24,6 +24,8 @@ The Molded Pulp candidate is Auto3D 0.67.0 / Packaging 1.10.7 / Primary Products
 
 The mode-first AI Create panel is Auto3D 0.69.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0, based on main after #123 (0.68.0). See docs/release-0690.md.
 
+The AI creations management release is Auto3D 0.71.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0, based on main after #127 (0.70.0): delete and multi-select, hover Add/New, main-viewer download feedback and thumbnail size. See docs/release-0710.md.
+
 # Agent-accessible features
 
 The unified agent approval release in PR #123 is Auto3D 0.68.0 / Packaging 1.10.7 / Primary Products 0.15.0 / Molded Pulp 0.1.0. One OAuth approval grants read, write and screenshots; Live Control has no separate screenshot preference. Server-issued window codes are visible in the header, Preferences and MCP connections; Copy code/New code use `agent.access.code.copy/refresh`, and agents pair with a user-supplied code through `auto3d.sessions.pair_code`. Existing restricted credentials require reconnection. Use `auto3d.capabilities.inspect` for effective grant permissions. See docs/release-0680.md.

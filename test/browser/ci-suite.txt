@@ -1,6 +1,7 @@
 account-storage
 accounts
 admin-controls
+ai-creations
 ai-credentials
 ai-extended
 ai-progress

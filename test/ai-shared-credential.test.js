@@ -104,3 +104,23 @@ describe ('Meshy upstream calls on the Cloudflare Workers runtime', () => {
         const response = await call (['balance']); assert.equal (response.status, 502); assert.equal ((await response.json ()).code, 'MESHY_REQUEST_FAILED'); assert.deepEqual (seen, ['https://api.meshy.ai/openapi/v1/balance']);
     });
 });
+
+describe ('Deleting AI creations through the proxy', () => {
+    let original; beforeEach (() => { original = globalThis.fetch; }); afterEach (() => { globalThis.fetch = original; });
+    const call = (env, owner, id) => proxy ({ env, data : { user : { id : owner } }, params : { path : ['text-to-image', id] }, request : new Request ('https://auto3d.test/api/ai/text-to-image/' + id, { method : 'DELETE' }) });
+    it ('deletes only the account\'s own shared-key tasks and forgets them', async () => {
+        const env = Environment (); await StoreSharedMeshyKey (env, sharedKey);
+        env.objects.set ('meshy/v1/tasks/' + userId, JSON.stringify ({ version : 1, tasks : [{ id : 'mine', createdAt : 1 }, { id : 'kept', createdAt : 2 }] }));
+        const calls = []; globalThis.fetch = async (url, init = {}) => { calls.push ([String (url), init.method]); return new Response ('', { status : 200 }); };
+        assert.equal ((await call (env, userId, 'someone-else')).status, 404); assert.equal (calls.length, 0);
+        const response = await call (env, userId, 'mine'); assert.equal (response.status, 200); assert.deepEqual (await response.json (), { deleted : true });
+        assert.deepEqual (calls, [['https://api.meshy.ai/openapi/v1/text-to-image/mine', 'DELETE']]);
+        assert.deepEqual (JSON.parse (env.objects.get ('meshy/v1/tasks/' + userId)).tasks.map (task => task.id), ['kept']);
+    });
+    it ('treats a task Meshy no longer has as deleted, and passes other provider errors through', async () => {
+        const env = Environment (); await StoreMeshyKey (env, userId, personalKey); let status = 404;
+        globalThis.fetch = async () => Response.json ({ message : 'not found' }, { status });
+        let response = await call (env, userId, 'gone'); assert.equal (response.status, 200); assert.deepEqual (await response.json (), { deleted : true, missing : true });
+        status = 500; response = await call (env, userId, 'broken'); assert.equal (response.status, 500);
+    });
+});
