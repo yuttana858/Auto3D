@@ -23,6 +23,8 @@ export class CommandBar
         this.browse = document.createElement ('button'); this.browse.type = 'button'; this.browse.textContent = 'Commands & macros'; this.browse.addEventListener ('click', () => OpenCommandPanel (website)); form.appendChild (this.browse);
         this.history = []; this.historyIndex = 0; this.RestoreVisibility ();
         this.log = []; this.nextId = 1; this.ownStatus = null;
+        let owner = website.auth?.user?.id || null;
+        website.auth?.Subscribe (user => { const next = user?.id || null; if (next !== owner) { this.log = []; this.history = []; this.historyIndex = 0; this.input.value = ''; this.status.textContent = 'Add a model to begin'; owner = next; } });
         // Every status line change (app progress, errors, agent replies) is kept for agents to read.
         // Observer callbacks run after ShowStatus returns, so its own text is skipped by value.
         new MutationObserver (() => { const text = this.status.textContent; if (text === this.ownStatus) { this.ownStatus = null; return; } this.ownStatus = null; delete this.status.dataset.tone; this.Record ('app', 'status', text); }).observe (this.status, { childList : true, characterData : true, subtree : true });
@@ -63,6 +65,7 @@ export class CommandBar
         if (kind === 'status' && (!value || last?.kind === 'status' && last.text === value)) { return null; }
         const entry = { id : this.nextId++, at : Date.now (), from, kind, text : value, ok };
         this.log.push (entry); if (this.log.length > LogLimit) { this.log.splice (0, this.log.length - LogLimit); }
+        this.root.dispatchEvent (new CustomEvent ('auto3d-command-entry', { detail : entry }));
         return entry;
     }
     SendToAgent (text)
