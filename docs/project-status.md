@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Messenger recovery — local development
+
+Recovers the floating Messenger UI from #119 onto current main and connects its AI tab to the existing session-only command-bar agent channel. Agent replies appear in Messenger and can be read aloud; the command-bar log is cleared on account change. Direct/group messaging, persistent history, agent conversation permissions and prompt-injection defenses are not complete. Do not describe the implementation as a completed Messenger or deploy it as such. See [messenger-plan.md](messenger-plan.md).
+
 ## Model spec default right panel — Auto3D 0.70.0 / Primary Products 0.15.0 / Packaging 1.10.7 (2026-11-13)
 
 Phase 1 of the Model spec redesign: Model data is renamed Model spec and is the default right panel (modules open only from their icons; closing one returns to Model spec). The preview gets Rotate/Update/× actions, generated boxes show a Packaging section with Open in CAD Studio, Fold/Unfold and Packaging Gen tools, and agents use `ui.model_spec.inspect` / `ui.model_spec.preview`. Next: Assign facing placement visual, other module sections, live preview. See [release-0700.md](release-0700.md).
@@ -65,9 +69,6 @@ Edit model opens a split profile/3D workspace. Dimension callouts commit on Ente
 ## Staged hero pullbacks — Auto3D 0.64.3 / Packaging 1.10.7 / Primary Products 0.13.0
 
 Preserves the close motor opening, eases back to half its apparent size as molded pulp appears, then to 35% when the carton appears. Both moves use the presentation clock and the motor as the framing reference; the box view holds through folding and cutaway. See [release-0643.md](release-0643.md).
-## Messenger foundation — local work in progress
-
-A movable shell with Messages and AI tabs is in progress; sending, storage and AI transport are not connected. See [messenger-plan.md](messenger-plan.md).
 
 ## Fixed motor-scale hero — Auto3D 0.64.2 / Packaging 1.10.7 / Primary Products 0.13.0
 
@@ -609,5 +610,5 @@ Use shared application services and strict registry commands for new user action
 
 # Messenger voice foundation (local work in progress)
 
-The floating Messenger foundation includes a user-initiated browser dictation button, privacy disclosure, opt-in browser speech playback hook and `ui.messenger.voice` command. Dictation adds editable draft text only. The AI reply transport and persistence are not implemented, so live agent TTS is not yet connected. Browser speech support and audio processing vary; see [Messenger plan](messenger-plan.md).
+The floating Messenger foundation includes a user-initiated browser dictation button, privacy disclosure, opt-in browser speech playback hook and `ui.messenger.voice` command. Dictation adds editable draft text only. The local AI tab reads connected-agent replies from the command-bar channel; persistent conversation storage is not implemented. Browser speech support and audio processing vary; see [Messenger plan](messenger-plan.md).
 

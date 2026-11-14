@@ -15,7 +15,7 @@ export class Messenger
         this.identity = document.createElement ('div'); this.identity.className = 'messenger_identity'; root.appendChild (this.identity);
         const form = document.createElement ('form'); form.className = 'messenger_composer'; root.appendChild (form);
         this.input = document.createElement ('textarea'); this.input.rows = 1; this.input.maxLength = 4000; this.input.setAttribute ('aria-label', 'Messenger message'); this.input.placeholder = 'Write a message'; form.appendChild (this.input);
-        const send = document.createElement ('button'); send.type = 'submit'; send.textContent = 'Send'; send.disabled = true; form.appendChild (send); form.addEventListener ('submit', event => event.preventDefault ());
+        const send = document.createElement ('button'); this.send = send; send.type = 'submit'; send.textContent = 'Send'; send.disabled = true; form.appendChild (send); form.addEventListener ('submit', event => { event.preventDefault (); this.SendToAgent (); });
         this.mic = document.createElement ('button'); this.mic.type = 'button'; this.mic.textContent = '🎙'; this.mic.setAttribute ('aria-label', 'Start voice dictation'); this.mic.setAttribute ('aria-pressed', 'false'); this.mic.title = 'Dictate a message'; form.insertBefore (this.mic, send);
         this.voiceStatus = document.createElement ('div'); this.voiceStatus.className = 'messenger_voice_status'; this.voiceStatus.setAttribute ('role', 'status'); root.appendChild (this.voiceStatus);
         this.voiceStatus.textContent = 'Voice recognition may send audio to your browser provider. Dictation is never sent automatically.';
@@ -35,7 +35,7 @@ export class Messenger
         const placeLauncher = () => { const button = website.parameters.headerButtonsDiv.querySelector ('.header_fullscreen_button'); const header = website.parameters.headerDiv.getBoundingClientRect (), rect = button?.getBoundingClientRect (); launcher.style.top = Math.round ((rect?.bottom || header.bottom) + 5) + 'px'; launcher.style.right = Math.max (5, Math.round (window.innerWidth - (rect?.right || window.innerWidth - 5))) + 'px'; if (!root.hidden) { const bounds = root.getBoundingClientRect (); position (bounds.left, bounds.top); } };
         window.addEventListener ('resize', placeLauncher); const layoutObserver = new ResizeObserver (placeLauncher); layoutObserver.observe (website.parameters.headerDiv); const fullscreen = website.parameters.headerButtonsDiv.querySelector ('.header_fullscreen_button'); if (fullscreen) { layoutObserver.observe (fullscreen); } requestAnimationFrame (placeLauncher); let account = website.auth.user?.id || null; website.auth.Subscribe (user => { const next = user?.id || null; if (next !== account) { this.input.value = ''; this.drafts = { people : '', ai : '' }; this.SetVisible (false); this.SetReadReplies (false); account = next; } this.UpdateIdentity (); }); this.SetTab ('people');
     }
-    Inspect () { return { visible : !this.root.hidden, tab : this.tab, messagingConnected : false, aiConnected : false }; }
+    Inspect () { return { visible : !this.root.hidden, tab : this.tab, messagingConnected : false, aiConnected : !!this.website.sessionEditor?.commandBar?.AgentConnected () }; }
     SetVisible (visible)
     {
         if (typeof visible !== 'boolean') { throw new Error ('Choose whether Messenger is visible.'); }
@@ -46,7 +46,24 @@ export class Messenger
     {
         if (!['people', 'ai'].includes (tab)) { throw new Error ('Choose Messages or AI.'); }
         this.StopDictation (); this.drafts[this.tab] = this.input.value; this.tab = tab; this.input.value = this.drafts[tab]; this.input.style.height = 'auto'; this.input.style.height = Math.min (this.input.scrollHeight, 180) + 'px'; for (const [id, button] of this.tabs) { button.setAttribute ('aria-selected', String (id === tab)); button.tabIndex = id === tab ? 0 : -1; }
-        this.content.textContent = tab === 'people' ? 'Messages and group conversations are being set up.' : 'AI conversations are being set up.'; this.input.placeholder = tab === 'people' ? 'Write a message' : 'Ask about Auto3D'; this.UpdateIdentity (); return this.Inspect ();
+        this.input.placeholder = tab === 'people' ? 'Write a message' : 'Ask about Auto3D'; this.send.disabled = tab !== 'ai'; this.RenderConversation (); this.UpdateIdentity (); return this.Inspect ();
+    }
+    BindAgentChannel ()
+    {
+        const bar = this.website.sessionEditor?.commandBar; if (!bar || this.agentBar === bar) { return; } this.agentBar = bar;
+        bar.root.addEventListener ('auto3d-command-entry', event => { if (event.detail?.from === 'agent' && event.detail.kind === 'response') { this.SpeakAgentReply (event.detail.text); } if (this.tab === 'ai') { this.RenderConversation (); } });
+    }
+    RenderConversation ()
+    {
+        this.content.replaceChildren (); if (this.tab !== 'ai') { this.content.textContent = 'Messages and group conversations are being set up.'; return; }
+        this.BindAgentChannel (); const note = document.createElement ('p'); note.textContent = 'Agent messages are kept in this window during this session. A connected agent must respond.'; this.content.appendChild (note);
+        for (const entry of this.agentBar?.log || []) { if (!['message', 'response'].includes (entry.kind)) { continue; } const row = document.createElement ('p'); const who = document.createElement ('strong'); who.textContent = entry.from === 'agent' ? 'Agent: ' : (this.website.auth?.user?.email || 'You') + ': '; row.append (who, document.createTextNode (entry.text)); this.content.appendChild (row); } this.content.scrollTop = this.content.scrollHeight;
+    }
+    SendToAgent ()
+    {
+        const message = this.input.value.trim (); if (this.tab !== 'ai' || !message || !this.website.auth?.user || this.website.sessionEditor?.readOnly) { return; }
+        this.BindAgentChannel (); if (!this.agentBar) { return; } if (message.length > 2000) { this.voiceStatus.textContent = 'Agent messages are limited to 2,000 characters.'; return; }
+        this.agentBar.SendToAgent (message); this.input.value = ''; this.drafts.ai = ''; this.input.dispatchEvent (new Event ('input', { bubbles : true })); this.RenderConversation ();
     }
     UpdateIdentity () { const user = this.website.auth?.user; const name = user?.email || user?.id || 'Signed-out user'; this.identity.textContent = (this.input.value.trim () ? 'Drafting as ' : 'Signed in as ') + name; }
     ToggleDictation ()

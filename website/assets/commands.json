@@ -6740,7 +6740,7 @@
       "id": "ui.messenger",
       "title": "Open or close Messenger",
       "category": "Panels",
-      "description": "Show or hide the Messenger window and optionally choose its Messages or AI tab. This UI foundation cannot send, receive or read conversations yet.",
+      "description": "Show or hide Messenger and choose its Messages or AI tab. The AI tab shares the session-only command-bar agent channel; direct/group messaging and persistent history are not available.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
