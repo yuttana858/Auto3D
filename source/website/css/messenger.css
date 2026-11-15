@@ -1,0 +1,19 @@
+.messenger_launcher { position: fixed; z-index: 10; padding: 7px 12px; border: 1px solid var(--ov_border_color); border-radius: 5px; color: var(--ov_foreground_color); background: var(--ov_background_color); font: inherit; cursor: pointer; }
+.auth_locked .messenger_launcher, .shared_view .messenger_launcher, .mini_shared_view .messenger_launcher { display: none; }
+.messenger_window { position: fixed; z-index: 30; right: 16px; bottom: 90px; width: min(420px, calc(100vw - 24px)); height: min(520px, calc(100dvh - 120px)); min-width: min(280px, calc(100vw - 24px)); min-height: 230px; max-width: calc(100vw - 12px); max-height: calc(100dvh - 12px); display: flex; flex-direction: column; resize: both; overflow: auto; box-sizing: border-box; background: var(--ov_background_color); color: var(--ov_foreground_color); border: 1px solid var(--ov_border_color); border-radius: 8px; box-shadow: 0 6px 25px #0008; }
+.messenger_window[hidden] { display: none; }
+.messenger_header { display: flex; align-items: center; border-bottom: 1px solid var(--ov_border_color); background: var(--ov_toolbar_background_color); }
+.messenger_window button { font: inherit; color: inherit; background: transparent; border: 0; padding: 10px; cursor: pointer; }
+.messenger_handle { flex: 1; text-align: left; font-weight: 600 !important; cursor: move !important; touch-action: none; }
+.messenger_tabs { display: flex; gap: 4px; padding: 4px 8px; border-bottom: 1px solid var(--ov_border_color); }
+.messenger_tabs button[aria-selected="true"] { color: #70c6eb; border-bottom: 2px solid #70c6eb; }
+.messenger_content { flex: 1; min-height: 40px; overflow: auto; padding: 12px; font-size: 13px; }
+.messenger_identity { padding: 4px 10px; font-size: 12px; opacity: .8; overflow-wrap: anywhere; }
+.messenger_composer { display: flex; gap: 8px; align-items: end; padding: 10px; border-top: 1px solid var(--ov_border_color); }
+.messenger_composer textarea { flex: 1; min-height: 38px; max-height: 180px; resize: vertical; box-sizing: border-box; padding: 8px; font: inherit; background: var(--ov_background_color); color: var(--ov_foreground_color); border: 1px solid var(--ov_border_color); border-radius: 4px; }
+.messenger_composer button:disabled { opacity: .45; cursor: default; }
+.messenger_voice_status { padding: 0 10px 4px; font-size: 12px; opacity: .8; }
+.messenger_voice_controls { display: flex; align-items: center; gap: 4px; padding: 0 4px 4px; font-size: 12px; }
+.messenger_voice_controls button { padding: 6px; }
+.messenger_voice_controls button:disabled { opacity: .45; cursor: default; }
+.messenger_composer button[aria-pressed="true"] { color: #70c6eb; }
