@@ -112,6 +112,14 @@ Implementation commit: `6f9686cda10a43889c4d3b2ce765546324b4a6e3`, based on main
 
 Hosted full-suite CI and deployment are pending. Keep the development PR in draft under the repository's Actions cost-control process; local results do not substitute for a passing hosted gate.
 
-## Local Parasolid converter (from #137)
+## Lighter CI gate
+
+- **Ready PRs** run validation and a quick **browser smoke suite** (`test/browser/smoke-suite.txt`, 10 tests: sign-in, workspace, module panels, command bar, Messenger AI, AI creations, Packaging and MCP consent). That's one browser job instead of three.
+- **The full browser suite** (all of `ci-suite.txt`, three shards) runs only on request: the `full-ci` PR label, or a manual CI run (suite `full`, the default). Adding other labels neither starts nor cancels CI.
+- **One runner.** `tools/run_browser_suite.mjs` runs a suite in CI and locally, and writes a pass/fail report tied to the commit. With `--serve` it also starts and stops the test servers. Unit tests check its options, the shard split, the report, and that every smoke test is also in the full suite.
+- The Playwright Chromium download is cached between runs.
+- **Test fix.** `module-panels` asserted that Packaging showed no tab list. Auto Pack's **Packaging tools** tabs are allowed now, while the old AI/Packaging tab strip must still stay gone. This was caught by the new smoke suite on the stacked branch.
+- See [actions-cost-control.md](actions-cost-control.md#plan-for-a-private-repository) for minutes per run and the plan for a private repository.
+
 
 Docs only: `docs/parasolid-local-converter.md` and a downloadable `docs/downloads/auto3d-parasolid-local.zip` with its SHA-256 checksum, for converting Parasolid files offline. No app code changes.
