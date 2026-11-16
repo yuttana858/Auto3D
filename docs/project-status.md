@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Add several AI models at once, Mesh dropdown in Details — Auto3D 0.72.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0 (2026-11-16)
+
+Checked creations can be added together (**Add selected**, or **New session** for one new tab). Images are skipped, and one viewer message tracks the batch. In Details, Format, Vertices, Lines and Triangles collapse into a **Mesh** dropdown with a triangle-count summary. See [release-0720.md](release-0720.md).
+
 ## AI creations: delete, multi-select, Add/New, thumbnail size — Auto3D 0.71.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0 (2026-11-14)
 
 Latest creations gains per-card delete (confirmed; removed at Meshy, own tasks only with the shared key), multi-select with Delete selected, hover **Add** / **New** on 3D models, an animated download and add message over the main viewer, and a thumbnail size slider in the extended view. The header is about half its previous height. Generate reference views was verified against live Meshy. See [release-0710.md](release-0710.md).

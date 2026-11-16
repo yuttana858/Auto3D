@@ -217,6 +217,8 @@ export class AIWorkspace
         this.selectionBar = Element ('div', 'ai_selection_bar', undefined, recentHeader); this.selectionBar.hidden = true;
         this.selectionCount = Element ('span', 'ai_selection_count', '', this.selectionBar);
         const selectAll = Element ('button', null, 'Select all', this.selectionBar); selectAll.type = 'button'; selectAll.addEventListener ('click', () => this.Run (() => this.SetChecked (this.recent.map (item => item.id), true)));
+        this.addCheckedButton = Element ('button', null, 'Add selected', this.selectionBar); this.addCheckedButton.type = 'button'; this.addCheckedButton.title = 'Add the selected 3D models to the current session'; this.addCheckedButton.addEventListener ('click', () => this.Run (() => this.AddCreations ([...this.checkedTasks])));
+        this.newCheckedButton = Element ('button', null, 'New session', this.selectionBar); this.newCheckedButton.type = 'button'; this.newCheckedButton.title = 'Open the selected 3D models together in a new session'; this.newCheckedButton.addEventListener ('click', () => this.Run (() => this.AddCreations ([...this.checkedTasks], { newSession : true })));
         const deleteChecked = Element ('button', 'ai_danger_button', 'Delete selected', this.selectionBar); deleteChecked.type = 'button'; deleteChecked.addEventListener ('click', () => this.Run (() => this.ConfirmDelete ([...this.checkedTasks])));
         const clearChecked = Element ('button', null, 'Clear', this.selectionBar); clearChecked.type = 'button'; clearChecked.addEventListener ('click', () => this.Run (() => this.ClearChecked ()));
         const sizeLabel = Element ('label', 'ai_thumb_size', 'Thumbnails', recentHeader);
@@ -710,7 +712,31 @@ export class AIWorkspace
             const result = await this.AddAsset (asset, toast); return { ...result, id, newSession };
         } catch (error) { toast.Fail (error.message); throw error; }
     }
-    async AddAsset (asset, toast = null)
+    IsAddableModel (task) { return task?.status === 'SUCCEEDED' && (!!task.modelUrl || this.assets.has (task.id)); }
+    // Multi-select Add: adds every checked 3D model (images are skipped) in one batch, optionally in one new session tab.
+    async AddCreations (ids, { newSession = false } = {})
+    {
+        this.AssertEditable ();
+        if (!Array.isArray (ids) || !ids.length || ids.length > 48 || ids.some (id => typeof id !== 'string' || !id || id.length > 200)) { throw new Error ('Choose 1–48 creations to add.'); }
+        const tasks = ids.map (id => this.recent.find (item => item.id === id)); if (tasks.some (task => !task)) { throw new Error ('Creation not found.'); }
+        const models = tasks.filter (task => this.IsAddableModel (task)), skipped = tasks.filter (task => !this.IsAddableModel (task)).map (task => task.id);
+        if (!models.length) { throw new Error ('Select at least one completed 3D model. Images cannot be added to a session.'); }
+        const editor = this.website.sessionEditor; if (editor.busy || this.adding) { throw new Error ('Wait for the current session operation.'); }
+        const owner = this.website.auth.user.id, added = [], label = (task, index) => (models.length > 1 ? (index + 1) + ' of ' + models.length + ' · ' : '') + '“' + (task.name || 'model') + '”';
+        const toast = this.ShowViewerToast ('Downloading ' + label (models[0], 0) + '…', 'progress');
+        try {
+            if (newSession) { toast.Update ('Opening a new session…', null); await editor.sessions.New (); }
+            for (const [index, task] of models.entries ()) {
+                const asset = await this.EnsureAsset (task, owner, (received, total) => toast.Update ('Downloading ' + label (task, index) + (total ? ' · ' + Math.round (received / total * 100) + '%' : ''), total ? (index + received / total) / models.length : null));
+                toast.Update ('Adding ' + label (task, index) + '…', (index + 1) / models.length);
+                await this.AddAsset (asset, toast, { finish : false }); added.push (task.id);
+            }
+        } catch (error) { toast.Fail ((added.length ? 'Added ' + added.length + ' of ' + models.length + '. ' : '') + error.message); throw error; }
+        toast.Done (models.length === 1 ? 'Added “' + (models[0].name || 'model') + '” to the session' : 'Added ' + added.length + ' models to ' + (newSession ? 'a new session' : 'the session'));
+        this.status.textContent = 'Added ' + added.length + (added.length === 1 ? ' model' : ' models') + (skipped.length ? ' · skipped ' + skipped.length + ' that are not 3D models' : '') + '.';
+        return { added, skipped, newSession };
+    }
+    async AddAsset (asset, toast = null, { finish = true } = {})
     {
         this.AssertEditable (); const editor = this.website.sessionEditor;
         if (editor.busy || this.adding) { throw new Error ('Wait for the current session operation.'); }
@@ -721,8 +747,8 @@ export class AIWorkspace
             this.AssertEditable (); if (owner !== this.website.auth.user?.id || document !== editor.document || editor.busy) { throw new Error ('Account or workspace changed. Retry adding the model.'); }
             const saved = OpenSessionArchive (archive); MatchAISceneUnits (saved, document);
             const result = await editor.AppendArchive (saved, PlaceAIModel); this.status.textContent = 'Model added to session with textures and scale.';
-            toast.Done ('Added “' + (asset.name || 'model') + '” to the session'); return result;
-        } catch (error) { toast.Fail (error.message); throw error; }
+            if (finish) { toast.Done ('Added “' + (asset.name || 'model') + '” to the session'); } return result;
+        } catch (error) { if (finish) { toast.Fail (error.message); } throw error; }
         finally { this.adding = false; }
     }
     // Animated status message over the main viewer while a model downloads and is added.
@@ -769,6 +795,8 @@ export class AIWorkspace
         if (!this.selectionBar) { return; }
         for (const id of [...this.checkedTasks]) { if (!this.recent.some (item => item.id === id)) { this.checkedTasks.delete (id); } }
         this.selectionBar.hidden = !this.checkedTasks.size; this.selectionCount.textContent = this.checkedTasks.size + ' selected';
+        const models = [...this.checkedTasks].filter (id => this.IsAddableModel (this.recent.find (item => item.id === id))).length;
+        for (const button of [this.addCheckedButton, this.newCheckedButton]) { if (button) { button.disabled = !models; } }
     }
     // UI path asks first; ai.creations.delete is itself the explicit request.
     async ConfirmDelete (ids)

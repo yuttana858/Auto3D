@@ -799,6 +799,7 @@ export class SessionEditor
             if (label === 'Vertices:' || label === 'Triangles:') { row.querySelector ('.ov_property_table_value').textContent = (label === 'Triangles:' ? counts.triangles : counts.vertices).toLocaleString (); }
             if (label === 'Triangles:') { const tool = Element ('div', 'scene_polygon_tool'); const button = Element ('button', null, 'Optimize polygons…', tool); button.disabled = this.readOnly; button.onclick = () => this.OpenPolygonTool (); row.after (tool); }
         }
+        panel.RefreshMeshSummary?.();
         const base = this.GetObjectBaseSize (object);
         const units = this.website.preferences.units;
         const unitLabel = UnitFactor (object.unit, units) === null ? 'model units' : DisplayUnitLabel (units);
