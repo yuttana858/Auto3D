@@ -18,7 +18,7 @@ export class SidebarDetailsPanel extends SidebarPanel
     constructor (parentDiv)
     {
         super (parentDiv);
-        this.modelFormat = null;
+        this.modelFormat = null; this.meshOpen = false;
         this.unitSystem = 'metric';
         const toggle = document.createElement ('button'); toggle.className = 'details_collapse'; toggle.textContent = '−'; toggle.setAttribute ('aria-label', 'Minimize Details'); toggle.setAttribute ('aria-expanded', 'true'); this.titleDiv.appendChild (toggle);
         this.collapseButton = toggle; toggle.addEventListener ('click', () => this.SetCollapsed (!this.collapsed));
@@ -29,6 +29,22 @@ export class SidebarDetailsPanel extends SidebarPanel
         this.collapsed = Boolean (collapsed); this.contentDiv.hidden = this.collapsed;
         this.collapseButton.textContent = this.collapsed ? '+' : '−'; this.collapseButton.setAttribute ('aria-expanded', String (!this.collapsed)); this.collapseButton.setAttribute ('aria-label', this.collapsed ? 'Expand Details' : 'Minimize Details');
         return { collapsed : this.collapsed };
+    }
+
+    // Shared by the Mesh dropdown and ui.details.mesh.
+    SetMeshOpen (open)
+    {
+        this.meshOpen = Boolean (open); const mesh = this.contentDiv.querySelector ('.details_mesh_group'); if (mesh) { mesh.open = this.meshOpen; }
+        return { open : this.meshOpen, available : !!mesh };
+    }
+
+    // Summary reads the rows so counts rewritten later by the session editor stay in step.
+    RefreshMeshSummary ()
+    {
+        const mesh = this.contentDiv.querySelector ('.details_mesh_group'); if (!mesh || !this.meshSummary) { return; }
+        const value = name => [...mesh.querySelectorAll ('.ov_property_table_row')].find (row => row.querySelector ('.ov_property_table_name')?.textContent === name)?.querySelector ('.ov_property_table_value')?.textContent;
+        const triangles = value ('Triangles:'), format = value ('Format:');
+        this.meshSummary.textContent = ['Mesh', format, triangles ? triangles + ' triangles' : value ('Vertices:') ? value ('Vertices:') + ' vertices' : null].filter (Boolean).join (' · ');
     }
 
     GetName ()
@@ -46,21 +62,28 @@ export class SidebarDetailsPanel extends SidebarPanel
         this.Clear ();
         if (!model || !object3D) { return; }
         let table = AddDiv (this.contentDiv, 'ov_property_table');
+        // Format and mesh counts sit in a collapsible "Mesh" dropdown; the summary shows the triangle count.
+        // The rows stay inside the first table so the session editor can still update counts and add tools.
+        const mesh = AddDomElement (table, 'details', 'details_mesh_group'); mesh.open = this.meshOpen;
+        this.meshSummary = AddDomElement (mesh, 'summary', 'details_mesh_summary');
+        mesh.addEventListener ('toggle', () => { this.meshOpen = mesh.open; });
+        const meshRows = AddDiv (mesh, 'details_mesh_rows');
         if (this.modelFormat !== null) {
-            this.AddProperty (table, new Property (PropertyType.Text, Loc ('Format'), this.modelFormat));
+            this.AddProperty (meshRows, new Property (PropertyType.Text, Loc ('Format'), this.modelFormat));
         }
         let boundingBox = GetBoundingBox (object3D);
         let size = SubCoord3D (boundingBox.max, boundingBox.min);
         let unit = model.GetUnit ();
-        this.AddProperty (table, new Property (PropertyType.Integer, Loc ('Vertices'), object3D.VertexCount ()));
+        this.AddProperty (meshRows, new Property (PropertyType.Integer, Loc ('Vertices'), object3D.VertexCount ()));
         let lineSegmentCount = object3D.LineSegmentCount ();
         if (lineSegmentCount > 0) {
-            this.AddProperty (table, new Property (PropertyType.Integer, Loc ('Lines'), lineSegmentCount));
+            this.AddProperty (meshRows, new Property (PropertyType.Integer, Loc ('Lines'), lineSegmentCount));
         }
         let triangleCount = object3D.TriangleCount ();
         if (triangleCount > 0) {
-            this.AddProperty (table, new Property (PropertyType.Integer, Loc ('Triangles'), triangleCount));
+            this.AddProperty (meshRows, new Property (PropertyType.Integer, Loc ('Triangles'), triangleCount));
         }
+        this.RefreshMeshSummary ();
         if (unit !== Unit.Unknown) {
             this.AddProperty (table, new Property (PropertyType.Text, Loc ('Unit'), DisplayUnitLabel (this.unitSystem)));
         }

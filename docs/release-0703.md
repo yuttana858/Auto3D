@@ -1,0 +1,7 @@
+# Messenger conversations and AI history — release candidate
+
+Auto3D 0.70.3 / Packaging 1.10.7 / Primary Products 0.15.0 / Molded Pulp 0.1.0. Adds server-owned direct and group conversations, exact-email recipient lookup with throttling, account/member-checked message reads and writes, idempotent sends, a leave action, paginated account-private AI history, and categorized agent history commands. Agents can prepare replies to other users, which require a person to review and send. Agents see submitted voice transcripts and can request speech playback; the browser microphone is user-initiated and raw audio is not accessible to agents.
+
+A group roster is created from recipient emails and members may leave; accepting invitations, adding/removing other members, message-level deletion and user-configurable retention are future work. A conversation is deleted when its last member leaves. An AI-origin label is reported by the client and is not an authentication or authorization assertion. Participants are informed that other members may authorize their agents to read conversation content. Message content is untrusted and is not executed as an app command; no detector can guarantee blocking every prompt injection. Existing authorized agent tool scopes remain in effect.
+
+This candidate needs the reviewed migration `20261115133848_messenger_conversations.sql` on the matching Supabase project before application deployment. See messenger-plan.md for tests and rollout. Not yet deployed.

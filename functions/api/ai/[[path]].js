@@ -1,4 +1,4 @@
-import { MeshyCredential, OwnedTasks, RecordOwnedTask } from '../../_lib/aicredentials.js';
+import { ForgetOwnedTask, MeshyCredential, OwnedTasks, RecordOwnedTask } from '../../_lib/aicredentials.js';
 const MeshyBaseUrl = 'https://api.meshy.ai';
 const MeshyAssetHost = 'assets.meshy.ai';
 const ModelLimit = 200 * 1024 * 1024, ImageRequestLimit = 28 * 1024 * 1024, TextRequestLimit = 65536;
@@ -150,6 +150,14 @@ export async function onRequest (context)
                 if (!response.ok) { return response; }
                 const listed = await response.json ();
                 return json (Array.isArray (listed) ? listed.filter (task => owned.has (task?.id)).slice (0, pageSize) : [], 200);
+            }
+            // Deleting removes the task at Meshy. With the shared key an account may delete only its own tasks.
+            if (path.length === 2 && method === 'DELETE' && String (path[1]).length <= 200) {
+                const id = String (path[1]);
+                if (credential.shared && !(await OwnedTasks (context.env, owner)).tasks.some (task => task.id === id)) { return json ({ error : 'AI task not found.' }, 404); }
+                const response = await upstreamJson (context, base + '/' + encodeURIComponent (id), { method : 'DELETE' }, credential);
+                if (credential.shared && (response.ok || response.status === 404)) { await ForgetOwnedTask (context.env, owner, id); }
+                return response.status === 404 ? json ({ deleted : true, missing : true }, 200) : response.ok ? json ({ deleted : true }, 200) : response;
             }
             if (path.length === 2 && method === 'GET' && String (path[1]).length <= 200) {
                 if (credential.shared && !(await OwnedTasks (context.env, owner)).tasks.some (task => task.id === String (path[1]))) { return json ({ error : 'AI task not found.' }, 404); }

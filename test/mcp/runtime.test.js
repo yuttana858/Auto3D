@@ -266,6 +266,8 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         for (const name of ['auto3d.design', 'auto3d.commands', 'auto3d.capture', 'auto3d.modules', 'auto3d.sessions', 'auto3d.settings']) { assert.ok (tools.some (tool => tool.name === name)); }
         const design = await rpc (writer.access_token, 'tools/call', { name : 'auto3d.design', arguments : {} });
         const designGroups = JSON.parse ((await design.json ()).result.content[0].text); assert.ok (designGroups.categories.some (category => category.category === 'Objects')); assert.equal (designGroups.commands, undefined);
+        const messenger = await rpc (writer.access_token, 'tools/call', { name : 'auto3d.commands', arguments : { category : 'Messenger' } });
+        const messengerPage = JSON.parse ((await messenger.json ()).result.content[0].text); assert.ok (messengerPage.commands.some (command => command.id === 'messenger.ai.history')); assert.ok (messengerPage.commands.some (command => command.id === 'messenger.audio.capabilities')); assert.ok (messengerPage.commands.some (command => command.id === 'messenger.message.draft'));
         assert.ok (tools.some (tool => tool.name === 'auto3d.commands.categories'));
         assert.ok (tools.some (tool => tool.name === 'auto3d.commands.list'));
         assert.ok (tools.some (tool => tool.name === 'auto3d.commands.invoke' && tool.annotations.readOnlyHint === false && tool.annotations.destructiveHint));

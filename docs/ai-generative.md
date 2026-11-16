@@ -25,6 +25,10 @@ Meshy also documents remesh, conversion, resize, UV unwrap, 3D-print and relief 
 
 The Create panel starts with the generation type and shows only its inputs; see [release-0690.md](release-0690.md). Multi-image to 3D holds up to 4 reference views, from uploads and from **Generate reference views from prompt**.
 
+## Managing creations (0.71.0)
+
+Delete (×, confirmed) removes a creation at Meshy; check several cards to **Delete selected**. Hover a 3D model for **Add** (current session) or **New** (new session tab); a message over the main viewer shows download progress. The extended view has a **Thumbnails** size slider. See [release-0710.md](release-0710.md).
+
 ## Revisions
 
 **Revise** on a completed creation puts its prompt in the prompt box; edit it and choose **Submit revision**. Every revision is a new paid task shown beside the original, marked *Revision* in history; the original is never modified.
@@ -57,7 +61,7 @@ The browser sends a key only on the explicit same-origin HTTPS save request. It 
 
 The proxy prefers the account's personal key, then the administrator-saved shared organization key (encrypted in the same private bucket, see [release-0640.md](release-0640.md#shared-organization-key)), then a deployment key only with `AUTO3D_AI_ALLOW_SHARED_KEY=true`. Shared keys are limited to 20 generations per account per hour and each account sees only its own shared-key tasks. An unreadable personal key or provider rejection does not silently switch to the deployment key. Browser `X-Auto3D-AI-Key` headers remain rejected. `MESHY_API_BASE_URL` is an HTTPS-only server-side override; credentialed requests refuse redirects.
 
-Routes: GET balance; POST/GET text-to-3d, image-to-3d, multi-image-to-3d, text-to-image, image-to-image, retexture, rigging and animations; GET each task by ID. Text to 3D maps to Meshy v2, the others to v1. Allow-listed routes do not expose arbitrary upstream URLs. JSON request bodies are bounded to 28 MiB (including base64 references), upstream metadata to 4 MiB; GLB downloads stream through `/model?url=...`, restricted to HTTPS assets.meshy.ai. Private API middleware enforces account identity and same-origin writes.
+Routes: GET balance; DELETE a task by ID (own tasks only with a shared key); POST/GET text-to-3d, image-to-3d, multi-image-to-3d, text-to-image, image-to-image, retexture, rigging and animations; GET each task by ID. Text to 3D maps to Meshy v2, the others to v1. Allow-listed routes do not expose arbitrary upstream URLs. JSON request bodies are bounded to 28 MiB (including base64 references), upstream metadata to 4 MiB; GLB downloads stream through `/model?url=...`, restricted to HTTPS assets.meshy.ai. Private API middleware enforces account identity and same-origin writes.
 
 Submission returns a queued task ID immediately. The shared poller respects bounded Retry-After intervals and stops on account changes, success, failure, cancellation or timeout. Refresh loads provider history (Text to 3D, Image and Multi-image to 3D, images, image revisions and textures; up to 24) without submitting tasks. Provider files may expire; refreshing history does not renew them.
 

@@ -1,8 +1,24 @@
 # Auto3D development log and handoff
 
-## AI import and Library usability — Auto3D 0.70.1 / Packaging 1.10.7 / Primary Products 0.15.0 / Molded Pulp 0.1.0
+## AI import and Library usability — Auto3D 0.73.0 / Packaging 1.10.7 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-16)
 
-Adds a shared hover cue for enabled buttons, an accessible busy indicator through AI model import, and visible error feedback for personal/device Library deletion. The duplicate AI project save button is removed; the standard Save dialog offers AI project as a contents option when completed models are available. Published shared Library remains read-only. Changes are not deployed.
+Adds a shared hover cue for enabled buttons, an accessible busy indicator through AI model import, and visible error feedback for personal/device Library deletion. The duplicate AI project save button is removed; the standard Save dialog offers AI project as a contents option when completed models are available. Published shared Library remains read-only. Changes are not deployed. See [release-0730.md](release-0730.md).
+
+## Add several AI models at once, Mesh dropdown in Details — Auto3D 0.72.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0 (2026-11-16)
+
+Checked creations can be added together (**Add selected**, or **New session** for one new tab). Images are skipped, and one viewer message tracks the batch. In Details, Format, Vertices, Lines and Triangles collapse into a **Mesh** dropdown with a triangle-count summary. See [release-0720.md](release-0720.md).
+
+## AI creations: delete, multi-select, Add/New, thumbnail size — Auto3D 0.71.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0 (2026-11-14)
+
+Latest creations gains per-card delete (confirmed; removed at Meshy, own tasks only with the shared key), multi-select with Delete selected, hover **Add** / **New** on 3D models, an animated download and add message over the main viewer, and a thumbnail size slider in the extended view. The header is about half its previous height. Generate reference views was verified against live Meshy. See [release-0710.md](release-0710.md).
+
+## Messenger multi-user and durable AI history — Auto3D 0.70.3 candidate
+
+Adds server-only membership-scoped direct/group conversations, exact-email lookup with throttling, paginated agent-readable AI history, and browser STT/TTS capability reporting. The production schema and this follow-up have not been deployed. Members may leave; adding or removing others is not yet implemented. Agent origin is client-reported, and prompt-injection detection is not guaranteed. See [messenger-plan.md](messenger-plan.md).
+
+## Messenger recovery — local development
+
+Recovers the floating Messenger UI from #119 onto current main and connects its AI tab to the existing session-only command-bar agent channel. Agent replies appear in Messenger and can be read aloud; the command-bar log is cleared on account change. Direct/group messaging, persistent history, agent conversation permissions and prompt-injection defenses are not complete. Do not describe the implementation as a completed Messenger or deploy it as such. See [messenger-plan.md](messenger-plan.md).
 
 ## Model spec default right panel — Auto3D 0.70.0 / Primary Products 0.15.0 / Packaging 1.10.7 (2026-11-13)
 
@@ -607,4 +623,8 @@ Validation: 464 unit tests, lint and website/Pages build; Chromium covers clean 
 Read `AGENTS.md`, this log and the architecture overview first. Treat the live deployment commit and tests as evidence; do not infer release success from a merged PR or the old version label. Keep the current batch in one release PR. Preserve unrelated local files and development screenshots under work/. Publish only reviewed changes on the current main tree.
 
 Use shared application services and strict registry commands for new user actions; synchronize the catalog. Respect login, account isolation and read-only sessions. Never put credentials in documents, browser code, screenshots or logs. Do not replay SQL from `database/history/pr16/`. Update this log after each release with version, commit, deployment result, meaningful tests and remaining issues.
+
+# Messenger voice foundation (local work in progress)
+
+The floating Messenger foundation includes a user-initiated browser dictation button, privacy disclosure, opt-in browser speech playback hook and `ui.messenger.voice` command. Dictation adds editable draft text only. The local AI tab reads connected-agent replies from the command-bar channel; persistent conversation storage is not implemented. Browser speech support and audio processing vary; see [Messenger plan](messenger-plan.md).
 
