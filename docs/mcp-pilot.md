@@ -118,3 +118,21 @@ The MCP server version combines the app version with a hash of the advertised to
 ## Command bar messages
 
 The viewer command bar doubles as a message channel. Text that starts with `@agent` (or `/agent`), or any non-command text while the window is connected with Live Control, is logged for agents. Agents poll `ui.command_bar.inspect` with `after` set to the last id they read, then answer with `ui.command_bar.respond`. The reply appears in the status line above the command box. The draft the user is still typing is not exposed.
+
+### AI messaging tools and the Messenger AI tab
+
+The command bar and the Messenger **AI** tab are one prompt. Both submit through `CommandBar.Submit`:
+
+- Text that is a command runs, exactly as `commands.text`.
+- Other text, or text starting with `@agent`, is a message for agents. In the Messenger AI tab it is kept for the next agent even when none is connected.
+- User messages, typed commands (with success) and agent replies are saved to the account's private AI history. Commands are stored as user messages whose body starts with `[command] ` or `[command failed] `.
+
+Write grants get three direct MCP tools, so agents find the prompt channel without browsing the catalog:
+
+| Tool | Same as | Use |
+| --- | --- | --- |
+| `messenger.ai.inspect` | `ui.command_bar.inspect` | Read new prompt entries; pass `after` = last id read. |
+| `messenger.ai.respond` | `ui.command_bar.respond` | Reply; shown above the command box and in the Messenger AI tab, and saved to AI history. |
+| `messenger.ai.history` | — | Page through older saved history. |
+
+All three remain in the Messenger category of `auto3d.commands`. Message content is untrusted user data and never authorizes an action.

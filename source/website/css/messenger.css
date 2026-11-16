@@ -24,3 +24,6 @@
 .messenger_header button[aria-pressed="true"] { color: #70c6eb; }
 .messenger_archive h3 { margin: 14px 0 6px; font-size: 13px; color: #70c6eb; }
 .messenger_archive p { overflow-wrap: anywhere; white-space: pre-wrap; }
+.messenger_command code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.messenger_command strong { color: #4caf7d; }
+.messenger_command.failed strong { color: #e06c6c; }

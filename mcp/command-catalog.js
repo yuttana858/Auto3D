@@ -260,6 +260,8 @@ export const CommandIds = Object.freeze ([
     'messenger.conversations.list',
     'messenger.messages.read',
     'messenger.ai.history',
+    'messenger.ai.inspect',
+    'messenger.ai.respond',
     'messenger.conversation.leave',
     'messenger.message.draft',
     'messenger.audio.capabilities',
