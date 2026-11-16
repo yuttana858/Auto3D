@@ -44,3 +44,24 @@ To produce a downloadable isolated pilot only, explicitly dispatch **Verify isol
 ## Current quota exhaustion
 
 The owner reported the monthly Actions allotment exhausted while PR #110 was being checked. Preserve the failing records as evidence; do not spend repeated retries on an unchanged quota limit. Continue stacking and validating locally, then run the final batch when quota is restored or the owner chooses a budget change. This process does not reset the allowance or make hosted runners free.
+
+## Findings, 2026-11-16
+
+- **The repository is public**, so its jobs on standard GitHub-hosted runners (`ubuntu-latest`) are free.
+  - The Actions run-timing endpoint reports 0 billable minutes for every run, including the full CI runs on 2026-11-16.
+  - A quota or budget limit reached on the account does not come from current Auto3D runs. It is earlier usage in the billing cycle, from before the repository was public, or another private repository on the same account. Check *Settings → Billing → Usage*, grouped by repository.
+- **Size of a full CI run.** A ready PR uses about 65–75 runner-minutes:
+  - `validate` takes about 2 minutes;
+  - each of the three browser shards takes 17–31 minutes.
+  - On a private repository with the Free plan's 2,000 minutes, that is roughly 25–30 full runs a month. 35 CI runs started between 2026-11-01 and 2026-11-16. A deployment takes about 2 minutes.
+- **Avoidable runs seen this month:**
+  - superseded PRs marked ready after their work was already in the integration PR (#128 ran a full gate at the same time as #134, which contained it);
+  - re-runs of failing CI on unchanged code (2026-11-13, run attempts 2–3);
+  - several ready PRs open at once, each running the gate.
+- **Working rules.** These still matter if the repository becomes private again:
+  1. Validate locally first.
+  2. Keep one integration PR in draft and mark it ready once.
+  3. Close superseded PRs instead of marking them ready.
+  4. Fix failures locally before pushing again.
+  5. Merge batches rather than single features, because each merge also deploys.
+
