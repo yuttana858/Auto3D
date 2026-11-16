@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Messenger daily history — Auto3D 0.71.1 candidate
+
+Adds a History button for AI and direct/group messages, grouped by the viewer’s local calendar date with paginated access to older messages. History uses the existing membership-protected message store; it does not move, delete, or duplicate messages, and leaving a conversation still removes access. The connected Auto3D session was inspected, but this harness exposes no Messenger/command response tool, so an in-app agent reply could not be tested. Not deployed.
+
 ## AI creations: delete, multi-select, Add/New, thumbnail size — Auto3D 0.71.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0 (2026-11-14)
 
 Latest creations gains per-card delete (confirmed; removed at Meshy, own tasks only with the shared key), multi-select with Delete selected, hover **Add** / **New** on 3D models, an animated download and add message over the main viewer, and a thumbnail size slider in the extended view. The header is about half its previous height. Generate reference views was verified against live Meshy. See [release-0710.md](release-0710.md).
