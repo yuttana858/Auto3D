@@ -1,3 +1,4 @@
+import { AssertAutoPackPlacement, AutoPackMotionGuard, PackagingFoldRig, PackagingFoldPose, InspectPackagingFold } from './autopackfold.js';
 import { Box3, Sphere } from 'three';
 import { LoadPackagingModule, PackagingModel, ApplyFefcoFoldPose, FefcoSurfaces, PackagingUnitMM, ApplyPackagingPresentation } from './packagingadapter.js';
 import { FefcoProfile, ValidateFefco } from '../../modules/packaging/src/fefco.js';
@@ -23,20 +24,22 @@ export class FoldPresentation
     async Prepare (object)
     {
         if (!object?.threeObject || !object.userData?._auto3dFefco) { throw new Error ('Select a generated box or its dieline.'); }
+        AssertAutoPackPlacement (this.editor.document, object);
         const existing = this.records.get (object.id); if (existing?.root === object.threeObject) { return existing; }
         if (this.preparing.has (object.id)) { return this.preparing.get (object.id); }
         const owner = this.editor.website.auth?.user?.id; const generation = this.generation; const root = object.threeObject; const document = this.editor.document;
         const work = (async () => {
             const module = await LoadPackagingModule (); const parameters = ValidateFefco (JSON.parse (object.userData._auto3dFefco)); const profile = object.packagingProfile || FefcoProfile (parameters);
-            const rig = module.CreateFefcoFoldRig (parameters, profile); const clearance = await module.InspectFefcoFold (rig); if (!clearance.clear) { throw new Error ('Fold action blocked by intersecting panels: ' + clearance.intersections[0].panels.join (' / ')); } const unit = PackagingUnitMM[object.unit] ? object.unit : PackagingUnitMM[document.model.GetUnit ()] ? document.model.GetUnit () : 1; const model = PackagingModel (rig, unit, FefcoSurfaces (document.CompactModel ([object], true)));
+            const guard = AutoPackMotionGuard (document, object); const rig = PackagingFoldRig (module, object, parameters, profile); const clearance = await InspectPackagingFold (module, rig, async () => { guard (); }); if (!clearance.clear) { throw new Error ('Fold action blocked by intersecting panels: ' + clearance.intersections[0].panels.join (' / ')); } const unit = PackagingUnitMM[object.unit] ? object.unit : PackagingUnitMM[document.model.GetUnit ()] ? document.model.GetUnit () : 1; const model = PackagingModel (rig, unit, FefcoSurfaces (document.CompactModel ([object], true)));
             const output = new ModelToThreeConversionOutput ();
             const preview = await new Promise ((resolve, reject) => ConvertModelToThreeObject (model, new ModelToThreeConversionParams (), output, { onTextureLoaded : () => {}, onModelLoaded : resolve, onError : reject })).catch (error => { output.objectUrls.forEach (URL.revokeObjectURL); throw error; });
+            try { guard (); } catch (error) { output.objectUrls.forEach (URL.revokeObjectURL); preview.traverse (child => { child.geometry?.dispose (); }); throw error; }
             if (owner !== this.editor.website.auth?.user?.id || generation !== this.generation || document !== this.editor.document || root !== object.threeObject) { output.objectUrls.forEach (URL.revokeObjectURL); preview.traverse (child => { child.geometry?.dispose (); }); throw new Error ('The model changed while preparing fold controls.'); }
             const sourceMaterials = new Map (); const sourceMeshes = new Map (); root.traverse (child => { if (!child.isMesh) { return; } if (child.userData.originalMeshInstance) { sourceMeshes.set (child.name, child.userData.originalMeshInstance); } const materials = Array.isArray (child.material) ? child.material : [child.material]; materials.forEach ((material, slot) => sourceMaterials.set (material.name, { material, index : child.userData.originalMaterials?.[slot] })); });
             const fallback = sourceMeshes.values ().next ().value; const unused = new Set ();
             preview.traverse (child => { if (!child.isMesh) { return; } const materials = Array.isArray (child.material) ? child.material : [child.material]; child.material = materials.map (material => { const original = sourceMaterials.get (material.name); if (!original) { return material; } unused.add (material); return original.material; }); child.userData.originalMaterials = materials.map (material => sourceMaterials.get (material.name)?.index ?? 0); child.userData.originalMeshInstance = sourceMeshes.get (child.name) || fallback; child.userData.auto3dFoldPresentation = true; }); unused.forEach (material => material.dispose ());
             ApplyPackagingPresentation (preview, rig, unit, document.model.materials, true);
-            const record = { object, root, preview, rig, module, unit, urls : output.objectUrls, children : root.children.map (child => [child, child.visible]) };
+            const record = { object, root, preview, rig, module, unit, guard, urls : output.objectUrls, children : root.children.map (child => [child, child.visible]) };
             preview.visible = false; root.add (preview); this.records.set (object.id, record); return record;
         }) ();
         this.preparing.set (object.id, work); try { return await work; } finally { if (this.preparing.get (object.id) === work) { this.preparing.delete (object.id); } }
@@ -48,8 +51,9 @@ export class FoldPresentation
     }
     SetPose (record, pose)
     {
+        record.guard?.();
         record.children.forEach (([child]) => { child.visible = false; }); record.preview.visible = true;
-        ApplyFefcoFoldPose (record.preview, record.rig, record.module.FefcoFoldPose (record.rig, pose), record.unit); record.pose = pose;
+        ApplyFefcoFoldPose (record.preview, record.rig, PackagingFoldPose (record.module, record.rig, pose), record.unit); record.pose = pose;
     }
     Apply (time, camera = true)
     {

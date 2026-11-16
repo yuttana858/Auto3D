@@ -1,8 +1,8 @@
 # Auto3D development log and handoff
 
-## Connected AI prompt and SWIS branding — Auto3D 0.75.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0 (2026-11-16)
+## Connected AI prompt, SWIS branding and Auto Pack — Auto3D 0.75.0 / Packaging 1.11.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-16)
 
-Based on main after #134 (0.74.0); these were committed to the #134 branch after it merged. Not deployed.
+PR #136, based on main after #134 (0.74.0). Stacks #135 (Auto Pack) and #137 (Parasolid converter docs) so they share one CI run and one merge. Not deployed.
 
 - **Connected AI prompt.** The Messenger AI tab and the command bar are one prompt: commands run from either box, other text goes to a connected agent, and Messenger saves commands (✓/✗), messages and agent replies as AI history. `messenger.ai.inspect`, `messenger.ai.respond` and `messenger.ai.history` are direct MCP tools for write grants. See [release-0750.md](release-0750.md).
 - **Branding.** The visible name is Auto3D (no "SW"). The SWIS mark with "SW Innovation Systems" is under sign-in on the landing page and in a new grey strip at the bottom right of the main app. Saved-session and Library identifiers are unchanged. See [release-0750.md](release-0750.md).
@@ -14,6 +14,9 @@ PR #134 stacks the three open drafts so they share one CI run and one merge (#12
 - **Level right-drag orbit.** Main-viewer right-drag is a level turntable orbit: left/right turns around the scene up axis, up/down raises or lowers the view (stopping 1° short of the poles), and the camera never rolls or tilts. With a model selected, it still orbits the model's center while keeping the framing. Held X/Y/Z axis rotation, pan, zoom and touch are unchanged; Free orbit now affects touch only. See [release-0740.md](release-0740.md).
 - **AI import and Library usability (from #128, prepared as 0.73.0).** Shared hover cue for enabled buttons, an accessible busy indicator through AI model import (in the shared Add path), and visible error feedback for personal/device Library deletion. The duplicate AI project save button is removed; the standard Save dialog offers AI project when completed models are available. Published shared Library remains read-only. See [release-0730.md](release-0730.md).
 - **Messenger daily history (from #132, prepared as 0.71.1).** A History button for AI and direct/group messages, grouped by the viewer's local date with paginated older messages (`ui.messenger.history`). It uses the existing membership-protected message store; nothing is moved, deleted or duplicated, and leaving a conversation still removes access. See [release-0711.md](release-0711.md).
+- **Auto Pack (from #135).** Packaging Auto tab fits a finite-caliper RSC to the selected static model world bounds with 0.001 inch per-face clearance and an explicit glue-tab reserve. A bottom-flap anchored route folds around the stationary product, with collision auditing, playback controls, Undo and persisted fold metadata. See [release-0750.md](release-0750.md). Candidate, not deployed.
+  Implementation `6f9686c`: 910 full-suite tests passed before the final account/session completion guard; 35 focused integration tests passed after that guard and its regression. Also passed 72 MCP tests, lint, website/Pages/standalone Packaging builds, and the production-bundle Auto Pack browser flow (desktop/mobile, transformed bounds, units, creation, cancel, replay, saved summary and Undo). Hosted CI pending; retain draft to conserve Actions quota. Based on main through #133; versions 0.73.0 and 0.74.0 are reserved by separate open workstreams.
+- **Local Parasolid converter (from #137).** Docs and an offline converter download; see [parasolid-local-converter.md](parasolid-local-converter.md).
 
 ## Add several AI models at once, Mesh dropdown in Details — Auto3D 0.72.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0 (2026-11-16)
 

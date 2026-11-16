@@ -80,3 +80,4 @@ viewport-quality
 workspace-commands
 workspace-editing
 workspace-optimization
+packaging-auto-pack

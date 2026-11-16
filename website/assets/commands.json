@@ -2448,6 +2448,68 @@
       }
     },
     {
+      "id": "packaging.auto.inspect",
+      "title": "Inspect Auto Pack fit",
+      "category": "Packaging",
+      "description": "Measure the selected static model world bounding box and planned RSC inside size in mm, with 0.0254 mm per-face clearance.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.auto.generate",
+      "title": "Auto Pack selected product",
+      "category": "Packaging",
+      "description": "Create a flat RSC beneath the selected product and start checked bottom-anchored folding around it. Requires known scene units. Existing fold controls inspect, pause, resume or cancel playback; cancel retains the flat carton and Undo removes it.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "duration": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 30
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "duration": 8
+      }
+    },
+    {
+      "id": "packaging.tab",
+      "title": "Select Packaging tab",
+      "category": "Packaging",
+      "description": "Open Packaging or its Auto Pack controls without generating geometry.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tab": {
+            "type": "string",
+            "enum": [
+              "packaging",
+              "auto"
+            ]
+          }
+        },
+        "required": [
+          "tab"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "tab": "auto"
+      }
+    },
+    {
       "id": "packaging.download",
       "title": "Download packaging vectors",
       "category": "Packaging",

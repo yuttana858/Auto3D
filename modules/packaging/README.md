@@ -1,4 +1,4 @@
-# Packaging module v1.7.1
+# Packaging module v1.11.0
 
 A separate package for FEFCO 0200–0203 boxes, canonical-mm dielines, physical board extrusion, kraft textures, catalog controls and flat-sheet unfolding. It can be developed or copied to a separate repository without Auto3D source. Its only runtime dependencies are Three.js and fflate, under MIT licenses.
 
@@ -106,3 +106,5 @@ The standalone preview restores inner and closed materials from the original box
 ### Busy-state board surface controls (1.10.5)
 
 `SetDisabled`, which hosts call whenever their busy state changes, also refreshes the board-surface controls. A change that still arrives while the host is busy shows a wait message and restores the control instead of being ignored silently.
+
+Auto Pack APIs: `CreateAutoPackPlan`, `CreateAutoPackRig`, `AutoPackFoldPose`, `AutoPackFoldFrame` (`AutoPackFrame` alias), and `InspectAutoPackFold`. Planning accepts `{size:[x,y,z], thickness, clearanceMm}` in mm. The product frame is centered on X/Z with lower face at Y=0. Pure planning lives in `autopackplan.js`; geometry is loaded with the module. See the host release notes for fit limits and the distinction between nominal inside and usable dimensions.
