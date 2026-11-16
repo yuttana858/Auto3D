@@ -1,6 +1,6 @@
 # Auto3D 0.71.0 — AI creations: delete, multi-select, Add/New, thumbnail size, download feedback
 
-Primary Products remains 0.15.0, Packaging remains 1.10.7 and Molded Pulp remains 0.1.0. Based on main after #127 (0.70.0).
+Primary Products remains 0.15.0, Packaging remains 1.10.7 and Molded Pulp remains 0.1.0. Based on main after #131 (0.70.3).
 
 ## Change
 

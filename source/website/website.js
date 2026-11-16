@@ -1,3 +1,4 @@
+import { Messenger } from './messenger.js';
 import { DimensionTool } from './dimensiontool.js';
 import { RenderQueue } from './renderqueue.js';
 import { ViewModes } from './viewmodes.js';
@@ -228,6 +229,7 @@ export class Website
         this.InitNavigator ();
         this.InitWorkspace ();
         this.InitFullscreen ();
+        this.messenger = new Messenger (this);
 
         this.viewer.SetMouseClickHandler (this.OnModelClicked.bind (this));
         this.viewer.SetMouseMoveHandler (this.OnModelMouseMoved.bind (this));
