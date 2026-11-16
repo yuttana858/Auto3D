@@ -41,6 +41,24 @@ try {
     await page.waitForFunction (() => document.querySelector ('#main_viewer .ai_viewer_toast')?.dataset.state === 'done');
     assert.equal ((await call ('session.tabs.inspect')).tabs.length, tabs + 1); assert.equal ((await call ('scene.inspect')).objects.length, 1);
 
+    // Details: Format / Vertices / Triangles sit in a closed Mesh dropdown whose summary carries the triangle count.
+    const mesh = page.locator ('.details_mesh_group'); await mesh.waitFor ({ state : 'attached' });
+    assert.equal (await mesh.evaluate (node => node.open), false); assert.match (await page.locator ('.details_mesh_summary').textContent (), /^Mesh · .*\d triangles$/);
+    assert.deepEqual (await mesh.locator ('.ov_property_table_name').allTextContents (), ['Format:', 'Vertices:', 'Triangles:']);
+    assert.deepEqual (await call ('ui.details.mesh', { open : true }), { open : true, available : true }); assert.equal (await mesh.evaluate (node => node.open), true);
+    await call ('ui.details.mesh', { open : false }); assert.equal (await mesh.evaluate (node => node.open), false);
+
+    // Multi-select Add: checked models go in together; the image is skipped.
+    const before = (await call ('scene.inspect')).objects.length;
+    for (const [id, name] of [['mug', 'Ceramic mug'], ['box', 'Shipping box'], ['image', 'Mug photo']]) { await card (id).hover (); await card (id).getByRole ('checkbox', { name : 'Select ' + name }).check (); }
+    await page.locator ('.ai_selection_bar').getByRole ('button', { name : 'Add selected' }).click ();
+    await page.waitForFunction (() => document.querySelector ('#main_viewer .ai_viewer_toast')?.dataset.state === 'done');
+    assert.match (await page.locator ('#main_viewer .ai_viewer_toast').textContent (), /Added 2 models to the session/); assert.equal ((await call ('scene.inspect')).objects.length, before + 2);
+    const tabsBefore = (await call ('session.tabs.inspect')).tabs.length;
+    assert.deepEqual ((await call ('ai.creations.import', { ids : ['mug', 'box'], target : 'new' })).added, ['mug', 'box']);
+    assert.equal ((await call ('session.tabs.inspect')).tabs.length, tabsBefore + 1); assert.equal ((await call ('scene.inspect')).objects.length, 2);
+    await call ('ai.creations.clear_selection');
+
     // Multi-select and delete (the UI asks for confirmation first; cancelling deletes nothing).
     await call ('ui.module.mode', { module : 'ai', mode : 'extended' });
     await card ('box').hover (); await card ('box').getByRole ('checkbox', { name : 'Select Shipping box' }).check ();
@@ -61,5 +79,5 @@ try {
     const header = await page.locator ('.ai_recent_header').boundingBox (); assert.ok (header.height <= 30, 'Latest creations bar is ' + header.height + 'px');
     await page.screenshot ({ path : 'work/ai-review/ai-creations-extended.png' });
     assert.deepEqual (errors, []);
-    console.log ('AI creations: hover Add/New with viewer download feedback, new session, multi-select, confirmed delete, thumbnail size and compact header passed.');
+    console.log ('AI creations: hover Add/New with viewer download feedback, new session, multi-select, confirmed delete, thumbnail size, compact header, multi-select Add/New session and the Details Mesh dropdown passed.');
 } finally { await browser.close (); }

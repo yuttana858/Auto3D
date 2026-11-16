@@ -105,6 +105,18 @@ describe ('Extended AI workspace services', () => {
   await workspace.AddCreation ('model', { newSession : true }); assert.deepEqual (calls, ['toast:Downloading', 'download', 'toast:Opening', 'new-session', 'append:model']);
   workspace.recent.push ({ id : 'img', status : 'SUCCEEDED', imageUrl : 'x' }); await assert.rejects (() => workspace.AddCreation ('img'), /3D model/);
  });
+ it ('Adds several selected models in one batch, skipping images, with one new session', async () => {
+  const { workspace } = Workspace (); const calls = [];
+  workspace.recent = [{ id : 'a', name : 'A', status : 'SUCCEEDED', modelUrl : 'https://assets.meshy.ai/a.glb' }, { id : 'img', name : 'Image', status : 'SUCCEEDED', imageUrl : 'x' }, { id : 'b', name : 'B', status : 'SUCCEEDED', modelUrl : 'https://assets.meshy.ai/b.glb' }];
+  const toast = { Update () {}, Done (text) { calls.push ('done:' + text); }, Fail (text) { calls.push ('fail:' + text); } };
+  Object.assign (workspace, { ShowViewerToast : () => toast, EnsureAsset : async task => { calls.push ('download:' + task.id); return { id : task.id }; }, AddAsset : async (asset, t, options) => { calls.push ('append:' + asset.id + ':' + options.finish); return {}; } });
+  workspace.website.sessionEditor = { readOnly : false, busy : false, sessions : { New : async () => { calls.push ('new-session'); } } };
+  assert.deepEqual (await workspace.AddCreations (['a', 'img', 'b'], { newSession : true }), { added : ['a', 'b'], skipped : ['img'], newSession : true });
+  assert.deepEqual (calls, ['new-session', 'download:a', 'append:a:false', 'download:b', 'append:b:false', 'done:Added 2 models to a new session']);
+  await assert.rejects (() => workspace.AddCreations (['img']), /at least one completed 3D model/); await assert.rejects (() => workspace.AddCreations ([]), /1–48/);
+  calls.length = 0; workspace.EnsureAsset = async task => { if (task.id === 'b') { throw new Error ('expired'); } return { id : task.id }; };
+  await assert.rejects (() => workspace.AddCreations (['a', 'b']), /expired/); assert.deepEqual (calls, ['append:a:false', 'fail:Added 1 of 2. expired']);
+ });
  it ('Downloads a model once with byte progress', async () => {
   const { workspace } = Workspace (); const previous = globalThis.fetch; let fetched = 0;
   try {
