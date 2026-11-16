@@ -13,7 +13,7 @@ const CatalogTools = Object.freeze ([
 // source of truth, so newly registered commands appear without a hard-coded count.
 const Families = Object.freeze ({
     design : { title : 'Design', categories : ['Scene', 'Objects', 'Materials', 'Lighting', 'View', 'Camera', 'Rendering', 'Animation', 'History'] },
-    commands : { title : 'Commands & Macros', categories : ['Commands', 'Macros'] },
+    commands : { title : 'Commands & Macros', categories : ['Commands', 'Macros', 'Messenger'] },
     capture : { title : 'Screen capture', categories : ['Capture'] },
     modules : { title : 'Modules', categories : ['Packaging', 'Primary Products', 'Molded Pulp', 'AI', 'Panels', 'Knowledge'] },
     sessions : { title : 'Sessions & Library', categories : ['Sessions', 'Library'] },

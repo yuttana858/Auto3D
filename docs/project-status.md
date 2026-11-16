@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Messenger multi-user and durable AI history — Auto3D 0.70.3 candidate
+
+Adds server-only membership-scoped direct/group conversations, exact-email lookup with throttling, paginated agent-readable AI history, and browser STT/TTS capability reporting. The production schema and this follow-up have not been deployed. Members may leave; adding or removing others is not yet implemented. Agent origin is client-reported, and prompt-injection detection is not guaranteed. See [messenger-plan.md](messenger-plan.md).
+
 ## Messenger recovery — local development
 
 Recovers the floating Messenger UI from #119 onto current main and connects its AI tab to the existing session-only command-bar agent channel. Agent replies appear in Messenger and can be read aloud; the command-bar log is cleared on account change. Direct/group messaging, persistent history, agent conversation permissions and prompt-injection defenses are not complete. Do not describe the implementation as a completed Messenger or deploy it as such. See [messenger-plan.md](messenger-plan.md).
