@@ -1,5 +1,27 @@
 // Account-scoped durable transcript for the command-bar agent channel. The origin label
 // is reported by the client for display only; it is never used to authorize actions.
+// Commands typed in the command box or the Messenger AI tab are saved as user messages with a
+// marker line, so the stored conversation is also a command history.
+const CommandMarker = /^\[command( failed)?\] /;
+export function EncodeCommand (text, ok) { return (ok ? '[command] ' : '[command failed] ') + text; }
+export function DecodeEntry (body)
+{
+    const match = CommandMarker.exec (body || ''); if (!match) { return { kind : 'message', text : body }; }
+    return { kind : 'command', ok : !match[1], text : body.slice (match[0].length) };
+}
+// One saved AI-history row, shared by the live AI tab and the date-grouped history.
+export function AIHistoryRow (entry, you = 'You')
+{
+    const decoded = entry.origin === 'agent' ? { kind : 'message', text : entry.body } : DecodeEntry (entry.body);
+    const row = document.createElement ('p'), who = document.createElement ('strong');
+    if (decoded.kind === 'command') {
+        row.className = 'messenger_command' + (decoded.ok ? '' : ' failed'); row.dataset.kind = 'command';
+        who.textContent = (decoded.ok ? 'Command ✓' : 'Command ✗') + ': '; who.title = decoded.ok ? 'Command completed' : 'Command failed';
+        const code = document.createElement ('code'); code.textContent = decoded.text; row.append (who, code); return row;
+    }
+    row.dataset.kind = entry.origin === 'agent' ? 'agent' : 'message';
+    who.textContent = (entry.origin === 'agent' ? 'Agent' : you) + ': '; row.append (who, document.createTextNode (decoded.text)); return row;
+}
 export class MessengerAIHistory
 {
     constructor (messenger)
@@ -27,9 +49,9 @@ export class MessengerAIHistory
     }
     Record (entry)
     {
-        if (!this.owner || !((entry.from === 'user' && entry.kind === 'message') || (entry.from === 'agent' && entry.kind === 'response'))) { return; }
+        if (!this.owner || !((entry.from === 'user' && (entry.kind === 'message' || entry.kind === 'command')) || (entry.from === 'agent' && entry.kind === 'response'))) { return; }
         if (this.pending.length >= 100) { this.error = 'AI history queue is full. Further command-bar messages are not saved; retry before closing this window.'; this.Changed (); return; }
-        this.pending.push ({ id : crypto.randomUUID (), body : entry.text, origin : entry.from === 'agent' ? 'agent' : 'user', created_at : new Date (entry.at).toISOString () }); this.Changed (); this.Flush ();
+        this.pending.push ({ id : crypto.randomUUID (), body : entry.kind === 'command' ? EncodeCommand (entry.text, entry.ok !== false).slice (0, 4000) : entry.text, origin : entry.from === 'agent' ? 'agent' : 'user', created_at : new Date (entry.at).toISOString () }); this.Changed (); this.Flush ();
     }
     async Flush ()
     {

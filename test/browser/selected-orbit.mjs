@@ -12,6 +12,9 @@ try {
     const call = async (id, args = {}) => { const r = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (r.ok, true, JSON.stringify (r)); return r.result; };
     const labels = await page.locator ('.scene_tools button').evaluateAll (nodes => nodes.map (node => node.getAttribute ('aria-label'))); for (const text of ['Hide or show', 'Delete object', 'Model library', 'Save or open', 'Export', 'Add model']) { assert.equal (labels.some (label => label.startsWith (text)), false); }
     assert.equal (await page.locator ('.header_library_button').count () > 0, true);
+    // Brand strip: SWIS mark and "SW Innovation Systems" bottom right; the workspace ends where the strip begins.
+    const strip = await page.evaluate (() => ({ text : document.querySelector ('.app_brand').innerText, main : document.getElementById ('main').getBoundingClientRect ().bottom, footer : document.getElementById ('app_footer').getBoundingClientRect (), logo : document.querySelector ('.logo_image use').getAttribute ('href') }));
+    assert.equal (strip.text, 'SW Innovation Systems'); assert.ok (Math.abs (strip.main - strip.footer.top) < 1 && strip.footer.height > 0 && strip.footer.bottom === 1000, JSON.stringify (strip)); assert.match (strip.logo, /auto3d-logo\.svg/);
     await call ('packaging.fefco.preset', { code : '0201', length : 100, width : 80, height : 60 }); await call ('object.transform', { position : [60, 20, 0] });
     // The preset's animated fit may still be moving the camera; wait until two reads agree.
     let settled = null; for (let retry = 0; retry < 100; retry++) { const next = await call ('camera.current.inspect'); if (settled && JSON.stringify (settled) === JSON.stringify (next)) { break; } settled = next; await page.waitForTimeout (100); }

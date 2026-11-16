@@ -164,7 +164,10 @@ class WebsiteLayouter
         const drawer = document.getElementById ('material_drawer');
         const animationDrawer = document.getElementById ('advance_animation_panel');
         const drawerHeight = (drawer && drawer.classList.contains ('open') ? drawer.offsetHeight : 0) + (animationDrawer && !animationDrawer.hidden ? animationDrawer.offsetHeight : 0);
-        let contentHeight = Math.max (120, windowHeight - headerHeight - drawerHeight);
+        // The brand strip sits under the workspace; bottom drawers open above it.
+        const footer = document.getElementById ('app_footer'), footerHeight = footer && getComputedStyle (footer).display !== 'none' ? footer.offsetHeight : 0;
+        document.documentElement.style.setProperty ('--app_footer_height', footerHeight + 'px');
+        let contentHeight = Math.max (120, windowHeight - headerHeight - footerHeight - drawerHeight);
 
         const panelHeaderHeight = document.getElementById ('upload_panel_toggle').offsetHeight;
         this.parameters.mainDiv.style.height = contentHeight + 'px';
@@ -630,6 +633,7 @@ export class Website
         this.settings.themeId = newThemeId;
         this.settings.AlignBackgroundWithTheme ();
         this.themeHandler.SwitchTheme (this.settings.themeId);
+        document.documentElement.dataset.theme = this.settings.themeId === Theme.Dark ? 'dark' : 'light';
         if (resetColors) {
             let defaultSettings = new Settings (this.settings.themeId);
             if (this.settings.backgroundPreset !== 'custom') { this.settings.backgroundColor = defaultSettings.backgroundColor; }

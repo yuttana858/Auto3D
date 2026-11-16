@@ -30,6 +30,6 @@ const server = createServer (async (request, response) => {
     } catch { response.writeHead (404).end ('Not found'); }
 });
 server.on ('error', async (error) => { console.error (error.message); await build.dispose (); process.exit (1); });
-server.listen (8080, '127.0.0.1', () => console.log ('SW Auto3D development server: http://localhost:8080/website/index.html — source watching, no browser cache. Refresh after a successful rebuild.'));
+server.listen (8080, '127.0.0.1', () => console.log ('Auto3D development server: http://localhost:8080/website/index.html — source watching, no browser cache. Refresh after a successful rebuild.'));
 async function stop () { server.close (); await Promise.all ([build.dispose (), packaging.dispose (), primaryProducts.dispose (), moldedPulp.dispose ()]); process.exit (0); }
 process.on ('SIGINT', stop); process.on ('SIGTERM', stop);

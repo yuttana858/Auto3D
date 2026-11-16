@@ -1,6 +1,6 @@
 import { MessengerService } from './messengerservice.js';
 import { MessengerPeople } from './messengerpeople.js';
-import { MessengerAIHistory } from './messengeraistory.js';
+import { MessengerAIHistory, AIHistoryRow } from './messengeraistory.js';
 import { MessengerArchive } from './messengerarchive.js';
 // Presentation foundation. Messaging and AI transport are added separately.
 export class Messenger
@@ -51,7 +51,7 @@ export class Messenger
     {
         if (!['people', 'ai'].includes (tab)) { throw new Error ('Choose Messages or AI.'); }
         this.StopDictation (); this.archive?.Close (); this.archive = null; this.historyOpen = false; this.historyButton.setAttribute ('aria-pressed', 'false'); this.drafts[this.tab] = this.input.value; this.tab = tab; this.input.value = this.drafts[tab]; this.input.style.height = 'auto'; this.input.style.height = Math.min (this.input.scrollHeight, 180) + 'px'; for (const [id, button] of this.tabs) { button.setAttribute ('aria-selected', String (id === tab)); button.tabIndex = id === tab ? 0 : -1; }
-        this.input.placeholder = tab === 'people' ? 'Select a conversation to write' : 'Ask about Auto3D'; this.input.disabled = tab !== 'ai'; this.send.disabled = tab !== 'ai'; this.RenderConversation (); this.RefreshDictationAvailability (); this.UpdateIdentity (); return this.Inspect ();
+        this.input.placeholder = tab === 'people' ? 'Select a conversation to write' : 'Type a command or message an agent'; this.input.disabled = tab !== 'ai'; this.send.disabled = tab !== 'ai'; this.RenderConversation (); this.RefreshDictationAvailability (); this.UpdateIdentity (); return this.Inspect ();
     }
     SetHistory (open)
     {
@@ -73,21 +73,26 @@ export class Messenger
         if (this.historyOpen) { return; }
         const oldTop = this.content.scrollTop, oldHeight = this.content.scrollHeight, preserveScroll = this.tab === 'ai' && this.aiHistory?.preserveScroll; if (this.aiHistory) { this.aiHistory.preserveScroll = false; }
         this.people?.Close (); this.people = null; this.content.replaceChildren (); if (this.tab !== 'ai') { if (!this.root.hidden && this.website.auth?.user) { this.people = new MessengerPeople (this); } else { this.content.textContent = 'Open Messenger to load conversations.'; } return; }
-        this.BindAgentChannel (); const note = document.createElement ('p'); note.textContent = 'AI history is private to your account. A connected agent must respond; agent labels are reported by the client.'; this.content.appendChild (note);
+        this.BindAgentChannel (); const note = document.createElement ('p'); note.textContent = 'Commands and agent messages from this box and the command bar are saved here, privately to your account. Text that is not a command goes to a connected agent; agent labels are reported by the client.'; this.content.appendChild (note);
         if (this.aiHistory?.error || this.aiHistory?.pending.length) { const status = document.createElement ('p'); status.setAttribute ('role', 'status'); status.textContent = this.aiHistory.error || 'Saving AI history…'; this.content.appendChild (status); if (this.aiHistory.error && this.aiHistory.pending.length) { const retry = document.createElement ('button'); retry.type = 'button'; retry.textContent = 'Retry saving'; retry.addEventListener ('click', () => this.aiHistory.Flush ()); this.content.appendChild (retry); } }
         if (this.aiHistory?.more) { const older = document.createElement ('button'); older.type = 'button'; older.textContent = 'Load older messages'; older.addEventListener ('click', () => this.aiHistory.Load (true)); this.content.appendChild (older); }
-        const messages = new Map ([...(this.aiHistory?.items || []), ...(this.aiHistory?.pending || [])].map (entry => [entry.id, entry])); for (const entry of messages.values ()) { const row = document.createElement ('p'); const who = document.createElement ('strong'); who.textContent = entry.origin === 'agent' ? 'Agent: ' : (this.website.auth?.user?.email || 'You') + ': '; row.append (who, document.createTextNode (entry.body)); this.content.appendChild (row); } this.content.scrollTop = preserveScroll ? oldTop + this.content.scrollHeight - oldHeight : this.content.scrollHeight;
+        const messages = new Map ([...(this.aiHistory?.items || []), ...(this.aiHistory?.pending || [])].map (entry => [entry.id, entry])); for (const entry of messages.values ()) { this.content.appendChild (AIHistoryRow (entry, this.website.auth?.user?.email || 'You')); } this.content.scrollTop = preserveScroll ? oldTop + this.content.scrollHeight - oldHeight : this.content.scrollHeight;
     }
-    SendToAgent ()
+    // The AI tab composer is the same prompt as the command bar: commands run, other text goes to a connected agent.
+    async SendToAgent ()
     {
-        const message = this.input.value.trim (); if (this.tab !== 'ai' || !message || !this.website.auth?.user || this.website.sessionEditor?.readOnly) { return; }
-        if (this.aiHistory.pending.length >= 100) { this.voiceStatus.textContent = 'AI history is waiting to save. Retry before sending another message.'; return; }
-        this.BindAgentChannel (); if (!this.agentBar) { return; } if (message.length > 2000) { this.voiceStatus.textContent = 'Agent messages are limited to 2,000 characters.'; return; }
-        this.agentBar.SendToAgent (message); this.input.value = ''; this.drafts.ai = ''; this.input.dispatchEvent (new Event ('input', { bubbles : true })); this.RenderConversation ();
+        const message = this.input.value.trim (); if (this.tab !== 'ai' || !message || !this.website.auth?.user || this.website.sessionEditor?.readOnly) { return { accepted : false, kind : 'invalid', error : 'Open the AI tab in an editable session and enter text.' }; }
+        if (this.aiHistory.pending.length >= 100) { this.voiceStatus.textContent = 'AI history is waiting to save. Retry before sending another message.'; return { accepted : false, kind : 'busy', error : this.voiceStatus.textContent }; }
+        this.BindAgentChannel (); if (!this.agentBar) { return { accepted : false, kind : 'unavailable', error : 'Command bar unavailable.' }; } if (message.length > 2000) { this.voiceStatus.textContent = 'Messages and commands are limited to 2,000 characters.'; return { accepted : false, kind : 'invalid', error : this.voiceStatus.textContent }; }
+        this.send.disabled = true; let result;
+        try { result = await this.agentBar.Submit (message, { keepForAgent : true }); } finally { this.send.disabled = this.tab !== 'ai' || this.historyOpen; }
+        if (result.accepted && this.tab === 'ai' && this.input.value.trim () === message) { this.input.value = ''; this.drafts.ai = ''; this.input.dispatchEvent (new Event ('input', { bubbles : true })); }
+        this.voiceStatus.textContent = result.kind === 'command' ? (result.ok ? this.agentBar.status.textContent : 'Command failed: ' + result.error) : result.kind === 'message' ? (this.agentBar.AgentConnected () ? 'Sent to agent · waiting for a reply.' : 'No agent connected · message kept for the next agent that connects.') : result.error || '';
+        this.RenderConversation (); return result;
     }
     async Submit ()
     {
-        if (this.tab === 'ai') { this.SendToAgent (); return; }
+        if (this.tab === 'ai') { await this.SendToAgent (); return; }
         const text = this.input.value.trim (), people = this.people; if (!text || !people || text.length > 4000) { return; } if (this.peopleAgentDraft && this.peopleAgentDraftConversation !== people.current) { people.status.textContent = 'Select the original conversation or clear this agent draft.'; return; }
         if (await people.Send (text) && this.people === people && this.tab === 'people' && this.input.value.trim () === text) { this.peopleDrafts.delete (people.current); this.input.value = ''; this.drafts.people = ''; this.peopleAgentDraft = false; this.input.dispatchEvent (new Event ('input', { bubbles : true })); }
     }

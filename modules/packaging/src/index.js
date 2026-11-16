@@ -25,3 +25,5 @@ export { PackagingPanel } from './workspacepanel.js';
 
 export * from './boarddatabase.js';
 export { OpenBoardDatabaseEditor } from './boarddatabasepanel.js';
+
+export * from './autopack.js';
