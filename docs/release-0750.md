@@ -22,3 +22,15 @@ Only the selected product is protected by the fit audit; other scene objects are
 - Existing `packaging.fefco.playback.inspect`, `packaging.fefco.control`, `packaging.fefco.animate`, fold check and scrub commands operate on the generated carton.
 
 These are shared UI/agent/MCP services with strict schemas and existing session/account/read-only checks. No upload or publication occurs.
+
+## Validation and integration
+
+Implementation commit: `6f9686cda10a43889c4d3b2ce765546324b4a6e3`, based on main `2b8e1b3` (PR #133). Version 0.75.0 avoids the versions already used by the separate open 0.73.0 and 0.74.0 workstreams; those unmerged features are not included here.
+
+- Full local unit/integration suite: 910 passed before the final fold-completion account/session guard. After that guard and its new regression, all 35 Auto Pack and existing fold/unfold integration tests passed.
+- MCP suite: 72 passed, including catalog, scope and account isolation checks.
+- Lint, production website build, Pages build and standalone Packaging build passed.
+- Production-bundle Chromium regression passed: actual Auto tab and Auto Pack/Fold buttons, transformed model bounds, glue-tab reserve, inch/mm display, mobile layout, Pause/Cancel to flat, replay to closed, saved fit summary, unchanged product and two Undo steps. No page errors. Added to the browser CI manifest.
+- Final-render account/session-switch regression confirms no old-document history or selection leaks into a newly opened session.
+
+Hosted full-suite CI and deployment are pending. Keep the development PR in draft under the repository's Actions cost-control process; local results do not substitute for a passing hosted gate.
