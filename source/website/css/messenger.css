@@ -21,3 +21,6 @@
 .messenger_voice_controls button { padding: 6px; }
 .messenger_voice_controls button:disabled { opacity: .45; cursor: default; }
 .messenger_composer button[aria-pressed="true"] { color: #70c6eb; }
+.messenger_header button[aria-pressed="true"] { color: #70c6eb; }
+.messenger_archive h3 { margin: 14px 0 6px; font-size: 13px; color: #70c6eb; }
+.messenger_archive p { overflow-wrap: anywhere; white-space: pre-wrap; }

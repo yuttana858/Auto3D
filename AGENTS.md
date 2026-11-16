@@ -28,8 +28,7 @@ The AI creations management release is Auto3D 0.71.0 / Primary Products 0.15.0 /
 
 The multi-add and Details Mesh dropdown release is Auto3D 0.72.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0, based on main after #130 (0.71.0). See docs/release-0720.md.
 
-The level right-drag orbit release is Auto3D 0.74.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0, based on main after #133 (0.72.0): right-drag turns around the scene up axis and pitches without roll or tilt, keeping the selected-model pivot and framing. See docs/release-0740.md.
-The AI and Library usability release (PR #128) is Auto3D 0.73.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0, based on main after #133 (0.72.0): shared button hover cue, busy Add to session, AI project in the standard Save dialog and Library delete retry. See docs/release-0730.md.
+The integrated release in PR #134 is Auto3D 0.74.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0, based on main after #133 (0.72.0). It stacks the level right-drag orbit (right-drag turns around the scene up axis and pitches without roll or tilt, keeping the selected-model pivot and framing), #128 AI/Library usability (prepared as 0.73.0) and #132 Messenger daily history (prepared as 0.71.1). See docs/release-0740.md, docs/release-0730.md and docs/release-0711.md.
 
 # Agent-accessible features
 

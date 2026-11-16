@@ -6789,6 +6789,28 @@
       }
     },
     {
+      "id": "ui.messenger.history",
+      "title": "Show Messenger history",
+      "category": "Panels",
+      "description": "Open or close the date-grouped history for the current Messenger tab and selected conversation.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "open"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "open": true
+      }
+    },
+    {
       "id": "ui.messenger.voice",
       "title": "Set Messenger speech playback",
       "category": "Panels",
