@@ -4,9 +4,11 @@ Draft implementation plan, 2026-11-16. Reviewed against Auto3D main `70601cd5ceb
 
 The user has chosen hosted Modal processing after evaluating local installation. Keep the [local converter download](parasolid-local-converter.md) as an alternative. Hosted processing means CAD leaves the user's computer for private processing; it does not mean publishing the model.
 
+Implementation update: the worker now belongs to **Cloud 3D Studio 0.1.0**, in [foundation PR #1](https://github.com/yuttana858/Cloud-3D-Studio/pull/1), using the existing intended Modal workspace. Architecture and local CPU foundation milestones are complete: 20 tests passed, the box GLB passed Khronos validation with no issues, and Auto3D 0.74.0's actual GLB importer preserved its physical dimensions. Remote Modal execution, account-owned transfers and the product UI remain later gates. Modal credentials are absent and fresh requests to Modal hosts are blocked by this coding environment's proxy. See the shared [goals and milestones](https://github.com/yuttana858/Cloud-3D-Studio/blob/feat/cad-conversion-foundation/docs/conversion-roadmap.md).
+
 ## 1. Recommended format contract
 
-Use one conversion job to produce these outputs from supported Parasolid `.x_t` / `.x_b` files:
+Use one conversion job to produce these outputs from supported Parasolid `.x_t` / `.x_b` files, or an explicitly requested STEP conversion. Ordinary formats already imported locally by Auto3D retain their local path.
 
 | Artifact | Purpose | Units and fidelity |
 | --- | --- | --- |
@@ -40,19 +42,19 @@ Use Supabase as the authoritative job store and R2 as the binary store. Modal's 
 
 ## 3. Modal application
 
-Create a separately deployable `services/converter/` package. Promote the tested local converter into importable production functions; do not deploy by unpacking the downloadable ZIP at runtime.
+Use the shared [Cloud 3D Studio project](https://github.com/yuttana858/Cloud-3D-Studio/tree/feat/cad-conversion-foundation). CAD is its first CPU worker; later Blender rendering uses a separate function/image in the same project. Reuse Auto3D's identity, job metadata and private storage rather than creating another paid workspace, database or login system. Do not deploy by unpacking the downloadable ZIP at runtime.
 
 | File | Responsibility |
 | --- | --- |
-| `modal_app.py` | CPU image, authenticated gateway, worker, bounded status/cancel methods and scheduled reconciliation. |
-| `contracts.py` | Strict request/result schemas and versioned error codes. |
-| `converter.py` | Parse, explicit units, placed instances, complete B-Rep conversion and validated STEP. |
-| `mesh_export.py` | One controlled tessellation used for GLB and STL; output and triangle limits. |
-| `job_client.py` | Scoped worker claims, progress, artifact transfer, cancellation and completion. |
-| `requirements.lock` | Pinned Modal SDK, parser, OCP and mesh/HTTP dependencies with reviewed licenses. |
-| `tests/` | Geometry, scale, mesh quality, transfer, failure and isolation tests. |
+| `deploy/modal_app.py` | Implemented private SDK CPU smoke/capability functions and bounded image settings. Gateway, customer-job dispatch and reconciliation are M3 extensions. |
+| `src/cloud_3d_studio/contracts.py` | Implemented versioned format/units/limits registry and local errors. HTTP job contracts are extended in M3. |
+| `src/cloud_3d_studio/native.py` | Implemented STEP/Parasolid geometry conversion, units, placed instances, CAD measurements and independent STEP reimport. |
+| `src/cloud_3d_studio/meshes.py` | Implemented bounded tessellation, GLB/STL, sharp CAD-face normals and mesh reimport checks. |
+| `src/cloud_3d_studio/jobs.py`, `worker.py` | Implemented isolated native process, frozen inputs, evidence checks and exclusive artifact publication. Scoped remote transfers are M3. |
+| `uv.lock`, `deploy/requirements-worker.lock` | Pinned development environment and hashed native-worker requirements. |
+| `tests/` | Implemented native geometry, scale, quality, limits and failure tests. Account/provider tests arrive with the connector. |
 
-Start with Python 3.12, `parasolid-kit[occt]==0.3.17`, `cadquery-ocp-novtk==7.9.3.1.1` and `cadquery-ocp-proxy==7.9.3.1.1`. Verify the current supported release before implementation; upgrades require rerunning the acceptance corpus. Pin the Modal SDK and any GLB exporter after the deployment spike. A focused OCP tessellation adapter plus a reviewed mesh writer such as Trimesh is a candidate, not an already-verified component.
+The foundation pins Python 3.12, `parasolid-kit[occt]==0.3.17`, OCP 7.9.3.1.1, Modal SDK 1.6.4, NumPy 2.5.5 and Trimesh 5.2.1. The local OCP/Trimesh pipeline is validated; its cloud image build/execution is still M2. Upgrades require rerunning the acceptance corpus.
 
 Build images from an explicit source allowlist. Install dependencies during image construction. Never include customer inputs, private folders, credentials or generated CAD in an image. Use a temporary per-job directory and cleanup in `finally`; no persistent customer-data Volume and no enabled memory snapshots for the conversion worker.
 
@@ -62,7 +64,7 @@ Proposed starting settings, to benchmark rather than treat as measured capacity:
 | --- | --- |
 | Worker compute | CPU only; `cpu=(2.0, 2.0)` physical cores, approximately four vCPU equivalent. |
 | Worker memory | `memory=(4096, 8192)` MiB: 4 GiB request, 8 GiB hard cap. |
-| Scaling | `min_containers=0`, `max_containers=2`, one conversion per container at a time. |
+| Scaling | `min_containers=0`, `max_containers=1`, one conversion per container; 10-second idle shutdown. |
 | Native conversion deadline | 480 seconds, including CAD/mesh validation. |
 | Modal worker deadline | 900 seconds, allowing transfers and cleanup. |
 | Input cap | 50 MiB for the first release; raise only after upload/runtime/browser benchmarks. |
@@ -70,9 +72,9 @@ Proposed starting settings, to benchmark rather than treat as measured capacity:
 | Attempts | At most two application-controlled attempts, within a fixed overall job deadline. |
 | Per-account quota | One running job and a small bounded pending queue; configurable. |
 
-Modal requests and limits are distinct, and CPU units are physical cores. Review the local prototype's 4 GiB address-space and CPU limits before moving it unchanged into an 8 GiB Modal container; virtual address space is not the same as resident RAM. [Modal resource settings](https://modal.com/docs/guide/resources).
+Modal requests and limits are distinct, and CPU units are physical cores. The native process also has CPU, address-space and file limits; virtual address space is not the same as resident RAM. Tune these from real staging measurements. [Modal resource settings](https://modal.com/docs/guide/resources).
 
-Use `modal.asgi_app(requires_proxy_auth=True)` for the small FastAPI gateway. Cloudflare supplies `Modal-Key` / `Modal-Secret` from server-only configuration. Separate deployment credentials from proxy credentials. The browser never receives either. [Modal proxy authentication](https://modal.com/docs/guide/webhook-proxy-auth).
+After M2, extend the shared App with a small `modal.asgi_app(requires_proxy_auth=True)` FastAPI gateway. The initial v0.1.0 module has no public HTTP submission endpoint. Cloudflare supplies `Modal-Key` / `Modal-Secret` from server-only configuration. Separate deployment credentials from proxy credentials. The browser never receives either. [Modal proxy authentication](https://modal.com/docs/guide/webhook-proxy-auth).
 
 The gateway validates a small job-reference request, calls `convert_job.spawn(...)`, and returns promptly. Do not hold a browser HTTP request open through conversion: Modal Web Functions have a 150-second HTTP timeout. [Request timeouts and asynchronous polling](https://modal.com/docs/guide/webhook-timeouts).
 
@@ -123,7 +125,7 @@ Example create request; values are illustrative, not a test result:
 }
 ```
 
-`source_coordinate_unit` is required and has no default. Supported choices are `m`, `cm`, `mm`, `in`, `ft`. A CAD application's display unit may differ from the exported coordinate unit; check a known dimension when uncertain. Window/session IDs correlate results to a scene; they do not authorize access to files or another account.
+`source_coordinate_unit` is required for Parasolid and has no default. Supported choices are `m`, `cm`, `mm`, `in`, `ft`. STEP uses its embedded units and must not receive a manual unit override. A CAD application's display unit may differ from the exported coordinate unit; check a known dimension when uncertain. Window/session IDs correlate results to a scene; they do not authorize access to files or another account.
 
 Return `{schema_version, job_id, state, stage, revision, poll_after_ms, artifacts, error}` with strict schemas. Never expose a raw provider exception, service token or signed URL through public diagnostics. Examples of actionable errors: `source_units_required`, `unsupported_parasolid_schema`, `unsupported_geometry`, `input_too_large`, `conversion_timeout`, `mesh_validation_failed`, `source_hash_mismatch`, `account_changed`.
 
@@ -194,6 +196,10 @@ Proposed application policy: delete source after successful validated output; re
 
 ## 10. Delivery sequence and acceptance gates
 
+The canonical sequence is now **M0 shared architecture (complete) → M1 local worker (validated) → M2 authenticated Modal proof (blocked on connection/access/cost verification) → M3 owned job API → M4 Auto3D UI/commands → M5 private supplier pilot → M6 additional adapters**. The phases below describe the remaining cloud/product delivery, not an already deployed service.
+
+Additional format groundwork is documented in the shared [format roadmap](https://github.com/yuttana858/Cloud-3D-Studio/blob/feat/cad-conversion-foundation/docs/formats.md): IGES for legacy surfaces; version/unit-qualified OCCT BREP for kernel interchange; 3MF for unit-aware manufacturing meshes; OBJ/PLY/glTF for mesh workflows; DXF/SVG for a separate layer-preserving drawing pipeline. Native proprietary CAD and artwork formats require separate feasibility. Planned adapters are not advertised as enabled; existing Auto3D local imports stay local.
+
 | Phase | Deliverable | Acceptance gate | Estimate |
 | --- | --- | --- | --- |
 | A. Geometry proof | Pinned Modal image, synthetic tests, secure staging sample run, STEP/STL and candidate GLB writer. | User sample parses/converts; a known dimension, body placement and curved features match. | 1–2 days. |
@@ -209,6 +215,8 @@ Verification must cover malformed/unsupported text and binary sources, mm/m/in s
 Use separate Modal staging/production Apps, object prefixes or buckets and scoped secrets. Pin source/image versions. Deploy the service and backwards-compatible API/schema before enabling the client feature flag. Start with an allowlisted account and the reference file, then expand after evidence. CI can test/build artifacts without deploying. Rollback disables new submissions through the flag, preserves existing local imports and drains or cancels owned jobs; provider and API compatibility must cover in-flight attempts.
 
 ## 11. Operating cost and prerequisites
+
+Reuse the existing Modal workspace and shared Cloud 3D Studio project. App count itself does not add a per-App subscription fee; CPU/memory/runtime still consume workspace-wide credits shared with future rendering. Before the first remote test, verify actual remaining applicable credits and the **net spend limit** (after credits), rather than treating the before-credit usage budget as the same control. No new paid tier, GPU, billing-limit increase or permanent warm pool is included. [Modal Apps](https://modal.com/docs/guide/apps); [spend controls](https://modal.com/docs/guide/budgets).
 
 Measure billed startup, conversion, transfer, cleanup and any warm time. As a current illustration, Modal lists CPU at $0.0000131 per physical-core-second and memory at $0.00000222 per GiB-second. Sixty billed seconds at two cores and 4 GiB is approximately $0.0021 compute, or $2.10 for 1,000 such jobs. This excludes higher actual memory/CPU usage, retries, warm time, region multipliers, plan charges, storage/API operations and applicable network egress; it is not a measured CAD price. [Modal pricing](https://modal.com/pricing).
 
