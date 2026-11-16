@@ -67,3 +67,9 @@
 .entry_login .auth_panel .auth_continue { order: 1; background: linear-gradient(180deg, #4585e6, #2868c6); border-color: #679dec; color: #eff6ff; }
 .entry_login .auth_panel .auth_sign_out { order: 2; margin-top: 12px; }
 @media(prefers-reduced-motion:reduce) { .entry_frame_flash, .entry_login::after { display: none; } }
+/* SWIS brand at the bottom of the sign-in column; the sign-in content stays centered above it. */
+.entry_login { align-self: stretch; display: flex; flex-direction: column; justify-content: center; }
+.entry_login > .entry_eyebrow { margin-top: auto; }
+.entry_swis { margin-top: auto; padding-top: 24px; display: flex; align-items: center; justify-content: flex-end; gap: 12px; color: #c9d6e6; font-size: 12px; letter-spacing: .06em; }
+.entry_swis img { display: block; width: auto; height: 28px; }
+@media(max-width:760px) { .entry_swis { justify-content: center; padding-top: 18px; } .entry_swis img { height: 24px; } }

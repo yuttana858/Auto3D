@@ -48,7 +48,7 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         assert.ok (!html.includes ('name="appWindowCode"')); assert.ok (!html.includes ('name="harness"')); assert.ok (!html.includes ('name="name"'));
         assert.match (html, /read and edit your selected workspace, use every Auto3D tool, and capture viewport or workspace screenshots/);
         assert.ok (!html.includes ('type="checkbox"'));
-        assert.ok (!html.includes ('approve-manual')); assert.match (html, /SW Auto3D/); assert.match (html, /mcp-consent\.css/);
+        assert.ok (!html.includes ('approve-manual')); assert.match (html, /<span>Auto3D<\/span>/); assert.doesNotMatch (html, /SW Auto3D/); assert.match (html, /mcp-consent\.css/);
         const form = new URLSearchParams ({ handle : html.match (/name="handle" value="([^"]+)"/)[1], binding : html.match (/name="binding" value="([^"]+)"/)[1], permissions : html.match (/name="permissions" value="([^"]+)"/)[1], name : 'My review agent', harness : 'chatgpt', appWindowCode, decision : 'approve' });
         if (!appWindowCode) { form.delete ('name'); form.delete ('harness'); }
         const cookies = [cookieFor (id), ...response.headers.getSetCookie ().map (value => value.split (';')[0])].join ('; ');

@@ -77,3 +77,33 @@ Stacked into the same integrated release.
   - checks that `messenger.ai.respond` shows in Messenger;
   - checks that the History view shows the commands.
 
+
+# Branding: Auto3D with the SWIS mark
+
+Stacked into the same integrated release.
+
+- **No "SW" in the app name.** The visible name is now **Auto3D** in these places:
+  - the header logo, the empty viewer and the loading dialog (`auto3d-logo.svg`; its view box is narrowed to fit the shorter name);
+  - About in Preferences;
+  - the agent consent page;
+  - the development server message.
+- **Unchanged on purpose.** These internal identifiers keep `SW Auto3D` / `sw-auto3d`, so existing saved sessions, recovery packs and the browser Library still open:
+  - the saved-session `format` value;
+  - the `sw-auto3d-library` browser database name.
+- **SWIS mark.**
+  - The Smurfit Westrock Innovation Systems mark is in `website/assets/images/`:
+    - `swis-mark.png`, the original colours, for light backgrounds;
+    - `swis-mark-dark.png`, with a light "SW", for dark backgrounds.
+  - Each is cropped to the mark and 128 px high. The subtitle is replaced by the text "SW Innovation Systems".
+- **Landing page.** The SWIS mark and "SW Innovation Systems" sit at the bottom right of the sign-in column, which still keeps the sign-in content centered. On phones it is centered under sign-in.
+- **Main app.**
+  - A 24 px grey strip in the toolbar colour runs along the bottom of the workspace, with the SWIS mark and "SW Innovation Systems" at the bottom right.
+  - The mark follows the light or dark theme (`data-theme` on the root element).
+  - The workspace height accounts for the strip, and the material and animation drawers open above it.
+  - It is hidden behind the sign-in screen and in the mini shared viewer.
+
+Validation:
+- `engineering-landing` checks the landing brand text and that the image loads, and that no "SW Auto3D" text remains, at 1440 and 390 px.
+- `selected-orbit` checks the strip text and that the workspace ends where the strip begins.
+- The MCP runtime and `mcp-consent` tests check the "Auto3D" brand on the consent page.
+- Browser tests `landing-signin`, `auth`, `material-surface`, `animation`, `workspace-editing` and `messenger-ai-history` pass.
