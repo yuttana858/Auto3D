@@ -1,5 +1,7 @@
 # Local Parasolid converter download
 
+For the proposed hosted workflow, see the [Modal service and Auto3D connector plan](parasolid-modal-integration-plan.md). This local package remains available as an alternative.
+
 [Download the converter ZIP](downloads/auto3d-parasolid-local.zip?raw=1) · [SHA-256 checksum](downloads/auto3d-parasolid-local.zip.sha256)
 
 If the download does not start, open the ZIP's GitHub file page and choose **Download raw file**.
