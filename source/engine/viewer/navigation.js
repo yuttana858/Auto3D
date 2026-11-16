@@ -255,6 +255,8 @@ export class Navigation
         this.spacePan = false;
         this.panGesture = false;
         this.orbitCenter = null; this.rightOrbitStarted = false; this.heldOrbitAxes = [];
+        // Scene up axis (set by the viewer). Right-drag orbit turns around it and keeps the camera level.
+        this.worldUp = null;
         // When true, the horizontal part of a right-drag pans the camera sideways instead of orbiting; vertical movement still tilts.
         this.rightDragPansHorizontally = false;
 
@@ -483,7 +485,10 @@ export class Navigation
 		if (navigationType === NavigationType.Orbit && mouseButton === 3 && this.rightDragPansHorizontally) {
 			let panRatio = 0.001 * CoordDistance3D (this.camera.eye, this.camera.center);
 			if (moveDiff.x !== 0) { this.Pan (moveDiff.x * panRatio, 0); }
-			if (moveDiff.y !== 0) { this.Orbit (0, moveDiff.y * 0.5); }
+			if (moveDiff.y !== 0) { this.OrbitLevel (0, moveDiff.y * 0.5); }
+		} else if (navigationType === NavigationType.Orbit && mouseButton === 3 && !this.heldOrbitAxes?.length) {
+			// Right-drag: level turntable orbit (no roll or tilt) around the pivot, in either navigation mode.
+			this.OrbitLevel (moveDiff.x * 0.5, moveDiff.y * 0.5);
 		} else if (navigationType === NavigationType.Orbit) {
 			let orbitRatio = 0.5;
 			this.Orbit (moveDiff.x * orbitRatio, moveDiff.y * orbitRatio);
@@ -646,6 +651,26 @@ export class Navigation
 			let verticalDirection = CrossVector3D (horizontalDirection, viewDirection).Normalize ();
 			rotate (horizontalDirection, -radAngleY);
 			rotate (verticalDirection, -radAngleX); this.camera.up = verticalDirection;
+		}
+	}
+
+	// Turntable orbit: horizontal movement turns around the world up axis through the pivot, vertical movement
+	// raises or lowers the view around a level horizontal axis, stopping short of straight up/down so it never
+	// flips. The camera's up is held at world up, so the view never rolls or tilts sideways.
+	OrbitLevel (angleX, angleY)
+	{
+		const pivot = this.orbitCenter || this.camera.center;
+		const rotate = (axis, angle) => { this.camera.eye.Rotate (axis, angle, pivot); if (pivot !== this.camera.center) { this.camera.center.Rotate (axis, angle, pivot); } };
+		const up = (this.worldUp || this.camera.up).Clone ().Normalize ();
+		this.camera.up = up.Clone ();
+		if (angleX !== 0) { rotate (up, -angleX * DegRad); }
+		if (angleY !== 0) {
+			const viewDirection = SubCoord3D (this.camera.center, this.camera.eye).Normalize ();
+			const horizontal = CrossVector3D (viewDirection, up);
+			if (horizontal.Length () < 1e-9) { return; }
+			const limit = DegRad, current = VectorAngle3D (viewDirection, up);
+			const target = Math.min (Math.PI - limit, Math.max (limit, current + angleY * DegRad));
+			if (!IsZero (target - current)) { rotate (horizontal.Normalize (), -(target - current)); }
 		}
 	}
 

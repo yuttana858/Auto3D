@@ -1,5 +1,13 @@
 # Auto3D development log and handoff
 
+## Integrated release: level orbit, AI/Library usability, Messenger daily history — Auto3D 0.74.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0 (2026-11-16)
+
+PR #134 stacks the three open drafts so they share one CI run and one merge (#128 and #132 are folded in and close when #134 merges). Not deployed.
+
+- **Level right-drag orbit.** Main-viewer right-drag is a level turntable orbit: left/right turns around the scene up axis, up/down raises or lowers the view (stopping 1° short of the poles), and the camera never rolls or tilts. With a model selected, it still orbits the model's center while keeping the framing. Held X/Y/Z axis rotation, pan, zoom and touch are unchanged; Free orbit now affects touch only. See [release-0740.md](release-0740.md).
+- **AI import and Library usability (from #128, prepared as 0.73.0).** Shared hover cue for enabled buttons, an accessible busy indicator through AI model import (in the shared Add path), and visible error feedback for personal/device Library deletion. The duplicate AI project save button is removed; the standard Save dialog offers AI project when completed models are available. Published shared Library remains read-only. See [release-0730.md](release-0730.md).
+- **Messenger daily history (from #132, prepared as 0.71.1).** A History button for AI and direct/group messages, grouped by the viewer's local date with paginated older messages (`ui.messenger.history`). It uses the existing membership-protected message store; nothing is moved, deleted or duplicated, and leaving a conversation still removes access. See [release-0711.md](release-0711.md).
+
 ## Add several AI models at once, Mesh dropdown in Details — Auto3D 0.72.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0 (2026-11-16)
 
 Checked creations can be added together (**Add selected**, or **New session** for one new tab). Images are skipped, and one viewer message tracks the batch. In Details, Format, Vertices, Lines and Triangles collapse into a **Mesh** dropdown with a triangle-count summary. See [release-0720.md](release-0720.md).

@@ -406,6 +406,11 @@
 .ai_workspace_panel[data-mode="extended"] .ai_workspace_pane { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
 @media (max-width: 650px) { .ai_workspace_panel[data-mode="extended"] .ai_workspace_pane { grid-template-columns: minmax(0, 1fr); } }
 .ai_project_toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.ai_project_toolbar .ai_adding::before { content: ''; display: inline-block; width: 12px; height: 12px; margin-right: 7px; vertical-align: -2px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: ai_add_spin .8s linear infinite; }
+.ai_add_status { flex-basis: 100%; font-size: var(--workspace-help-font-size, 11px); }
+.ai_add_status:empty { display: none; }
+@keyframes ai_add_spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ai_project_toolbar .ai_adding::before { animation: none; } }
 .ai_project_toolbar input { min-width: 80px; flex: 1; }
 .ai_preview_host { position: relative; min-height: 280px; background: #1e2024; overflow: hidden; border-radius: 6px; }
 .ai_preview_host canvas { display: block; width: 100%; height: 100%; touch-action: none; }

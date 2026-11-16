@@ -255,6 +255,7 @@ export const CommandIds = Object.freeze ([
     'ui.save',
     'commands.text',
     'ui.messenger',
+    'ui.messenger.history',
     'ui.messenger.voice',
     'messenger.conversations.list',
     'messenger.messages.read',

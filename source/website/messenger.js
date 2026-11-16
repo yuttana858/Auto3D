@@ -1,16 +1,18 @@
 import { MessengerService } from './messengerservice.js';
 import { MessengerPeople } from './messengerpeople.js';
 import { MessengerAIHistory } from './messengeraistory.js';
+import { MessengerArchive } from './messengerarchive.js';
 // Presentation foundation. Messaging and AI transport are added separately.
 export class Messenger
 {
     constructor (website)
     {
-        this.website = website; this.service = new MessengerService (website); this.tab = 'people'; this.drafts = { people : '', ai : '' }; this.peopleDrafts = new Map ();
+        this.website = website; this.service = new MessengerService (website); this.tab = 'people'; this.drafts = { people : '', ai : '' }; this.peopleDrafts = new Map (); this.historyOpen = false;
         const launcher = document.createElement ('button'); this.launcher = launcher; launcher.type = 'button'; launcher.className = 'messenger_launcher'; launcher.textContent = 'Messenger'; launcher.setAttribute ('aria-label', 'Open Messenger'); launcher.setAttribute ('aria-expanded', 'false'); document.body.appendChild (launcher);
         const root = document.createElement ('section'); this.root = root; root.className = 'messenger_window'; root.setAttribute ('role', 'dialog'); root.setAttribute ('aria-label', 'Messenger'); root.dataset.capturePrivate = ''; root.hidden = true; document.body.appendChild (root);
         const header = document.createElement ('div'); header.className = 'messenger_header'; root.appendChild (header);
         const handle = document.createElement ('button'); handle.type = 'button'; handle.className = 'messenger_handle'; handle.textContent = 'Messenger'; handle.setAttribute ('aria-label', 'Move Messenger; drag or use arrow keys'); header.appendChild (handle);
+        const history = document.createElement ('button'); this.historyButton = history; history.type = 'button'; history.textContent = 'History'; history.setAttribute ('aria-pressed', 'false'); history.addEventListener ('click', () => this.SetHistory (!this.historyOpen)); header.appendChild (history);
         const close = document.createElement ('button'); close.type = 'button'; close.textContent = '×'; close.setAttribute ('aria-label', 'Close Messenger'); close.addEventListener ('click', () => this.SetVisible (false)); header.appendChild (close);
         const tabs = document.createElement ('div'); tabs.className = 'messenger_tabs'; tabs.setAttribute ('role', 'tablist'); tabs.setAttribute ('aria-label', 'Messenger conversations'); root.appendChild (tabs); this.tabs = new Map ();
         for (const [id, title] of [['people', 'Messages'], ['ai', 'AI']]) { const button = document.createElement ('button'); button.type = 'button'; button.textContent = title; button.setAttribute ('role', 'tab'); button.addEventListener ('click', () => this.SetTab (id)); tabs.appendChild (button); this.tabs.set (id, button); }
@@ -43,13 +45,23 @@ export class Messenger
     {
         if (typeof visible !== 'boolean') { throw new Error ('Choose whether Messenger is visible.'); }
         if (visible && (!this.website.auth?.user || this.website.sessionEditor?.readOnly)) { throw new Error ('Sign in to an editable session to open Messenger.'); }
-        if (!visible) { this.StopDictation (); this.StopSpeech (); this.people?.Close (); this.people = null; } this.root.hidden = !visible; this.launcher.setAttribute ('aria-expanded', String (visible)); if (visible) { this.RenderConversation (); this.input.focus (); } return this.Inspect ();
+        if (!visible) { this.historyOpen = false; this.archive?.Close (); this.archive = null; this.historyButton.setAttribute ('aria-pressed', 'false'); this.input.disabled = this.tab !== 'ai'; this.send.disabled = this.tab !== 'ai'; this.StopDictation (); this.StopSpeech (); this.people?.Close (); this.people = null; } this.root.hidden = !visible; this.launcher.setAttribute ('aria-expanded', String (visible)); if (visible) { this.RenderConversation (); this.input.focus (); } return this.Inspect ();
     }
     SetTab (tab)
     {
         if (!['people', 'ai'].includes (tab)) { throw new Error ('Choose Messages or AI.'); }
-        this.StopDictation (); this.drafts[this.tab] = this.input.value; this.tab = tab; this.input.value = this.drafts[tab]; this.input.style.height = 'auto'; this.input.style.height = Math.min (this.input.scrollHeight, 180) + 'px'; for (const [id, button] of this.tabs) { button.setAttribute ('aria-selected', String (id === tab)); button.tabIndex = id === tab ? 0 : -1; }
+        this.StopDictation (); this.archive?.Close (); this.archive = null; this.historyOpen = false; this.historyButton.setAttribute ('aria-pressed', 'false'); this.drafts[this.tab] = this.input.value; this.tab = tab; this.input.value = this.drafts[tab]; this.input.style.height = 'auto'; this.input.style.height = Math.min (this.input.scrollHeight, 180) + 'px'; for (const [id, button] of this.tabs) { button.setAttribute ('aria-selected', String (id === tab)); button.tabIndex = id === tab ? 0 : -1; }
         this.input.placeholder = tab === 'people' ? 'Select a conversation to write' : 'Ask about Auto3D'; this.input.disabled = tab !== 'ai'; this.send.disabled = tab !== 'ai'; this.RenderConversation (); this.RefreshDictationAvailability (); this.UpdateIdentity (); return this.Inspect ();
+    }
+    SetHistory (open)
+    {
+        if (typeof open !== 'boolean') { throw new Error ('Choose whether history is open.'); }
+        if (this.root.hidden) { throw new Error ('Open Messenger first.'); }
+        if (open === this.historyOpen) { return { open, tab : this.tab }; }
+        this.StopDictation (); this.archive?.Close (); this.archive = null; this.historyOpen = open; this.historyButton.setAttribute ('aria-pressed', String (open));
+        if (open) { const conversation = this.tab === 'people' ? this.people?.current : null; this.people?.Close (); this.people = null; this.input.disabled = true; this.send.disabled = true; this.RefreshDictationAvailability (); this.archive = new MessengerArchive (this, this.tab, conversation); }
+        else { this.input.disabled = this.tab !== 'ai'; this.send.disabled = this.tab !== 'ai'; this.RenderConversation (); this.RefreshDictationAvailability (); }
+        return { open, tab : this.tab };
     }
     BindAgentChannel ()
     {
@@ -58,6 +70,7 @@ export class Messenger
     }
     RenderConversation ()
     {
+        if (this.historyOpen) { return; }
         const oldTop = this.content.scrollTop, oldHeight = this.content.scrollHeight, preserveScroll = this.tab === 'ai' && this.aiHistory?.preserveScroll; if (this.aiHistory) { this.aiHistory.preserveScroll = false; }
         this.people?.Close (); this.people = null; this.content.replaceChildren (); if (this.tab !== 'ai') { if (!this.root.hidden && this.website.auth?.user) { this.people = new MessengerPeople (this); } else { this.content.textContent = 'Open Messenger to load conversations.'; } return; }
         this.BindAgentChannel (); const note = document.createElement ('p'); note.textContent = 'AI history is private to your account. A connected agent must respond; agent labels are reported by the client.'; this.content.appendChild (note);

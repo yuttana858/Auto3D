@@ -5185,7 +5185,7 @@
       "id": "camera.orbit.focus_selected",
       "title": "Orbit selected object",
       "category": "Camera",
-      "description": "Use the combined center of the selected visible objects as the orbit target and aim the view at it without changing the camera position. Right-drag uses the same pivot after the drag threshold but keeps the current framing (eye and view center orbit together).",
+      "description": "Use the combined center of the selected visible objects as the orbit target and aim the view at it without changing the camera position. Right-drag uses the same pivot after the drag threshold but keeps the current framing (eye and view center orbit together) and stays level: it turns around the scene up axis and raises or lowers the view with no camera roll or tilt.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -6786,6 +6786,28 @@
       "example": {
         "visible": true,
         "tab": "people"
+      }
+    },
+    {
+      "id": "ui.messenger.history",
+      "title": "Show Messenger history",
+      "category": "Panels",
+      "description": "Open or close the date-grouped history for the current Messenger tab and selected conversation.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "open"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "open": true
       }
     },
     {

@@ -121,9 +121,8 @@ export class AIWorkspace
         const header = Element ('div', 'ai_workspace_header', undefined, panel); Element ('span', 'module_version', 'AI v' + AppVersion, header); this.connectionBadge = Element ('span', 'ai_connection_badge', 'Not connected', header);
         const toolbar = Element ('div', 'ai_project_toolbar', undefined, panel);
         this.addButton = Element ('button', null, 'Add to session', toolbar); this.addButton.disabled = true; this.addButton.addEventListener ('click', () => this.Run (() => this.AddSelected ()));
-        const save = Element ('button', null, 'Save project to Library', toolbar); save.addEventListener ('click', () => this.Run (() => this.OpenSaveDialog ()));
         const open = Element ('button', null, 'Open AI project', toolbar); this.projectInput = Element ('input', null, undefined, toolbar); this.projectInput.type = 'file'; this.projectInput.accept = '.auto3d'; this.projectInput.hidden = true; open.addEventListener ('click', () => this.OpenProjectPicker ()); this.projectInput.addEventListener ('change', () => this.Run (async () => { const file = this.projectInput.files[0]; if (file) { await this.OpenProject (await file.arrayBuffer ()); } this.projectInput.value = ''; }));
-        Element ('span', 'section_hint', 'Library save includes all completed 3D creations below.', toolbar);
+        this.addStatus = Element ('span', 'ai_add_status', '', toolbar); this.addStatus.setAttribute ('role', 'status'); this.addStatus.setAttribute ('aria-live', 'polite');
         this.projectName = Element ('input', null, undefined, toolbar); this.projectName.placeholder = 'AI project'; this.projectName.maxLength = 120; this.projectName.setAttribute ('aria-label', 'AI project name'); this.projectName.addEventListener ('input', () => this.ScheduleWorkspaceSave ());
         this.aiPane = Element ('div', 'ai_workspace_pane', undefined, panel);
         this.previewHost = Element ('div', 'ai_preview_host', undefined, this.aiPane); this.previewHost.setAttribute ('aria-label', 'AI model viewer'); this.previewHost.tabIndex = 0;
@@ -313,7 +312,7 @@ export class AIWorkspace
             const name = selected ? '“' + (selected.name || 'creation') + '”' : '';
             this.selectedHint.textContent = this.mode === 'texture' ? (selectedModel ? 'Selected model: ' + name : 'Select a completed 3D model below.') : !references && (this.mode === 'image3d' ? selected?.imageUrl : selectedImage) ? 'Using selected image ' + name + '.' : '';
         }
-        if (this.addButton) { this.addButton.disabled = !this.assets.has (this.selectedTask); }
+        if (this.addButton) { this.addButton.disabled = !!this.adding || !this.assets.has (this.selectedTask); }
     }
     // Shared by the generation-type buttons and ai.mode.set: shows only the inputs this type uses.
     SetMode (mode)
@@ -741,15 +740,20 @@ export class AIWorkspace
         this.AssertEditable (); const editor = this.website.sessionEditor;
         if (editor.busy || this.adding) { throw new Error ('Wait for the current session operation.'); }
         const owner = this.website.auth.user.id; const document = editor.document; this.adding = true;
+        // Busy state on Add to session plus a status line, alongside the main-viewer message.
+        if (this.addButton) { this.addButton.disabled = true; this.addButton.setAttribute ('aria-busy', 'true'); this.addButton.classList.add ('ai_adding'); this.addButton.textContent = 'Adding to session…'; }
+        if (this.addStatus) { this.addStatus.textContent = 'Preparing model for the session…'; }
         toast = toast || this.ShowViewerToast ('Adding “' + (asset.name || 'model') + '” to the session…', 'progress'); toast.Update ('Adding “' + (asset.name || 'model') + '” to the session…', null);
         try {
+            // Allow the loading state to paint, with a fallback for background tabs.
+            await Promise.race ([new Promise (resolve => requestAnimationFrame (() => requestAnimationFrame (resolve))), new Promise (resolve => setTimeout (resolve, 150))]);
             const { archive } = await AIProjectArchive ([{ ...asset }], asset.name || 'AI model');
             this.AssertEditable (); if (owner !== this.website.auth.user?.id || document !== editor.document || editor.busy) { throw new Error ('Account or workspace changed. Retry adding the model.'); }
             const saved = OpenSessionArchive (archive); MatchAISceneUnits (saved, document);
-            const result = await editor.AppendArchive (saved, PlaceAIModel); this.status.textContent = 'Model added to session with textures and scale.';
+            const result = await editor.AppendArchive (saved, PlaceAIModel); this.status.textContent = 'Model added to session with textures and scale.'; if (this.addStatus) { this.addStatus.textContent = 'Model ready in session.'; }
             if (finish) { toast.Done ('Added “' + (asset.name || 'model') + '” to the session'); } return result;
-        } catch (error) { if (finish) { toast.Fail (error.message); } throw error; }
-        finally { this.adding = false; }
+        } catch (error) { if (this.addStatus) { this.addStatus.textContent = 'Could not add model: ' + error.message; } if (finish) { toast.Fail (error.message); } throw error; }
+        finally { this.adding = false; if (this.addButton) { this.addButton.removeAttribute ('aria-busy'); this.addButton.classList.remove ('ai_adding'); this.addButton.textContent = 'Add to session'; } this.RefreshActions (); }
     }
     // Animated status message over the main viewer while a model downloads and is added.
     ShowViewerToast (message, state = 'progress')
