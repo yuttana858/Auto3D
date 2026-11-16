@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Auto Pack — Auto3D 0.75.0 / Packaging 1.11.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0
+
+Packaging Auto tab fits a finite-caliper RSC to the selected static model world bounds with 0.001 inch per-face clearance and an explicit glue-tab reserve. A bottom-flap anchored route folds around the stationary product, with collision auditing, playback controls, Undo and persisted fold metadata. See [release-0750.md](release-0750.md). Candidate, not deployed.
+
 ## Add several AI models at once, Mesh dropdown in Details — Auto3D 0.72.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0 (2026-11-16)
 
 Checked creations can be added together (**Add selected**, or **New session** for one new tab). Images are skipped, and one viewer message tracks the batch. In Details, Format, Vertices, Lines and Triangles collapse into a **Mesh** dropdown with a triangle-count summary. See [release-0720.md](release-0720.md).

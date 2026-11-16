@@ -61,3 +61,5 @@ The next stacked candidate in draft PR #116 (following #110, merged through #109
 # Actions spending and stacked work
 
 Keep active development PRs in draft and stack related increments into the current integration PR where practical. Draft conversion cancels superseded CI; draft pushes skip runner jobs. Validate locally and record the exact commit/results. Mark ready once the batch is complete and Actions quota is available; ready PR pushes run the full gate, so return to draft before further iterative work. Never treat quota failures or skipped checks as passing. CI already covers MCP; dispatch the separate isolated pilot workflow only when its downloadable artifact is needed. See docs/actions-cost-control.md. Do not change spending limits, bypass branch protection, or deploy as part of CI cost optimization.
+
+Auto Pack candidate: Auto3D 0.75.0 / Packaging 1.11.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0. See docs/release-0750.md. Auto Pack cartons use their saved anchored fold route and require regeneration when product placement or fitted dimensions change.

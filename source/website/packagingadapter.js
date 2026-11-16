@@ -149,6 +149,13 @@ export async function PreparePackagingPresentations (objects, materials, unit)
         const profile = object.packagingProfile, parameters = object.userData?._auto3dFefco ? JSON.parse (object.userData._auto3dFefco) : null;
         const flat = object.userData?._auto3dPackagingState === 'flat'; let localRig = false; object.threeObject.traverse (mesh => { if (mesh.name === 'Left wall') { localRig = true; } });
         if (parameters) { const expected = module.FefcoProfile (parameters); if (JSON.stringify (expected.paths) !== JSON.stringify (profile.paths) || expected.thickness !== profile.thickness) { continue; } }
+        if (object.userData?._auto3dAutoPack) {
+            const { PackagingFoldRig, PackagingFoldFrame } = await import ('./autopackfold.js');
+            const rig = PackagingFoldRig (module, object, parameters, profile);
+            const data = object._autoPackPreview ? rig : PackagingFoldFrame (module, rig, parameters, profile, flat);
+            ApplyPackagingPresentation (object.threeObject, data, unit, materials, false, geometryCache);
+            continue;
+        }
         const key = JSON.stringify ([profile, parameters, flat, localRig]);
         let data = cache.get (key); if (!data) { data = parameters ? flat ? localRig ? module.CreateFefcoFoldRig (parameters, profile) : module.UnfoldFefco (parameters, profile) : module.CreateFefcoBox (parameters, profile) : module.CreateBoard (profile, { textured : true }); cache.set (key, data); }
         ApplyPackagingPresentation (object.threeObject, data, unit, materials, false, geometryCache);
