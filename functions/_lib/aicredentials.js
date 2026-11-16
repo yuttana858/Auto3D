@@ -91,3 +91,14 @@ export async function RecordOwnedTask (env, owner, id, now = Date.now ())
     }
     throw unavailable ();
 }
+// Removes a deleted task from the account's shared-key ownership list.
+export async function ForgetOwnedTask (env, owner, id)
+{
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const { tasks, etag } = await OwnedTasks (env, owner);
+        if (!tasks.some (task => task.id === id)) { return; }
+        const options = { httpMetadata : { contentType : 'application/json', cacheControl : 'no-store' }, ...(etag ? { onlyIf : { etagMatches : etag } } : {}) };
+        if (await env.AUTO3D_AI_CREDENTIALS_R2.put (OwnedTasksPath (owner), JSON.stringify ({ version : 1, tasks : tasks.filter (task => task.id !== id) }), options) !== null) { return; }
+    }
+    throw unavailable ();
+}

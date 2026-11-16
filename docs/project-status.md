@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## AI creations: delete, multi-select, Add/New, thumbnail size — Auto3D 0.71.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0 (2026-11-14)
+
+Latest creations gains per-card delete (confirmed; removed at Meshy, own tasks only with the shared key), multi-select with Delete selected, hover **Add** / **New** on 3D models, an animated download and add message over the main viewer, and a thumbnail size slider in the extended view. The header is about half its previous height. Generate reference views was verified against live Meshy. See [release-0710.md](release-0710.md).
+
 ## Messenger multi-user and durable AI history — Auto3D 0.70.3 candidate
 
 Adds server-only membership-scoped direct/group conversations, exact-email lookup with throttling, paginated agent-readable AI history, and browser STT/TTS capability reporting. The production schema and this follow-up have not been deployed. Members may leave; adding or removing others is not yet implemented. Agent origin is client-reported, and prompt-injection detection is not guaranteed. See [messenger-plan.md](messenger-plan.md).

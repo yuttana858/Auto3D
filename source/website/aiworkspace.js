@@ -6,6 +6,8 @@ import { UnitFactor } from './preferences.js';
 import * as THREE from 'three';
 
 const AIStorageKey = 'auto3d-ai-connections-v1';
+const ThumbnailSizeKey = 'auto3d-ai-thumbnail-size';
+export const ThumbnailSizeRange = { min : 72, max : 240, step : 4, initial : 150 };
 // Current Meshy image models (openapi.json, 2026-11-12). GPT Image models also accept 3:2 and 2:3.
 export const AIImageModels = ['nano-banana', 'nano-banana-2', 'nano-banana-2-lite', 'nano-banana-2-1', 'nano-banana-pro', 'gpt-image-2', 'gpt-image-2-5-flare', 'gpt-image-2-5-sunburst', 'gpt-image-2-6-flare', 'gpt-image-2-6-sunburst'];
 export const AIAspectRatios = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'];
@@ -64,7 +66,7 @@ export class AIWorkspace
     constructor (website)
     {
         this.website = website;
-        this.imageFile = null; this.imageFiles = []; this.remoteReferences = []; this.referenceUrls = []; this.revising = null; this.mode = 'text3d';
+        this.imageFile = null; this.imageFiles = []; this.remoteReferences = []; this.referenceUrls = []; this.revising = null; this.mode = 'text3d'; this.checkedTasks = new Set (); this.thumbnailSize = this.LoadThumbnailSize ();
         this.recent = []; this.assets = new Map (); this.selectedTask = null; this.previewSequence = 0;
         this.settings = this.LoadSettings ();
         this.CreateHeaderButton ();
@@ -210,8 +212,18 @@ export class AIWorkspace
         this.SetMode (this.mode);
 
         const recentSection = Element ('div', 'ai_workspace_section ai_recent_section', undefined, this.aiPane);
-        const recentHeader = Element ('div', 'ai_recent_header', undefined, recentSection); Element ('strong', null, 'Latest creations', recentHeader); const refresh = Element ('button', null, 'Refresh', recentHeader); refresh.addEventListener ('click', () => this.Run (() => this.RefreshRecent ()));
-        this.recentGrid = Element ('div', 'ai_recent_grid', undefined, recentSection);
+        const recentHeader = Element ('div', 'ai_recent_header', undefined, recentSection); Element ('strong', null, 'Latest creations', recentHeader);
+        // Multi-select actions appear while creations are checked.
+        this.selectionBar = Element ('div', 'ai_selection_bar', undefined, recentHeader); this.selectionBar.hidden = true;
+        this.selectionCount = Element ('span', 'ai_selection_count', '', this.selectionBar);
+        const selectAll = Element ('button', null, 'Select all', this.selectionBar); selectAll.type = 'button'; selectAll.addEventListener ('click', () => this.Run (() => this.SetChecked (this.recent.map (item => item.id), true)));
+        const deleteChecked = Element ('button', 'ai_danger_button', 'Delete selected', this.selectionBar); deleteChecked.type = 'button'; deleteChecked.addEventListener ('click', () => this.Run (() => this.ConfirmDelete ([...this.checkedTasks])));
+        const clearChecked = Element ('button', null, 'Clear', this.selectionBar); clearChecked.type = 'button'; clearChecked.addEventListener ('click', () => this.Run (() => this.ClearChecked ()));
+        const sizeLabel = Element ('label', 'ai_thumb_size', 'Thumbnails', recentHeader);
+        this.thumbnailSlider = Element ('input', null, undefined, sizeLabel); this.thumbnailSlider.type = 'range'; Object.assign (this.thumbnailSlider, { min : ThumbnailSizeRange.min, max : ThumbnailSizeRange.max, step : ThumbnailSizeRange.step, value : this.thumbnailSize });
+        this.thumbnailSlider.setAttribute ('aria-label', 'Thumbnail size'); this.thumbnailSlider.addEventListener ('input', () => this.Run (() => this.SetThumbnailSize (Number (this.thumbnailSlider.value))));
+        const refresh = Element ('button', null, 'Refresh', recentHeader); refresh.addEventListener ('click', () => this.Run (() => this.RefreshRecent ()));
+        this.recentGrid = Element ('div', 'ai_recent_grid', undefined, recentSection); this.recentGrid.style.setProperty ('--ai-card-size', this.thumbnailSize + 'px'); this.recentGrid.classList.toggle ('ai_compact_cards', this.thumbnailSize < 120);
         this.RenderRecent (); this.RefreshConnection ();
         this.panel = panel; panel.id = 'ai_module_panel'; panel.setAttribute ('aria-label', 'AI Generative');
         this.website.modulePanels.Register ('ai', { title : 'AI Generative', body : panel, onOpen : () => this.RefreshConnection (), onMode : state => { this.headerButton?.setAttribute ('aria-pressed', String (state.visible)); this.preview?.Resize (); } });
@@ -461,11 +473,20 @@ export class AIWorkspace
     RevealTask (id)
     {
         const card = [...(this.recentGrid?.querySelectorAll ('.ai_recent_card') || [])].find (item => item.dataset.taskId === id); if (!card) { return false; }
-        const reduced = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-        card.scrollIntoView?.({ block : 'nearest', inline : 'nearest', behavior : reduced ? 'auto' : 'smooth' }); return true;
+        const reduced = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches, behavior = reduced ? 'auto' : 'smooth';
+        // Scroll each scrollable ancestor by whole pixels rounded outward: the browser's 'nearest' can stop a
+        // fraction of a pixel short when card edges fall between pixels.
+        const box = card.getBoundingClientRect (); let top = box.top, bottom = box.bottom, left = box.left, right = box.right;
+        for (let node = card.parentElement; node && node !== document.documentElement; node = node.parentElement) {
+            const style = getComputedStyle (node), rect = node.getBoundingClientRect ();
+            const dy = /auto|scroll/.test (style.overflowY) && node.scrollHeight > node.clientHeight ? (bottom > rect.bottom ? Math.min (Math.ceil (bottom - rect.bottom), Math.floor (top - rect.top)) : top < rect.top ? Math.floor (top - rect.top) : 0) : 0;
+            const dx = /auto|scroll/.test (style.overflowX) && node.scrollWidth > node.clientWidth ? (right > rect.right ? Math.min (Math.ceil (right - rect.right), Math.floor (left - rect.left)) : left < rect.left ? Math.floor (left - rect.left) : 0) : 0;
+            if (dx || dy) { node.scrollBy?.({ top : dy, left : dx, behavior }); top -= dy; bottom -= dy; left -= dx; right -= dx; }
+        }
+        return true;
     }
     AssertEditable () { if (this.website.sessionEditor.readOnly || !this.website.auth?.user?.id) { throw new Error ('Sign in to an editable workspace.'); } }
-    Inspect () { return { progress : this.progressState ? { ...this.progressState } : null, mode : this.mode, selected : this.selectedTask, revising : this.revising || null, references : this.ReferenceCount (), viewer : this.previewHost?.classList.contains ('showing_image') ? this.imageViewer?.State () : this.preview?.root ? this.preview.State () : null, tasks : this.recent.map (item => ({ ...item, loaded : this.assets.has (item.id), scale : this.assets.get (item.id)?.scale || 1 })), models : this.assets.size }; }
+    Inspect () { return { progress : this.progressState ? { ...this.progressState } : null, checked : [...(this.checkedTasks || [])], thumbnailSize : this.thumbnailSize, mode : this.mode, selected : this.selectedTask, revising : this.revising || null, references : this.ReferenceCount (), viewer : this.previewHost?.classList.contains ('showing_image') ? this.imageViewer?.State () : this.preview?.root ? this.preview.State () : null, tasks : this.recent.map (item => ({ ...item, loaded : this.assets.has (item.id), scale : this.assets.get (item.id)?.scale || 1 })), models : this.assets.size }; }
     UIOptions (action)
     {
         const texturePrompt = this.texturePrompt?.value.trim () || '';
@@ -585,7 +606,7 @@ export class AIWorkspace
         const owner = this.website.auth.user.id; this.submitting = true; this.status.textContent = 'Submitting ' + route + '…'; this.ShowProgress ('sending', { taskId : null });
         try { const { result } = await this.RequestJSON (this.settings.baseUrl + '/' + route, { method : 'POST', headers : this.Headers (true), body : JSON.stringify (payload) });
             if (typeof result.result !== 'string' || !result.result) { throw new Error ('Provider did not return a task ID.'); }
-            const task = { id : result.result, route, type : action === 'text3d' ? 'text-to-3d-preview' : route, name : prompt || texturePrompt || selected?.name || RouteLabels[route], texturePrompt : action === 'texture' && !payload.image_style_url ? prompt : texturePrompt.trim () || null, status : 'PENDING', progress : 0, createdAt : Date.now (), provider : 'Meshy', ...(revisionOf ? { revisionOf } : {}), ...(payload.input_task_id || payload.rig_task_id ? { parentId : payload.input_task_id || payload.rig_task_id } : {}) }; this.UpsertTask (task);
+            const task = { id : result.result, route, type : action === 'text3d' ? 'text-to-3d-preview' : route, name : prompt || texturePrompt || (payload.input_task_id && this.recent.find (item => item.id === payload.input_task_id)?.name?.replace (/ · views$/, '')) || selected?.name || RouteLabels[route], texturePrompt : action === 'texture' && !payload.image_style_url ? prompt : texturePrompt.trim () || null, status : 'PENDING', progress : 0, createdAt : Date.now (), provider : 'Meshy', ...(revisionOf ? { revisionOf } : {}), ...(payload.input_task_id || payload.rig_task_id ? { parentId : payload.input_task_id || payload.rig_task_id } : {}) }; this.UpsertTask (task);
             // Poll independently; callers receive the real queued task without waiting for a long generation.
             this.PollTask (route, task.id, owner).catch (error => { if (owner === this.website.auth?.user?.id) { this.status.textContent = error.message; } }); return { queued : task.id, route };
         } finally { this.submitting = false; this.RefreshActions (); }
@@ -646,7 +667,7 @@ export class AIWorkspace
         }
         this.HideImages ();
         let asset = this.assets.get (id);
-        if (!asset) { const response = await fetch (this.settings.baseUrl + '/model?url=' + encodeURIComponent (task.modelUrl), { headers : this.Headers () }); if (!response.ok) { throw new Error ('Model download failed (' + response.status + '). Refresh expired creations.'); } const buffer = await response.arrayBuffer (); if (owner !== this.website.auth?.user?.id) { throw new Error ('Account changed.'); } asset = { ...task, buffer, scale : 1 }; this.assets.set (id, asset); }
+        if (!asset) { asset = await this.EnsureAsset (task, owner); }
         if (sequence !== this.previewSequence) { return { superseded : true }; }
         const preview = await this.EnsurePreview (); if (sequence !== this.previewSequence) { return { superseded : true }; }
         const loaded = await preview.Load (asset.buffer, asset.scale, (done, total) => { this.previewMessage.textContent = 'Loading model ' + done + ' / ' + total; });
@@ -654,17 +675,128 @@ export class AIWorkspace
         if (!task.thumbnail) { task.thumbnail = preview.Thumbnail (); this.RenderRecent (); } this.previewMessage.hidden = true; this.scaleInput.value = String (asset.scale); this.RefreshActions (); this.ScheduleWorkspaceSave (); return { selected : id, loaded : true, scale : asset.scale, animations : preview.clipCount };
     }
     async SetScale (scale) { this.AssertEditable (); if (!Number.isFinite (scale) || scale < .001 || scale > 1000) { throw new Error ('Scale must be between 0.001 and 1000.'); } const asset = this.assets.get (this.selectedTask); if (!asset) { throw new Error ('Preview a 3D model first.'); } asset.scale = scale; await this.SelectTask (asset.id); return { id : asset.id, scale }; }
+    // Downloads a creation's GLB once, reporting byte progress when the size is known.
+    async EnsureAsset (task, owner = this.website.auth?.user?.id, onProgress = null, failMessage = null)
+    {
+        const cached = this.assets.get (task.id); if (cached) { return cached; }
+        if (!task.modelUrl) { throw new Error ('This creation has no 3D model.'); }
+        const response = await fetch (this.settings.baseUrl + '/model?url=' + encodeURIComponent (task.modelUrl), { headers : this.Headers () });
+        if (!response.ok) { throw new Error (failMessage || 'Model download failed (' + response.status + '). Refresh expired creations.'); }
+        const total = Number (response.headers.get ('Content-Length')) || 0; let buffer;
+        if (onProgress && response.body?.getReader) {
+            const reader = response.body.getReader (), chunks = []; let received = 0;
+            for (;;) { const { done, value } = await reader.read (); if (done) { break; } chunks.push (value); received += value.byteLength; onProgress (received, total); }
+            const bytes = new Uint8Array (received); let offset = 0; for (const chunk of chunks) { bytes.set (chunk, offset); offset += chunk.byteLength; } buffer = bytes.buffer;
+        }
+        else { buffer = await response.arrayBuffer (); }
+        if (owner !== this.website.auth?.user?.id) { throw new Error ('Account changed.'); }
+        const asset = { ...task, buffer, scale : 1 }; this.assets.set (task.id, asset); return asset;
+    }
     async AddSelected ()
     {
-        this.AssertEditable (); const asset = this.assets.get (this.selectedTask); if (!asset) { throw new Error ('Preview a completed 3D model first.'); } const editor = this.website.sessionEditor;
+        this.AssertEditable (); const asset = this.assets.get (this.selectedTask); if (!asset) { throw new Error ('Preview a completed 3D model first.'); }
+        return this.AddAsset (asset);
+    }
+    // Shared by the card overlay (Add / New) and ai.creation.import: download with feedback in the main viewer, then append.
+    async AddCreation (id, { newSession = false } = {})
+    {
+        this.AssertEditable (); const task = this.recent.find (item => item.id === id); if (!task) { throw new Error ('Creation not found.'); }
+        if (task.status !== 'SUCCEEDED' || (!task.modelUrl && !this.assets.has (id))) { throw new Error ('Choose a completed 3D model.'); }
+        const editor = this.website.sessionEditor; if (editor.busy || this.adding) { throw new Error ('Wait for the current session operation.'); }
+        const owner = this.website.auth.user.id; const toast = this.ShowViewerToast ('Downloading “' + (task.name || 'model') + '”…', 'progress');
+        try {
+            const asset = await this.EnsureAsset (task, owner, (received, total) => toast.Update (total ? 'Downloading “' + (task.name || 'model') + '” · ' + Math.round (received / total * 100) + '%' : 'Downloading “' + (task.name || 'model') + '” · ' + (received / 1048576).toFixed (1) + ' MB', total ? received / total : null));
+            if (newSession) { toast.Update ('Opening a new session…', null); await editor.sessions.New (); }
+            const result = await this.AddAsset (asset, toast); return { ...result, id, newSession };
+        } catch (error) { toast.Fail (error.message); throw error; }
+    }
+    async AddAsset (asset, toast = null)
+    {
+        this.AssertEditable (); const editor = this.website.sessionEditor;
         if (editor.busy || this.adding) { throw new Error ('Wait for the current session operation.'); }
         const owner = this.website.auth.user.id; const document = editor.document; this.adding = true;
+        toast = toast || this.ShowViewerToast ('Adding “' + (asset.name || 'model') + '” to the session…', 'progress'); toast.Update ('Adding “' + (asset.name || 'model') + '” to the session…', null);
         try {
             const { archive } = await AIProjectArchive ([{ ...asset }], asset.name || 'AI model');
             this.AssertEditable (); if (owner !== this.website.auth.user?.id || document !== editor.document || editor.busy) { throw new Error ('Account or workspace changed. Retry adding the model.'); }
             const saved = OpenSessionArchive (archive); MatchAISceneUnits (saved, document);
-            const result = await editor.AppendArchive (saved, PlaceAIModel); this.status.textContent = 'Model added to session with textures and scale.'; return result;
-        } finally { this.adding = false; }
+            const result = await editor.AppendArchive (saved, PlaceAIModel); this.status.textContent = 'Model added to session with textures and scale.';
+            toast.Done ('Added “' + (asset.name || 'model') + '” to the session'); return result;
+        } catch (error) { toast.Fail (error.message); throw error; }
+        finally { this.adding = false; }
+    }
+    // Animated status message over the main viewer while a model downloads and is added.
+    ShowViewerToast (message, state = 'progress')
+    {
+        const host = document.getElementById ('main_viewer') || document.body;
+        this.viewerToast?.remove (); clearTimeout (this.viewerToastTimer);
+        const toast = Element ('div', 'ai_viewer_toast', undefined, host); toast.setAttribute ('role', 'status'); toast.setAttribute ('aria-live', 'polite'); toast.dataset.state = state;
+        Element ('span', 'ai_viewer_toast_icon', undefined, toast); const text = Element ('span', 'ai_viewer_toast_text', message, toast);
+        const bar = Element ('div', 'ai_viewer_toast_bar', undefined, toast); const fill = Element ('div', null, undefined, bar);
+        this.viewerToast = toast; requestAnimationFrame (() => toast.classList.add ('visible'));
+        const close = delay => { this.viewerToastTimer = setTimeout (() => { toast.classList.remove ('visible'); setTimeout (() => toast.remove (), 300); }, delay); };
+        return {
+            element : toast,
+            Update : (value, fraction) => { text.textContent = value; toast.dataset.state = 'progress'; bar.classList.toggle ('indeterminate', !Number.isFinite (fraction)); if (Number.isFinite (fraction)) { fill.style.width = Math.max (2, Math.min (100, fraction * 100)) + '%'; } },
+            Done : value => { text.textContent = value; toast.dataset.state = 'done'; bar.classList.remove ('indeterminate'); fill.style.width = '100%'; close (2600); },
+            Fail : value => { text.textContent = value; toast.dataset.state = 'failed'; bar.classList.remove ('indeterminate'); close (5000); }
+        };
+    }
+    LoadThumbnailSize ()
+    {
+        try { const value = Number (localStorage.getItem (ThumbnailSizeKey)); if (value >= ThumbnailSizeRange.min && value <= ThumbnailSizeRange.max) { return value; } } catch { /* Storage may be unavailable. */ }
+        return ThumbnailSizeRange.initial;
+    }
+    // Card width in pixels for Latest creations; smaller fits more thumbnails. Remembered on this device.
+    SetThumbnailSize (size)
+    {
+        if (!Number.isFinite (size) || size < ThumbnailSizeRange.min || size > ThumbnailSizeRange.max) { throw new Error ('Thumbnail size must be ' + ThumbnailSizeRange.min + '–' + ThumbnailSizeRange.max + ' px.'); }
+        this.thumbnailSize = Math.round (size); this.recentGrid?.style.setProperty ('--ai-card-size', this.thumbnailSize + 'px'); this.recentGrid?.classList.toggle ('ai_compact_cards', this.thumbnailSize < 120);
+        if (this.thumbnailSlider && Number (this.thumbnailSlider.value) !== this.thumbnailSize) { this.thumbnailSlider.value = this.thumbnailSize; }
+        try { localStorage.setItem (ThumbnailSizeKey, String (this.thumbnailSize)); } catch { /* Storage may be unavailable. */ }
+        return { size : this.thumbnailSize };
+    }
+    SetChecked (ids, checked = true)
+    {
+        if (!Array.isArray (ids)) { throw new Error ('Expected creation IDs.'); }
+        for (const id of ids) { if (!this.recent.some (item => item.id === id)) { throw new Error ('Creation not found.'); } }
+        for (const id of ids) { if (checked) { this.checkedTasks.add (id); } else { this.checkedTasks.delete (id); } }
+        this.RenderRecent (); return { selected : [...this.checkedTasks] };
+    }
+    ClearChecked () { this.checkedTasks.clear (); this.RenderRecent (); return { selected : [] }; }
+    RefreshSelectionBar ()
+    {
+        if (!this.selectionBar) { return; }
+        for (const id of [...this.checkedTasks]) { if (!this.recent.some (item => item.id === id)) { this.checkedTasks.delete (id); } }
+        this.selectionBar.hidden = !this.checkedTasks.size; this.selectionCount.textContent = this.checkedTasks.size + ' selected';
+    }
+    // UI path asks first; ai.creations.delete is itself the explicit request.
+    async ConfirmDelete (ids)
+    {
+        if (!ids.length) { throw new Error ('Select creations to delete.'); }
+        const names = ids.map (id => this.recent.find (item => item.id === id)?.name || 'creation');
+        const message = ids.length === 1 ? 'Delete “' + names[0] + '”? It is removed from Meshy and from this list. This cannot be undone.' : 'Delete ' + ids.length + ' creations? They are removed from Meshy and from this list. This cannot be undone.';
+        if (!globalThis.confirm?.(message)) { return { deleted : [], cancelled : true }; }
+        return this.DeleteCreations (ids);
+    }
+    async DeleteCreations (ids)
+    {
+        this.AssertEditable ();
+        if (!Array.isArray (ids) || !ids.length || ids.length > 48 || ids.some (id => typeof id !== 'string' || !id || id.length > 200)) { throw new Error ('Choose 1–48 creations to delete.'); }
+        const tasks = ids.map (id => this.recent.find (item => item.id === id)); if (tasks.some (task => !task)) { throw new Error ('Creation not found.'); }
+        const running = tasks.find (task => ['PENDING', 'IN_PROGRESS'].includes (task.status)); if (running) { throw new Error ('Wait for “' + (running.name || 'creation') + '” to finish before deleting it.'); }
+        const owner = this.website.auth.user.id, deleted = [], failed = [];
+        for (const task of tasks) {
+            try { await this.RequestJSON (this.settings.baseUrl + '/' + task.route + '/' + encodeURIComponent (task.id), { method : 'DELETE', headers : this.Headers () }); deleted.push (task.id); }
+            catch (error) { if (owner !== this.website.auth?.user?.id) { throw error; } failed.push ({ id : task.id, error : error.message }); }
+        }
+        const gone = new Set (deleted);
+        this.recent = this.recent.filter (item => !gone.has (item.id)); for (const id of gone) { this.assets.delete (id); this.checkedTasks.delete (id); }
+        this.remoteReferences = this.remoteReferences.filter (item => !gone.has (item.taskId));
+        if (gone.has (this.selectedTask)) { this.selectedTask = null; this.previewSequence++; this.preview?.Clear (); this.HideImages (); this.previewMessage.hidden = false; this.previewMessage.textContent = 'Select a completed creation to preview'; }
+        this.RenderReferences (); this.RenderRecent (); this.ScheduleWorkspaceSave ();
+        this.status.textContent = 'Deleted ' + deleted.length + (deleted.length === 1 ? ' creation' : ' creations') + (failed.length ? ' · ' + failed.length + ' could not be deleted: ' + failed[0].error : '.');
+        return { deleted, failed };
     }
     // Shared by the toolbar buttons and the agent commands.
     OpenProjectPicker () { this.projectInput.click (); }
@@ -693,7 +825,7 @@ export class AIWorkspace
     {
         this.AssertEditable (); const owner = this.website.auth.user.id; if (this.saving) { throw new Error ('Project save already in progress.'); } this.saving = true;
         try { this.status.textContent = 'Saving AI project…'; for (const task of this.recent.filter (item => item.status === 'SUCCEEDED' && item.modelUrl && !this.assets.has (item.id))) {
-                this.status.textContent = 'Saving project · downloading ' + task.name + '…'; const response = await fetch (this.settings.baseUrl + '/model?url=' + encodeURIComponent (task.modelUrl), { headers : this.Headers () }); if (!response.ok) { throw new Error ('Cannot save ' + task.name + ': model unavailable. Refresh creations and retry.'); } const buffer = await response.arrayBuffer (); if (owner !== this.website.auth.user?.id) { throw new Error ('Account changed.'); } this.assets.set (task.id, { ...task, buffer, scale : 1 });
+                this.status.textContent = 'Saving project · downloading ' + task.name + '…'; await this.EnsureAsset (task, owner, null, 'Cannot save ' + task.name + ': model unavailable. Refresh creations and retry.');
             }
             const { archive, objects } = await AIProjectArchive ([...this.assets.values ()].map (asset => ({ ...asset })), name, this.recent);
             if (owner !== this.website.auth.user?.id) { throw new Error ('Account changed.'); } if (!this.preview?.root) { const first = [...this.assets.keys ()][0]; if (first) { await this.SelectTask (first); } } if (!this.preview?.root) { throw new Error ('Preview a model first.'); }
@@ -737,7 +869,7 @@ export class AIWorkspace
         if (!this.recentGrid) { return; }
         this.recentGrid.replaceChildren ();
         if (!this.recent.length) {
-            const empty = Element ('div', 'ai_recent_empty', undefined, this.recentGrid); Element ('strong', null, 'No AI creations yet', empty); Element ('span', null, 'Completed generations will appear here with thumbnail, status, provider, and import action.', empty); return;
+            const empty = Element ('div', 'ai_recent_empty', undefined, this.recentGrid); Element ('strong', null, 'No AI creations yet', empty); Element ('span', null, 'Completed generations will appear here with thumbnail, status, provider, and import action.', empty); this.RefreshSelectionBar (); return;
         }
         for (const item of this.recent.slice (0, 48)) {
             const card = Element ('div', 'ai_recent_card', undefined, this.recentGrid);
@@ -745,12 +877,24 @@ export class AIWorkspace
             card.classList.toggle ('ai_recent_active', item.id === this.progressState?.taskId && this.progressState.phase === 'processing'); card.setAttribute ('aria-busy', String (card.classList.contains ('ai_recent_active')));
             const previewButton = Element ('button', 'ai_preview_button', 'Preview', card); previewButton.addEventListener ('click', () => this.Run (() => this.SelectTask (item.id)));
             const placeholder = () => { const box = Element ('div', 'ai_recent_placeholder', undefined); Element ('span', null, item.status !== 'SUCCEEDED' && Number.isFinite (item.progress) ? item.progress + '%' : RouteLabels[item.route] || 'AI', box); return box; };
+            const thumb = Element ('div', 'ai_thumb', undefined, card);
             if (item.thumbnail && !item.thumbnailFailed) {
-                const image = Element ('img', null, undefined, card); image.alt = ''; image.loading = 'lazy'; image.decoding = 'async'; image.referrerPolicy = 'no-referrer';
+                const image = Element ('img', null, undefined, thumb); image.alt = ''; image.loading = 'lazy'; image.decoding = 'async'; image.referrerPolicy = 'no-referrer';
                 // Meshy thumbnails are signed URLs that expire; fall back instead of showing a broken image.
                 image.addEventListener ('error', () => { item.thumbnailFailed = true; image.replaceWith (placeholder ()); }, { once : true }); image.src = item.thumbnail;
             }
-            else { card.appendChild (placeholder ()); }
+            else { thumb.appendChild (placeholder ()); }
+            const check = Element ('input', 'ai_card_check', undefined, thumb); check.type = 'checkbox'; check.checked = this.checkedTasks.has (item.id); check.setAttribute ('aria-label', 'Select ' + (item.name || 'creation'));
+            check.addEventListener ('change', () => this.Run (() => this.SetChecked ([item.id], check.checked)));
+            card.classList.toggle ('checked', check.checked);
+            const remove = Element ('button', 'ai_card_delete', '×', thumb); remove.type = 'button'; remove.title = 'Delete'; remove.setAttribute ('aria-label', 'Delete ' + (item.name || 'creation'));
+            remove.disabled = ['PENDING', 'IN_PROGRESS'].includes (item.status); remove.addEventListener ('click', () => this.Run (() => this.ConfirmDelete ([item.id])));
+            if (item.status === 'SUCCEEDED' && (item.modelUrl || this.assets.has (item.id))) {
+                // Hover actions: add to the open session, or open the model in a new session tab.
+                const overlay = Element ('div', 'ai_thumb_overlay', undefined, thumb);
+                const add = Element ('button', null, 'Add', overlay); add.type = 'button'; add.title = 'Add to the current session'; add.setAttribute ('aria-label', 'Add ' + (item.name || 'model') + ' to the current session'); add.addEventListener ('click', () => this.Run (() => this.AddCreation (item.id)));
+                const fresh = Element ('button', null, 'New', overlay); fresh.type = 'button'; fresh.title = 'Open in a new session'; fresh.setAttribute ('aria-label', 'Open ' + (item.name || 'model') + ' in a new session'); fresh.addEventListener ('click', () => this.Run (() => this.AddCreation (item.id, { newSession : true })));
+            }
             Element ('strong', null, item.name || 'Generated asset', card);
             const meta = [RouteLabels[item.route] || item.provider, item.revisionOf ? 'Revision' : null, item.status, Number.isFinite (item.progress) && item.status !== 'SUCCEEDED' ? item.progress + '%' : null, Number.isFinite (item.credits) ? item.credits + ' cr' : null].filter (Boolean).join (' · ');
             Element ('span', 'ai_recent_meta', meta, card).title = meta;
@@ -764,6 +908,6 @@ export class AIWorkspace
                 const importButton = Element ('button', null, 'Import', actions); importButton.title = 'Add this model to the Auto3D session'; importButton.addEventListener ('click', () => this.Run (() => this.ImportTask (item)));
             }
         }
-        this.RefreshActions ();
+        this.RefreshSelectionBar (); this.RefreshActions ();
     }
 }

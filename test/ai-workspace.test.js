@@ -81,6 +81,38 @@ describe ('Extended AI workspace services', () => {
   await assert.rejects (() => workspace.GenerateReferenceViews ({ prompt : 'a mug' }), /Remove a reference/);
   await assert.rejects (() => workspace.SetReferenceFiles ([{ type : 'image/png', size : 1 }], { append : true }), /up to 4/);
  });
+ it ('Deletes creations, keeps failures, refuses running tasks and clears dependent state', async () => {
+  const { workspace } = Workspace (); const requests = [];
+  Object.assign (workspace, { recent : [{ id : 'a', route : 'text-to-3d', status : 'SUCCEEDED', name : 'A' }, { id : 'b', route : 'text-to-image', status : 'SUCCEEDED', name : 'B' }, { id : 'c', route : 'image-to-3d', status : 'FAILED', name : 'C' }, { id : 'run', route : 'text-to-3d', status : 'IN_PROGRESS', name : 'R' }], selectedTask : 'a', checkedTasks : new Set (['a', 'b']), remoteReferences : [{ url : 'u', taskId : 'b' }], previewSequence : 0, previewMessage : {}, RenderReferences () {}, RenderRecent () {}, HideImages () {}, ScheduleWorkspaceSave () {} });
+  workspace.assets.set ('a', { buffer : new ArrayBuffer (1) });
+  workspace.RequestJSON = async (url, init) => { requests.push ([url, init.method]); if (url.endsWith ('/c')) { throw new Error ('Meshy refused'); } return { result : { deleted : true } }; };
+  await assert.rejects (() => workspace.DeleteCreations (['run']), /finish/); await assert.rejects (() => workspace.DeleteCreations ([]), /1–48/); await assert.rejects (() => workspace.DeleteCreations (['missing']), /not found/); assert.equal (requests.length, 0);
+  const result = await workspace.DeleteCreations (['a', 'b', 'c']);
+  assert.deepEqual (requests, [['/api/ai/text-to-3d/a', 'DELETE'], ['/api/ai/text-to-image/b', 'DELETE'], ['/api/ai/image-to-3d/c', 'DELETE']]);
+  assert.deepEqual (result.deleted, ['a', 'b']); assert.equal (result.failed[0].id, 'c');
+  assert.deepEqual (workspace.recent.map (item => item.id), ['c', 'run']); assert.equal (workspace.assets.has ('a'), false); assert.equal (workspace.selectedTask, null); assert.equal (workspace.checkedTasks.size, 0); assert.deepEqual (workspace.remoteReferences, []);
+  globalThis.confirm = () => false; assert.deepEqual (await workspace.ConfirmDelete (['c']), { deleted : [], cancelled : true }); delete globalThis.confirm;
+ });
+ it ('Validates multi-select and thumbnail size and keeps Add and New on one shared path', async () => {
+  const { workspace } = Workspace (); Object.assign (workspace, { checkedTasks : new Set (), RenderRecent () {} });
+  assert.deepEqual (workspace.SetChecked (['model'], true), { selected : ['model'] }); assert.throws (() => workspace.SetChecked (['missing'], true), /not found/); assert.deepEqual (workspace.ClearChecked (), { selected : [] });
+  assert.throws (() => workspace.SetThumbnailSize (40), /72–240/); assert.throws (() => workspace.SetThumbnailSize (NaN)); assert.deepEqual (workspace.SetThumbnailSize (100), { size : 100 });
+  const calls = []; const toast = { Update (text) { calls.push ('toast:' + text.split (' ')[0]); }, Done () {}, Fail () {} };
+  Object.assign (workspace, { ShowViewerToast : () => toast, EnsureAsset : async (task, owner, progress) => { progress (50, 100); calls.push ('download'); return { id : task.id, name : 'Mug' }; }, AddAsset : async asset => { calls.push ('append:' + asset.id); return { objectCount : 1 }; } });
+  workspace.website.sessionEditor = { readOnly : false, busy : false, sessions : { New : async () => { calls.push ('new-session'); } } };
+  assert.deepEqual (await workspace.AddCreation ('model'), { objectCount : 1, id : 'model', newSession : false });
+  assert.deepEqual (calls.splice (0), ['toast:Downloading', 'download', 'append:model']);
+  await workspace.AddCreation ('model', { newSession : true }); assert.deepEqual (calls, ['toast:Downloading', 'download', 'toast:Opening', 'new-session', 'append:model']);
+  workspace.recent.push ({ id : 'img', status : 'SUCCEEDED', imageUrl : 'x' }); await assert.rejects (() => workspace.AddCreation ('img'), /3D model/);
+ });
+ it ('Downloads a model once with byte progress', async () => {
+  const { workspace } = Workspace (); const previous = globalThis.fetch; let fetched = 0;
+  try {
+   globalThis.fetch = async () => { fetched++; return new Response (new Blob ([new Uint8Array (10), new Uint8Array (6)]).stream (), { headers : { 'Content-Length' : '16' } }); };
+   const progress = []; const asset = await workspace.EnsureAsset (workspace.recent[0], 'owner', (received, total) => progress.push ([received, total]));
+   assert.equal (asset.buffer.byteLength, 16); assert.deepEqual (progress.at (-1), [16, 16]); await workspace.EnsureAsset (workspace.recent[0], 'owner'); assert.equal (fetched, 1);
+  } finally { globalThis.fetch = previous; }
+ });
  it ('Rejects unavailable references, invalid rigs, read-only work and strict command extras before submission', async () => {
   const { workspace, requests } = Workspace (); for (const options of [{ action : 'image3d' }, { action : 'animations' }, { action : 'text3d' }, { action : 'rigging', height : -1 }, { action : 'texture', prompt : 'x'.repeat (801) }]) { await assert.rejects (() => workspace.Generate (options)); } assert.deepEqual (requests, []);
   workspace.website.sessionEditor.readOnly = true; await assert.rejects (() => workspace.Generate ({ action : 'text3d', prompt : 'x' }), /editable/);
