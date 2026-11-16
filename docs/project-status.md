@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Modal credential bridge — Auto3D 0.75.0 candidate (2026-11-16)
+
+Adds administrator-only Modal connections backed by existing Supabase Vault: separate complete deployment/proxy token pairs and production/preview profiles, server target checks, revision-safe rotation/removal, private masked entry, credential-free commands and safe errors. The three service-role-only RPCs are installed; the synthetic encrypted database round-trip and role checks passed with no retained credentials. App and Modal deployments remain pending. Automatic approval review blocked the Cloudflare profile setting update; no production settings were changed. See [setup](modal-credentials.md) and [release](release-0750.md). Packaging 1.10.7, Primary Products 0.15.0, Molded Pulp 0.1.0 are unchanged.
+
 ## Integrated release: level orbit, AI/Library usability, Messenger daily history — Auto3D 0.74.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0 (2026-11-16)
 
 PR #134 stacks the three open drafts so they share one CI run and one merge (#128 and #132 are folded in and close when #134 merges). Not deployed.

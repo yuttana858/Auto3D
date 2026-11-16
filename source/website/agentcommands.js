@@ -6,6 +6,7 @@ import { AgentAccessFor } from './agentaccess.js';
 import { ExecuteCommandText } from './commandtext.js';
 import { OpenCommandPanel } from './commandpanel.js';
 import { OpenErrorLog } from './errorlogpanel.js';
+import { OpenModalConnection, ModalConnectionRequest, RemoveModalConnection } from './modalconnection.js';
 import { CaptureApp } from './agentcapture.js';
 import { EditMacro } from './macrodesign.js';
 import { CommandRegistry } from './commandregistry.js';
@@ -90,6 +91,10 @@ export function CreateAgentCommands (website)
     add ('landing.prompt.voice', 'Inspect simulated voice display', 'Welcome', 'Compatibility response for the former narration control. Returns enabled:false; voice transcription and mic activity are visual animation only. Does not access speech or microphone APIs.', { enabled : boolean }, ['enabled'], false, () => ({ enabled : false, presentationOnly : true, reason : 'Voice is represented by the animated mic and text.' }), { enabled : false });
     add ('auth.request_account', 'Request an account', 'Account', 'Open an interactive account request form. Submitting requires user confirmation in the form.', {}, [], false, () => website.accountAdmin.OpenRequest ());
     add ('admin.open', 'Open account administration', 'Account', 'Open administrator requests and approvals. Approval passwords are entered interactively.', {}, [], false, () => website.accountAdmin.Open ());
+    add ('admin.modal.open', 'Manage Modal connections', 'Account', 'Administrator only: open the private interactive Modal credential form. Tokens are entered by the user, never as command or macro arguments.', {}, [], true, () => OpenModalConnection (website));
+    add ('admin.modal.inspect', 'Inspect Modal connections', 'Account', 'Administrator only: inspect the server profile and saved connection metadata, without credentials.', {}, [], false, () => ModalConnectionRequest (website));
+    add ('admin.modal.test', 'Test Modal app connection', 'Account', 'Administrator only: test the saved server connection and target identity. Starts the lightweight status service, with no CAD generation.', {}, [], false, () => ModalConnectionRequest (website, 'POST', {}));
+    add ('admin.modal.remove', 'Remove Modal connection', 'Account', 'Administrator only: remove the selected saved credential pair. Does not revoke it at Modal.', { purpose : enumOf ('runtime', 'deployment') }, ['purpose'], true, ({ purpose }) => RemoveModalConnection (website, purpose), { purpose : 'runtime' });
     add ('admin.approve', 'Review account approval', 'Account', 'Open one account request for interactive approval. The administrator enters the initial password and confirms in the dialog.', { id : text }, ['id'], true, ({ id }) => website.accountAdmin.Open (id), { id : '00000000-0000-0000-0000-000000000000' });
     add ('admin.requests', 'List account requests', 'Account', 'List account requests for a verified administrator.', {}, [], false, () => website.accountAdmin.Refresh ());
     add ('admin.reject', 'Reject account request', 'Account', 'Reject one pending account request. Administrator authorization is checked on the server.', { id : text }, ['id'], true, ({ id }) => website.accountAdmin.Review (id, 'reject'), { id : '00000000-0000-0000-0000-000000000000' });
