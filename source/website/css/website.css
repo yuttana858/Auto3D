@@ -414,3 +414,10 @@ div.ov_bottom_floating_panel
 }
 
 }
+/* A consistent hover cue without replacing the button's selected/background colors. */
+@media (hover: hover) {
+    :is(button, input[type="button"], input[type="submit"], [role="button"], .ov_toolbar_button, .header_button):not(:disabled):not([aria-disabled="true"]):hover {
+        outline: 2px solid var(--ov_button_color, #39a7d8);
+        outline-offset: -2px;
+    }
+}

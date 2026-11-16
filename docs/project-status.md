@@ -3,6 +3,9 @@
 ## Level right-drag orbit — Auto3D 0.74.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0 (2026-11-16)
 
 Main-viewer right-drag is a level turntable orbit: left/right turns around the scene up axis, up/down raises or lowers the view (stopping 1° short of the poles), and the camera never rolls or tilts. With a model selected, it still orbits the model's center while keeping the framing. Held X/Y/Z axis rotation, pan, zoom and touch are unchanged; Free orbit now affects touch only. See [release-0740.md](release-0740.md).
+## AI import and Library usability — Auto3D 0.73.0 / Packaging 1.10.7 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-16)
+
+Adds a shared hover cue for enabled buttons, an accessible busy indicator through AI model import, and visible error feedback for personal/device Library deletion. The duplicate AI project save button is removed; the standard Save dialog offers AI project as a contents option when completed models are available. Published shared Library remains read-only. Changes are not deployed. See [release-0730.md](release-0730.md).
 
 ## Add several AI models at once, Mesh dropdown in Details — Auto3D 0.72.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0 (2026-11-16)
 
