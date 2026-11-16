@@ -95,8 +95,8 @@ export class SessionEditor
         this.controls = new TransformControls (viewer.camera, viewer.renderer.domElement); this.controls.setSize (0.8); this.helper = this.controls.getHelper (); viewer.scene.add (this.helper);
         viewer.renderer.domElement.addEventListener ('pointerdown', event => { this.shiftDragRequested = event.shiftKey && this.mode === 'translate'; }, true);
         viewer.navigation.onOrbitStart = () => this.OrbitSelected (false);
-        // Main viewer: right-drag orbits around the selected model's center (left/right, with up/down tilt) without first
-        // re-aiming the camera, so the current framing is kept while the view swings around the object.
+        // Main viewer: right-drag is a level turntable orbit around the selected model's center (left/right around the scene up
+        // axis, up/down over the top) with no camera roll or tilt, and without re-aiming, so the current framing is kept.
         viewer.navigation.rightDragPansHorizontally = false;
         let panControlsEnabled = null;
         viewer.navigation.onPanModifier = active => {
