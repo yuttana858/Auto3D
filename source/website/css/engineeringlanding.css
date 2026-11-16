@@ -72,4 +72,4 @@
 .entry_login > .entry_eyebrow { margin-top: auto; }
 .entry_swis { margin-top: auto; padding-top: 24px; display: flex; align-items: center; justify-content: flex-end; gap: 12px; color: #c9d6e6; font-size: 12px; letter-spacing: .06em; }
 .entry_swis img { display: block; width: auto; height: 28px; }
-@media(max-width:760px) { .entry_swis { justify-content: center; padding-top: 18px; } .entry_swis img { height: 24px; } }
+@media(max-width:760px) { .entry_swis { justify-content: center; padding-top: 10px; gap: 10px; font-size: 11px; } .entry_swis img { height: 20px; } }

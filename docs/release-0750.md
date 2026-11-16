@@ -118,6 +118,7 @@ Hosted full-suite CI and deployment are pending. Keep the development PR in draf
 - **The full browser suite** (all of `ci-suite.txt`, three shards) runs only on request: the `full-ci` PR label, or a manual CI run (suite `full`, the default). Adding other labels neither starts nor cancels CI.
 - **One runner.** `tools/run_browser_suite.mjs` runs a suite in CI and locally, and writes a pass/fail report tied to the commit. With `--serve` it also starts and stops the test servers. Unit tests check its options, the shard split, the report, and that every smoke test is also in the full suite.
 - The Playwright Chromium download is cached between runs.
+- **Landing fix.** On phones the SWIS block under sign-in pushed the landing banner 1 px past its 900 px limit (`engineering-prompts`). Its phone spacing and mark height are now smaller (20 px).
 - **Test fix.** `module-panels` asserted that Packaging showed no tab list. Auto Pack's **Packaging tools** tabs are allowed now, while the old AI/Packaging tab strip must still stay gone. This was caught by the new smoke suite on the stacked branch.
 - See [actions-cost-control.md](actions-cost-control.md#plan-for-a-private-repository) for minutes per run and the plan for a private repository.
 
