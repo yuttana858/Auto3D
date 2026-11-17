@@ -2965,10 +2965,163 @@
       }
     },
     {
+      "id": "packaging.accessories.inspect",
+      "title": "Inspect carton accessories",
+      "category": "Packaging",
+      "description": "Read the selected folded carton engineering inside size and board, the board catalog and grades for pads, and the planned pads (positions, board, keepBox) and partitions (columns along the length, rows across the width, 1–12), without changing the scene. Same as the Accessories tab.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "positions": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "bottom",
+                "top",
+                "front",
+                "back"
+              ]
+            }
+          },
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "grade": {
+            "type": "string",
+            "enum": [
+              "32 ECT",
+              "44 ECT",
+              "48 ECT",
+              "200# test",
+              "275# test"
+            ]
+          },
+          "keepBox": {
+            "type": "boolean"
+          },
+          "columns": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "rows": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "positions": [
+          "bottom",
+          "top"
+        ],
+        "keepBox": false,
+        "columns": 3,
+        "rows": 2
+      }
+    },
+    {
+      "id": "packaging.accessories.pads",
+      "title": "Add carton pads",
+      "category": "Packaging",
+      "description": "Same as Add pads in the Accessories tab. positions: bottom/top pads lie horizontal (inside length × width), front/back pads stand vertical against the long walls (inside length × height, between top and bottom pads); every edge is 1 mm clear. boardId (from packaging.accessories.inspect boards) and grade set the pad board and thickness; omitted, pads use the carton board. keepBox false (default) grows the carton inside by the pad thicknesses through the standard dimension path so the product space stays the same (two Undo steps; not for Auto Pack cartons or cartons that already have accessories); keepBox true leaves the box size unchanged and shows the pads in place (one Undo step). Pads are CAD board profiles grouped with the carton. Add pads before partitions.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "positions": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "bottom",
+                "top",
+                "front",
+                "back"
+              ]
+            }
+          },
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "grade": {
+            "type": "string",
+            "enum": [
+              "32 ECT",
+              "44 ECT",
+              "48 ECT",
+              "200# test",
+              "275# test"
+            ]
+          },
+          "keepBox": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "positions": [
+          "bottom",
+          "top"
+        ],
+        "boardId": "nominal-b",
+        "grade": "32 ECT",
+        "keepBox": false
+      }
+    },
+    {
+      "id": "packaging.accessories.partitions",
+      "title": "Add carton partitions",
+      "category": "Packaging",
+      "description": "Same as Add partitions in the Accessories tab: add interlocking slotted dividers inside the selected folded carton with equal cells (columns along the length, rows across the width, 1–12 each, at least 2 cells). Strips along the length are slotted from the top and strips across from the bottom, at half height; they stand on any bottom pad, stop under any top pad and fit between any front and back pads. CAD board profiles in the carton board, grouped with the carton. One Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "rows": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          }
+        },
+        "required": [
+          "columns",
+          "rows"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "columns": 3,
+        "rows": 2
+      }
+    },
+    {
       "id": "packaging.tab",
       "title": "Select Packaging tab",
       "category": "Packaging",
-      "description": "Open Packaging or its Auto tab (Auto Pack and Auto pallet) without generating geometry.",
+      "description": "Open Packaging, its Auto tab (Auto Pack and Auto pallet) or its Accessories tab (pads and partitions) without generating geometry.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -2977,7 +3130,8 @@
             "type": "string",
             "enum": [
               "packaging",
-              "auto"
+              "auto",
+              "accessories"
             ]
           }
         },
