@@ -1,10 +1,13 @@
 # Auto3D development log and handoff
 
-## Auto Pack on the packaging engineering system — Auto3D 0.79.0 / Packaging 1.13.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-17)
+## Auto Pack on the packaging engineering system — Auto3D 0.80.0 / Packaging 1.13.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-17)
 
-Based on main after #140 (0.78.0). Not deployed.
+Based on main after #142 (0.79.0). Not deployed.
 
-- **Auto Pack follows the generator.** It now sizes the RSC like Generate with the inside basis: inside targets (product + clearance + glue-tab reserve) go through `ScoreForTarget` with the generation board's allowance factors. The carton's CAD profile carries the standard measurement layer, built by the shared `GenerationProfile`. Before, Auto Pack used its own score formula and attached no engineering record, so the dimension tools reported an inside size smaller than the product. Older cartons keep their fit. See [release-0790.md](release-0790.md).
+- **Auto Pack follows the generator.** It now sizes the RSC like Generate with the inside basis: inside targets (product + clearance + glue-tab reserve) go through `ScoreForTarget` with the generation board's allowance factors. The carton's CAD profile carries the standard measurement layer, built by the shared `GenerationProfile`. Before, Auto Pack used its own score formula and attached no engineering record, so the dimension tools reported an inside size smaller than the product. Older cartons keep their fit. See [release-0800.md](release-0800.md).
+## Private CAD conversion — Auto3D 0.79.0 candidate (2026-11-17)
+
+Based on main after merged #138/#139/#140 at `751f03f`; Packaging 1.12.0, Primary Products 0.15.0 and Molded Pulp 0.1.0 are preserved. Adds private owned Parasolid/STEP conversion, streamed/checksummed R2 files, leases/cancellation/cleanup, strict `conversion.*` commands and explicit unit-safe session import. Cloud 3D Studio 0.3.0 is live: hosted run 44131313665 passed native calibration, protected gateway verification and direct Vault runtime provisioning. App rollout, hosted CI and user-API canary are pending. The owner added the production Pages profile through the individual dashboard editor, and its exact value/existing bindings were verified. See [release-0790.md](release-0790.md), [cad-conversion.md](cad-conversion.md) and [exact credential/profile steps](modal-credentials.md).
 
 ## Image to 3D drop zone and Auto Pack for arrays — Auto3D 0.78.0 / Packaging 1.12.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-17)
 

@@ -42,7 +42,7 @@ export function GuardAutoPackGeometryEdit (object)
 {
     if (object?.userData?.[AutoPackDataKey] !== undefined) { throw new Error ('This carton is fitted by Auto Pack. Change the product or generation board, then generate Auto Pack again.'); }
 }
-// Engineering cartons (0.79.0+) re-derive their fit from the board record saved in the
+// Engineering cartons (0.80.0+) re-derive their fit from the board record saved in the
 // CAD profile's measurement layer; earlier cartons keep their saved score fit.
 export function AutoPackPlanInput (data, parameters, profile)
 {

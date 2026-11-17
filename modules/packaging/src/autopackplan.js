@@ -12,7 +12,7 @@ const Keys = ['size', 'thickness', 'clearanceMm', 'material'];
 // required INSIDE dimensions (product + clearance, plus the glue-tab reserve)
 // become score spans through ScoreForTarget, so the carton's engineering
 // measurements, CAD dimensions and board record agree with the fit.
-// Without a material (cartons saved before 0.79.0) the original score-equals-
+// Without a material (cartons saved before 0.80.0) the original score-equals-
 // inside fit is reproduced so saved cartons still replay.
 export function CreateAutoPackPlan (input)
 {

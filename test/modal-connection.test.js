@@ -49,6 +49,7 @@ describe ('Supabase Vault Modal credential bridge', () => {
     });
     it ('rejects swapped token types, missing pairs and arbitrary outbound destinations', () => {
         assert.deepEqual (ValidateModalSettings (settings (), 'runtime'), settings ());
+        assert.ok (ValidateModalSettings ({ ...settings (), endpoint : 'https://acme-prod--cad-gateway.us-east.modal.run' }, 'runtime'));
         for (const value of [{ ...settings (), tokenId : settings ('deployment').tokenId }, { ...settings (), tokenSecret : '' }, { ...settings (), extra : true }]) { assert.throws (() => ValidateModalSettings (value, 'runtime')); }
         for (const endpoint of ['http://acme--gateway.modal.run', 'https://127.0.0.1', 'https://acme--gateway.modal.run.evil.test', 'https://x.modal.run', 'https://acme--gateway.modal.run/path', 'https://acme--gateway.modal.run?x=1', 'https://user:secret@acme--gateway.modal.run', 'https://acme--gateway.modal.run:443']) { assert.throws (() => ValidateModalSettings ({ ...settings (), endpoint }, 'runtime')); }
     });
