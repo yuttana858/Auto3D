@@ -38,6 +38,8 @@ Auto3D 0.78.0 (Packaging 1.12.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0, b
 
 Auto3D 0.80.0 (Packaging 1.13.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0, based on main after #142) puts Auto Pack on the packaging engineering system: inside targets go through `ScoreForTarget` with the generation board's allowance factors, and `PackagingWorkspace.GenerationProfile` is the shared builder for generated CAD profiles and their measurement layer. Keep new packaging features on these shared paths rather than computing score spans directly. See docs/release-0800.md.
 
+Molded Pulp 0.2.0 (Auto3D 0.81.0 / Packaging 1.13.0 / Primary Products 0.15.0, based on main after #141) adds a knowledge-base rule base for ribs and denest lugs (`modules/molded-pulp/src/rules.js`, traced decisions), live preview with one Undo step per burst, worker-based progressive detail (Draft/Standard/Fine/Ultra, `molded-pulp.worker.js`) and top-bottom/side clamshells. Keep heavy forming in the worker and new geometry on the adaptive shell mesher. See docs/release-0810.md.
+
 # Agent-accessible features
 
 The unified agent approval release in PR #123 is Auto3D 0.68.0 / Packaging 1.10.7 / Primary Products 0.15.0 / Molded Pulp 0.1.0. One OAuth approval grants read, write and screenshots; Live Control has no separate screenshot preference. Server-issued window codes are visible in the header, Preferences and MCP connections; Copy code/New code use `agent.access.code.copy/refresh`, and agents pair with a user-supplied code through `auto3d.sessions.pair_code`. Existing restricted credentials require reconnection. Use `auto3d.capabilities.inspect` for effective grant permissions. See docs/release-0680.md.

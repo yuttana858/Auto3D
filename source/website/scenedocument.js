@@ -53,14 +53,15 @@ export class SceneDocument
         this.name = 'Untitled session';
     }
 
-    AddImported (source, name, upVector = Direction.Y, promote = true)
+    // adopt: take ownership of a freshly built source model's meshes instead of cloning them (large generated geometry).
+    AddImported (source, name, upVector = Direction.Y, promote = true, adopt = false)
     {
         if (!this.objects.length) { this.model.SetUnit (source.GetUnit ()); }
         const materialOffset = this.model.MaterialCount ();
         source.materials.forEach ((material) => this.model.AddMaterial (promote ? EditableSurface (material) : CloneSurface (material)));
         const meshes = new Map ();
         source.meshes.forEach ((mesh, index) => {
-            const copy = mesh.Clone ();
+            const copy = adopt ? mesh : mesh.Clone ();
             for (const item of [...copy.triangles, ...copy.lines]) {
                 if (item.mat !== null) { item.mat += materialOffset; }
             }

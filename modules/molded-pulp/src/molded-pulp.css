@@ -28,3 +28,13 @@
 .mp_footer { display: flex; justify-content: flex-end; }
 .mp_status { min-height: 1.4em; margin: 8px 0 0; font-size: var(--workspace-help-font-size, 11px); }
 @media (prefers-color-scheme: dark) { .mp_workspace { --mp-accent: #c9a96e; } }
+.mp_select { width: 100%; min-width: 0; box-sizing: border-box; padding: 7px 6px; border: 1px solid var(--ov_border_color, #cad2d3); border-radius: 5px; color: inherit; background: var(--ov_background_color, white); font: inherit; }
+.mp_check_field { display: flex; align-items: center; gap: 7px; margin-top: 8px; font-size: var(--workspace-menu-font-size, 12px); }
+.mp_progress { width: 100%; height: 6px; margin-top: 6px; accent-color: var(--mp-accent); }
+.mp_form_tray { margin: 0 0 14px; }
+.mp_why { margin-top: 8px; font-size: var(--workspace-help-font-size, 11px); }
+.mp_why summary { cursor: pointer; font-weight: 600; }
+.mp_trace { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.mp_trace_item { line-height: 1.45; }
+.mp_trace_item strong { display: block; font-weight: 600; }
+.mp_trace_item span { opacity: .75; }

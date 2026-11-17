@@ -8906,7 +8906,7 @@
       "id": "pulp.configure",
       "title": "Configure molded pulp draft",
       "category": "Molded Pulp",
-      "description": "Validate and update the pulp draft in canonical mm. Changing pulpType resets thickness, draft and colour to that type unless set in the same call. extraLengthMm/extraWidthMm grow the sheet beyond the exact product footprint (split evenly on both sides). Does not change the scene; Generate sheet or Form tray applies it.",
+      "description": "Validate and update the pulp draft in canonical mm. Changing pulpType resets thickness, draft and colour to that type unless set in the same call. extraLengthMm/extraWidthMm grow the sheet beyond the exact product footprint (split evenly on both sides). ribs/lugs auto use the knowledge-base rule base (ribDepthMm/ribWidthMm null = automatic; lugStandoffMm 1–3 mm typical). clamshell top-bottom, side-x or side-z forms two shells meeting at partingFraction of the product extent, with an optional hinge. detail draft/standard/fine/ultra sets the mesh resolution (fine/ultra are refined in a worker). live true also updates the current sheet or tray in the viewer, like typing in the panel; otherwise the scene is unchanged until Generate sheet or Form tray.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -8954,7 +8954,7 @@
             "anyOf": [
               {
                 "type": "number",
-                "minimum": 0.25,
+                "minimum": 0.1,
                 "maximum": 10
               },
               {
@@ -8965,6 +8965,78 @@
           "color": {
             "type": "string",
             "pattern": "^#[a-fA-F0-9]{6}$"
+          },
+          "detail": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "standard",
+              "fine",
+              "ultra"
+            ]
+          },
+          "ribs": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "off"
+            ]
+          },
+          "lugs": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "off"
+            ]
+          },
+          "ribDepthMm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 30
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ribWidthMm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 2,
+                "maximum": 60
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lugStandoffMm": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 5
+          },
+          "clamshell": {
+            "type": "string",
+            "enum": [
+              "none",
+              "top-bottom",
+              "side-x",
+              "side-z"
+            ]
+          },
+          "partingFraction": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 0.9
+          },
+          "hinge": {
+            "type": "boolean"
+          },
+          "live": {
+            "type": "boolean"
           }
         },
         "required": [],
@@ -8974,8 +9046,24 @@
         "pulpType": "type2",
         "thicknessMm": 2.5,
         "extraLengthMm": 40,
-        "extraWidthMm": 40
+        "extraWidthMm": 40,
+        "clamshell": "top-bottom",
+        "detail": "fine"
       }
+    },
+    {
+      "id": "pulp.rules.list",
+      "title": "List molded pulp feature rules",
+      "category": "Molded Pulp",
+      "description": "List the knowledge-base rule base that places ribs and denest lugs and checks nesting and hinges (id, kind, title, basis). The last tray's decisions are in pulp.inspect result.trace.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
     },
     {
       "id": "pulp.sense",
@@ -9009,7 +9097,7 @@
       "id": "pulp.form_depth.set",
       "title": "Set form depth",
       "category": "Molded Pulp",
-      "description": "Set how far up the mold forms the pulp, in mm above the sheet. If a formed tray is current it is re-formed live in one Undo step.",
+      "description": "Set how far up the mold forms the pulp, in mm above the sheet. If a formed tray is current it is re-formed in one Undo step; the result waits for the draft's detail level.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -9033,7 +9121,7 @@
       "id": "pulp.tray.form",
       "title": "Form pulp tray",
       "category": "Molded Pulp",
-      "description": "Form the sheet over the sensed products: pockets follow each product bottom, the rest rises to the form depth, with clearance, draft and true wall thickness. Returns metrics and DFM checks. One Undo step; replaces the current sheet in place.",
+      "description": "Form the sheet over the sensed products: pockets follow each product bottom, the rest rises to the form depth, with clearance, draft, true wall thickness, rule-base ribs and denest lugs, or a two-shell clamshell. Returns metrics, DFM checks and the rule trace after the draft's detail level is ready (fine/ultra are computed in a worker). One Undo step; replaces the current sheet in place.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
