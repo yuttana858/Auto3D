@@ -26,14 +26,14 @@ try {
                 if (!parts.length && request.method () === 'GET') { return route.fulfill ({ json : { jobs : [...jobs.values ()] } }); }
                 if (!parts.length) {
                     const body = request.postDataJSON (); assert.equal (body.sourceUnit, 'mm'); assert.equal (body.extension, 'x_t'); assert.ok (body.origin.windowId && body.origin.tabId);
-                    const job = { id : randomUUID (), revision : 1, state : 'awaiting_upload', stage : 'awaiting_upload', source : { name : body.sourceName, bytes : body.sourceBytes, sha256 : body.sourceSha256, extension : body.extension, unit : body.sourceUnit }, origin : body.origin, artifacts : {}, summary : null };
+                    const job = { id : randomUUID (), revision : 1, state : 'awaiting_upload', stage : 'awaiting_upload', source : { name : body.sourceName, bytes : body.sourceBytes, sha256 : body.sourceSha256, extension : body.extension, unit : body.sourceUnit }, origin : body.origin, artifacts : {}, summary : null, createdAt : new Date ().toISOString (), updatedAt : new Date ().toISOString () };
                     jobs.set (job.id, job); return route.fulfill ({ status : 201, json : { job } });
                 }
                 const job = jobs.get (parts[0]); assert.ok (job);
                 if (parts[1] === 'source') { uploads++; assert.equal (createHash ('sha256').update (request.postDataBuffer ()).digest ('hex'), job.source.sha256); return route.fulfill ({ json : { uploaded : true } }); }
                 if (parts[1] === 'submit') {
                     assert.equal (uploads, 1); job.state = 'queued'; job.stage = 'queued'; job.revision++;
-                    setTimeout (() => Object.assign (job, { state : 'ready', stage : 'ready', revision : 3, artifacts : { step : { bytes : 100, units : 'mm' }, glb : { bytes : glb.length, units : 'm' }, stl : { bytes : 100, units : 'mm' }, manifest : { bytes : 100, units : null } }, summary : { dimensionsMm : [40, 30, 20], topology : { solids : 1 }, producerVersion : '0.3.0' } }), 300);
+                    Object.assign (job, { state : 'running', stage : 'converting', progress : { phase : 'read_source', completed : null, total : null, unit : null } });
                     return route.fulfill ({ json : { job } });
                 }
                 if (parts[1] === 'artifacts') { downloaded++; return route.fulfill ({ body : glb, contentType : 'model/gltf-binary', headers : { 'Content-Length' : String (glb.length) } }); }
@@ -56,7 +56,20 @@ try {
         assert.equal (uploads, 0); assert.equal (await dialog.getByRole ('button', { name : 'Convert privately', exact : true }).isDisabled (), true);
         await dialog.getByLabel ('Parasolid coordinate units', { exact : true }).selectOption ('mm');
         await dialog.getByRole ('button', { name : 'Convert privately', exact : true }).click ();
+        const phaseBar = dialog.getByRole ('progressbar', { name : 'Reading CAD format', exact : true }); await phaseBar.waitFor ();
+        assert.equal (await phaseBar.getAttribute ('aria-valuenow'), null);
+        await phaseBar.evaluate (node => { node.dataset.progressIdentity = 'retained'; });
+        const active = [...jobs.values ()][0]; Object.assign (active, { progress : { phase : 'build_mesh', completed : 3, total : 12, unit : 'faces' } });
+        const measured = dialog.getByRole ('progressbar', { name : 'Building browser mesh', exact : true });
+        await page.waitForFunction (() => document.querySelector ('.cad_conversion_job [role="progressbar"]')?.getAttribute ('aria-valuenow') === '25');
+        assert.equal (await measured.getAttribute ('data-progress-identity'), 'retained', 'polling must preserve the animated bar');
+        assert.ok ((await dialog.innerText ()).includes ('3 / 12 faces'));
+        active.progress.completed = 9;
+        await page.waitForFunction (() => document.querySelector ('.cad_conversion_job [role="progressbar"]')?.getAttribute ('aria-valuenow') === '75');
+        assert.equal (await measured.getAttribute ('data-progress-identity'), 'retained');
+        Object.assign (active, { state : 'ready', stage : 'ready', revision : 3, artifacts : { step : { bytes : 100, units : 'mm' }, glb : { bytes : glb.length, units : 'm' }, stl : { bytes : 100, units : 'mm' }, manifest : { bytes : 100, units : null } }, summary : { dimensionsMm : [40, 30, 20], topology : { solids : 1 }, producerVersion : '0.3.0' }, updatedAt : new Date ().toISOString () });
         await dialog.getByRole ('button', { name : 'Add to current session', exact : true }).waitFor ({ timeout : 15000 }).catch (async error => { console.log ({ width, uploads, jobs : [...jobs.values ()], ui : await dialog.innerText (), errors }); throw error; }); assert.equal (uploads, 1);
+        assert.equal (await dialog.getByRole ('progressbar', { name : 'Ready · independently validated', exact : true }).getAttribute ('aria-valuenow'), '100');
         assert.equal ((await call ('scene.inspect')).objects.length, 0, 'completed jobs must never import themselves');
         await dialog.getByRole ('button', { name : 'Add to current session', exact : true }).click ();
         await dialog.getByText ('Added to the current session. Undo is available.', { exact : true }).waitFor ();

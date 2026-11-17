@@ -1,6 +1,6 @@
 import { WorkspaceDialog } from './modellibrary.js';
 import { AgentError } from '../../mcp/common.js';
-import { CadLimits, CadArtifacts, CadMessages, CadUuid, CadRequest } from './cadconversioncontract.js';
+import { CadLimits, CadArtifacts, CadMessages, CadUuid, CadRequest, CadProgressView, CadPhases } from './cadconversioncontract.js';
 import { ParseConvertedGlb, AddConvertedModel } from './cadconversionimport.js';
 
 function ClientError (code)
@@ -10,14 +10,29 @@ function ClientError (code)
 }
 function Element (tag, text, parent) { const node = document.createElement (tag); if (text) { node.textContent = text; } parent?.appendChild (node); return node; }
 const liveStates = new Set (['awaiting_upload', 'queued', 'running', 'cancelling']);
-const stageText = { awaiting_upload : 'Waiting for private upload', queued : 'Queued', downloading : 'Reading private source', converting : 'Converting and validating CAD', uploading : 'Publishing validated files', cancelling : 'Cancelling', cancelled : 'Cancelled', ready : 'Ready', failed : 'Failed', expired : 'Expired' };
+function ProgressElement (parent)
+{
+    const root = Element ('div', null, parent); root.className = 'cad_conversion_progress';
+    const heading = Element ('div', null, root); heading.className = 'cad_conversion_progress_heading';
+    const label = Element ('span', '', heading), percentage = Element ('strong', '', heading);
+    const bar = Element ('div', null, root); bar.className = 'cad_conversion_progress_track'; bar.setAttribute ('role', 'progressbar'); bar.setAttribute ('aria-valuemin', '0'); bar.setAttribute ('aria-valuemax', '100');
+    const fill = Element ('div', null, bar); fill.className = 'cad_conversion_progress_fill';
+    const detail = Element ('span', '', root); detail.className = 'cad_conversion_progress_detail';
+    return { root, update : view => {
+        label.textContent = view.label; percentage.textContent = view.percent === null ? '' : view.percent + '%'; detail.textContent = view.detail || '';
+        bar.setAttribute ('aria-label', view.label); root.classList.toggle ('indeterminate', view.active && view.percent === null); root.classList.toggle ('is_active', view.active);
+        if (view.percent === null) { bar.removeAttribute ('aria-valuenow'); } else { bar.setAttribute ('aria-valuenow', String (view.percent)); }
+        fill.style.width = view.percent === null ? view.active ? '35%' : '0%' : view.percent + '%';
+    } };
+}
 
 export class CadConversions
 {
     constructor (website, fetchImpl = (...args) => fetch (...args))
     {
         this.website = website; this.fetch = fetchImpl; this.windowId = crypto.randomUUID (); this.file = null; this.pending = null; this.submitting = false;
-        this.unsubscribe = website.auth?.Subscribe?.(user => { if (!user || this.owner && user.id !== this.owner) { this.ClearFile (); this.jobs = []; this.dialog?.close (); } });
+        this.submissionProgress = null;
+        this.unsubscribe = website.auth?.Subscribe?.(user => { if (!user || this.owner && user.id !== this.owner) { this.uploadRequest?.abort (); this.Progress (null); this.ClearFile (); this.jobs = []; this.dialog?.close (); } });
     }
     Account (owner = this.website.auth?.user?.id, generation = this.website.auth?.generation)
     {
@@ -28,7 +43,25 @@ export class CadConversions
     {
         this.Account (); return { windowId : this.windowId, tabId : this.website.sessionEditor.sessions.active, revision : this.website.sessionEditor.recoveryRevision };
     }
-    Inspect () { this.Account (); return { windowId : this.windowId, target : this.Origin (), stagedFile : this.file ? { name : this.file.name, bytes : this.file.size } : null, submitting : this.submitting, opened : !!this.dialog?.open }; }
+    Inspect () { this.Account (); return { windowId : this.windowId, target : this.Origin (), stagedFile : this.file ? { name : this.file.name, bytes : this.file.size } : null, submitting : this.submitting, submissionProgress : this.submissionProgress ? { ...this.submissionProgress } : null, opened : !!this.dialog?.open }; }
+    Progress (value) { this.submissionProgress = value; this.updateProgress?.(value); }
+    async UploadSource (job, file)
+    {
+        const { owner, generation } = this.Account (), path = this.JobPath (job.id) + '/source';
+        const progress = (loaded, total) => { this.Account (owner, generation); this.Progress ({ label : 'Uploading source privately', percent : total > 0 ? Math.floor (100 * Math.min (loaded, total) / total) : null, active : true, detail : total > 0 ? (loaded / 1048576).toFixed (1) + ' / ' + (total / 1048576).toFixed (1) + ' MiB' : '' }); };
+        progress (0, file.size);
+        if (typeof XMLHttpRequest === 'undefined') { await this.Request (path, 'PUT', file, true); progress (file.size, file.size); return; }
+        try {
+            await new Promise ((resolve, reject) => {
+                const xhr = new XMLHttpRequest (); this.uploadRequest = xhr; xhr.open ('PUT', '/api/conversions' + path); xhr.withCredentials = true; xhr.timeout = 90000; xhr.responseType = 'json';
+                xhr.setRequestHeader ('X-Auto3D-Account', owner); xhr.setRequestHeader ('Content-Type', 'application/octet-stream');
+                xhr.upload.onprogress = event => { try { progress (event.loaded, event.lengthComputable ? event.total : file.size); } catch (error) { reject (error); xhr.abort (); } };
+                xhr.upload.onload = () => { try { this.Account (owner, generation); this.Progress ({ label : 'Confirming private upload', percent : null, active : true, detail : '' }); } catch (error) { reject (error); xhr.abort (); } };
+                xhr.onload = () => { try { this.Account (owner, generation); if (xhr.status < 200 || xhr.status >= 300) { throw ClientError (Object.hasOwn (CadMessages, xhr.response?.code || '') ? xhr.response.code : 'unavailable'); } resolve (); } catch (error) { reject (error); } };
+                xhr.onerror = xhr.ontimeout = xhr.onabort = () => reject (ClientError ('unavailable')); xhr.send (file);
+            });
+        } finally { this.uploadRequest = null; }
+    }
     ClearFile () { this.file = null; this.pending = null; if (this.picker) { this.picker.value = ''; } }
     Stage (file)
     {
@@ -60,6 +93,7 @@ export class CadConversions
         const { owner, generation } = this.Account ();
         if (this.submitting || !this.file || this.website.sessionEditor.readOnly) { throw ClientError ('invalid_request'); }
         this.submitting = true; const file = this.file, origin = this.Origin ();
+        this.Progress ({ label : 'Preparing and verifying source', percent : null, active : true, detail : '' });
         try {
             const extension = file.name.split ('.').pop ().toLowerCase ();
             if (this.pending && (this.pending.sourceUnit !== sourceUnit || this.pending.quality !== quality)) { throw ClientError ('conflict'); }
@@ -69,12 +103,13 @@ export class CadConversions
                 this.pending = CadRequest ({ requestKey : crypto.randomUUID (), sourceName : file.name, extension, sourceBytes : file.size, sourceSha256 : Array.from (digest, byte => byte.toString (16).padStart (2, '0')).join (''), sourceUnit, quality, origin });
             }
             let job = (await this.Request ('', 'POST', this.pending)).job;
-            if (job.state === 'awaiting_upload') { await this.Request (this.JobPath (job.id) + '/source', 'PUT', file, true); }
+            if (job.state === 'awaiting_upload') { await this.UploadSource (job, file); }
+            this.Progress ({ label : 'Starting private conversion', percent : null, active : true, detail : '' });
             job = await this.Get (job.id);
             if (['awaiting_upload', 'queued'].includes (job.state)) { job = (await this.Request (this.JobPath (job.id) + '/submit', 'POST', { revision : job.revision })).job; }
-            return { job };
+            this.Progress (null); return { job };
         } catch (error) { if (error instanceof Error && error.cadCode) { throw error; } throw ClientError (error.code || 'unavailable'); }
-        finally { this.submitting = false; if (this.file !== file) { this.pending = null; } this.updateFile?.(); }
+        finally { this.submitting = false; if (this.submissionProgress) { this.Progress ({ ...this.submissionProgress, active : false }); } if (this.file !== file) { this.pending = null; } this.updateFile?.(); }
     }
     async Action (id, action)
     {
@@ -136,21 +171,42 @@ export class CadConversions
         const submit = Element ('button', 'Convert privately', actions); submit.type = 'submit';
         const sample = Element ('button', 'Convert sample · 40 × 30 × 20 mm', actions); sample.type = 'button';
         const status = Element ('p', 'Checking CAD service…', form); status.setAttribute ('role', 'status');
+        const submission = ProgressElement (form); submission.root.hidden = true;
+        this.updateProgress = value => { submission.root.hidden = !value; if (value) { submission.update (value); } }; this.updateProgress (this.submissionProgress);
         const jobs = Element ('div', null, dialog); jobs.className = 'cad_conversion_jobs'; jobs.setAttribute ('aria-label', 'My CAD conversions');
+        const empty = Element ('p', 'Your conversions will appear here.', jobs), rows = new Map ();
         let closed = false, busy = false, ready = false, timer = null, pollDelay = 1500;
         const update = () => { const parasolid = /\.(x_t|x_b)$/i.test (this.file?.name || ''); filename.textContent = this.file ? this.file.name + ' · ' + (this.file.size / 1048576).toFixed (2) + ' MiB' : 'Choose a file or convert the public sample.'; units.disabled = busy || !parasolid; quality.disabled = busy; picker.disabled = busy; submit.disabled = busy || !ready || !this.file || parasolid && !units.value; sample.disabled = busy || !ready; };
         this.updateFile = update;
         const run = async action => { if (closed || busy) { return; } busy = true; update (); try { await action (); if (!closed) { await refresh (); } } catch (error) { if (!closed) { status.textContent = error.message || CadMessages.unavailable; } } finally { busy = false; if (!closed) { update (); } } };
         const button = (text, parent, action) => { const node = Element ('button', text, parent); node.type = 'button'; node.onclick = () => run (action); return node; };
+        const elapsed = () => { for (const record of rows.values ()) { const seconds = Math.max (0, Math.floor (((record.finished || Date.now ()) - record.started) / 1000)); record.elapsed.textContent = Number.isFinite (seconds) ? Math.floor (seconds / 60) + ':' + String (seconds % 60).padStart (2, '0') + ' elapsed' : ''; } };
+        const clock = setInterval (elapsed, 1000);
+        const schedule = (delay = pollDelay) => {
+            clearTimeout (timer);
+            if (closed || !this.jobs?.some (job => liveStates.has (job.state))) { return; }
+            timer = setTimeout (async () => {
+                if (closed) { return; } if (busy) { schedule (); return; }
+                try { await refresh (); } catch { if (!closed) { status.textContent = CadMessages.unavailable; schedule (6000); } }
+            }, delay);
+        };
         const refresh = async () => {
-            const result = await this.List (); if (closed) { return; } jobs.replaceChildren ();
-            if (!result.jobs.length) { Element ('p', 'Your conversions will appear here.', jobs); }
+            const result = await this.List (); if (closed) { return; } empty.hidden = !!result.jobs.length;
+            const ids = new Set (result.jobs.map (job => job.id)); for (const [id, record] of rows) { if (!ids.has (id)) { record.row.remove (); rows.delete (id); } }
+            let anchor = empty;
             for (const job of result.jobs) {
-                const row = Element ('article', null, jobs); row.className = 'cad_conversion_job'; row.dataset.jobId = job.id;
-                Element ('strong', job.source.name, row); Element ('span', stageText[job.stage] || stageText[job.state] || 'Processing', row).className = 'cad_conversion_stage';
-                if (job.errorCode) { Element ('p', CadMessages[job.errorCode] || CadMessages.conversion_failed, row); }
-                if (job.summary) { Element ('p', 'X × Y × Z: ' + job.summary.dimensionsMm.map (n => Number (n.toFixed (3))).join (' × ') + ' mm · ' + job.summary.topology.solids + ' solids · independently validated', row); }
-                const controls = Element ('div', null, row); controls.className = 'mode_buttons';
+                let record = rows.get (job.id);
+                if (!record) {
+                    const row = Element ('article', null, jobs); row.className = 'cad_conversion_job'; row.dataset.jobId = job.id;
+                    const title = Element ('strong', '', row), progress = ProgressElement (row), elapsed = Element ('span', '', row), message = Element ('p', '', row), summary = Element ('p', '', row), controls = Element ('div', null, row);
+                    elapsed.className = 'cad_conversion_elapsed'; controls.className = 'mode_buttons'; record = { row, title, progress, elapsed, message, summary, controls }; rows.set (job.id, record);
+                }
+                const { row, controls } = record; if (anchor.nextSibling !== row) { anchor.after (row); } anchor = row; row.dataset.state = job.state;
+                record.title.textContent = job.source.name; record.progress.update (CadProgressView (job));
+                record.started = Date.parse (job.createdAt); record.finished = liveStates.has (job.state) ? null : Date.parse (job.updatedAt);
+                record.message.hidden = !job.errorCode; record.message.textContent = job.errorCode ? (CadMessages[job.errorCode] || CadMessages.conversion_failed) + (CadPhases[job.progress?.phase] ? ' Stopped during: ' + CadPhases[job.progress.phase].toLowerCase () + '.' : '') : '';
+                record.summary.hidden = !job.summary; record.summary.textContent = job.summary ? 'X × Y × Z: ' + job.summary.dimensionsMm.map (n => Number (n.toFixed (3))).join (' × ') + ' mm · ' + job.summary.topology.solids + ' solids · independently validated' : '';
+                const signature = JSON.stringify ([job.state, job.canRetry, Object.keys (job.artifacts)]); if (record.signature === signature) { continue; } record.signature = signature; controls.replaceChildren ();
                 if (liveStates.has (job.state)) { button ('Cancel', controls, () => this.Action (job.id, 'cancel')); }
                 if (job.canRetry) { button ('Retry', controls, () => this.Action (job.id, 'retry')); }
                 if (job.state === 'ready') {
@@ -159,13 +215,13 @@ export class CadConversions
                 }
                 button ('Delete files', controls, () => this.Action (job.id, 'delete'));
             }
-            clearTimeout (timer); if (result.jobs.some (job => liveStates.has (job.state))) { timer = setTimeout (async () => { try { if (!closed && !busy) { await refresh (); } } catch { if (!closed) { status.textContent = CadMessages.unavailable; timer = setTimeout (() => run (refresh), 6000); } } }, pollDelay); pollDelay = Math.min (6000, pollDelay * 1.3); }
+            elapsed (); schedule (); pollDelay = Math.min (4000, pollDelay * 1.15);
         };
         picker.onchange = () => { try { if (picker.files[0]) { this.Stage (picker.files[0]); } status.textContent = ready ? 'Ready to convert privately.' : 'CAD service is not ready.'; } catch (error) { status.textContent = error.message; } update (); };
         units.onchange = update;
         form.onsubmit = event => { event.preventDefault (); run (async () => { status.textContent = 'Hashing and uploading your source privately…'; const result = await this.Submit ({ sourceUnit : /\.(x_t|x_b)$/i.test (this.file.name) ? units.value : null, quality : quality.value }); status.textContent = 'Conversion submitted. You can close this window while it runs.'; this.ClearFile (); return result; }); };
         sample.onclick = () => run (async () => { status.textContent = 'Converting the public sample…'; await this.Sample (); this.ClearFile (); status.textContent = 'Sample submitted. Expected size: 40 × 30 × 20 mm.'; });
-        dialog.addEventListener ('close', () => { closed = true; clearTimeout (timer); this.ClearFile (); this.dialog = null; this.picker = null; this.updateFile = null; this.notice = null; }, { once : true });
+        dialog.addEventListener ('close', () => { closed = true; clearTimeout (timer); clearInterval (clock); this.ClearFile (); this.dialog = null; this.picker = null; this.updateFile = null; this.updateProgress = null; this.notice = null; }, { once : true });
         update ();
         try { const caps = await this.Capabilities (); if (!closed) { ready = caps.ready; status.textContent = ready ? 'CAD service ready · STEP/STL in mm · GLB in meters.' : 'The CAD service is not ready yet.'; await refresh (); } }
         catch (error) { if (!closed) { status.textContent = error.message; } }
