@@ -85,3 +85,4 @@ packaging-auto-pack
 packaging-auto-pallet
 cad-conversion
 ai-image-dropzone
+packaging-accessories

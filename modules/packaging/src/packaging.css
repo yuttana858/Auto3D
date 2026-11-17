@@ -87,6 +87,23 @@
 .packaging_workspace .packaging_manual[hidden], .packaging_workspace .packaging_auto_pack[hidden], .packaging_auto_pack [hidden] { display: none; }
 .packaging_auto_pack p:empty { display: none; }
 
+.packaging_auto_contents { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--packaging-border, var(--ov_border_color, #aaa)); border-radius: 6px; padding: 10px; }
+.packaging_auto_contents select { min-width: 0; flex: 1 1 80px; font: inherit; color: inherit; background: transparent; border: 1px solid var(--packaging-border, var(--ov_border_color, #aaa)); border-radius: 5px; padding: 4px 6px; }
+.packaging_auto_contents select option, .packaging_accessories select option { color: #111; }
+.packaging_accessories { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.packaging_workspace .packaging_accessories[hidden], .packaging_accessories [hidden] { display: none; }
+.packaging_accessories h3 { margin: 2px 0; font-size: var(--workspace-title-font-size, 14px); }
+.packaging_accessories h4, .packaging_accessories p { margin: 0; line-height: 1.5; }
+.packaging_accessories h4 { font-size: var(--packaging-menu-font); }
+.packaging_accessories p:empty { display: none; }
+.packaging_accessory_group { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--packaging-border, var(--ov_border_color, #aaa)); }
+.packaging_accessory_options { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; font-size: var(--packaging-menu-font); }
+.packaging_accessory_options label { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.packaging_accessory_options input[type=number] { min-width: 0; flex: 1 1 60px; font: inherit; color: inherit; background: transparent; border: 1px solid var(--packaging-border, var(--ov_border_color, #aaa)); border-radius: 5px; padding: 4px 6px; }
+.packaging_accessories button { color: inherit; background: transparent; border: 1px solid var(--packaging-border, var(--ov_border_color, #aaa)); border-radius: 5px; padding: 8px 12px; cursor: pointer; }
+.packaging_accessories .packaging_auto_create { border-color: #458b9b; background: #458b9b22; }
+.packaging_accessories button:disabled { opacity: .55; cursor: default; }
+.packaging_accessories button:focus-visible, .packaging_accessories input:focus-visible { outline: 2px solid #458b9b; outline-offset: 2px; }
 .packaging_auto_pallet { display: flex; flex-direction: column; gap: 10px; min-width: 0; margin-top: 8px; padding-top: 14px; border-top: 1px solid var(--packaging-border, var(--ov_border_color, #aaa)); }
 .packaging_auto_pallet h3 { margin: 2px 0; font-size: var(--workspace-title-font-size, 14px); }
 .packaging_auto_pallet h4, .packaging_auto_pallet p { margin: 0; line-height: 1.5; }

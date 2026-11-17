@@ -1,5 +1,7 @@
 import { FefcoPanel } from './panel.js';
 import { AutoPackPanel } from './autopanel.js';
+import { AccessoriesPanel } from './accessoriespanel.js';
+const Tabs = [['packaging', 'Packaging'], ['auto', 'Auto'], ['accessories', 'Accessories']];
 let nextPanelId = 0;
 function Element (tag, parent, text, className)
 {
@@ -17,11 +19,13 @@ export class PackagingPanel
         const tabs = Element ('div', this.root, undefined, 'packaging_tabs'); tabs.setAttribute ('role', 'tablist'); tabs.setAttribute ('aria-label', 'Packaging tools');
         this.manual = Element ('div', this.root, undefined, 'packaging_manual'); this.manual.id = id + '-packaging'; this.manual.setAttribute ('role', 'tabpanel');
         this.autoPanel = new AutoPackPanel (host, this.root); this.autoPanel.root.id = id + '-auto'; this.autoPanel.root.setAttribute ('role', 'tabpanel');
-        for (const [tab, title] of [['packaging', 'Packaging'], ['auto', 'Auto']]) {
+        this.accessoriesPanel = new AccessoriesPanel (host, this.root); this.accessoriesPanel.root.id = id + '-accessories'; this.accessoriesPanel.root.setAttribute ('role', 'tabpanel');
+        this.panels = { packaging : this.manual, auto : this.autoPanel.root, accessories : this.accessoriesPanel.root };
+        for (const [tab, title] of Tabs) {
             const button = Element ('button', tabs, title); button.type = 'button'; button.id = id + '-tab-' + tab; button.setAttribute ('role', 'tab'); button.setAttribute ('aria-controls', id + '-' + tab);
-            const panel = tab === 'packaging' ? this.manual : this.autoPanel.root; panel.setAttribute ('aria-labelledby', button.id);
+            const panel = this.panels[tab]; panel.setAttribute ('aria-labelledby', button.id);
             button.addEventListener ('click', () => this.SetTab (tab));
-            button.addEventListener ('keydown', event => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes (event.key)) { event.preventDefault (); const target = event.key === 'Home' ? 'packaging' : event.key === 'End' ? 'auto' : tab === 'auto' ? 'packaging' : 'auto'; this.SetTab (target); this.tabs.get (target).focus (); } });
+            button.addEventListener ('keydown', event => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes (event.key)) { event.preventDefault (); const ids = Tabs.map (item => item[0]), at = ids.indexOf (tab); const target = event.key === 'Home' ? ids[0] : event.key === 'End' ? ids.at (-1) : ids[(at + (event.key === 'ArrowRight' ? 1 : ids.length - 1)) % ids.length]; this.SetTab (target); this.tabs.get (target).focus (); } });
             this.tabs.set (tab, button);
         }
         this.fefcoPanel = new FefcoPanel (host, this.manual);
@@ -37,14 +41,14 @@ export class PackagingPanel
     }
     SetTab (tab)
     {
-        if (!['packaging', 'auto'].includes (tab)) { throw new Error ('Choose Packaging or Auto.'); }
-        this.tab = tab; this.manual.hidden = tab !== 'packaging'; this.autoPanel.root.hidden = tab !== 'auto';
+        if (!Object.hasOwn (this.panels, tab)) { throw new Error ('Choose Packaging, Auto or Accessories.'); }
+        this.tab = tab; for (const [id, panel] of Object.entries (this.panels)) { panel.hidden = id !== tab; }
         for (const [id, button] of this.tabs) { button.setAttribute ('aria-selected', String (id === tab)); button.tabIndex = id === tab ? 0 : -1; }
-        if (tab === 'auto') { this.autoPanel.Refresh (); } return this.InspectTab ();
+        if (tab === 'auto') { this.autoPanel.Refresh (); } if (tab === 'accessories') { this.accessoriesPanel.Refresh (); } return this.InspectTab ();
     }
     InspectTab () { return { tab : this.tab }; }
     Refresh ()
     {
-        const profile = this.host.profile (); this.root.dataset.profileName = profile.name; for (const button of this.actions) { button.disabled = this.host.blocked (); } this.fefcoPanel.Refresh (); if (this.tab === 'auto') { this.autoPanel.Refresh (); }
+        const profile = this.host.profile (); this.root.dataset.profileName = profile.name; for (const button of this.actions) { button.disabled = this.host.blocked (); } this.fefcoPanel.Refresh (); if (this.tab === 'auto') { this.autoPanel.Refresh (); } if (this.tab === 'accessories') { this.accessoriesPanel.Refresh (); }
     }
 }

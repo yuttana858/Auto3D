@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { AutoPackWorkspace } from '../source/website/autopackworkspace.js';
+import { AutoPackWorkspace, MeasureWorldBoundsMm } from '../source/website/autopackworkspace.js';
 import { PackagingWorkspace } from '../source/website/packagingworkspace.js';
 import { SceneDocument, SceneHistory } from '../source/website/scenedocument.js';
 import { FinalizeModel } from '../source/engine/model/modelfinalization.js';
@@ -113,6 +113,35 @@ describe ('Auto Pack scene integration', function () {
         copies[1].position[2] += 1; editor.document.ApplyTransform (copies[1]); await assert.rejects (() => editor.packaging.AnimateFold (), /product changed/);
         copies[1].position[2] -= 1; editor.document.ApplyTransform (copies[1]);
         editor.SelectedObjects = () => [...group, carton]; editor.selected = product; assert.match (auto.Inspect ().reason, /rather than their Auto Pack carton/);
+    });
+    it ('packs an array with nested partitions and pads: opens gaps, nests strips, fits the carton around everything', async () => {
+        const { auto, editor, product } = fixture ();
+        const copies = [1, 2].map (index => { const copy = editor.document.Instance (product); copy.position = [index * 50, 0, 0]; editor.document.ApplyTransform (copy); return copy; });
+        const products = [product, ...copies]; products.forEach (item => { item.userData = { _auto3dGroup : 'row', _auto3dGroupName : 'Array group of Selected product', _auto3dGroupKind : 'array' }; });
+        editor.SelectedObjects = () => products; const positions = products.map (item => [...item.position]);
+        const options = { partitions : true, pads : ['bottom', 'top', 'front', 'back'], boardId : 'nominal-e', grade : '44 ECT' };
+        // Preview: 3 columns touching, so 2 gaps open to 1.5 mm board + 2 × 0.5 mm; carton sized for everything.
+        const preview = auto.Inspect (options).contents;
+        assert.equal (preview.partitions.layout.columns, 3); assert.equal (preview.partitions.strips, 2); near (preview.partitions.growthMm.length, 5); assert.equal (preview.pads.length, 4);
+        near (preview.packedMm.width, 155); near (preview.packedMm.height, 83); near (preview.packedMm.length, 33);
+        assert.equal (editor.document.objects.length, 3);
+        const result = await auto.Generate ({ duration : 1, ...options }); assert.equal (result.started, true);
+        assert.equal (result.contents.pieces.length, 6); assert.equal (result.contents.moved, 2); assert.match (result.contents.board, /E flute · 44 ECT/); assert.match (result.message, /2 partition strips and 4 pads/);
+        const bounds = object => MeasureWorldBoundsMm (editor.document, object, 1), pieces = result.contents.pieces.map (id => editor.document.objects.find (o => o.id === id));
+        const productBounds = products.map (bounds), strips = pieces.filter (o => JSON.parse (o.userData._auto3dAccessory).kind === 'partition').map (bounds);
+        // Products now stand 2.5 mm apart and each strip sits in a gap without touching them.
+        near (productBounds[1].min[0] - productBounds[0].max[0], 2.5); near (productBounds[2].min[0] - productBounds[1].max[0], 2.5);
+        for (const s of strips) { near (s.size[0], 1.5); near (s.size[1], 80); near (s.size[2], 30); for (const p of productBounds) { assert.ok (s.max[0] <= p.min[0] + 1e-9 || s.min[0] >= p.max[0] - 1e-9); } }
+        // The carton is fitted around products and contents, and guards them all.
+        const flat = editor.document.objects.find (o => o.userData._auto3dAutoPack), saved = JSON.parse (flat.userData._auto3dAutoPack);
+        assert.equal (saved.productIds.length, 9); near (saved.size[0], 155); near (saved.size[1], 83); near (saved.size[2], 33);
+        assert.ok (pieces.every (o => JSON.parse (o.userData._auto3dAccessory).cartonId === flat.id));
+        const operation = editor.packaging.foldOperation; editor.packaging.FoldControl ('cancel'); await operation.completion;
+        // Undo removes the carton, then the contents, and puts the products back.
+        await editor.history.Undo (); await editor.history.Undo ();
+        assert.deepEqual (editor.document.objects, products); products.forEach ((item, i) => assert.deepEqual (item.position, positions[i]));
+        await assert.rejects (auto.Generate ({ duration : 1, pads : ['side'] }), /pad positions/);
+        editor.SelectedObjects = () => [product]; assert.match (auto.Inspect ({ partitions : true }).contents.reason, /at least two products/);
     });
     it ('refuses replay and dimension edits after the fitted product or carton moves', async () => {
         const { auto, editor, product } = fixture (); await auto.Generate ({ duration : 1 }); const operation = editor.packaging.foldOperation;
