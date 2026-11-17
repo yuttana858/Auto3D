@@ -83,6 +83,20 @@ try {
     const group = await call ('packaging.auto.inspect'); assert.equal (group.available, true, group.reason); assert.equal (group.objectIds.length, 3);
     assert.ok (group.productMm.width > fit.productMm.width * 2.5, 'combined bounds cover the array');
     assert.equal (await auto.getByRole ('button', { name : 'Auto Pack', exact : true }).isEnabled (), true); assert.match (await auto.textContent (), /3 products/);
+    // Packed contents: partitions between the array members and top/bottom pads, previewed then packed.
+    await auto.getByLabel ('Partitions between products', { exact : true }).check (); await auto.getByLabel ('Top pad', { exact : true }).check (); await auto.getByLabel ('Bottom pad', { exact : true }).check ();
+    await auto.getByLabel ('Contents flute', { exact : true }).selectOption ('nominal-e');
+    assert.match (await auto.getByRole ('region', { name : 'Packed contents', exact : true }).textContent (), /3 × 1 × 1 products .* 2 partition strips .* 2 pads/);
+    const beforeContents = (await call ('scene.inspect')).objects.length;
+    await auto.getByRole ('button', { name : 'Auto Pack', exact : true }).click ();
+    // Mid-fold, the walls rise around the products, partitions and pads.
+    await page.evaluate (() => new Promise ((resolve, reject) => { const started = Date.now (); const check = async () => { const s = (await Auto3D.execute ('packaging.fefco.playback.inspect')).result; if (s.state === 'playing' && s.progress > .3) { await Auto3D.execute ('packaging.fefco.playback', { action : 'pause' }); resolve (); } else if (Date.now () - started > 180000 || s.state === 'completed') { reject (new Error ('Fold did not pause mid-way: ' + s.state)); } else { setTimeout (check, 5); } }; check (); }));
+    await page.screenshot ({ path : 'work/auto-pack-review/array-contents-mid-fold.png' });
+    await call ('packaging.fefco.playback', { action : 'resume' }); await waitPlayback (['completed']);
+    const packedScene = await call ('scene.inspect'); assert.equal (packedScene.objects.length, beforeContents + 2 + 2 + 1);
+    const packedCarton = packedScene.objects.find (item => item.userData?._auto3dAutoPack); assert.equal (JSON.parse (packedCarton.userData._auto3dAutoPack).productIds.length, 3 + 4);
+    await call ('view.fit'); await page.screenshot ({ path : 'work/auto-pack-review/array-with-partitions-and-pads.png' });
+    await call ('history.undo'); await call ('history.undo'); await call ('history.undo'); assert.equal ((await call ('scene.inspect')).objects.length, beforeContents);
     assert.deepEqual (errors, []);
-    console.log ('Auto Pack tabs, array group selection, live bounds/units, exact fit clearance, cancel to flat, replay to closed, product preservation, Undo and mobile layout passed.');
+    console.log ('Auto Pack tabs, array group selection, packed partitions and pads, live bounds/units, exact fit clearance, cancel to flat, replay to closed, product preservation, Undo and mobile layout passed.');
 } finally { await browser.close (); }

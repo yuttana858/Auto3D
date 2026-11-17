@@ -148,20 +148,9 @@ export class AccessoriesWorkspace
         try {
             const module = await LoadPackagingModule (); unchanged ();
             for (const piece of pieces) {
-                const material = piece.material || c.material;
-                const profile = ValidatePackaging ({ ...piece.profile, grade : material.name || piece.profile.grade, ...(material.id ? { engineering : Engineering (piece.profile, material) } : {}) });
-                const object = target.AddImported (PackagingModel (module.CreateBoard (profile, { textured : true }), target.model.GetUnit ()), piece.name); added.push (object);
-                object.source = 'Accessory · ' + piece.data.kind; object.packagingProfile = profile;
-                // Boards extrude flat (profile X → world X, profile Y → world −Z, caliper up). Stand strips up, then turn to their axis.
-                const runsAlongX = axis[piece.place.along] === 0, rotation = new THREE.Quaternion ();
-                if (piece.place.upright) { rotation.setFromAxisAngle (new THREE.Vector3 (1, 0, 0), Math.PI / 2); }
-                if (!runsAlongX) { rotation.premultiply (new THREE.Quaternion ().setFromAxisAngle (new THREE.Vector3 (0, 1, 0), Math.PI / 2)); }
-                const euler = new THREE.Euler ().setFromQuaternion (rotation, 'XYZ');
-                object.rotation = [euler.x, euler.y, euler.z].map (v => Math.abs (THREE.MathUtils.radToDeg (v)) < 1e-9 ? 0 : THREE.MathUtils.radToDeg (v)); object.position = [0, 0, 0]; object.scale = [1, 1, 1];
-                target.ApplyTransform (object);
-                const now = MeasureWorldBoundsMm (target, object, f, 'accessory');
-                const want = [0, 0, 0]; want[axis.length] = corner[axis.length] + piece.place.min.length; want[axis.width] = corner[axis.width] + piece.place.min.width; want[1] = piece.place.min.y;
-                object.position = want.map ((value, i) => (value - now.min[i]) / f); target.ApplyTransform (object);
+                const material = piece.material || c.material, want = [0, 0, 0];
+                want[axis.length] = corner[axis.length] + piece.place.min.length; want[axis.width] = corner[axis.width] + piece.place.min.width; want[1] = piece.place.min.y;
+                const object = AddBoardPiece (module, target, piece.profile, material, { upright : piece.place.upright, runsAlongX : axis[piece.place.along] === 0, min : want }, f, piece.name, 'Accessory · ' + piece.data.kind); added.push (object);
                 object.userData = { ...group, [AccessoryKey] : JSON.stringify ({ version : 1, cartonId : carton.id, thicknessMm : (piece.material || c.material).caliperMm, boardName : (piece.material || c.material).name, ...piece.data }) };
                 unchanged ();
             }
@@ -183,6 +172,24 @@ export class AccessoriesWorkspace
     }
 }
 
+// Adds one board piece: the CAD profile in the given board record, extruded and placed so its world
+// bounds start at `min` (mm). Boards extrude flat (profile X → world X, profile Y → world −Z, caliper up);
+// upright pieces stand on edge, then turn so they run along X or Z. Shared by Accessories and Auto Pack.
+export function AddBoardPiece (module, target, sourceProfile, material, { upright = false, runsAlongX = true, min }, factor, name, source)
+{
+    const profile = ValidatePackaging ({ ...sourceProfile, grade : material.name || sourceProfile.grade, ...(material.id ? { engineering : Engineering (sourceProfile, material) } : {}) });
+    const object = target.AddImported (PackagingModel (module.CreateBoard (profile, { textured : true }), target.model.GetUnit ()), name);
+    object.source = source; object.packagingProfile = profile;
+    const rotation = new THREE.Quaternion ();
+    if (upright) { rotation.setFromAxisAngle (new THREE.Vector3 (1, 0, 0), Math.PI / 2); }
+    if (!runsAlongX) { rotation.premultiply (new THREE.Quaternion ().setFromAxisAngle (new THREE.Vector3 (0, 1, 0), Math.PI / 2)); }
+    const euler = new THREE.Euler ().setFromQuaternion (rotation, 'XYZ');
+    object.rotation = [euler.x, euler.y, euler.z].map (v => Math.abs (THREE.MathUtils.radToDeg (v)) < 1e-9 ? 0 : THREE.MathUtils.radToDeg (v)); object.position = [0, 0, 0]; object.scale = [1, 1, 1];
+    target.ApplyTransform (object);
+    const now = MeasureWorldBoundsMm (target, object, factor, 'accessory');
+    object.position = min.map ((value, i) => (value - now.min[i]) / factor); target.ApplyTransform (object);
+    return object;
+}
 // The carton's board record becomes the accessory's measurement-layer material.
 function Engineering (profile, material)
 {

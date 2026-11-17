@@ -87,6 +87,9 @@
 .packaging_workspace .packaging_manual[hidden], .packaging_workspace .packaging_auto_pack[hidden], .packaging_auto_pack [hidden] { display: none; }
 .packaging_auto_pack p:empty { display: none; }
 
+.packaging_auto_contents { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--packaging-border, var(--ov_border_color, #aaa)); border-radius: 6px; padding: 10px; }
+.packaging_auto_contents select { min-width: 0; flex: 1 1 80px; font: inherit; color: inherit; background: transparent; border: 1px solid var(--packaging-border, var(--ov_border_color, #aaa)); border-radius: 5px; padding: 4px 6px; }
+.packaging_auto_contents select option, .packaging_accessories select option { color: #111; }
 .packaging_accessories { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .packaging_workspace .packaging_accessories[hidden], .packaging_accessories [hidden] { display: none; }
 .packaging_accessories h3 { margin: 2px 0; font-size: var(--workspace-title-font-size, 14px); }

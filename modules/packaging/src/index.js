@@ -31,3 +31,4 @@ export * from './palletplan.js';
 export { CreatePallet } from './pallet.js';
 export * from './accessories.js';
 export { AccessoriesPanel } from './accessoriespanel.js';
+export * from './partitionnest.js';

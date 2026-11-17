@@ -2826,21 +2826,62 @@
       "id": "packaging.auto.inspect",
       "title": "Inspect Auto Pack fit",
       "category": "Packaging",
-      "description": "Measure the selected static model world bounding box and planned RSC inside size in mm, with 0.0254 mm per-face clearance. A selected group or array is measured as one product (combined bounds; objectIds lists every member).",
+      "description": "Measure the selected static model world bounding box and planned RSC inside size in mm, with 0.0254 mm per-face clearance. A selected group or array is measured as one product (combined bounds; objectIds lists every member). With contents options (pads, partitions, boardId, grade) it also previews the packed contents: the product layout (columns × rows × layers), partition strips, how far gaps open, pad sizes and the carton they need. Does not change the scene.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
-        "properties": {},
+        "properties": {
+          "pads": {
+            "type": "array",
+            "maxItems": 4,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "bottom",
+                "top",
+                "front",
+                "back"
+              ]
+            }
+          },
+          "partitions": {
+            "type": "boolean"
+          },
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "grade": {
+            "type": "string",
+            "enum": [
+              "32 ECT",
+              "44 ECT",
+              "48 ECT",
+              "200# test",
+              "275# test"
+            ]
+          }
+        },
         "required": [],
         "additionalProperties": false
       },
-      "example": {}
+      "example": {
+        "pads": [
+          "bottom",
+          "top"
+        ],
+        "partitions": true,
+        "boardId": "nominal-b",
+        "grade": "32 ECT"
+      }
     },
     {
       "id": "packaging.auto.generate",
       "title": "Auto Pack selected product",
       "category": "Packaging",
-      "description": "Create a flat RSC beneath the selected product, or around a selected group or array as one product, and start checked bottom-anchored folding around it. Requires known scene units. Existing fold controls inspect, pause, resume or cancel playback; cancel retains the flat carton and Undo removes it.",
+      "description": "Create a flat RSC beneath the selected product, or around a selected group or array as one product, and start checked bottom-anchored folding around it. Optional packed contents: partitions true nests interlocking slotted partitions between the products (layout read from the products; gaps narrower than the board plus 0.5 mm per face are opened by moving whole columns/rows apart; one set per layer, length strips slotted from the top and width strips from the bottom), and pads places bottom/top/front/back pads around them, in the board from boardId and grade. The carton is fitted around products and contents together. Requires known scene units. Existing fold controls inspect, pause, resume or cancel playback; cancel retains the flat carton. Undo removes the carton, then Undo again removes the contents and restores product positions.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -2849,13 +2890,50 @@
             "type": "number",
             "minimum": 1,
             "maximum": 30
+          },
+          "pads": {
+            "type": "array",
+            "maxItems": 4,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "bottom",
+                "top",
+                "front",
+                "back"
+              ]
+            }
+          },
+          "partitions": {
+            "type": "boolean"
+          },
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "grade": {
+            "type": "string",
+            "enum": [
+              "32 ECT",
+              "44 ECT",
+              "48 ECT",
+              "200# test",
+              "275# test"
+            ]
           }
         },
         "required": [],
         "additionalProperties": false
       },
       "example": {
-        "duration": 8
+        "duration": 8,
+        "pads": [
+          "bottom",
+          "top"
+        ],
+        "partitions": true
       }
     },
     {

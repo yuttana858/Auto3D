@@ -1,4 +1,4 @@
-# Auto3D 0.81.0 — Packaging Accessories: pads and partitions
+# Auto3D 0.81.0 — Packaging Accessories, and Auto Pack with nested partitions and pads
 
 Auto3D 0.81.0 / Packaging 1.14.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0. Based on main after #141 (0.80.0). Not deployed.
 
@@ -34,8 +34,40 @@ It works on the selected folded carton:
 - **Placement:** strips stand on any bottom pad, stop under any top pad and fit between any front and back pads, with 1 mm clearance.
 - **Board:** partitions use the carton's board.
 
+## Auto Pack with packed contents
+
+The Auto tab has a **Packed contents** section with these controls:
+- **Partitions between products**;
+- **Top / Bottom / Front / Back pad**;
+- **Contents flute** and **Contents grade**, from the board catalog.
+
+It previews the layout, the partition strips, how far the gaps open, the pads and the carton they need. On **Auto Pack**, the contents are built first and the RSC is then fitted around products and contents together. The carton folds around them, so the contents are in place during the assembly.
+
+### The nesting algorithm (`modules/packaging/src/partitionnest.js`, pure)
+
+Inputs: product bounds in the carton frame (length = the longer horizontal side, height, width) and the board caliper.
+
+1. **Read the layout.** Products are grouped by overlapping extents into **columns** (along the length), **rows** (across the width) and **layers** (by height). Uneven spacing and mixed sizes within a column are understood.
+2. **Make room.** Every gap between neighbouring columns or rows must hold one board plus 0.5 mm on each face (3 mm board → 4 mm). Short gaps are opened by moving whole columns or rows apart, keeping the layout centred; gaps that are already wide enough are left alone. The total growth is reported and becomes part of the carton ID.
+3. **Nest.** One interlocking set goes in each layer:
+   - a strip runs down the middle of every gap, spans the whole product envelope, and is as tall as the layer;
+   - length strips are slotted from the top and width strips from the bottom, each slot the caliper + 0.5 mm, so they lock at half height;
+   - like a collapsible die-cut partition, the set can pivot flat at its slots. The plan reports `collapsedMm`: the flat length and the stack thickness of one caliper per strip.
+4. **Pad.** Front and back pads cover the envelope's long faces. Top and bottom pads cover the envelope plus the front and back pads.
+5. **Fit.** Auto Pack measures products, strips and pads together, adds the clearance and the board allowance factors as in 0.80.0, folds the carton around everything (the 3,601-pose clearance audit includes the contents), and guards every piece for replay.
+
+**Example:** a 4 × 3 × 2 grid of touching 66 mm bottles with a 3 mm board:
+- every gap opens to 4 mm, so the load grows 12 mm in length and 8 mm in width;
+- 5 strips per layer, 10 in total;
+- 24 cells.
+
+**Undo:** the first Undo removes the carton; the second removes the contents and puts the products back where they were. Content pieces are linked to their carton, so the Accessories tab sees them.
+
+`AddBoardPiece` (in `accessoriesworkspace.js`) is the shared builder that extrudes and places board pieces, for both Accessories and Auto Pack.
+
 ## Agent commands
 
+- `packaging.auto.inspect` and `packaging.auto.generate` take `{ pads, partitions, boardId, grade }`. Inspect previews the contents; generate builds them and fits the carton.
 - `packaging.tab` accepts `accessories`.
 - `packaging.accessories.inspect` reads the inside size, the boards and grades, and the planned pads and partitions.
 - `packaging.accessories.pads { positions, boardId, grade, keepBox }`.
@@ -55,6 +87,20 @@ It works on the selected folded carton:
 
 ## Validation
 
+- **Nesting module tests (6):**
+  - layout reading and clustering;
+  - touching products opened to exactly board + 2 × 0.5 mm, with no strip touching a product;
+  - already-wide gaps left alone, with cuts at the gap centres;
+  - only narrow gaps opened, with the layout kept centred;
+  - every slot lined up with the crossing strip at half height;
+  - error cases.
+- **Auto Pack scene test:** a 3-product array with partitions and four E-flute 44 ECT pads. It checks:
+  - the preview: 3 columns, 2 strips, +5 mm, packed size 155 × 83 × 33 mm;
+  - products 2.5 mm apart with each strip in its gap;
+  - the carton fitted around all 9 pieces and guarding them, with pieces linked to the carton;
+  - two Undos restoring the original positions.
+- **Browser test `packaging-auto-pack`** is extended for an array with partitions and top/bottom pads: the preview text, a paused mid-fold screenshot with the contents in place, the completed fold, and three Undos.
+
 - **Module tests (80):** pad sizes and growth for all four positions, valid CAD boards, slots aligned with the crossing strips and half-height interlocks, and input validation.
 - **Scene tests:**
   - Pads and partitions inside a generated carton, both normal and turned 90°: they sit on the floor and under the lid, stay inside, line up on the cell boundaries, are grouped, and take one Undo step each.
@@ -70,4 +116,5 @@ It works on the selected folded carton:
   - mobile width;
   - three Undo steps back to 150 mm.
 - **Related browser tests pass:** `module-panels`, `packaging-auto-pack`, `packaging-auto-pallet`, `packaging-module`, `packaging-measurements` and `workspace-commands`.
-- **Totals:** 981 unit, 72 MCP and 80 Packaging module tests pass. Lint and builds pass.
+- **Totals:** 988 unit, 72 MCP and 86 Packaging module tests pass. Lint and builds pass.
+- **Browser tests also pass:** `packaging-auto-pallet`, `fold-actions` and `packaging-solid-folds`.

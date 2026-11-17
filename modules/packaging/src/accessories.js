@@ -25,6 +25,8 @@ function Clearance (value, name, max = 20)
     if (typeof value !== 'number' || !Number.isFinite (value) || value < 0 || value > max) { throw new Error (name + ' must be 0–' + max + ' mm.'); }
     return value;
 }
+// A plain rectangular board (pads) as a CAD profile: X = length, Y = across.
+export function BoardRectangle (name, thickness, length, across) { return Profile (name, Positive (thickness, 'Board caliper'), [[0, 0], [Positive (length, 'Board length'), 0], [length, Positive (across, 'Board width')], [0, across]]); }
 function Profile (name, thickness, points)
 {
     return ValidatePackaging ({ version : 1, name, grade : 'Custom', thickness, paths : [{ id : 'outline', type : 'cut', closed : true, points }] });
@@ -55,26 +57,23 @@ export function CreatePadPlan ({ insideMm, thickness, positions = ['bottom'], cl
     return { version : 1, units : 'mm', kind : 'pads', thicknessMm : t, clearanceMm : c, pads, growthMm : { length : 0, width : vertical * t, height : horizontal * t } };
 }
 
-// Slotted partition (divider) set. columns = cells along the length, rows = cells along the width.
-// Length strips run along the carton length and carry slots from the top; width strips run across
-// and carry slots from the bottom, so each crossing interlocks at half height.
-export function CreatePartitionPlan ({ insideMm, thickness, columns, rows, clearanceMm = AccessoryClearanceMm, slotClearanceMm = PartitionSlotClearanceMm } = {})
+// Interlocking slotted strips for any set of cut positions. Cuts are strip centre lines measured
+// from the start wall of the other axis (lengthCuts run across the length, widthCuts across the width).
+// Length strips run along the length with slots from the top; width strips run across with slots from
+// the bottom, so each crossing interlocks at half height and the assembly can pivot flat at its slots.
+export function PartitionStrips ({ spanMm, heightMm, lengthCuts = [], widthCuts = [], thickness, clearanceMm = AccessoryClearanceMm, slotClearanceMm = PartitionSlotClearanceMm, name = 'Partition' })
 {
-    const inside = Inside (insideMm), t = Positive (thickness, 'Board caliper');
-    const c = Clearance (clearanceMm, 'Partition clearance'), slotGap = Clearance (slotClearanceMm, 'Slot clearance', 5);
-    for (const [value, name] of [[columns, 'Columns'], [rows, 'Rows']]) { if (!Number.isInteger (value) || value < 1 || value > MaxCells) { throw new Error (name + ' must be a whole number from 1 to ' + MaxCells + '.'); } }
-    if (columns === 1 && rows === 1) { throw new Error ('Choose at least two columns or two rows of cells.'); }
-    const cellLength = (inside.length - (columns - 1) * t) / columns, cellWidth = (inside.width - (rows - 1) * t) / rows;
-    if (cellLength <= t || cellWidth <= t) { throw new Error ('The cells would be narrower than the board caliper. Use fewer columns or rows.'); }
-    const height = inside.height - 2 * c; if (height <= 4 * t) { throw new Error ('The carton is too shallow for partitions.'); }
-    const lengthStrip = inside.length - 2 * c, widthStrip = inside.width - 2 * c, slot = t + slotGap, half = height / 2;
-    // Centre lines of each strip, measured from the inside wall at the start of the other axis.
-    const crossLength = Array.from ({ length : columns - 1 }, (_, i) => (i + 1) * cellLength + i * t + t / 2);
-    const crossWidth = Array.from ({ length : rows - 1 }, (_, i) => (i + 1) * cellWidth + i * t + t / 2);
+    const t = Positive (thickness, 'Board caliper'), c = Clearance (clearanceMm, 'Partition clearance'), slotGap = Clearance (slotClearanceMm, 'Slot clearance', 5);
+    const height = Positive (heightMm, 'Partition height'); if (height <= 4 * t) { throw new Error ('The space is too shallow for partitions.'); }
+    const lengthStrip = Positive (spanMm?.length, 'Inside length') - 2 * c, widthStrip = Positive (spanMm?.width, 'Inside width') - 2 * c, slot = t + slotGap, half = height / 2;
+    if (lengthStrip <= 0 || widthStrip <= 0) { throw new Error ('The space is too small for partitions.'); }
+    for (const [cuts, span, axis] of [[lengthCuts, spanMm.length, 'length'], [widthCuts, spanMm.width, 'width']]) {
+        if (!Array.isArray (cuts) || cuts.some ((x, i) => !Number.isFinite (x) || x - slot / 2 < c || x + slot / 2 > span - c || (i > 0 && x - cuts[i - 1] < slot))) { throw new Error ('Partition cuts along the ' + axis + ' must lie inside the space and at least one slot apart.'); }
+    }
+    if (!lengthCuts.length && !widthCuts.length) { throw new Error ('Choose at least one partition cut.'); }
     const notched = (span, centres, fromTop) => {
         // Outline in profile X (along the strip) and Y (up the strip), counter-clockwise, slots cut from one edge.
-        const points = [];
-        const edge = fromTop ? height : 0, depth = fromTop ? height - half : half;
+        const points = [], edge = fromTop ? height : 0, depth = fromTop ? height - half : half;
         const slots = centres.map (x => [x - c - slot / 2, x - c + slot / 2]);
         if (fromTop) {
             points.push ([0, 0], [span, 0], [span, height]);
@@ -88,10 +87,27 @@ export function CreatePartitionPlan ({ insideMm, thickness, columns, rows, clear
         return points;
     };
     const strips = [
-        ...crossWidth.map ((offset, i) => ({ id : 'length-' + (i + 1), axis : 'length', offsetMm : offset, lengthMm : lengthStrip, heightMm : height, slots : 'top', profile : Profile ('Partition · length strip ' + (i + 1), t, notched (lengthStrip, crossLength, true)) })),
-        ...crossLength.map ((offset, i) => ({ id : 'width-' + (i + 1), axis : 'width', offsetMm : offset, lengthMm : widthStrip, heightMm : height, slots : 'bottom', profile : Profile ('Partition · width strip ' + (i + 1), t, notched (widthStrip, crossWidth, false)) }))
+        ...widthCuts.map ((offset, i) => ({ id : 'length-' + (i + 1), axis : 'length', offsetMm : offset, lengthMm : lengthStrip, heightMm : height, slots : 'top', crossings : lengthCuts.length, profile : Profile (name + ' · length strip ' + (i + 1), t, notched (lengthStrip, lengthCuts, true)) })),
+        ...lengthCuts.map ((offset, i) => ({ id : 'width-' + (i + 1), axis : 'width', offsetMm : offset, lengthMm : widthStrip, heightMm : height, slots : 'bottom', crossings : widthCuts.length, profile : Profile (name + ' · width strip ' + (i + 1), t, notched (widthStrip, widthCuts, false)) }))
     ];
-    return { version : 1, units : 'mm', kind : 'partitions', columns, rows, cells : columns * rows, cellMm : { length : cellLength, width : cellWidth, height }, thicknessMm : t, clearanceMm : c, slotWidthMm : slot, slotDepthMm : half, strips };
+    // Folded flat, every strip pivots at its slots to lie along the length: the stack is one caliper per strip.
+    const collapsedMm = { length : Math.max (lengthStrip, widthStrip) + (lengthCuts.length && widthCuts.length ? Math.min (lengthStrip, widthStrip) : 0), stackThickness : strips.length * t, height };
+    return { thicknessMm : t, clearanceMm : c, slotWidthMm : slot, slotDepthMm : half, strips, collapsedMm };
+}
+
+// Equal-cell partition set. columns = cells along the length, rows = cells along the width.
+export function CreatePartitionPlan ({ insideMm, thickness, columns, rows, clearanceMm = AccessoryClearanceMm, slotClearanceMm = PartitionSlotClearanceMm } = {})
+{
+    const inside = Inside (insideMm), t = Positive (thickness, 'Board caliper'), c = Clearance (clearanceMm, 'Partition clearance');
+    for (const [value, name] of [[columns, 'Columns'], [rows, 'Rows']]) { if (!Number.isInteger (value) || value < 1 || value > MaxCells) { throw new Error (name + ' must be a whole number from 1 to ' + MaxCells + '.'); } }
+    if (columns === 1 && rows === 1) { throw new Error ('Choose at least two columns or two rows of cells.'); }
+    const cellLength = (inside.length - (columns - 1) * t) / columns, cellWidth = (inside.width - (rows - 1) * t) / rows;
+    if (cellLength <= t || cellWidth <= t) { throw new Error ('The cells would be narrower than the board caliper. Use fewer columns or rows.'); }
+    const height = inside.height - 2 * c; if (height <= 4 * t) { throw new Error ('The carton is too shallow for partitions.'); }
+    const lengthCuts = Array.from ({ length : columns - 1 }, (_, i) => (i + 1) * cellLength + i * t + t / 2);
+    const widthCuts = Array.from ({ length : rows - 1 }, (_, i) => (i + 1) * cellWidth + i * t + t / 2);
+    const set = PartitionStrips ({ spanMm : inside, heightMm : height, lengthCuts, widthCuts, thickness : t, clearanceMm : c, slotClearanceMm });
+    return { version : 1, units : 'mm', kind : 'partitions', columns, rows, cells : columns * rows, cellMm : { length : cellLength, width : cellWidth, height }, ...set };
 }
 
 const Round = value => Number (value.toFixed (1));
