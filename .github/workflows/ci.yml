@@ -52,6 +52,7 @@ jobs:
       - run: npm test
       - run: npm run lint_mcp
       - run: npm run test_mcp
+      - run: node test/modal-worker.mjs
       - name: Committed MCP command catalog matches the registry
         run: git diff --exit-code mcp/command-catalog.js website/assets/commands.json
       - name: Verify audience-sharing database permissions and throttling

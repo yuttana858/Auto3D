@@ -609,6 +609,74 @@
       "example": {}
     },
     {
+      "id": "admin.modal.open",
+      "title": "Manage Modal connections",
+      "category": "Account",
+      "description": "Administrator only: open the private interactive Modal credential form. Tokens are entered by the user, never as command or macro arguments.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "admin.modal.inspect",
+      "title": "Inspect Modal connections",
+      "category": "Account",
+      "description": "Administrator only: inspect the server profile and saved connection metadata, without credentials.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "admin.modal.test",
+      "title": "Test Modal app connection",
+      "category": "Account",
+      "description": "Administrator only: test the saved server connection and target identity. Starts the lightweight status service, with no CAD generation.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "admin.modal.remove",
+      "title": "Remove Modal connection",
+      "category": "Account",
+      "description": "Administrator only: remove the selected saved credential pair. Does not revoke it at Modal.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "runtime",
+              "deployment"
+            ]
+          }
+        },
+        "required": [
+          "purpose"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "purpose": "runtime"
+      }
+    },
+    {
       "id": "admin.approve",
       "title": "Review account approval",
       "category": "Account",

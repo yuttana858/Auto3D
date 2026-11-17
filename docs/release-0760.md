@@ -1,4 +1,4 @@
-# Auto3D 0.76.0 — Auto pallet and Image to 3D drop zone
+# Auto3D 0.76.0 — Auto pallet
 
 Auto3D 0.76.0 / Packaging 1.12.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0. Based on main after #136 (0.75.0). Not deployed.
 
@@ -68,36 +68,12 @@ Pure module code: millimetres in, a layer pattern and placements out. It works f
 
 **Refused selections:** a flat dieline (fold it first), a box tilted on X or Z, the pallet itself, animated or partly hidden models, unknown scene units, and read-only sessions.
 
-## AI Generative: Image to 3D drop zone and automatic preview
-
-- **Drop zone.** Choosing **Image to 3D** (or Multi-image to 3D) turns the AI viewer into an upload target until a reference image is chosen. It reads *Drop an image here · or click to browse · Ctrl+V to paste*. Clicking it, or pressing Enter or Space on it, opens the image picker.
-- **Drag and drop:** an image file dropped anywhere on the viewer becomes the reference. In Multi-image to 3D it is added as another view. The viewer outlines while a file is dragged over it.
-- **Ctrl+V paste:** while the AI panel is open in Image to 3D or Multi-image to 3D, pasting an image from the clipboard sets the reference, named *pasted image.png*.
-  - Pasting text into the prompt fields still pastes text.
-  - Pastes are ignored in the other generation types.
-- **After a reference is set,** the viewer shows the image as before. **Clear** brings the drop zone back.
-- **Automatic preview.** When a generation submitted from this window finishes, the result opens in the viewer by itself: the model for 3D types, the image for image types. This doesn't happen if a newer submission has taken over the progress display. The progress line now reads *Complete · opened in the viewer*.
-- **Agents:**
-  - `ai.reference.add_image { dataUrl, name? }` takes the same path as drop and paste, with a base64 PNG, JPEG or WebP. It switches to Image to 3D if another type is selected, and doesn't submit anything.
-  - `ai.workspace.inspect` reports `dropZone`.
-  - The `ai.mode.set` description mentions the drop zone.
-
 ## Other changes
 
 - **Shared measurement.** Auto Pack's world-bounds measurement is now the shared `MeasureWorldBoundsMm`.
 - **Units refresh.** Changing display units now refreshes an open Auto tab. Before, Auto Pack's sizes only updated on the next refresh.
 
 ## Validation
-
-- **New browser test `ai-image-dropzone`** (added to CI):
-  - the drop zone appears only for Image to 3D;
-  - paste is ignored in Text to 3D;
-  - Ctrl+V paste sets the reference and hides the drop zone;
-  - Clear brings the drop zone back;
-  - drag and drop works;
-  - the agent data-URL command works, and non-images are rejected;
-  - the generated model opens in the viewer without pressing Preview.
-- `ai-progress`, `ai-creations`, `ai-extended` and `ai-credentials` pass. `ai-progress` was updated for the new completion text.
 
 - **Module tests (73):**
   - the pallet preset and the 55 in default;
