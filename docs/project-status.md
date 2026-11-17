@@ -2,11 +2,11 @@
 
 ## Durable CAD retry dispatch — Auto3D 0.82.1 (2026-11-17)
 
-Repairs the outbox gap found when retrying the original private X_T: queued retries now reset the old sent flag and attempt identity, and reject late acknowledgements. The corrective migration repairs only affected unclaimed queued rows, preserving two attempts, ownership, quotas and retention. Isolated PostgreSQL reproducer/recovery checks pass; production state is verified pending. App/module versions and validation are in [release-0821.md](release-0821.md).
+Repairs the outbox gap found when retrying the original private X_T: queued retries now reset the old sent flag and attempt identity, and reject late acknowledgements. The corrective migration repairs only affected unclaimed queued rows, preserving two attempts, ownership, quotas and retention. Isolated PostgreSQL reproducer/recovery checks pass. PR #145 and production run 44187702251 (attempt 2) passed; Auto3D 0.82.1 is live. The retry reached OCCT topology construction and failed with `invalid_geometry`; source-file acceptance remains open. App/module versions and validation are in [release-0821.md](release-0821.md).
 
-## CAD progress and failure diagnosis — Auto3D 0.82.0 candidate (2026-11-17)
+## CAD progress and failure diagnosis — Auto3D 0.82.0 live (2026-11-17)
 
-Packaging 1.14.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 are preserved. Adds animated current-stage progress, measured percentages where work counts exist, elapsed time, stable polling and reduced motion. Cloud 3D Studio 0.3.3 reports native phases and actionable failures without exposing private CAD or exception text. Older generic failures gain one quota-checked retry, still capped at two total attempts and the original retention. Source-specific diagnosis and rollout remain pending; see [release-0820.md](release-0820.md).
+Packaging 1.14.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 are preserved. Adds animated current-stage progress, measured percentages where work counts exist, elapsed time, stable polling and reduced motion. Cloud 3D Studio 0.3.3 reports native phases and actionable failures without exposing private CAD or exception text. Older generic failures gain one quota-checked retry, still capped at two total attempts and the original retention. PR #144, hosted CI and deployment passed. All 991 application tests and 72 MCP tests passed; the preceding full browser run completed 87/87, and final integrated CAD/Accessories/Auto Pack flows passed separately. Native progress was verified through the real private user API. The actual source failed during OCCT construction; see [release-0820.md](release-0820.md).
 
 ## Packaging Accessories: pads and partitions — Auto3D 0.81.0 / Packaging 1.14.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-17)
 
