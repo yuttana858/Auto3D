@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Modal bridge integration — Auto3D 0.77.0 candidate (2026-11-17)
+
+PR #138 incorporates current main and the Auto pallet work from #139, preserving the connected prompt, branding and Auto Pack release. Packaging 1.12.0, Primary Products 0.15.0 and Molded Pulp 0.1.0 remain intact. The credential bridge has its own [0.77.0 release notes](release-0770.md); the existing 0.75.0 and 0.76.0 release histories are retained. The hosted CAD service and conversion connector continue in this integration candidate. No production app deployment is claimed.
+
 ## Auto pallet — Auto3D 0.76.0 / Packaging 1.12.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-17)
 
 Based on main after #136 (0.75.0). Not deployed.

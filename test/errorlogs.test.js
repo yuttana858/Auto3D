@@ -32,6 +32,11 @@ describe ('Browser diagnostics', () => {
         restored.BindAccount ('two'); assert.equal (restored.entries.length, 0); assert.equal (data.has ('auto3d-error-log-v1:one'), false); restored.Record ('warning', 'test', 'two'); restored.BindAccount (null); assert.equal (data.has ('auto3d-error-log-v1:two'), false);
         log.listeners.add (() => { throw new Error ('panel failed'); }); assert.doesNotThrow (() => log.Clear ());
     });
+    it ('redacts complete Modal deployment and Web Function tokens from exported diagnostics', () => {
+        const tokens = ['ak-deploymentfixture123', 'as-secretfixture123', 'wk-proxyfixture123', 'ws-secretfixture456'];
+        const text = RedactLogText (tokens.join (' '));
+        assert.ok (tokens.every (token => !text.includes (token))); assert.ok (text.includes ('[Modal token omitted]'));
+    });
     it ('Includes failed offscreen captures in the error filter even when the model remains visible', () => {
         const { log } = Fixture ();
         const baseline = { contextLost : false, shaderErrors : [], meshes : 1, visibleMeshes : 1 };
