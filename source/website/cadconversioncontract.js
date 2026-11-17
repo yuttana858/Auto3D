@@ -1,0 +1,41 @@
+// Public format contract. Provider credentials and storage paths belong only on the server.
+export const CadLimits = Object.freeze ({ inputBytes : 50 * 1024 * 1024, artifactBytes : 64 * 1024 * 1024, manifestBytes : 16 * 1024 * 1024, totalBytes : 208 * 1024 * 1024, retentionHours : 24 });
+export const CadArtifacts = Object.freeze ({ step : { file : 'model.step', units : 'mm', type : 'application/step' }, glb : { file : 'model.glb', units : 'm', type : 'model/gltf-binary' }, stl : { file : 'model.stl', units : 'mm', type : 'model/stl' }, manifest : { file : 'manifest.json', type : 'application/json' } });
+export const CadMessages = Object.freeze ({
+    invalid_request : 'Check the file, source units and conversion options.',
+    unauthenticated : 'Sign in to convert CAD.', forbidden : 'This conversion is unavailable for this account.',
+    conflict : 'This conversion changed. Refresh its status before retrying.', not_found : 'Conversion not found.',
+    expired : 'This conversion has expired. Submit the source again.', queue_full : 'Conversion queue limit reached. Try again after a job finishes.',
+    unavailable : 'CAD conversion is temporarily unavailable. Try again shortly.', not_ready : 'The CAD service has not completed its native verification.',
+    too_large : 'The file exceeds the conversion size limit.', source_mismatch : 'The uploaded file does not match this submission.',
+    cancelled : 'Conversion cancelled.', transfer_failed : 'A private file transfer failed. You can retry this job.',
+    lease_expired : 'The worker stopped responding. You can retry this job.', dispatch_failed : 'The worker could not be started. You can retry this job.',
+    conversion_failed : 'This file could not be converted. Check its geometry and format.',
+    unsupported_format : 'This CAD format is not enabled.', unsupported_entity : 'The open source Parasolid reader does not support an entity in this file.',
+    source_units_required : 'Select the actual Parasolid coordinate units.', validation_failed : 'Independent geometry validation failed; no result was published.',
+    wrong_target : 'The active account or session changed. Select the intended session and try Add again.',
+    unknown_units : 'Set the existing scene units before adding the converted model.'
+});
+export function CadError (code, status = 400) { return Object.assign (new Error (CadMessages[code] || CadMessages.conversion_failed), { code, status }); }
+export function CadUuid (value) { return typeof value === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test (value); }
+export function CadHash (value) { return typeof value === 'string' && /^[a-f0-9]{64}$/.test (value); }
+export function CadExact (value, keys)
+{
+    if (!value || typeof value !== 'object' || Array.isArray (value) || Object.keys (value).length !== keys.length || keys.some (key => !Object.hasOwn (value, key))) { throw CadError ('invalid_request'); }
+    return value;
+}
+export function CadRequest (value)
+{
+    CadExact (value, ['requestKey', 'sourceName', 'extension', 'sourceBytes', 'sourceSha256', 'sourceUnit', 'quality', 'origin']);
+    CadExact (value.origin, ['windowId', 'tabId', 'revision']);
+    if (!CadUuid (value.requestKey) || !CadUuid (value.origin.windowId) || !CadUuid (value.origin.tabId) || !Number.isSafeInteger (value.origin.revision) || value.origin.revision < 0 || !CadHash (value.sourceSha256) || typeof value.sourceName !== 'string' || !value.sourceName.trim () || value.sourceName.length > 200 || /[\\/]/.test (value.sourceName) || [...value.sourceName].some (char => char.charCodeAt (0) < 32 || char.charCodeAt (0) === 127) || !['x_t', 'x_b', 'step', 'stp'].includes (value.extension) || !Number.isSafeInteger (value.sourceBytes) || value.sourceBytes < 1 || !['standard', 'fine'].includes (value.quality)) { throw CadError ('invalid_request'); }
+    if (value.sourceBytes > CadLimits.inputBytes) { throw CadError ('too_large', 413); }
+    if (['x_t', 'x_b'].includes (value.extension) ? !['mm', 'cm', 'm', 'in', 'ft'].includes (value.sourceUnit) : value.sourceUnit !== null) { throw CadError ('source_units_required'); }
+    return value;
+}
+export function CadFailureCode (code)
+{
+    if (['cancelled', 'transfer_failed', 'lease_expired', 'dispatch_failed', 'unsupported_entity', 'unsupported_format', 'source_units_required'].includes (code)) { return code; }
+    if (typeof code === 'string' && /validation|reimport|mismatch/.test (code)) { return 'validation_failed'; }
+    return 'conversion_failed';
+}

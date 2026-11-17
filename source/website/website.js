@@ -5,6 +5,7 @@ import { ViewModes } from './viewmodes.js';
 import { RenderingPanel } from './renderingpanel.js';
 import { CameraPanel } from './camerapanel.js';
 import { ModelExtensions, SupportedFormatsText } from './importformats.js';
+import { CadConversionsFor } from './cadconversion.js';
 import { GetFileExtension, TransformFileHostUrls } from '../engine/io/fileutils.js';
 import { InputFilesFromFileObjects, InputFilesFromUrls } from '../engine/import/importerfiles.js';
 import { ImportErrorCode, ImportSettings } from '../engine/import/importer.js';
@@ -284,6 +285,9 @@ export class Website
         const formats = document.getElementById ('supported_formats');
         if (formats) { formats.textContent = SupportedFormatsText; }
         document.getElementById ('workspace_upload').addEventListener ('click', () => this.OpenFileBrowserDialog ());
+        const cadButton = document.createElement ('button'); cadButton.className = 'workspace_upload_button'; cadButton.textContent = 'Convert CAD'; cadButton.id = 'workspace_convert_cad'; cadButton.type = 'button';
+        cadButton.addEventListener ('click', () => CadConversionsFor (this).Open ().catch (error => this.sessionEditor.Status (error.message)));
+        document.getElementById ('workspace_upload').after (cadButton);
         this.modulePanels.Render ();
         this.sidebar.detailsPanel.SetCollapsed (false); // Model spec is the default right panel, so its preview and specs start expanded.
         this.sidebar.detailsPanel.contentDiv.textContent = 'Load a model to view geometry, dimensions, materials and properties.';
@@ -518,6 +522,13 @@ export class Website
         const selected = Array.from (files);
         const session = selected.find ((file) => file.name.toLowerCase ().endsWith ('.auto3d'));
         if (session) { await this.sessionEditor.Run (() => this.sessionEditor.OpenArchiveFile (session)); return; }
+        const parasolid = selected.find (file => /\.(x_t|x_b)$/i.test (file.name));
+        if (parasolid) {
+            const conversion = CadConversionsFor (this);
+            const replacing = !!this.sessionEditor.replaceTarget; this.sessionEditor.replaceTarget = null;
+            if (selected.length > 1) { conversion.ClearFile (); await conversion.Open (null, 'Multiple source files were selected. Choose one CAD file below; the other selected models have not been imported or uploaded.'); }
+            else { await conversion.Open (parasolid, replacing ? 'Converted CAD is added as a new scene object with Add to current session.' : ''); } return;
+        }
 
         const candidates = selected.filter ((file) => MultiModelExtensions.has (GetFileExtension (file.name).toLowerCase ()));
         if (!this.sessionEditor.replaceTarget && candidates.length > 1) {

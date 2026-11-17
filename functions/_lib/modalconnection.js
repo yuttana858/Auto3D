@@ -35,8 +35,8 @@ export function ValidateModalSettings (settings, purpose)
     const slug = value => typeof value === 'string' && /^[a-z0-9][a-z0-9-]{0,62}$/.test (value);
     if (!settings || Array.isArray (settings) || Object.keys (settings).some (key => !allowed.includes (key)) || !slug (settings.workspace) || !slug (settings.environment) || settings.app !== 'cloud-3d-studio') { throw ModalFailure ('MODAL_INVALID_SETTINGS', 400); }
     if (purpose === 'runtime') {
-        // Only the provider's HTTPS domain, one host label, no credentials/port/path/query/fragment.
-        if (typeof settings.endpoint !== 'string' || !/^https:\/\/[a-z0-9][a-z0-9-]{0,190}\.modal\.run$/.test (settings.endpoint) || !new URL (settings.endpoint).hostname.startsWith (settings.workspace + '--')) { throw ModalFailure ('MODAL_INVALID_SETTINGS', 400); }
+        // Provider HTTPS origin: workspace/function label, optional region, no URL credentials or path.
+        if (typeof settings.endpoint !== 'string' || !/^https:\/\/[a-z0-9][a-z0-9-]{0,190}(?:\.[a-z0-9][a-z0-9-]{0,62})?\.modal\.run$/.test (settings.endpoint) || !new RegExp ('^' + settings.workspace + '(--|-[a-z0-9-]+--)').test (new URL (settings.endpoint).hostname)) { throw ModalFailure ('MODAL_INVALID_SETTINGS', 400); }
     } else if (settings.endpoint !== '') { throw ModalFailure ('MODAL_INVALID_SETTINGS', 400); }
     const [id, secret] = purpose === 'runtime' ? ['wk-', 'ws-'] : ['ak-', 'as-'];
     const token = (value, prefix) => typeof value === 'string' && value.length <= 512 && new RegExp ('^' + prefix + '[A-Za-z0-9_-]{8,509}$').test (value);
@@ -79,17 +79,16 @@ export function ModalConnectionStatus (record)
     if (!record) { return { saved : false, revision : null }; }
     return { saved : true, revision : record.revision, workspace : record.workspace, environment : record.environment, app : record.app, endpoint : record.endpoint };
 }
-// No browser-supplied URL, token or arbitrary operation reaches Modal. Future job submission
-// must add its own account/job authorization before using the same server-only reader.
-export async function TestModalConnection (env)
+// Callers must first authorize the account/job. Only fixed operations reach the saved server target.
+export async function ModalRequest (record, path, body)
 {
-    const record = await ReadModalConnection (env, 'runtime');
-    if (!record) { throw ModalFailure ('MODAL_NOT_CONFIGURED', 409); }
+    if (!['/connection', '/jobs', '/cancel'].includes (path)) { throw ModalFailure ('MODAL_INVALID_SETTINGS', 400); }
     let response;
     try {
-        response = await fetch (record.endpoint + '/connection', {
-            method : 'GET', redirect : 'manual', signal : AbortSignal.timeout (10000),
-            headers : { 'Modal-Key' : record.tokenId, 'Modal-Secret' : record.tokenSecret, Accept : 'application/json' }
+        response = await fetch (record.endpoint + path, {
+            method : path === '/connection' ? 'GET' : 'POST', redirect : 'manual', signal : AbortSignal.timeout (20000),
+            headers : { 'Modal-Key' : record.tokenId, 'Modal-Secret' : record.tokenSecret, Accept : 'application/json', ...(body ? { 'Content-Type' : 'application/json' } : {}) },
+            body : body ? JSON.stringify (body) : undefined
         });
     } catch { throw ModalFailure ('MODAL_NETWORK_FAILED', 502); }
     if ([401, 403].includes (response.status)) { throw ModalFailure ('MODAL_AUTH_REJECTED', 502); }
@@ -98,8 +97,15 @@ export async function TestModalConnection (env)
     let result;
     try { result = JSON.parse (await (await LimitedBody (response, 16384)).text ()); }
     catch { throw ModalFailure ('MODAL_RESPONSE_INVALID', 502); }
-    if (result?.service !== 'cloud-3d-studio' || result.protocol !== 1 || typeof result.version !== 'string' || !/^\d+\.\d+\.\d+$/.test (result.version) || result.conversionReady !== false) { throw ModalFailure ('MODAL_RESPONSE_INVALID', 502); }
+    return result;
+}
+export async function TestModalConnection (env)
+{
+    const record = await ReadModalConnection (env, 'runtime');
+    if (!record) { throw ModalFailure ('MODAL_NOT_CONFIGURED', 409); }
+    const result = await ModalRequest (record, '/connection');
+    if (result?.service !== 'cloud-3d-studio' || result.protocol !== 1 || typeof result.version !== 'string' || !/^\d+\.\d+\.\d+$/.test (result.version) || typeof result.conversionReady !== 'boolean' || result.conversionReady === true && result.jobApiVersion !== 1) { throw ModalFailure ('MODAL_RESPONSE_INVALID', 502); }
     if (['workspace', 'environment', 'app'].some (key => result[key] !== record[key])) { throw ModalFailure ('MODAL_TARGET_MISMATCH', 502); }
     // Explicit allowlist: a provider cannot inject secrets or arbitrary text into the UI/agent log.
-    return { connected : true, profile : ModalProfile (env), workspace : record.workspace, environment : record.environment, app : record.app, version : result.version, conversionReady : false };
+    return { connected : true, profile : ModalProfile (env), workspace : record.workspace, environment : record.environment, app : record.app, version : result.version, conversionReady : result.conversionReady, ...(result.jobApiVersion === 1 ? { jobApiVersion : 1 } : {}) };
 }

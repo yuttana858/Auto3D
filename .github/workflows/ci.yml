@@ -53,6 +53,7 @@ jobs:
       - run: npm run lint_mcp
       - run: npm run test_mcp
       - run: node test/modal-worker.mjs
+      - run: node test/cad-conversion-worker.mjs
       - name: Committed MCP command catalog matches the registry
         run: git diff --exit-code mcp/command-catalog.js website/assets/commands.json
       - name: Verify audience-sharing database permissions and throttling
@@ -69,6 +70,14 @@ jobs:
           docker exec '${{ job.services.postgres.id }}' createdb -U postgres messenger_test
           for script in test/security/messenger-bootstrap.sql supabase/migrations/20261115133848_messenger_conversations.sql test/security/messenger-access.sql; do
             docker exec -i '${{ job.services.postgres.id }}' psql -U postgres -d messenger_test -v ON_ERROR_STOP=1 < "$script"
+          done
+      - name: Verify owned CAD jobs and worker leases
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker exec '${{ job.services.postgres.id }}' createdb -U postgres conversion_test
+          for script in test/security/conversion-bootstrap.sql supabase/migrations/20261117162751_owned_conversion_jobs.sql test/security/conversion-access.sql; do
+            docker exec -i '${{ job.services.postgres.id }}' psql -U postgres -d conversion_test -v ON_ERROR_STOP=1 < "$script"
           done
       - run: npm --prefix backend test
       - run: npm run build_engine
