@@ -8,4 +8,17 @@
 .cad_conversion_stage { display: block; margin-top: 5px; color: #83b5ff; font-size: var(--workspace-meta-font-size, 12px); }
 .cad_conversion_job .mode_buttons { flex-wrap: wrap; margin-top: 10px; }
 .cad_conversion_job button { min-height: 32px; }
+.cad_conversion_progress { margin: 12px 0 6px; }
+.cad_conversion_progress[hidden] { display: none; }
+.cad_conversion_progress_heading { display: flex; justify-content: space-between; gap: 12px; color: #83b5ff; font-size: var(--workspace-help-font-size, 12px); }
+.cad_conversion_progress_track { position: relative; height: 7px; overflow: hidden; border-radius: 10px; margin: 8px 0 6px; background: rgba(118, 163, 225, .13); }
+.cad_conversion_progress_fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #3671d9, #86c5ff); transition: width .45s ease; }
+.cad_conversion_progress.is_active .cad_conversion_progress_fill::after { content: ''; display: block; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent); animation: cad_progress_shimmer 1.7s linear infinite; }
+.cad_conversion_progress.indeterminate .cad_conversion_progress_fill { animation: cad_progress_sweep 1.8s ease-in-out infinite; }
+.cad_conversion_progress_detail, .cad_conversion_elapsed { display: block; opacity: .7; font-size: var(--workspace-meta-font-size, 12px); }
+.cad_conversion_job[data-state="failed"] .cad_conversion_progress_fill { background: #cf8a76; }
+.cad_conversion_job[data-state="ready"] .cad_conversion_progress_fill { background: linear-gradient(90deg, #337fcf, #74cfbd); }
+@keyframes cad_progress_sweep { 0% { transform: translateX(-110%); } 100% { transform: translateX(390%); } }
+@keyframes cad_progress_shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .cad_conversion_progress_fill, .cad_conversion_progress_fill::after { animation: none !important; transition: none; } .cad_conversion_progress.indeterminate .cad_conversion_progress_fill { opacity: .6; } }
 @media (max-width: 560px) { .cad_conversion_options { grid-template-columns: 1fr; } .cad_conversion_jobs { padding: 0 14px 14px; } }

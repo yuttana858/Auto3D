@@ -25,6 +25,13 @@ begin
  if (r->>'claimed')::boolean is not true then raise exception 'Initial claim failed'; end if;
  r:=public.auto3d_conversion_transition(a,(j->>'id')::uuid,'claim',null,attempt);
  if (r->>'claimed')::boolean is not false then raise exception 'Duplicate claim accepted'; end if;
+ r:=public.auto3d_conversion_transition(a,(j->>'id')::uuid,'progress',null,attempt,jsonb_build_object('stage','converting','progress',jsonb_build_object('phase','build_mesh','completed',1,'total',4,'unit','faces')));
+ if r#>>'{job,summary,progress,completed}'<>'1' then raise exception 'Measured progress lost'; end if;
+ r:=public.auto3d_conversion_transition(a,(j->>'id')::uuid,'progress',null,attempt,jsonb_build_object('stage','converting','progress',jsonb_build_object('phase','read_source','completed',null,'total',null,'unit',null)));
+ if r#>>'{job,summary,progress,phase}'<>'build_mesh' then raise exception 'Late heartbeat regressed phase'; end if;
+ r:=public.auto3d_conversion_transition(a,(j->>'id')::uuid,'progress',null,attempt,jsonb_build_object('stage','converting','progress',jsonb_build_object('phase','build_mesh','completed',0,'total',4,'unit','faces')));
+ if r#>>'{job,summary,progress,completed}'<>'1' then raise exception 'Late heartbeat regressed measured count'; end if;
+ begin perform public.auto3d_conversion_transition(a,(j->>'id')::uuid,'progress',null,attempt,jsonb_build_object('stage','converting','progress',jsonb_build_object('phase','build_mesh','completed',-1,'total',4,'unit','faces'))); raise exception 'Invalid counter accepted'; exception when sqlstate '22023' then null; end;
  begin perform public.auto3d_conversion_transition(a,(j->>'id')::uuid,'progress',null,gen_random_uuid(),jsonb_build_object('stage','converting')); raise exception 'Superseded attempt accepted'; exception when sqlstate 'PT409' then null; end;
  update public.auto3d_conversion_jobs set lease_until=null where id=(j->>'id')::uuid;
  begin perform public.auto3d_conversion_transition(a,(j->>'id')::uuid,'complete',null,attempt,jsonb_build_object('summary','{}'::jsonb,'artifacts','{}'::jsonb)); raise exception 'Null lease accepted'; exception when sqlstate 'PT409' then null; end;
@@ -35,7 +42,7 @@ begin
  begin perform public.auto3d_conversion_transition(a,(j->>'id')::uuid,'complete',null,attempt,jsonb_build_object('summary','{}'::jsonb,'artifacts','{}'::jsonb)); raise exception 'Cancelled result accepted'; exception when sqlstate 'PT409' then null; end;
  r:=public.auto3d_conversion_transition(a,(j->>'id')::uuid,'failure',null,attempt,jsonb_build_object('code','cancelled'));
  if r->'job'->>'state'<>'cancelled' or r->'job'->>'token_hash' is not null then raise exception 'Terminal capability retained'; end if;
- -- A transient failure can retry once; unsupported/native failures cannot.
+ -- Transient and old unclassified failures can retry once; known unsupported failures cannot.
  j:=public.auto3d_conversion_create(b,request||jsonb_build_object('requestKey',gen_random_uuid()));
  perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'uploaded');
  perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'dispatch',null,null,jsonb_build_object('attemptId',attempt,'tokenHash',repeat('b',64)));
@@ -44,5 +51,21 @@ begin
  perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'dispatch',null,null,jsonb_build_object('attemptId',attempt,'tokenHash',repeat('c',64)));
  perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'failure',null,attempt,jsonb_build_object('code','transfer_failed'));
  begin perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'retry'); raise exception 'Attempt limit exceeded'; exception when sqlstate 'PT409' then null; end;
+ j:=public.auto3d_conversion_create(b,request||jsonb_build_object('requestKey',gen_random_uuid())); attempt:=gen_random_uuid();
+ perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'uploaded');
+ perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'dispatch',null,null,jsonb_build_object('attemptId',attempt,'tokenHash',repeat('d',64)));
+ perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'ack',null,attempt,jsonb_build_object('callId','fc-OldRetry123456'));
+ perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'failure',null,attempt,jsonb_build_object('code','conversion_failed'));
+ update public.auto3d_conversion_jobs set deadline_at=now()-interval '1 minute' where id=(j->>'id')::uuid;
+ r:=public.auto3d_conversion_transition(b,(j->>'id')::uuid,'retry');
+ if (r#>>'{job,deadline_at}')::timestamptz<=now() or r#>>'{job,state}'<>'queued' then raise exception 'Bounded retry did not renew its processing deadline'; end if;
+ if r#>>'{job,dispatch_state}'<>'pending' or r#>>'{job,provider_call_id}' is not null or r#>>'{job,active_attempt}' is not null then raise exception 'Retry retained old dispatch identity'; end if;
+ begin perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'ack',null,attempt,jsonb_build_object('callId','fc-LateOldRetry123456')); raise exception 'Late acknowledgement restored the old dispatch'; exception when sqlstate 'PT409' then null; end;
+ perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'cancel');
+ j:=public.auto3d_conversion_create(b,request||jsonb_build_object('requestKey',gen_random_uuid())); attempt:=gen_random_uuid();
+ perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'uploaded');
+ perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'dispatch',null,null,jsonb_build_object('attemptId',attempt,'tokenHash',repeat('e',64)));
+ perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'failure',null,attempt,jsonb_build_object('code','unsupported_schema'));
+ begin perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'retry'); raise exception 'Unsupported schema retry accepted'; exception when sqlstate 'PT409' then null; end;
 end $$;
 rollback;

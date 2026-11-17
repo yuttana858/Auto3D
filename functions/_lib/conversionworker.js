@@ -1,5 +1,5 @@
 import { JsonBody } from './accountstorage.js';
-import { CadExact, CadFailureCode } from '../../source/website/cadconversioncontract.js';
+import { CadExact, CadFailureCode, CadProgress } from '../../source/website/cadconversioncontract.js';
 import { JobDatabase, JobOwnerActive, JobBucket, GetJob, ChangeJob, PublicJob, SourceKey, ArtifactKey, Sha256, SafeEqual, UploadJobObject, CadArtifacts, CadLimits, CadUuid, CadHash, CadError } from './conversionjobs.js';
 
 export async function WorkerJob (env, request, id, attempt)
@@ -39,7 +39,7 @@ export async function ValidateJobResult (env, job)
     }
     const topology = {};
     for (const kind of ['solids', 'shells', 'faces', 'edges', 'vertices']) { const count = manifest.cad?.topology?.[kind]; if (!Number.isSafeInteger (count) || count < 0 || count > 100000000) { throw CadError ('validation_failed'); } topology[kind] = count; }
-    return { artifacts : objects, summary : { dimensionsMm : dimensions, topology, producerVersion : manifest.producer_version, stepReimportPassed : true, meshReimportPassed : true } };
+    return { artifacts : objects, summary : { dimensionsMm : dimensions, topology, producerVersion : manifest.producer_version, stepReimportPassed : true, meshReimportPassed : true, progressReported : !!job.summary?.progress } };
 }
 export async function WorkerOperation (env, request, parts)
 {
@@ -67,17 +67,23 @@ export async function WorkerOperation (env, request, parts)
     if (operation === 'claim') {
         CadExact (body, []); const result = await ChangeJob (env, job, 'claim');
         if (!result.claimed) { return { accepted : false }; }
-        return { accepted : true, source : { extension : job.source_extension, bytes : job.source_bytes, sha256 : job.source_sha256, unit : job.source_unit }, quality : job.quality };
+        return { accepted : true, progressProtocol : 1, source : { extension : job.source_extension, bytes : job.source_bytes, sha256 : job.source_sha256, unit : job.source_unit }, quality : job.quality };
     }
     if (operation === 'progress') {
-        CadExact (body, ['stage']); const result = await ChangeJob (env, job, 'progress', { stage : body.stage }); return { state : result.job.state };
+        CadExact (body, Object.hasOwn (body, 'progress') ? ['stage', 'progress'] : ['stage']);
+        const progress = body.progress ? CadProgress (body.progress) : null;
+        if (progress && (progress.phase === 'download_source' ? body.stage !== 'downloading' : ['upload_artifacts', 'finalizing'].includes (progress.phase) ? body.stage !== 'uploading' : body.stage !== 'converting')) { throw CadError ('invalid_request'); }
+        const result = await ChangeJob (env, job, 'progress', { stage : body.stage, ...(progress ? { progress } : {}) }); return { state : result.job.state };
     }
     if (operation === 'complete') {
         CadExact (body, []); const evidence = await ValidateJobResult (env, job);
         const result = await ChangeJob (env, job, 'complete', evidence); return { state : result.job.state };
     }
     if (operation === 'failure') {
-        CadExact (body, ['code']); const result = await ChangeJob (env, job, 'failure', { code : CadFailureCode (body.code) }); return { state : result.job.state };
+        CadExact (body, Object.hasOwn (body, 'diagnostic') ? ['code', 'diagnostic'] : ['code']);
+        const diagnostic = body.diagnostic;
+        if (diagnostic) { CadExact (diagnostic, ['exception', 'frames']); if (!['TypeError', 'ValueError', 'AttributeError', 'RuntimeError', 'MemoryError', 'OSError', 'ConversionError', 'SchemaError', 'ParseError', 'LimitExceededError', 'OcctConversionError', 'InteropError', 'NativeError'].includes (diagnostic.exception) || !Array.isArray (diagnostic.frames) || diagnostic.frames.length > 4 || !diagnostic.frames.every (frame => typeof frame === 'string' && /^[A-Za-z0-9_]{1,64}:[0-9]{1,8}$/.test (frame))) { throw CadError ('invalid_request'); } }
+        const result = await ChangeJob (env, job, 'failure', { code : CadFailureCode (body.code), ...(diagnostic ? { diagnostic } : {}) }); return { state : result.job.state };
     }
     throw CadError ('not_found', 404);
 }

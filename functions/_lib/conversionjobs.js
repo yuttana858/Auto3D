@@ -1,6 +1,6 @@
 import { SupabaseConfig, SupabaseHeaders, RequireServerKey } from './supabase.js';
 import { ReadModalConnection, ModalProfile, TestModalConnection, ModalRequest } from './modalconnection.js';
-import { CadLimits, CadArtifacts, CadError, CadUuid, CadHash, CadFailureCode } from '../../source/website/cadconversioncontract.js';
+import { CadLimits, CadArtifacts, CadError, CadUuid, CadHash, CadFailureCode, CadProgress } from '../../source/website/cadconversioncontract.js';
 
 export { CadLimits, CadArtifacts, CadError, CadUuid, CadHash };
 const statusCodes = { 400 : 'invalid_request', 404 : 'not_found', 409 : 'conflict', 410 : 'expired', 429 : 'queue_full' };
@@ -35,12 +35,14 @@ export function PublicJob (job)
 {
     const expired = Date.parse (job.expires_at) <= Date.now () || Date.parse (job.deadline_at) <= Date.now () && ['queued', 'running', 'cancelling', 'awaiting_upload'].includes (job.state);
     const state = expired ? 'expired' : job.state;
+    let progress = null;
+    try { if (job.summary?.progress) { progress = CadProgress (job.summary.progress); } } catch { /* Invalid persisted progress is never exposed. */ }
     return {
         id : job.id, revision : job.revision, state, stage : expired ? 'expired' : job.stage,
         source : { name : job.source_name, extension : job.source_extension, bytes : job.source_bytes, sha256 : job.source_sha256, unit : job.source_unit },
         quality : job.quality, origin : job.origin, createdAt : job.created_at, updatedAt : job.updated_at, expiresAt : job.expires_at,
-        errorCode : job.error_code ? CadFailureCode (job.error_code) : null,
-        canRetry : state === 'failed' && job.attempts < 2 && ['transfer_failed', 'lease_expired', 'dispatch_failed'].includes (job.error_code) && Date.parse (job.deadline_at) > Date.now (),
+        errorCode : job.error_code ? CadFailureCode (job.error_code) : null, progress,
+        canRetry : state === 'failed' && job.attempts < 2 && ['transfer_failed', 'lease_expired', 'dispatch_failed', 'conversion_failed', 'worker_failed'].includes (job.error_code) && Date.parse (job.expires_at) > Date.now (),
         summary : state === 'ready' ? job.summary : null,
         artifacts : state === 'ready' ? Object.fromEntries (Object.keys (CadArtifacts).filter (key => job.artifacts[key]).map (key => [key, { bytes : job.artifacts[key].bytes, units : CadArtifacts[key].units || null }])) : {}
     };
@@ -100,7 +102,7 @@ export async function RequestJobCancel (env, job)
 export async function JobCapabilities (env)
 {
     JobBucket (env); const connected = await TestModalConnection (env);
-    return { ready : connected.conversionReady === true && connected.jobApiVersion === 1, version : connected.version, inputs : ['x_t', 'x_b', 'step', 'stp'], outputs : Object.keys (CadArtifacts), limits : CadLimits, parasolidCoverage : 'supported_subset', featureHistory : false };
+    return { ready : connected.conversionReady === true && connected.jobApiVersion === 1, version : connected.version, progressProtocol : 1, inputs : ['x_t', 'x_b', 'step', 'stp'], outputs : Object.keys (CadArtifacts), limits : CadLimits, parasolidCoverage : 'supported_subset', featureHistory : false };
 }
 export async function ControlKey (env)
 {
