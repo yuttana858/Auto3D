@@ -1,6 +1,6 @@
 # Private CAD conversion — Auto3D 0.79.0
 
-Cloud 3D Studio 0.3.1 reuses the existing Modal workspace, Supabase identity/database and private `AUTO3D_LIBRARY_R2` bucket. There is no new login system, paid workspace, GPU or permanent warm pool. CPU/build/idle usage still consumes the existing workspace's allowance; billing tiers and limits are unchanged.
+Cloud 3D Studio 0.3.2 reuses the existing Modal workspace, Supabase identity/database and private `AUTO3D_LIBRARY_R2` bucket. Auto3D 0.79.0 and the native service are live; the full public-calibration pipeline passed. There is no new login system, paid workspace, GPU or permanent warm pool. CPU/build/idle usage still consumes the existing workspace's allowance; billing tiers and limits are unchanged.
 
 ## Use Convert CAD
 
@@ -32,6 +32,6 @@ The host adapter is `cadconversion.js`, with a separate `cadconversionimport.js`
 
 Commands: `conversion.open`, `inspect`, `capabilities`, `jobs`, `job`, `submit`, `cancel`, `retry`, `delete`, `download`, `import`, `sample`. Prefix every name with `conversion.`. `open` is interactive; `submit` uses an already selected local file. Commands never accept provider tokens, arbitrary source URLs or filesystem paths. `import` requires the exact target returned by `conversion.inspect` immediately before the action. Normal read-only, account and busy checks apply.
 
-Validation includes two-owner service-role SQL fixtures; actual workerd/R2 length/checksum and capability tests; desktop/mobile conversion/calibration import/download/Undo; cross-scene mm/cm/m/in/ft physical-size checks and failed-import rollback. CI runs the owned-job SQL in an isolated Postgres database; never run its bootstrap on production. Hosted Modal proof is recorded in [0.78.0 notes](release-0790.md). The rollout additionally runs a public-fixture canary through the real Auto3D user API with two temporary confirmed test accounts, verifies isolation and all artifact hashes/units, then deletes identities and files; Admin create-user sends no confirmation email.
+Validation includes two-owner service-role SQL fixtures; actual workerd/R2 length/checksum and capability tests; desktop/mobile conversion/calibration import/download/Undo; cross-scene mm/cm/m/in/ft physical-size checks and failed-import rollback. CI runs the owned-job SQL in an isolated Postgres database; never run its bootstrap on production. Hosted native proof and the successful live user-API canary are recorded in [0.79.0 notes](release-0790.md). The canary used two temporary confirmed test accounts, verified isolation and all artifact hashes/units, then deleted identities and files; Admin create-user sends no confirmation email. Follow-up database and private-object reads confirmed cleanup.
 
 Production rollout needs the explicit Pages profile in [credential setup](modal-credentials.md), matching Supabase project and installed database migrations. Preview has its own profile and must have separate Auth/Vault credentials; current previews are not automatically given production credentials or enabled remote submissions.

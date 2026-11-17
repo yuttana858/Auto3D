@@ -1,6 +1,6 @@
 # Modal credentials and deployment bridge
 
-Auto3D **0.79.0** candidate; Packaging **1.12.0**, Primary Products **0.15.0**, Molded Pulp **0.1.0**. Cloud 3D Studio **0.3.0** is deployed and verified; **0.3.1** adds the guarded controller and live canary. Auto3D 0.77.0's credential bridge is merged in #138; #139's Auto Pallet is preserved.
+Auto3D **0.79.0** is live; Packaging **1.12.0**, Primary Products **0.15.0**, Molded Pulp **0.1.0**. Cloud 3D Studio **0.3.2** is deployed with guarded reconciliation and a passing live user-API canary. Vault → Modal deployment authentication, direct runtime provisioning and the Auto3D connector are verified; see [release evidence](release-0790.md). Auto3D 0.77.0's credential bridge is merged in #138; #139's Auto Pallet is preserved.
 
 ## Verified configuration
 
@@ -45,7 +45,7 @@ There is no implicit fallback between profiles, and a known Pages branch/profile
 
 ## Manage saved pairs in Auto3D
 
-After deploying the candidate, open **Preferences → Administrator → Manage Modal connections**. Choose **Deployment · ak-/as-** or **App connection · wk-/ws-**. Enter both matching fields to replace a pair; saved values are never shown again. The token form clears on submit/close/account change and is excluded from app captures.
+For later administration, open **Preferences → Administrator → Manage Modal connections**. Choose **Deployment · ak-/as-** or **App connection · wk-/ws-**. Enter both matching fields to replace a pair; saved values are never shown again. The token form clears on submit/close/account change and is excluded from app captures. The production pairs are already provisioned and verified; no manual token copy is needed to use Convert CAD.
 
 **Test saved app connection** checks provider authentication, protocol and target without converting CAD. Verified readiness is reported separately from network connection. Commands `admin.modal.open`, `inspect`, `test` and `remove` share the same underlying service; prefix each with `admin.modal.`. Tokens are never command arguments.
 

@@ -6,7 +6,8 @@ Code tree: `7a6e28df82d017e1b4c3a6ced19e47cf4da85da3` (GitHub source commit `c0c
 - 72 MCP tests, application/MCP lint, backend tests, production license checks, zero-vulnerability production audit and engine/module/website/Pages builds pass.
 - Actual workerd checks pass for server-only Vault authentication, credentialed-redirect refusal, known-length R2 streams, SHA-256 enforcement, immutable replay, capability authorization, account revocation and complete-manifest publication.
 - Hosted Supabase service-role fixtures pass ownership, idempotency, quotas, single-claim, superseded-attempt, null-lease, cancellation and retry-budget checks. Every fixture write rolled back; browser table/function privileges are denied.
-- Cloud 3D Studio 0.3.0 live native/gateway proof passed in run 44131313665. The 0.3.1 controller/live-canary follow-up passes 52 local tests; hosted canary is tracked separately.
+- Hosted Auto3D CI [44145555167](https://github.com/yuttana858/Auto3D/actions/runs/44145555167) passed validation, isolated Postgres/workerd checks and browser smoke. Production rollout [44147440033](https://github.com/yuttana858/Auto3D/actions/runs/44147440033) passed version/bundle, landing/login and authentication checks for app commit `1bdd6a9`.
+- Cloud 3D Studio 0.3.2 passes all 55 local tests. Hosted [44150179064](https://github.com/yuttana858/Cloud-3D-Studio/actions/runs/44150179064) passed native proof, protected readiness and the real Auto3D private user-API calibration: two-account isolation, 40 × 30 × 20 mm, all artifact hashes/units and cleanup. Follow-up reads confirmed zero canary identities, conversion rows and private conversion objects. Supplier Parasolid acceptance remains pending the actual reference file.
 
 ## Browser coverage
 
