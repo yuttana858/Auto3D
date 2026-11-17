@@ -1,8 +1,11 @@
 export const MoldedPulpAPIVersion = 1;
 export * from './state.js';
 export { MoldedPulpPanel } from './panel.js';
-export { SenseBounds, SheetRect, FormGrid, BottomHeightfield, MaxSenseTriangles } from './surface.js';
-export { FormSurfaces, PocketMetrics } from './tray.js';
+export { SenseBounds, SheetRect, BottomHeightfield, MaxSenseTriangles } from './surface.js';
+export { FormSurfaces, FormTop, PocketMetrics } from './tray.js';
+export { DetailGrid, SlopeLimit, MinFilterOctagon, OffsetDown } from './field.js';
 export { ShellMesh } from './mesh.js';
-export { PlanSheet, PlanTray, PulpChecks } from './plan.js';
+export { AdaptiveShellMesh } from './rtin.js';
+export { PlanSheet, PlanTray, PlanPulp, PulpChecks } from './plan.js';
+export { PulpRuleBase, PulpRuleList, PlanFeatures } from './rules.js';
 export { PulpDefinition, ValidatePulpDefinition, MaxStoredProducts } from './definition.js';

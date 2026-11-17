@@ -23,7 +23,12 @@ export function SessionTrianglesMm (document, objects)
 
 // Neutral module plan (canonical mm, origin-relative components) to an engine model in scene units. The returned origin is
 // the object position, so the formed tray scales about its base plane during the forming animation.
-export function MoldedPulpModel (plan, unit, roughness)
+// Builds the engine model in slices, yielding between them (onSlice), so a large formed shell never becomes one long
+// main-thread task. Without onSlice it builds synchronously.
+export async function MoldedPulpModelAsync (plan, unit, roughness, onSlice = null) { return MoldedPulpModelBuild (plan, unit, roughness, onSlice); }
+export function MoldedPulpModel (plan, unit, roughness) { return MoldedPulpModelBuild (plan, unit, roughness, null); }
+const SliceTriangles = 40000;
+function MoldedPulpModelBuild (plan, unit, roughness, onSlice)
 {
     const factor = PulpMillimeters[unit]; if (!factor) { throw new Error ('Set known scene units before forming molded pulp.'); }
     if (plan.apiVersion !== 1 || plan.units !== 'mm') { throw new Error ('Unsupported Molded Pulp geometry.'); }
@@ -32,15 +37,24 @@ export function MoldedPulpModel (plan, unit, roughness)
     material.color = new RGBColor (...plan.draft.color.slice (1).match (/.{2}/g).map (part => parseInt (part, 16)));
     material.roughness = roughness; material.metalness = 0; material.doubleSided = false;
     const materialIndex = model.AddMaterial (material);
-    for (const component of plan.components) {
-        const mesh = new Mesh (); mesh.SetName (component.id);
-        for (let i = 0; i < component.positions.length; i += 3) {
-            mesh.AddVertex (new Coord3D (component.positions[i] / factor, component.positions[i + 1] / factor, component.positions[i + 2] / factor));
-            mesh.AddNormal (new Coord3D (component.normals[i], component.normals[i + 1], component.normals[i + 2]));
+    model.GetRootNode ().SetName (plan.components.length > 1 ? (plan.kind === 'sheet' ? 'Pulp sheets' : 'Pulp shells') : 'Molded pulp');
+    const result = { model, position : plan.origin.map (v => v / factor) };
+    const build = function* () {
+        for (const component of plan.components) {
+            const mesh = new Mesh (); mesh.SetName (component.id);
+            for (let i = 0; i < component.positions.length; i += 3) {
+                mesh.AddVertex (new Coord3D (component.positions[i] / factor, component.positions[i + 1] / factor, component.positions[i + 2] / factor));
+                mesh.AddNormal (new Coord3D (component.normals[i], component.normals[i + 1], component.normals[i + 2]));
+                if (i % (SliceTriangles * 3) === 0) { yield; }
+            }
+            for (let i = 0; i < component.uvs.length; i += 2) { mesh.AddTextureUV (new Coord2D (component.uvs[i], component.uvs[i + 1])); }
+            for (let i = 0; i < component.indices.length; i += 3) {
+                const a = component.indices[i], b = component.indices[i + 1], c = component.indices[i + 2]; mesh.AddTriangle (new Triangle (a, b, c).SetNormals (a, b, c).SetTextureUVs (a, b, c).SetMaterial (materialIndex).SetCurve (0));
+                if (i % (SliceTriangles * 3) === 0) { yield; }
+            }
+            model.AddMeshToRootNode (mesh);
         }
-        for (let i = 0; i < component.uvs.length; i += 2) { mesh.AddTextureUV (new Coord2D (component.uvs[i], component.uvs[i + 1])); }
-        for (let i = 0; i < component.indices.length; i += 3) { const a = component.indices[i], b = component.indices[i + 1], c = component.indices[i + 2]; mesh.AddTriangle (new Triangle (a, b, c).SetNormals (a, b, c).SetTextureUVs (a, b, c).SetMaterial (materialIndex).SetCurve (0)); }
-        model.AddMeshToRootNode (mesh);
-    }
-    return { model, position : plan.origin.map (v => v / factor) };
+    };
+    if (!onSlice) { for (const step of build ()) { void step; } return result; }
+    return (async () => { for (const step of build ()) { void step; await onSlice (); } return result; }) ();
 }

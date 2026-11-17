@@ -5,7 +5,6 @@
 // at every point of the footprint. That heightfield is single-valued by construction: undercuts cannot be represented,
 // which is exactly the constraint of conventional wet molding (negative draft is not moldable).
 export const MaxSenseTriangles = 2000000;
-export const MaxGridNodes = 360000;
 
 export function SenseBounds (triangles)
 {
@@ -32,23 +31,12 @@ export function SheetRect (bounds, draft)
     return { x0, x1, z0, z1, baseY : bounds.min[1], lengthMm : x1 - x0, widthMm : z1 - z0, footprintLengthMm : bounds.size[0], footprintWidthMm : bounds.size[2] };
 }
 
-// Node grid over the sheet. Automatic resolution targets ~1 mm, never coarser than needed for the node budget, and
-// never coarser than the pulp thickness when the budget allows (so thin walls are resolved).
-export function FormGrid (rect, draft)
-{
-    const area = rect.lengthMm * rect.widthMm, budget = Math.sqrt (area / MaxGridNodes);
-    const wanted = draft.resolutionMm ?? Math.max (0.5, Math.min (2, draft.thicknessMm, Math.max (rect.lengthMm, rect.widthMm) / 300));
-    const cell = Math.max (wanted, budget);
-    const nx = Math.max (2, Math.ceil (rect.lengthMm / cell) + 1), nz = Math.max (2, Math.ceil (rect.widthMm / cell) + 1);
-    return { x0 : rect.x0, z0 : rect.z0, dx : rect.lengthMm / (nx - 1), dz : rect.widthMm / (nz - 1), nx, nz, cell : Math.max (rect.lengthMm / (nx - 1), rect.widthMm / (nz - 1)) };
-}
-
 // Lowest product surface above each grid node, relative to baseY. Nodes with no product above them are Infinity.
 // Triangles are rasterized by barycentric point-in-triangle tests at node positions; triangle edges are also walked so
 // near-vertical walls and features thinner than a cell still register.
 export function BottomHeightfield (triangles, grid, baseY)
 {
-    const { x0, z0, dx, dz, nx, nz } = grid, field = new Float64Array (nx * nz).fill (Infinity);
+    const { x0, z0, dx, dz, nx, nz } = grid, field = new Float32Array (nx * nz).fill (Infinity);
     const put = (i, j, y) => { if (i >= 0 && j >= 0 && i < nx && j < nz) { const k = j * nx + i; if (y < field[k]) { field[k] = y; } } };
     const edge = (ax, ay, az, bx, by, bz) => {
         const steps = Math.max (1, Math.ceil (Math.max (Math.abs (bx - ax) / dx, Math.abs (bz - az) / dz) * 2));

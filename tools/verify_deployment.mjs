@@ -39,8 +39,8 @@ export async function VerifyDeployment (origin, expectedBuild, fetchImpl = fetch
     }
     if (release.modules?.moldedPulp) {
         const module = release.modules.moldedPulp;
-        for (const [key, hash] of [['script', 'scriptHash'], ['stylesheet', 'stylesheetHash']]) {
-            if (!new RegExp ('^/o3dv/molded-pulp/molded-pulp\\.module\\.' + (key === 'script' ? 'js' : 'css') + '\\?v=[a-f0-9]{12}$').test (module[key])) { throw new Error ('Invalid Molded Pulp module location.'); }
+        for (const [key, hash] of [['script', 'scriptHash'], ['stylesheet', 'stylesheetHash'], ...(module.worker ? [['worker', 'workerHash']] : [])]) {
+            if (!new RegExp ('^/o3dv/molded-pulp/molded-pulp\\.' + (key === 'script' ? 'module\\.js' : key === 'stylesheet' ? 'module\\.css' : 'worker\\.js') + '\\?v=[a-f0-9]{12}$').test (module[key])) { throw new Error ('Invalid Molded Pulp module location.'); }
             const bytes = await (await read (module[key])).arrayBuffer ();
             if (createHash ('sha256').update (Buffer.from (bytes)).digest ('hex') !== module[hash]) { throw new Error ('Served Molded Pulp module does not match the release.'); }
         }
