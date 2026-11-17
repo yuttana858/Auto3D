@@ -73,6 +73,12 @@ try {
     await call ('history.undo'); assert.equal ((await call ('scene.inspect')).objects.find (item => item.id === carton.id).userData._auto3dPackagingState, 'flat');
     await call ('history.undo'); assert.equal ((await call ('scene.inspect')).objects.length, before.objects.length);
     assert.deepEqual ((await call ('scene.inspect')).objects.find (item => item.id === product.objectId), original);
+    // An array is packed as one product: selecting any member selects the group and enables Auto Pack.
+    await call ('object.array', { objectId : product.objectId, width : 3, length : 1, height : 1, animate : false });
+    await call ('object.select', { objectId : product.objectId }); await auto.getByRole ('button', { name : 'Refresh bounds', exact : true }).click ();
+    const group = await call ('packaging.auto.inspect'); assert.equal (group.available, true, group.reason); assert.equal (group.objectIds.length, 3);
+    assert.ok (group.productMm.width > fit.productMm.width * 2.5, 'combined bounds cover the array');
+    assert.equal (await auto.getByRole ('button', { name : 'Auto Pack', exact : true }).isEnabled (), true); assert.match (await auto.textContent (), /3 products/);
     assert.deepEqual (errors, []);
-    console.log ('Auto Pack tabs, live bounds/units, exact fit clearance, cancel to flat, replay to closed, product preservation, Undo and mobile layout passed.');
+    console.log ('Auto Pack tabs, array group selection, live bounds/units, exact fit clearance, cancel to flat, replay to closed, product preservation, Undo and mobile layout passed.');
 } finally { await browser.close (); }

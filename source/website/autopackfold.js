@@ -5,19 +5,21 @@ export function AutoPackDefinition (object)
 {
     const raw = object?.userData?.[AutoPackDataKey]; if (raw === undefined) { return null; }
     let value; try { value = JSON.parse (raw); } catch { throw new Error ('Invalid Auto Pack metadata. Generate Auto Pack again.'); }
-    if (!value || value.version !== 1 || !Array.isArray (value.size) || value.size.length !== 3 || value.size.some (v => !Number.isFinite (v) || v <= 0) || !Number.isFinite (value.clearanceMm) || value.clearanceMm < .0254 || typeof value.productId !== 'string' || !Array.isArray (value.origin) || value.origin.length !== 3 || value.origin.some (v => !Number.isFinite (v))) { throw new Error ('Invalid Auto Pack metadata. Generate Auto Pack again.'); }
+    if (!value || value.version !== 1 || !Array.isArray (value.size) || value.size.length !== 3 || value.size.some (v => !Number.isFinite (v) || v <= 0) || !Number.isFinite (value.clearanceMm) || value.clearanceMm < .0254 || typeof value.productId !== 'string' || (value.productIds !== undefined && (!Array.isArray (value.productIds) || !value.productIds.length || value.productIds.some (id => typeof id !== 'string'))) || !Array.isArray (value.origin) || value.origin.length !== 3 || value.origin.some (v => !Number.isFinite (v))) { throw new Error ('Invalid Auto Pack metadata. Generate Auto Pack again.'); }
     return value;
 }
+// Earlier cartons packed one product; group packs list every product.
+export const AutoPackProducts = (document, data) => (data.productIds || [data.productId]).map (id => document.objects.find (o => o.id === id));
 export function AssertAutoPackPlacement (document, object)
 {
     const data = AutoPackDefinition (object); if (!data) { return; }
     const factor = PackagingUnitMM[document.model.GetUnit ()]; if (!factor) { throw new Error ('Auto Pack requires known scene units.'); }
     if (object.rotation.some (v => Math.abs (v) > 1e-8) || object.scale.some (v => Math.abs (v - 1) > 1e-8) || object.position.some ((v, i) => Math.abs (v * factor - data.origin[i]) > 1e-5)) { throw new Error ('The Auto Pack carton moved or scaled. Generate Auto Pack again before folding.'); }
-    const product = document.objects.find (o => o.id === data.productId);
-    if (!product || product.animationAsset || product.keyframes?.length) { throw new Error ('Select a stationary product and generate Auto Pack again before folding.'); }
+    const products = AutoPackProducts (document, data);
+    if (products.some (product => !product || product.animationAsset || product.keyframes?.length)) { throw new Error ('Select a stationary product and generate Auto Pack again before folding.'); }
     const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
-    document.ApplyTransform (product);
-    document.CompactModel ([product]).EnumerateTriangleVertices ((...points) => { for (const v of points) { [v.x, v.y, v.z].forEach ((n, i) => { min[i] = Math.min (min[i], n * factor); max[i] = Math.max (max[i], n * factor); }); } });
+    products.forEach (product => document.ApplyTransform (product));
+    document.CompactModel (products).EnumerateTriangleVertices ((...points) => { for (const v of points) { [v.x, v.y, v.z].forEach ((n, i) => { min[i] = Math.min (min[i], n * factor); max[i] = Math.max (max[i], n * factor); }); } });
     const expectedMin = [data.origin[0] - data.size[0] / 2, data.origin[1], data.origin[2] - data.size[2] / 2];
     if (min.some ((v, i) => !Number.isFinite (v) || Math.abs (v - expectedMin[i]) > 1e-5 || Math.abs (max[i] - v - data.size[i]) > 1e-5)) { throw new Error ('The packed product changed. Generate Auto Pack again before folding.'); }
 }
@@ -28,11 +30,11 @@ export function AutoPackMotionGuard (document, object)
 {
     AssertAutoPackPlacement (document, object);
     const data = AutoPackDefinition (object); if (!data) { return () => {}; }
-    const product = document.objects.find (o => o.id === data.productId);
+    const products = AutoPackProducts (document, data);
     const signature = item => JSON.stringify ([item.position, item.rotation, item.scale, item.animationAsset ? true : false, item.keyframes || []]);
-    const productState = signature (product), cartonState = signature (object), metadata = object.userData[AutoPackDataKey];
+    const productState = products.map (signature).join ('|'), cartonState = signature (object), metadata = object.userData[AutoPackDataKey];
     return () => {
-        if (!document.objects.includes (product) || signature (product) !== productState || signature (object) !== cartonState || object.userData[AutoPackDataKey] !== metadata) { throw new Error ('The product or fitted carton changed during folding. Generate Auto Pack again.'); }
+        if (products.some (product => !document.objects.includes (product)) || products.map (signature).join ('|') !== productState || signature (object) !== cartonState || object.userData[AutoPackDataKey] !== metadata) { throw new Error ('The product or fitted carton changed during folding. Generate Auto Pack again.'); }
     };
 }
 export function GuardAutoPackGeometryEdit (object)
