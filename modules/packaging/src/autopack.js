@@ -11,7 +11,7 @@ const phase = (progress, start, end) => { const t = Math.max (0, Math.min (1, (p
 
 export function CreateAutoPackRig (input, savedProfile = null)
 {
-    const plan = CreateAutoPackPlan ({ size : input.size, thickness : input.thickness, clearanceMm : input.clearanceMm });
+    const plan = CreateAutoPackPlan ({ size : input.size, clearanceMm : input.clearanceMm, ...(input.material ? { material : input.material } : { thickness : input.thickness }) });
     const rig = CreateFefcoFoldRig (plan.parameters, savedProfile);
     rig.autoPack = plan;
     // Cosmetic bow and crease arcs can leave the audited prisms by more than

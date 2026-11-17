@@ -1,5 +1,11 @@
 # Auto3D development log and handoff
 
+## Auto Pack on the packaging engineering system — Auto3D 0.79.0 / Packaging 1.13.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-17)
+
+Based on main after #140 (0.78.0). Not deployed.
+
+- **Auto Pack follows the generator.** It now sizes the RSC like Generate with the inside basis: inside targets (product + clearance + glue-tab reserve) go through `ScoreForTarget` with the generation board's allowance factors. The carton's CAD profile carries the standard measurement layer, built by the shared `GenerationProfile`. Before, Auto Pack used its own score formula and attached no engineering record, so the dimension tools reported an inside size smaller than the product. Older cartons keep their fit. See [release-0790.md](release-0790.md).
+
 ## Image to 3D drop zone and Auto Pack for arrays — Auto3D 0.78.0 / Packaging 1.12.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-17)
 
 Based on main after #138 (0.77.0). Not deployed.
