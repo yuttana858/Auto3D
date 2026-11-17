@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { CadRequest, CadLimits } from '../source/website/cadconversioncontract.js';
+import { CadRequest, CadLimits, CadProgress, CadProgressView, CadFailureCode } from '../source/website/cadconversioncontract.js';
 import { CadConversions } from '../source/website/cadconversion.js';
 import { AddConvertedModel } from '../source/website/cadconversionimport.js';
 import { SceneDocument, SceneHistory } from '../source/website/scenedocument.js';
@@ -28,6 +28,20 @@ function website ()
 const resultJob = () => ({ id : id (), source : { name : 'public-box.step', sha256 : 'a'.repeat (64), unit : null }, summary : { producerVersion : '0.3.0', dimensionsMm : [40, 30, 20] } });
 
 describe ('Private CAD conversion contract and account service', () => {
+    it ('shows measured stage percentages and leaves unknown work indeterminate', () => {
+        const job = { state : 'running', stage : 'converting', progress : { phase : 'build_mesh', completed : 3, total : 12, unit : 'faces' } };
+        assert.equal (CadProgressView (job).percent, 25);
+        assert.equal (CadProgressView ({ ...job, progress : { phase : 'read_source', completed : null, total : null, unit : null } }).percent, null);
+        for (const progress of [{ ...job.progress, completed : 20 }, { ...job.progress, total : 0 }, { ...job.progress, completed : NaN }, { ...job.progress, filename : 'private-source' }, { ...job.progress, phase : 'private-provider-text' }]) { assert.throws (() => CadProgress (progress)); assert.equal (CadProgressView ({ ...job, progress }).percent, null); }
+        assert.equal (CadProgressView ({ state : 'ready' }).percent, 100);
+        assert.equal (CadProgressView ({ ...job, state : 'failed' }).active, false);
+        assert.equal (CadFailureCode ('schema.missing'), 'unsupported_schema'); assert.equal (CadFailureCode ('worker_failed'), 'worker_failed'); assert.equal (CadFailureCode ('private-message'), 'conversion_failed');
+    });
+    it ('exposes only bounded counters and permits one diagnostic retry of an old generic failure', () => {
+        const job = { id : id (), state : 'failed', stage : 'failed', attempts : 1, error_code : 'conversion_failed', expires_at : new Date (Date.now () + 60000).toISOString (), deadline_at : new Date (Date.now () - 60000).toISOString (), artifacts : {}, summary : { progress : { phase : 'read_source', completed : null, total : null, unit : null }, raw : 'private-error' } };
+        assert.equal (PublicJob (job).canRetry, true); assert.ok (!JSON.stringify (PublicJob (job)).includes ('private-error'));
+        assert.equal (PublicJob ({ ...job, attempts : 2 }).canRetry, false); assert.equal (PublicJob ({ ...job, error_code : 'unsupported_schema' }).canRetry, false);
+    });
     it ('requires known Parasolid units, embedded STEP units, strict fields and bounded input', () => {
         assert.ok (CadRequest (request ()));
         for (const change of [{ sourceBytes : CadLimits.inputBytes + 1 }, { sourceName : '../private.step' }, { sourceName : 'bad\n.step' }, { sourceUnit : 'mm' }, { quality : 'invented' }, { url : 'https://evil.test' }, { origin : { ...request ().origin, token : 'private' } }]) { assert.throws (() => CadRequest ({ ...request (), ...change })); }
@@ -45,6 +59,19 @@ describe ('Private CAD conversion contract and account service', () => {
         await assert.rejects (cad.List (), /account or session changed/i);
         const changed = new CadConversions (site, async () => { site.auth.user = { id : other }; return Response.json ({ jobs : [] }); });
         await assert.rejects (changed.List (), /account or session changed/i);
+    });
+    it ('measures private upload bytes and aborts when the login changes mid-transfer', async () => {
+        const site = website (), cad = new CadConversions (site), original = globalThis.XMLHttpRequest, snapshots = []; let aborted = false;
+        cad.updateProgress = value => snapshots.push (value);
+        globalThis.XMLHttpRequest = class {
+            constructor () { this.upload = {}; }
+            open (method, path) { assert.equal (method, 'PUT'); assert.ok (path.startsWith ('/api/conversions/')); }
+            setRequestHeader (name, value) { if (name === 'X-Auto3D-Account') { assert.equal (value, owner); } }
+            send () { this.upload.onprogress ({ loaded : 5, total : 10, lengthComputable : true }); site.auth.generation++; this.upload.onprogress ({ loaded : 8, total : 10, lengthComputable : true }); }
+            abort () { aborted = true; this.onabort?.(); }
+        };
+        try { await assert.rejects (cad.UploadSource ({ id : id () }, new File (['0123456789'], 'public.step')), /account or session changed/i); assert.equal (snapshots.at (-1).percent, 50); assert.equal (aborted, true); assert.equal (cad.uploadRequest, null); }
+        finally { if (original === undefined) { delete globalThis.XMLHttpRequest; } else { globalThis.XMLHttpRequest = original; } }
     });
     it ('clears staged file handles when the owner changes', () => {
         const site = website (); let changed; site.auth.Subscribe = listener => { changed = listener; return () => {}; };

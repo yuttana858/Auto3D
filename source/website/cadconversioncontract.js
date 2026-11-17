@@ -10,7 +10,13 @@ export const CadMessages = Object.freeze ({
     too_large : 'The file exceeds the conversion size limit.', source_mismatch : 'The uploaded file does not match this submission.',
     cancelled : 'Conversion cancelled.', transfer_failed : 'A private file transfer failed. You can retry this job.',
     lease_expired : 'The worker stopped responding. You can retry this job.', dispatch_failed : 'The worker could not be started. You can retry this job.',
-    conversion_failed : 'This file could not be converted. Check its geometry and format.',
+    conversion_failed : 'The earlier converter could not classify this failure. Retry once with the updated converter for a precise diagnosis.',
+    worker_failed : 'The native converter stopped unexpectedly. You can retry this job once.',
+    unsupported_schema : 'This Parasolid schema is not supported by the installed reader. Export STEP from the original CAD system.',
+    invalid_parasolid : 'The reader could not read the complete Parasolid source. Check the export or provide STEP.',
+    invalid_geometry : 'The source did not produce complete valid geometry. No partial model was published.',
+    complexity_limit : 'This model exceeded the bounded conversion resource limits. Try a simpler source or a STEP export.',
+    timeout : 'Native conversion exceeded its time limit. Try a simpler source or a STEP export.',
     unsupported_format : 'This CAD format is not enabled.', unsupported_entity : 'The open source Parasolid reader does not support an entity in this file.',
     source_units_required : 'Select the actual Parasolid coordinate units.', validation_failed : 'Independent geometry validation failed; no result was published.',
     wrong_target : 'The active account or session changed. Select the intended session and try Add again.',
@@ -35,7 +41,31 @@ export function CadRequest (value)
 }
 export function CadFailureCode (code)
 {
-    if (['cancelled', 'transfer_failed', 'lease_expired', 'dispatch_failed', 'unsupported_entity', 'unsupported_format', 'source_units_required'].includes (code)) { return code; }
+    if (['cancelled', 'transfer_failed', 'lease_expired', 'dispatch_failed', 'unsupported_entity', 'unsupported_format', 'source_units_required', 'unsupported_schema', 'invalid_parasolid', 'invalid_geometry', 'complexity_limit', 'timeout', 'worker_failed'].includes (code)) { return code; }
+    if (typeof code === 'string' && code.startsWith ('schema.')) { return 'unsupported_schema'; }
+    if (typeof code === 'string' && /^(body|triangle|input|output)_limit$/.test (code)) { return 'complexity_limit'; }
+    if (code === 'incomplete_conversion' || code === 'unsupported_geometry') { return 'invalid_geometry'; }
     if (typeof code === 'string' && /validation|reimport|mismatch/.test (code)) { return 'validation_failed'; }
     return 'conversion_failed';
+}
+export const CadPhases = Object.freeze ({ download_source : 'Reading private source', read_source : 'Reading CAD format', build_geometry : 'Building CAD geometry', validate_geometry : 'Checking geometry', write_step : 'Writing engineering STEP', validate_step : 'Reopening STEP for validation', tessellate : 'Tessellating surfaces', build_mesh : 'Building browser mesh', validate_mesh : 'Checking mesh exports', upload_artifacts : 'Publishing validated files', finalizing : 'Confirming completed conversion' });
+export function CadProgress (value)
+{
+    CadExact (value, ['phase', 'completed', 'total', 'unit']);
+    if (!Object.hasOwn (CadPhases, value.phase)) { throw CadError ('invalid_request'); }
+    if (value.completed === null && value.total === null && value.unit === null) { return { ...value }; }
+    if (!Number.isSafeInteger (value.completed) || !Number.isSafeInteger (value.total) || value.completed < 0 || value.total <= 0 || value.total > 1e12 || value.completed > value.total || !['bytes', 'faces', 'files'].includes (value.unit)) { throw CadError ('invalid_request'); }
+    return { ...value };
+}
+export function CadProgressView (job)
+{
+    if (job.state === 'ready') { return { label : 'Ready · independently validated', percent : 100, active : false, detail : '' }; }
+    let progress = null;
+    try { if (job.progress) { progress = CadProgress (job.progress); } } catch { /* Untrusted or older progress is indeterminate. */ }
+    const active = ['awaiting_upload', 'queued', 'running', 'cancelling'].includes (job.state);
+    const labels = { awaiting_upload : 'Waiting for private upload', queued : 'Waiting for a worker', downloading : 'Reading private source', converting : 'Converting and validating CAD', uploading : 'Publishing validated files', cancelling : 'Cancelling', cancelled : 'Cancelled', failed : 'Failed', expired : 'Expired' };
+    const label = active && progress ? CadPhases[progress.phase] : labels[job.stage] || labels[job.state] || 'Processing';
+    const percent = active && progress?.total ? Math.floor (100 * progress.completed / progress.total) : null;
+    const detail = progress?.total ? progress.unit === 'bytes' ? (progress.completed / 1048576).toFixed (1) + ' / ' + (progress.total / 1048576).toFixed (1) + ' MiB' : progress.completed + ' / ' + progress.total + ' ' + progress.unit : '';
+    return { label, percent, active, detail };
 }

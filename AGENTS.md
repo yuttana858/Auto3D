@@ -40,6 +40,8 @@ Auto3D 0.80.0 (Packaging 1.13.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0, b
 
 # Agent-accessible features
 
+The conversion progress candidate is Auto3D 0.81.0 / Packaging 1.13.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 with Cloud 3D Studio 0.3.3. Percentages describe measured current-stage work; indeterminate native operations must remain indeterminate. Keep failure diagnostics geometry-free and server-only. Generic/worker failures may retry once, with two total attempts and quota/retention checks. See docs/release-0810.md.
+
 The unified agent approval release in PR #123 is Auto3D 0.68.0 / Packaging 1.10.7 / Primary Products 0.15.0 / Molded Pulp 0.1.0. One OAuth approval grants read, write and screenshots; Live Control has no separate screenshot preference. Server-issued window codes are visible in the header, Preferences and MCP connections; Copy code/New code use `agent.access.code.copy/refresh`, and agents pair with a user-supplied code through `auto3d.sessions.pair_code`. Existing restricted credentials require reconnection. Use `auto3d.capabilities.inspect` for effective grant permissions. See docs/release-0680.md.
 
 For every new PR, report the application version and PR number to the user. Keep the app version, package version and release notes aligned when preparing a release.
