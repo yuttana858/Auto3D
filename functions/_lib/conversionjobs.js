@@ -102,7 +102,7 @@ export async function RequestJobCancel (env, job)
 export async function JobCapabilities (env)
 {
     JobBucket (env); const connected = await TestModalConnection (env);
-    return { ready : connected.conversionReady === true && connected.jobApiVersion === 1, version : connected.version, inputs : ['x_t', 'x_b', 'step', 'stp'], outputs : Object.keys (CadArtifacts), limits : CadLimits, parasolidCoverage : 'supported_subset', featureHistory : false };
+    return { ready : connected.conversionReady === true && connected.jobApiVersion === 1, version : connected.version, progressProtocol : 1, inputs : ['x_t', 'x_b', 'step', 'stp'], outputs : Object.keys (CadArtifacts), limits : CadLimits, parasolidCoverage : 'supported_subset', featureHistory : false };
 }
 export async function ControlKey (env)
 {

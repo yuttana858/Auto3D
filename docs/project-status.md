@@ -1,8 +1,18 @@
 # Auto3D development log and handoff
 
-## CAD progress and failure diagnosis — Auto3D 0.81.0 candidate (2026-11-17)
+## CAD progress and failure diagnosis — Auto3D 0.82.0 candidate (2026-11-17)
 
-Packaging 1.13.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 are preserved. Adds animated current-stage progress, measured percentages where work counts exist, elapsed time, stable polling and reduced motion. Cloud 3D Studio 0.3.3 reports native phases and actionable failures without exposing private CAD or exception text. Older generic failures gain one quota-checked retry, still capped at two total attempts and the original retention. Source-specific diagnosis and rollout remain pending; see [release-0810.md](release-0810.md).
+Packaging 1.14.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 are preserved. Adds animated current-stage progress, measured percentages where work counts exist, elapsed time, stable polling and reduced motion. Cloud 3D Studio 0.3.3 reports native phases and actionable failures without exposing private CAD or exception text. Older generic failures gain one quota-checked retry, still capped at two total attempts and the original retention. Source-specific diagnosis and rollout remain pending; see [release-0820.md](release-0820.md).
+
+## Packaging Accessories: pads and partitions — Auto3D 0.81.0 / Packaging 1.14.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-17)
+
+Based on main after #141 (0.80.0). Not deployed.
+
+- **Accessories tab.** Pads and partitions for the selected carton, sized from its engineering inside dimensions:
+  - **Pads:** top, bottom, front and back, with flute and grade from the board catalog. By default the carton inside grows by the pad thicknesses so the product space stays the same; **Do not affect box ID** keeps the carton size instead.
+  - **Partitions:** interlocking slotted cells.
+  - Every piece is a CAD board profile grouped with the carton. See [release-0810.md](release-0810.md).
+- **Auto Pack with nested partitions and pads.** The algorithm reads the product layout (columns × rows × layers), opens gaps that are too narrow for the board, nests one interlocking slotted set per layer between the products, wraps the pads around them, and fits the carton around everything. The contents stay in place while the carton folds.
 
 ## Auto Pack on the packaging engineering system — Auto3D 0.80.0 / Packaging 1.13.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-17)
 

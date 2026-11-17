@@ -39,7 +39,7 @@ export async function ValidateJobResult (env, job)
     }
     const topology = {};
     for (const kind of ['solids', 'shells', 'faces', 'edges', 'vertices']) { const count = manifest.cad?.topology?.[kind]; if (!Number.isSafeInteger (count) || count < 0 || count > 100000000) { throw CadError ('validation_failed'); } topology[kind] = count; }
-    return { artifacts : objects, summary : { dimensionsMm : dimensions, topology, producerVersion : manifest.producer_version, stepReimportPassed : true, meshReimportPassed : true } };
+    return { artifacts : objects, summary : { dimensionsMm : dimensions, topology, producerVersion : manifest.producer_version, stepReimportPassed : true, meshReimportPassed : true, progressReported : !!job.summary?.progress } };
 }
 export async function WorkerOperation (env, request, parts)
 {

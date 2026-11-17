@@ -20,6 +20,15 @@ export class AutoPackPanel
         this.board = Element ('p', this.root, '', 'section_hint');
         Element ('p', this.root, 'Clearance: 0.001″ (0.0254 mm) on each face. The inside size adds clearance on both sides of each dimension and one board thickness along the longer side for the internal glue tab. It is generated like Generate with the inside basis: the selected board record and its allowance factors convert the inside size to score dimensions, and the carton keeps that CAD measurement layer.', 'section_hint');
         Element ('p', this.root, 'The blank starts below the product. A bottom flap stays underneath as the carton folds around it.', 'section_hint');
+        // Packed contents: nested partitions between the products and pads around them, fitted with them.
+        const contents = Element ('section', this.root, undefined, 'packaging_auto_contents'); contents.setAttribute ('aria-label', 'Packed contents'); Element ('h4', contents, 'Packed contents');
+        Element ('p', contents, 'Partitions nest between the products: the layout is read from the products, gaps too narrow for the board are opened, and one interlocking set goes in each layer. Pads wrap the products and partitions. The carton is fitted around everything and folds with the contents in place.', 'section_hint');
+        const choices = Element ('div', contents, undefined, 'packaging_accessory_options');
+        this.partitions = this.Check (choices, 'Partitions between products');
+        this.pads = new Map (['top', 'bottom', 'front', 'back'].map (position => [position, this.Check (choices, position[0].toUpperCase () + position.slice (1) + ' pad')]));
+        const board = Element ('div', contents, undefined, 'packaging_accessory_options');
+        this.contentsBoard = this.Select (board, 'Contents flute'); this.contentsGrade = this.Select (board, 'Contents grade');
+        this.contents = Element ('p', contents, '', 'section_hint'); this.contents.setAttribute ('aria-live', 'polite');
         this.refresh = Element ('button', this.root, 'Refresh bounds'); this.refresh.type = 'button'; this.refresh.addEventListener ('click', () => { this.status.textContent = ''; this.Refresh (); });
         this.create = Element ('button', this.root, 'Auto Pack', 'packaging_auto_create'); this.create.type = 'button'; this.create.addEventListener ('click', () => this.Create ());
         this.playback = Element ('section', this.root, undefined, 'packaging_auto_playback'); this.playback.setAttribute ('aria-label', 'Auto Pack folding');
@@ -34,6 +43,27 @@ export class AutoPackPanel
         this.Refresh ();
         this.palletPanel = new AutoPalletPanel (host, this.root);
     }
+    Check (parent, title)
+    {
+        const label = Element ('label', parent, undefined, 'packaging_accessory_check'); const input = Element ('input', label); input.type = 'checkbox'; input.setAttribute ('aria-label', title);
+        label.appendChild (document.createTextNode (' ' + title)); input.addEventListener ('change', () => this.Refresh ()); return input;
+    }
+    Select (parent, title)
+    {
+        const label = Element ('label', parent, title); const select = Element ('select', label); select.setAttribute ('aria-label', title); select.addEventListener ('change', () => this.Refresh ()); return select;
+    }
+    Fill (select, items, fallback)
+    {
+        const keys = items.map (item => item.value).join ('|');
+        if (select.dataset.keys !== keys) { const current = select.value; select.replaceChildren (...items.map (item => { const option = document.createElement ('option'); option.value = item.value; option.textContent = item.label; return option; })); select.dataset.keys = keys; select.value = items.some (item => item.value === current) ? current : fallback; }
+    }
+    ContentOptions ()
+    {
+        if (!this.pads) { return null; }
+        const pads = [...this.pads].filter (([, input]) => input.checked).map (([id]) => id), partitions = this.partitions.checked;
+        if (!pads.length && !partitions) { return null; }
+        const options = { pads, partitions }; if (this.contentsBoard.value) { options.boardId = this.contentsBoard.value; } if (this.contentsGrade.value) { options.grade = this.contentsGrade.value; } return options;
+    }
     Size (title)
     {
         const section = Element ('section', this.root, undefined, 'packaging_auto_size'); section.setAttribute ('aria-label', title); Element ('h4', section, title);
@@ -44,7 +74,12 @@ export class AutoPackPanel
     Refresh ()
     {
         let data;
-        try { data = this.host.autoInspect?.() || { available : false, reason : 'Select a product in Auto3D to use Auto Pack.' }; }
+        if (this.contentsBoard) {
+            const boards = this.host.accessoryBoards?.() || { records : [], grades : [] };
+            this.Fill (this.contentsBoard, boards.records.map (r => ({ value : r.id, label : r.flute + ' flute · ' + r.caliperMm + ' mm' })), boards.records.find (r => r.flute === 'B')?.id || boards.records[0]?.id || '');
+            this.Fill (this.contentsGrade, boards.grades.map (g => ({ value : g, label : g })), boards.grades[0] || '');
+        }
+        try { data = this.host.autoInspect?.(this.ContentOptions ()) || { available : false, reason : 'Select a product in Auto3D to use Auto Pack.' }; }
         catch (error) { data = { available : false, reason : error.message }; }
         this.state = data; const factor = this.host.factor (), unit = Math.abs (factor - 25.4) < 1e-9 ? 'in' : 'mm';
         this.objectName.textContent = data.objectName || 'No product selected';
@@ -54,6 +89,10 @@ export class AutoPackPanel
         this.inside.section.hidden = !data.insideMm; this.score.section.hidden = !data.scoreMm;
         this.board.textContent = Number.isFinite (data.thicknessMm) ? 'Board caliper: ' + (data.boardName ? data.boardName + ' · ' : '') + Number ((data.thicknessMm / factor).toFixed (6)) + ' ' + unit : '';
         this.reason.textContent = data.reason || '';
+        if (this.contents) {
+            const c = data.contents, mm = value => Number ((value / factor).toFixed (unit === 'in' ? 3 : 1)) + ' ' + unit;
+            this.contents.textContent = !c ? '' : c.reason ? c.reason : [c.partitions && c.partitions.layout.columns + ' × ' + c.partitions.layout.rows + ' × ' + c.partitions.layout.layers + ' products (columns × rows × layers) · ' + c.partitions.strips + ' partition strips' + (c.partitions.moves ? ' · gaps opened by ' + mm (c.partitions.growthMm.length) + ' × ' + mm (c.partitions.growthMm.width) : ' · gaps already fit'), c.pads.length && c.pads.length + ' pads', c.board + ' (' + mm (c.thicknessMm) + ')', 'carton inside ' + ['width', 'length', 'height'].map (k => mm (c.insideMm[k])).join (' × ')].filter (Boolean).join (' · ');
+        }
         this.refresh.disabled = this.pending || this.host.blocked ();
         this.create.disabled = this.pending || this.host.blocked () || !data.available || !this.host.autoPack;
         this.RefreshPlayback ();
@@ -86,7 +125,7 @@ export class AutoPackPanel
         this.pending = true; this.status.textContent = 'Checking fit and preparing Auto Pack…'; this.Refresh ();
         try {
             const action = async () => {
-                try { const result = await this.host.autoPack (); this.status.textContent = result?.message || 'Auto Pack complete.'; return result; }
+                try { const result = await this.host.autoPack (this.ContentOptions () || {}); this.status.textContent = result?.message || 'Auto Pack complete.'; return result; }
                 catch (error) { this.status.textContent = error.message; throw error; }
             };
             await (this.host.run ? this.host.run (action) : action ());
