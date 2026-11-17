@@ -1,5 +1,12 @@
 # Auto3D development log and handoff
 
+## Image to 3D drop zone and Auto Pack for arrays — Auto3D 0.78.0 / Packaging 1.12.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-17)
+
+Based on main after #138 (0.77.0). Not deployed.
+
+- **Auto Pack for arrays.** A selected group or array is packed as one product: the RSC fits the combined bounds and the carton records every member (`productIds`) for the replay guards. Before, Auto Pack required exactly one selected object, so selecting an array disabled it.
+- **Image to 3D drop zone.** The AI viewer becomes a drop zone (click, drag and drop, Ctrl+V paste) in Image to 3D and Multi-image to 3D until a reference is chosen. Finished generations from this window open in the viewer automatically. New command: `ai.reference.add_image`. See [release-0780.md](release-0780.md).
+
 ## Modal bridge integration — Auto3D 0.77.0 candidate (2026-11-17)
 
 PR #138 incorporates current main and the Auto pallet work from #139, preserving the connected prompt, branding and Auto Pack release. Packaging 1.12.0, Primary Products 0.15.0 and Molded Pulp 0.1.0 remain intact. The credential bridge has its own [0.77.0 release notes](release-0770.md); the existing 0.75.0 and 0.76.0 release histories are retained. The hosted CAD service and conversion connector continue in this integration candidate. No production app deployment is claimed.

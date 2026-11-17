@@ -338,6 +338,7 @@ export const CommandIds = Object.freeze ([
     'ai.project.open_file',
     'ai.mode.set',
     'ai.reference.generate_views',
+    'ai.reference.add_image',
     'ai.reference.clear',
     'ai.creations.delete',
     'ai.creations.select',

@@ -89,6 +89,23 @@ describe ('Auto Pack scene integration', function () {
         const { auto, editor, product } = fixture (); const profile = editor.document.packaging; let renders = 0; editor.Render = async () => { if (renders++ === 0) { throw new Error ('render failed'); } };
         await assert.rejects (() => auto.Generate (), /render failed/); assert.deepEqual (editor.document.objects, [product]); assert.equal (editor.document.packaging, profile); assert.equal (editor.selected, product); assert.equal (editor.busy, false); assert.equal (editor.history.undo.length, 0);
     });
+    it ('packs a selected array as one product around the combined bounds and guards every member', async () => {
+        const { auto, editor, product } = fixture ();
+        const copies = [1, 2].map (index => { const copy = editor.document.Instance (product); copy.position = [index * 50, 0, 0]; editor.document.ApplyTransform (copy); return copy; });
+        const group = [product, ...copies]; group.forEach (item => { item.userData = { _auto3dGroup : 'array-1', _auto3dGroupName : 'Array group of Selected product', _auto3dGroupKind : 'array' }; });
+        editor.SelectedObjects = () => group;
+        const state = auto.Inspect (); assert.equal (state.available, true, state.reason); assert.deepEqual (state.objectIds, group.map (item => item.id));
+        // Three 50 × 80 × 30 cuboids side by side along X: 150 wide.
+        near (state.productMm.width, 150); near (state.productMm.height, 80); near (state.productMm.length, 30); assert.match (state.objectName, /3 products/);
+        const result = await auto.Generate ({ duration : 1 }); assert.deepEqual (result.productIds, group.map (item => item.id)); assert.match (result.message, /3 selected products/);
+        const operation = editor.packaging.foldOperation; editor.packaging.FoldControl ('cancel'); await operation.completion;
+        const carton = editor.selected, saved = JSON.parse (carton.userData._auto3dAutoPack); assert.deepEqual (saved.productIds, group.map (item => item.id)); near (saved.size[0], 150);
+        assert.match (auto.Inspect ().objectName, /^3 products · saved fit$/);
+        // Moving any member of the array blocks replay until Auto Pack runs again.
+        copies[1].position[2] += 1; editor.document.ApplyTransform (copies[1]); await assert.rejects (() => editor.packaging.AnimateFold (), /product changed/);
+        copies[1].position[2] -= 1; editor.document.ApplyTransform (copies[1]);
+        editor.SelectedObjects = () => [...group, carton]; editor.selected = product; assert.match (auto.Inspect ().reason, /rather than their Auto Pack carton/);
+    });
     it ('refuses replay and dimension edits after the fitted product or carton moves', async () => {
         const { auto, editor, product } = fixture (); await auto.Generate ({ duration : 1 }); const operation = editor.packaging.foldOperation;
         editor.packaging.FoldControl ('cancel'); await operation.completion; const flat = editor.selected, count = editor.history.undo.length;

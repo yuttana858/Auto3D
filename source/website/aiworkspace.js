@@ -133,6 +133,20 @@ export class AIWorkspace
             button.addEventListener ('click', () => this.Run (() => this.ViewerControl (action)));
         }
         Element ('span', 'ai_viewer_hint', 'Drag to orbit · right-drag or Shift+drag to pan · scroll to zoom', this.previewHost);
+        // Image to 3D: until a reference is chosen, the viewer is an upload target (click, drop or Ctrl+V paste).
+        this.dropZone = Element ('div', 'ai_drop_zone', undefined, this.previewHost); this.dropZone.hidden = true; this.dropZone.tabIndex = 0;
+        this.dropZone.setAttribute ('role', 'button'); this.dropZone.setAttribute ('aria-label', 'Upload reference image: click to browse, drop an image, or press Ctrl+V to paste');
+        Element ('strong', null, 'Drop an image here', this.dropZone); Element ('span', null, 'or click to browse · Ctrl+V to paste', this.dropZone); Element ('span', 'ai_drop_zone_formats', 'PNG, JPG or WebP', this.dropZone);
+        this.dropZone.addEventListener ('click', () => this.OpenReferencePicker ());
+        this.dropZone.addEventListener ('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault (); this.OpenReferencePicker (); } });
+        const imageDrag = event => this.AcceptsReferenceImages () && [...(event.dataTransfer?.types || [])].includes ('Files');
+        this.previewHost.addEventListener ('dragover', event => { if (!imageDrag (event)) { return; } event.preventDefault (); event.dataTransfer.dropEffect = 'copy'; this.previewHost.classList.add ('dragging_image'); });
+        this.previewHost.addEventListener ('dragleave', event => { if (!this.previewHost.contains (event.relatedTarget)) { this.previewHost.classList.remove ('dragging_image'); } });
+        this.previewHost.addEventListener ('drop', event => {
+            this.previewHost.classList.remove ('dragging_image'); if (!imageDrag (event)) { return; }
+            event.preventDefault (); this.Run (() => this.AddReferenceImages ([...event.dataTransfer.files]));
+        });
+        document.addEventListener ('paste', event => this.PasteReference (event));
         // Mode first: the selected generation type decides which inputs are shown (see AIModes).
         const inputSection = Element ('div', 'ai_workspace_section ai_input_section', undefined, this.aiPane); this.inputSection = inputSection;
         Element ('strong', null, 'Create', inputSection);
@@ -330,7 +344,9 @@ export class AIWorkspace
         // Single-image types keep only one reference; generated views belong to Multi-image to 3D.
         if (mode !== 'multiimage3d' && this.ReferenceCount () > 1) { this.imageFiles = this.imageFiles.slice (0, 1); this.imageFile = this.imageFiles[0] || null; this.remoteReferences = this.imageFile ? [] : this.remoteReferences.slice (0, 1); }
         if (mode === 'texture') { this.remoteReferences = []; }
-        this.RenderReferences (); this.RefreshActions (); return { mode };
+        // Choosing an image-input type turns the viewer into the upload target until there is a reference.
+        if (this.AcceptsReferenceImages () && !this.ReferenceCount ()) { this.previewingTask = false; this.HideImages (); }
+        this.RenderReferences (); this.RefreshActions (); this.RefreshDropZone (); return { mode };
     }
     TextTo3DOptions ()
     {
@@ -462,7 +478,7 @@ export class AIWorkspace
     // phase: sending | processing | complete | failed. Processing tracks one task id; percent is 0–100 or null.
     ShowProgress (phase, { taskId = this.progressState?.taskId ?? null, percent = null, message = '' } = {})
     {
-        const label = { sending : 'Sending request…', processing : percent ? 'Request processing · ' + percent + '%' : 'Request accepted · processing…', complete : 'Complete · select Preview to review', failed : 'Request failed' + (message ? ': ' + message : '') }[phase];
+        const label = { sending : 'Sending request…', processing : percent ? 'Request processing · ' + percent + '%' : 'Request accepted · processing…', complete : 'Complete · opened in the viewer', failed : 'Request failed' + (message ? ': ' + message : '') }[phase];
         this.progressState = { phase, taskId, percent, message : label };
         if (!this.progressBox) { return; }
         this.progressBox.hidden = false; this.progressBox.dataset.phase = phase; this.progressText.textContent = label;
@@ -487,7 +503,7 @@ export class AIWorkspace
         return true;
     }
     AssertEditable () { if (this.website.sessionEditor.readOnly || !this.website.auth?.user?.id) { throw new Error ('Sign in to an editable workspace.'); } }
-    Inspect () { return { progress : this.progressState ? { ...this.progressState } : null, checked : [...(this.checkedTasks || [])], thumbnailSize : this.thumbnailSize, mode : this.mode, selected : this.selectedTask, revising : this.revising || null, references : this.ReferenceCount (), viewer : this.previewHost?.classList.contains ('showing_image') ? this.imageViewer?.State () : this.preview?.root ? this.preview.State () : null, tasks : this.recent.map (item => ({ ...item, loaded : this.assets.has (item.id), scale : this.assets.get (item.id)?.scale || 1 })), models : this.assets.size }; }
+    Inspect () { return { dropZone : !!this.dropZone && !this.dropZone.hidden, progress : this.progressState ? { ...this.progressState } : null, checked : [...(this.checkedTasks || [])], thumbnailSize : this.thumbnailSize, mode : this.mode, selected : this.selectedTask, revising : this.revising || null, references : this.ReferenceCount (), viewer : this.previewHost?.classList.contains ('showing_image') ? this.imageViewer?.State () : this.preview?.root ? this.preview.State () : null, tasks : this.recent.map (item => ({ ...item, loaded : this.assets.has (item.id), scale : this.assets.get (item.id)?.scale || 1 })), models : this.assets.size }; }
     UIOptions (action)
     {
         const texturePrompt = this.texturePrompt?.value.trim () || '';
@@ -497,6 +513,44 @@ export class AIWorkspace
     PrimaryGenerationAction ()
     {
         return this.mode;
+    }
+    // Image to 3D and Multi-image to 3D take reference images from the drop zone, drag and drop and paste.
+    AcceptsReferenceImages () { return ['image3d', 'multiimage3d'].includes (this.mode) && !this.revising; }
+    // Shared by drop, Ctrl+V paste and ai.reference.add_image: replaces the Image to 3D reference or adds Multi-image views.
+    async AddReferenceImages (files, { source = 'upload' } = {})
+    {
+        if (!this.AcceptsReferenceImages ()) { throw new Error ('Choose Image to 3D or Multi-image to 3D to add a reference image.'); }
+        const images = files.filter (file => file && ['image/png', 'image/jpeg', 'image/webp'].includes (file.type));
+        if (!images.length) { throw new Error ('Choose a PNG, JPG or WebP image.'); }
+        const multi = this.mode === 'multiimage3d', chosen = multi ? images : images.slice (0, 1);
+        const named = chosen.map ((file, index) => source === 'paste' && (!file.name || file.name === 'image.png') ? new File ([file], 'pasted image' + (chosen.length > 1 ? ' ' + (index + 1) : '') + '.' + file.type.split ('/')[1].replace ('jpeg', 'jpg'), { type : file.type }) : file);
+        return { ...(await this.SetReferenceFiles (named, { append : multi })), source };
+    }
+    PasteReference (event)
+    {
+        if (!this.aiPane?.isConnected || !this.aiPane.getClientRects ().length || !this.AcceptsReferenceImages ()) { return; }
+        const files = [...(event.clipboardData?.files || [])].filter (file => file.type.startsWith ('image/'));
+        if (!files.length) { return; }
+        // Text pasted into a text field stays text; an image-only clipboard becomes the reference.
+        const target = event.target, typing = target instanceof HTMLElement && (target.matches ('input, textarea') || target.isContentEditable);
+        if (typing && event.clipboardData.types.includes ('text/plain')) { return; }
+        event.preventDefault (); this.Run (() => this.AddReferenceImages (files, { source : 'paste' }));
+    }
+    // The drop zone replaces the viewer while an image-input type has no reference and no creation is being previewed.
+    RefreshDropZone ()
+    {
+        if (!this.dropZone) { return false; }
+        const show = this.AcceptsReferenceImages () && !this.ReferenceCount () && !this.previewingTask;
+        this.dropZone.hidden = !show; this.previewHost.classList.toggle ('showing_drop_zone', show); return show;
+    }
+    async AddReferenceImageData ({ dataUrl, name = 'reference image' })
+    {
+        const match = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=\s]+)$/.exec (dataUrl || '');
+        if (!match) { throw new Error ('Send a base64 PNG, JPG or WebP data URL.'); }
+        if (!this.AcceptsReferenceImages ()) { this.SetMode ('image3d'); }
+        const bytes = Uint8Array.from (atob (match[2].replace (/\s/g, '')), c => c.charCodeAt (0));
+        const extension = match[1].split ('/')[1].replace ('jpeg', 'jpg'), file = new File ([bytes], /\.[a-z0-9]+$/i.test (name) ? name : name + '.' + extension, { type : match[1] });
+        return this.AddReferenceImages ([file], { source : 'agent' });
     }
     ValidateReferenceFiles (files)
     {
@@ -513,7 +567,7 @@ export class AIWorkspace
         this.imageFiles = next; this.imageFile = next[0] || null; if (!append) { this.remoteReferences = []; }
         this.RenderReferences (true); this.RefreshActions (); return { images : this.ReferenceCount () };
     }
-    ClearReferences () { this.imageFiles = []; this.imageFile = null; this.remoteReferences = []; this.RenderReferences (); this.HideImages (); this.RefreshActions (); return { images : 0 }; }
+    ClearReferences () { this.imageFiles = []; this.imageFile = null; this.remoteReferences = []; if (this.AcceptsReferenceImages ()) { this.previewingTask = false; } this.RenderReferences (); this.HideImages (); this.RefreshActions (); this.RefreshDropZone (); return { images : 0 }; }
     RemoveReference (index)
     {
         const files = this.imageFiles.length;
@@ -535,7 +589,8 @@ export class AIWorkspace
         });
         const names = [...this.imageFiles.map (file => file.name), ...this.remoteReferences.map ((item, index) => 'generated view ' + (index + 1))];
         this.imageName.textContent = names.length ? names.length + ' of ' + (this.mode === 'multiimage3d' ? ReferenceImageCount : 1) + ' · ' + names.join (', ') : 'No image selected';
-        if (show && urls.length) { this.ShowImages (urls, urls.length > 1 ? 'Reference views for Multi-image to 3D' : 'Reference image', false); }
+        if (show && urls.length) { this.previewingTask = false; this.ShowImages (urls, urls.length > 1 ? 'Reference views for Multi-image to 3D' : 'Reference image', false); }
+        this.RefreshDropZone ();
     }
     ReadDataURL (file) { return new Promise ((resolve, reject) => { const reader = new FileReader (); reader.onload = () => resolve (reader.result); reader.onerror = () => reject (new Error ('Cannot read reference image.')); reader.readAsDataURL (file); }); }
     async ReferenceImage ()
@@ -616,7 +671,12 @@ export class AIWorkspace
     {
         this.ShowProgress ('processing', { taskId : id, percent : this.recent.find (item => item.id === id)?.progress || null }); this.RevealTask (id);
         const mine = () => this.progressState?.taskId === id; // A newer submission takes over the progress display.
-        try { return await this.PollTaskStatus (route, id, owner, mine); }
+        try {
+            const task = await this.PollTaskStatus (route, id, owner, mine);
+            // Show the finished creation (model, or image for image routes) unless a newer submission took over.
+            if (mine () && owner === this.website.auth?.user?.id && this.recent.some (item => item.id === id)) { this.SelectTask (id).catch (error => { this.status.textContent = error.message; }); }
+            return task;
+        }
         catch (error) { if (mine () && owner === this.website.auth?.user?.id) { this.ShowProgress ('failed', { taskId : id, message : error.message }); } throw error; }
     }
     async PollTaskStatus (route, id, owner, mine)
@@ -635,7 +695,7 @@ export class AIWorkspace
             }
             const existing = this.recent.find (item => item.id === id); const task = this.NormalizeMeshyTask ({ ...result, route, type : existing?.type || result.type, prompt : result.prompt || existing?.name }); this.UpsertTask (task); this.status.textContent = route + ' · ' + (task.progress || 0) + '%';
             if (mine () && task.status !== 'SUCCEEDED') { this.ShowProgress ('processing', { taskId : id, percent : task.progress || null }); }
-            if (task.status === 'SUCCEEDED') { this.status.textContent = 'Complete · select Preview to review'; if (mine ()) { this.ShowProgress ('complete', { taskId : id }); } return task; }
+            if (task.status === 'SUCCEEDED') { this.status.textContent = 'Complete · opened in the viewer'; if (mine ()) { this.ShowProgress ('complete', { taskId : id }); } return task; }
             if (['FAILED', 'CANCELED'].includes (task.status)) { throw new Error (result.task_error?.message || 'Generation ' + task.status.toLowerCase ()); }
             const retry = Number (response.headers.get ('Retry-After')); if (Number.isFinite (retry) && retry > 3600) { throw new Error ('Meshy requested a longer wait. Refresh creations later.'); }
             await Delay (Number.isFinite (retry) && retry > 0 ? retry * 1000 : 4000);
@@ -659,7 +719,7 @@ export class AIWorkspace
     async SelectTask (id)
     {
         const task = this.recent.find (item => item.id === id); if (!task) { throw new Error ('Creation not found.'); }
-        this.selectedTask = id; const sequence = ++this.previewSequence; const owner = this.website.auth?.user?.id;
+        this.selectedTask = id; const sequence = ++this.previewSequence; const owner = this.website.auth?.user?.id; this.previewingTask = true; this.RefreshDropZone ();
         this.RenderRecent (); this.previewMessage.hidden = false; this.previewMessage.textContent = 'Loading ' + task.name + '…';
         if (!task.modelUrl && !this.assets.has (id)) {
             this.preview?.Clear (); const urls = task.imageUrls || (task.imageUrl ? [task.imageUrl] : []);

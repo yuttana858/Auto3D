@@ -43,7 +43,7 @@ try {
     assert.equal (await page.locator ('.ai_progress_bar').evaluate (bar => bar.value), 40);
     if (process.env.AI_PROGRESS_SCREENSHOT) { await page.locator ('#ai_module_panel').screenshot ({ path : process.env.AI_PROGRESS_SCREENSHOT }); }
     releaseFinish ();
-    await box.getByText ('Complete · select Preview to review', { exact : true }).waitFor ();
+    await box.getByText ('Complete · opened in the viewer', { exact : true }).waitFor ();
     assert.equal ((await progress ()).phase, 'complete'); assert.equal (await card.getAttribute ('aria-busy'), 'false');
 
     // A rejected submission reports the failure in the same place.

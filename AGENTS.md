@@ -34,6 +34,8 @@ The connected AI prompt, branding and Auto Pack release in PR #136 is Auto3D 0.7
 
 The Auto pallet release is Auto3D 0.76.0 / Packaging 1.12.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0, based on main after #136 (0.75.0). The Packaging Auto tab's Auto pallet section column-stacks the selected box on a 40 × 48 × 5 in pallet (pure planning in `modules/packaging/src/palletplan.js`, procedural pallet in `pallet.js`, host scene work in `source/website/autopalletworkspace.js`; commands `packaging.pallet.plan/inspect/generate`). See docs/release-0760.md.
 
+Auto3D 0.78.0 (Packaging 1.12.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0, based on main after #138) lets Auto Pack fit one RSC around a selected group or array (combined bounds; `productIds` in the carton metadata), turns the AI viewer into an Image to 3D drop zone (click, drop, Ctrl+V paste; `ai.reference.add_image` for agents) and opens finished generations in the viewer automatically. See docs/release-0780.md.
+
 # Agent-accessible features
 
 The unified agent approval release in PR #123 is Auto3D 0.68.0 / Packaging 1.10.7 / Primary Products 0.15.0 / Molded Pulp 0.1.0. One OAuth approval grants read, write and screenshots; Live Control has no separate screenshot preference. Server-issued window codes are visible in the header, Preferences and MCP connections; Copy code/New code use `agent.access.code.copy/refresh`, and agents pair with a user-supplied code through `auto3d.sessions.pair_code`. Existing restricted credentials require reconnection. Use `auto3d.capabilities.inspect` for effective grant permissions. See docs/release-0680.md.
