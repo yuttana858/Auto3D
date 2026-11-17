@@ -2,6 +2,23 @@ import { CreateAutoPackPlan } from '../../modules/packaging/src/autopackplan.js'
 import { LoadPackagingModule, PackagingModel, PackagingUnitMM } from './packagingadapter.js';
 import { AutoPackDefinition } from './autopackfold.js';
 
+// World-space bounds of an object's transformed triangles in canonical mm (doubles, never display-rounded).
+// Shared by Auto Pack and Auto pallet.
+export function MeasureWorldBoundsMm (document, object, factor, noun = 'object')
+{
+    let triangles = 0; object.node.EnumerateMeshIndices (index => { triangles += document.model.GetMesh (index).TriangleCount (); });
+    if (triangles > 2000000) { throw new Error ('Simplify the ' + noun + ' below 2,000,000 triangles before fitting.'); }
+    document.ApplyTransform (object);
+    const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity]; let count = 0;
+    document.CompactModel ([object]).EnumerateTriangleVertices ((...points) => {
+        if (++count > 2000000) { throw new Error ('Simplify the ' + noun + ' below 2,000,000 triangles before fitting.'); }
+        for (const point of points) { [point.x, point.y, point.z].forEach ((value, axis) => { const mm = value * factor; if (!Number.isFinite (mm)) { throw new Error ('The ' + noun + ' geometry has invalid coordinates.'); } min[axis] = Math.min (min[axis], mm); max[axis] = Math.max (max[axis], mm); }); }
+    });
+    const size = max.map ((value, axis) => value - min[axis]);
+    if (!count || size.some (v => !Number.isFinite (v) || v <= 0)) { throw new Error ('Select a solid ' + noun + ' with three nonzero bounding dimensions.'); }
+    return { min, max, size };
+}
+
 // Measure canonical, transformed geometry in doubles; never round the fitting dimensions for display.
 export class AutoPackWorkspace
 {
@@ -14,16 +31,7 @@ export class AutoPackWorkspace
         if (object.userData?._auto3dFefco) { throw new Error ('Select the product, rather than its carton.'); }
         if (object.animationAsset || object.keyframes?.length || object.hiddenParts?.length) { throw new Error ('Auto Pack requires a complete static model. Remove animation or hidden parts before fitting.'); }
         const factor = PackagingUnitMM[document.model.GetUnit ()]; if (!factor) { throw new Error ('Set known scene units before using Auto Pack.'); }
-        let triangles = 0; object.node.EnumerateMeshIndices (index => { triangles += document.model.GetMesh (index).TriangleCount (); });
-        if (triangles > 2000000) { throw new Error ('Simplify the product below 2,000,000 triangles before fitting.'); }
-        document.ApplyTransform (object);
-        const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity]; let count = 0;
-        document.CompactModel ([object]).EnumerateTriangleVertices ((...points) => {
-            if (++count > 2000000) { throw new Error ('Simplify the product below 2,000,000 triangles before fitting.'); }
-            for (const point of points) { [point.x, point.y, point.z].forEach ((value, axis) => { const mm = value * factor; if (!Number.isFinite (mm)) { throw new Error ('Product geometry has invalid coordinates.'); } min[axis] = Math.min (min[axis], mm); max[axis] = Math.max (max[axis], mm); }); }
-        });
-        const size = max.map ((value, axis) => value - min[axis]);
-        if (!count || size.some (v => !Number.isFinite (v) || v <= 0)) { throw new Error ('Select a solid product with three nonzero bounding dimensions.'); }
+        const { min, max, size } = MeasureWorldBoundsMm (document, object, factor, 'product');
         const thickness = this.packaging.generationBoard?.caliperMm ?? this.packaging.FefcoInspect ().thickness;
         let plan, reason; try { plan = CreateAutoPackPlan ({ size, thickness, clearanceMm : .0254 }); } catch (error) { reason = error.message; }
         return { object, document, factor, bounds : { min, max }, size, plan, reason, origin : [(min[0] + max[0]) / 2, min[1], (min[2] + max[2]) / 2] };

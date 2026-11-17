@@ -2484,10 +2484,116 @@
       }
     },
     {
+      "id": "packaging.pallet.plan",
+      "title": "Plan a pallet load",
+      "category": "Packaging",
+      "description": "Calculate the most boxes that fit on a 40 × 48 × 5 in pallet with column stacking, for any outside box size in mm (W = X, L = Z, H = Y). Boxes stay upright and may turn 90° within a layer; every layer uses the same pattern; no overhang. maxHeightMm is the overall height including the 127 mm pallet (default 1397 mm = 55 in). Returns per-layer count, layers, total, pattern and placements from the pallet centre. Does not change the scene.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "width": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "length": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "height": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "maxHeightMm": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10000
+          }
+        },
+        "required": [
+          "width",
+          "length",
+          "height"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "width": 203,
+        "length": 303,
+        "height": 156,
+        "maxHeightMm": 1397
+      }
+    },
+    {
+      "id": "packaging.pallet.inspect",
+      "title": "Inspect Auto pallet",
+      "category": "Packaging",
+      "description": "Measure the selected box outside size and plan its column-stacked load on a 40 × 48 × 5 in pallet, without changing the scene. Same as the Auto pallet section of the Packaging Auto tab.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "maxHeightMm": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "blue",
+              "brown",
+              "black"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "maxHeightMm": 1397,
+        "color": "blue"
+      }
+    },
+    {
+      "id": "packaging.pallet.generate",
+      "title": "Auto pallet selected box",
+      "category": "Packaging",
+      "description": "Same as the Auto pallet button: add a 40 × 48 × 5 in pallet (blue, brown or black) under the selected box and column-stack copies of it, using the most boxes that fit under maxHeightMm overall (default 55 in). The selected box becomes the first box of the load; copies share its geometry and materials; pallet and boxes form one group. One Undo step removes the load and restores the box.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "maxHeightMm": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "blue",
+              "brown",
+              "black"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "maxHeightMm": 1397,
+        "color": "blue"
+      }
+    },
+    {
       "id": "packaging.tab",
       "title": "Select Packaging tab",
       "category": "Packaging",
-      "description": "Open Packaging or its Auto Pack controls without generating geometry.",
+      "description": "Open Packaging or its Auto tab (Auto Pack and Auto pallet) without generating geometry.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
