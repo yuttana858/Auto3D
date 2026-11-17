@@ -324,6 +324,15 @@ export class PackagingWorkspace
         try { if (JSON.parse (selected?.userData?._auto3dFefco || '{}').code === code && selected?.packagingProfile?.engineering) { const existing = EngineeringMeasurements (selected.packagingProfile).material; if ((!this.generationBoard && existing.caliperMm === input.thickness) || existing.id === this.generationBoard?.id) { prior = existing; } } } catch { /* A legacy or unrelated object has no reusable allowances. */ }
         return { ...state.materials[0], ...(prior || {}), ...(this.generationBoard || {}), caliperMm : input.thickness, calibrated : Boolean (prior?.calibrated && prior.caliperMm === input.thickness) };
     }
+    // The generated CAD profile with its measurement layer: board record, allowance
+    // factors and dimension basis. Shared by Generate, presets and Auto Pack so every
+    // generated carton carries the same engineering connection.
+    GenerationProfile (data, dimensional = null)
+    {
+        const profile = FefcoProfile (data);
+        if (dimensional || this.generationBoard?.caliperMm === data.thickness) { const engineering = DefaultEngineering (profile, data.code); engineering.materials[0] = dimensional?.material || { ...engineering.materials[0], ...this.generationBoard }; engineering.activeMaterialId = engineering.materials[0].id; if (dimensional) { engineering.dimensions.forEach (d => { d.basis = dimensional.basis; }); } profile.grade = engineering.materials[0].name; profile.engineering = engineering; }
+        return ValidatePackaging (profile);
+    }
     ConvertGenerationBasis ({ from, to, length, width, height })
     {
         if (!['inside', 'outside', 'score'].includes (from) || !['inside', 'outside', 'score'].includes (to)) { throw new Error ('Choose valid dimension bases.'); }
@@ -356,9 +365,7 @@ export class PackagingWorkspace
         if (target.objects.length >= 1000) { throw new Error ('Session has reached the 1000 object limit.'); }
         const unit = target.objects.length ? target.model.GetUnit () : Unit.Millimeter;
         // Validate geometry and units before changing the scene or profile.
-        let profile = FefcoProfile (data);
-        if (dimensional || this.generationBoard?.caliperMm === data.thickness) { const engineering = DefaultEngineering (profile, data.code); engineering.materials[0] = dimensional?.material || { ...engineering.materials[0], ...this.generationBoard }; engineering.activeMaterialId = engineering.materials[0].id; if (dimensional) { engineering.dimensions.forEach (d => { d.basis = dimensional.basis; }); } profile.grade = engineering.materials[0].name; profile.engineering = engineering; }
-        profile = ValidatePackaging (profile); const model = PackagingModel (module.CreateFefcoBox (data, profile), unit);
+        const profile = this.GenerationProfile (data, dimensional); const model = PackagingModel (module.CreateFefcoBox (data, profile), unit);
         const before = target.packaging; const previous = editor.selected;
         editor.busy = true; editor.RefreshButtons?.(); editor.Status ('Generating FEFCO ' + data.code + '…');
         let object;

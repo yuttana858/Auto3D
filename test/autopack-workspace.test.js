@@ -10,6 +10,7 @@ import { CreateAgentCommands } from '../source/website/agentcommands.js';
 import { SessionEditor } from '../source/website/sessioneditor.js';
 import { PackSession, ReadSession } from '../source/website/sessionarchive.js';
 import { Unit } from '../source/engine/model/unit.js';
+import { EngineeringMeasurements } from '../modules/packaging/src/engineering.js';
 
 function fixture (unit = Unit.Millimeter, size = [50, 80, 30]) {
     const website = { preferences : { units : 'metric' }, auth : { user : { id : 'auto-pack-owner' } }, accountReady : true };
@@ -54,6 +55,13 @@ describe ('Auto Pack scene integration', function () {
         assert.equal (JSON.stringify ([product.position, product.rotation, product.scale]), transform); assert.equal (editor.document.objects[0], product);
         const packed = editor.selected; assert.equal (packed.id, result.objectId); assert.equal (packed.userData._auto3dPackagingState, 'folded');
         const restored = ReadSession (PackSession (editor.document)).document.objects.find (o => o.id === packed.id); assert.equal (JSON.parse (restored.userData._auto3dAutoPack).productId, product.id);
+        // The carton is a standard generated box: its CAD profile carries the board record and inside-basis
+        // measurement layer, and the engineering inside dimensions are exactly the fit targets.
+        const engineering = EngineeringMeasurements (packed.packagingProfile), inside = Object.fromEntries (engineering.dimensions.filter (d => ['length', 'width', 'height'].includes (d.id)).map (d => [d.id, d]));
+        assert.equal (JSON.parse (packed.userData._auto3dAutoPack).basis, 'engineering-inside');
+        assert.ok (['length', 'width', 'height'].every (id => inside[id].basis === 'inside'));
+        near (inside.length.insideMm, 60 + .0508 + 3); near (inside.width.insideMm, 24 + .0508); near (inside.height.insideMm, 80 + .0508);
+        assert.equal (engineering.material.caliperMm, JSON.parse (packed.userData._auto3dFefco).thickness);
         await editor.history.Undo (); assert.equal (editor.selected.userData._auto3dPackagingState, 'flat'); await editor.history.Undo (); assert.deepEqual (editor.document.objects, [product]); assert.equal (editor.selected, product);
         await editor.history.Redo (); await editor.history.Redo (); assert.equal (editor.selected.userData._auto3dPackagingState, 'folded'); assert.equal (editor.document.objects.length, 2);
     });

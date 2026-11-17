@@ -7,6 +7,30 @@ const bounds = (rig, pose, kind, index) => {
     const i = rig.panels.findIndex (p => p.kind === kind && p.index === index);
     return new THREE.Box3 ().setFromPoints (rig.panels[i].solid.vertices.map (p => new THREE.Vector3 (...p).applyMatrix4 (new THREE.Matrix4 ().fromArray (pose.matrices[i]))));
 };
+describe ('Auto Pack plan on the engineering system', () => {
+    const material = { caliperMm : 3, insideFactors : [1, 1, 2], calibrated : false };
+    it ('drives inside targets through the board allowance factors like Generate with the inside basis', () => {
+        const plan = CreateAutoPackPlan ({ size : [50, 80, 30], clearanceMm : .0254, material });
+        assert.equal (plan.basis, 'engineering-inside'); assert.equal (plan.parameters.thickness, 3);
+        // RSC length is the longer horizontal side (X = 50 here) and reserves one caliper for the inside glue tab.
+        near (plan.insideTargetsMm.length, 50 + .0508 + 3); near (plan.insideTargetsMm.width, 30 + .0508); near (plan.insideTargetsMm.height, 80 + .0508);
+        near (plan.parameters.length, plan.insideTargetsMm.length + 3); near (plan.parameters.width, plan.insideTargetsMm.width + 3); near (plan.parameters.height, plan.insideTargetsMm.height + 6);
+        assert.deepEqual (plan.allowanceMm, { length : 3, width : 3, height : 6 });
+    });
+    it ('keeps the original score fit for cartons saved without a board record', () => {
+        const plan = CreateAutoPackPlan ({ size : [50, 80, 30], thickness : 3, clearanceMm : .0254 });
+        assert.equal (plan.basis, 'legacy-score'); near (plan.parameters.length, 50 + .0508 + 3); near (plan.parameters.height, 80 + .0508);
+    });
+    it ('refuses an uncalibrated board with no inside allowance, like the dimension tools', () => {
+        assert.throws (() => CreateAutoPackPlan ({ size : [50, 80, 30], material : { caliperMm : 3, insideFactors : [0, 0, 0], calibrated : false } }), /allowance factor/);
+        near (CreateAutoPackPlan ({ size : [50, 80, 30], material : { caliperMm : 3, insideFactors : [0, 0, 0], calibrated : true } }).parameters.height, 80 + .0508);
+    });
+    it ('clears the product through the whole anchored fold with engineering spans', async () => {
+        const report = await InspectAutoPackFold (CreateAutoPackRig ({ size : [50, 80, 30], clearanceMm : .0254, material }));
+        assert.equal (report.clear, true, JSON.stringify (report.intersections?.[0]));
+    });
+});
+
 describe ('Auto Pack stationary-product RSC', () => {
     it ('fits axis-aligned OD with 0.001 inch per face and reserves the inside glue-tab intrusion', () => {
         for (const size of [[80, 150, 100], [100, 150, 80], [80, 80, 80]]) {

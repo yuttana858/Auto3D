@@ -62,6 +62,10 @@ try {
     assert.equal (flatScene.objects.length, before.objects.length + 1); assert.ok (carton); assert.equal (carton.userData._auto3dPackagingState, 'flat');
     assert.deepEqual (flatScene.objects.find (item => item.id === product.objectId), original);
     assert.equal (JSON.parse (carton.userData._auto3dAutoPack).productId, product.objectId);
+    // The carton is a standard generated box: the dimension tools read the same inside size as the fit.
+    const dimensions = await call ('packaging.dimensions.inspect'), other = glueAxis === 'width' ? 'length' : 'width';
+    for (const [rsc, world] of [['length', glueAxis], ['width', other], ['height', 'height']]) { assert.ok (Math.abs (dimensions.inside[rsc] - fit.insideMm[world]) < 1e-6, rsc + ' ' + dimensions.inside[rsc] + ' != ' + fit.insideMm[world]); }
+    assert.equal (fit.basis, 'engineering-inside'); assert.ok (fit.scoreMm.height > fit.insideMm.height);
     const savedFit = await call ('packaging.auto.inspect'); assert.equal (savedFit.available, false); assert.deepEqual (savedFit.productMm, fit.productMm); assert.deepEqual (savedFit.insideMm, fit.insideMm);
     await call ('view.fit'); await page.screenshot ({ path : 'work/auto-pack-review/flat-beneath-product.png' });
     await auto.getByRole ('button', { name : 'Fold carton', exact : true }).click ();

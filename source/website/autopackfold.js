@@ -1,11 +1,12 @@
 import { PackagingUnitMM } from './packagingadapter.js';
+import { EngineeringMeasurements } from '../../modules/packaging/src/engineering.js';
 
 export const AutoPackDataKey = '_auto3dAutoPack';
 export function AutoPackDefinition (object)
 {
     const raw = object?.userData?.[AutoPackDataKey]; if (raw === undefined) { return null; }
     let value; try { value = JSON.parse (raw); } catch { throw new Error ('Invalid Auto Pack metadata. Generate Auto Pack again.'); }
-    if (!value || value.version !== 1 || !Array.isArray (value.size) || value.size.length !== 3 || value.size.some (v => !Number.isFinite (v) || v <= 0) || !Number.isFinite (value.clearanceMm) || value.clearanceMm < .0254 || typeof value.productId !== 'string' || (value.productIds !== undefined && (!Array.isArray (value.productIds) || !value.productIds.length || value.productIds.some (id => typeof id !== 'string'))) || !Array.isArray (value.origin) || value.origin.length !== 3 || value.origin.some (v => !Number.isFinite (v))) { throw new Error ('Invalid Auto Pack metadata. Generate Auto Pack again.'); }
+    if (!value || value.version !== 1 || !Array.isArray (value.size) || value.size.length !== 3 || value.size.some (v => !Number.isFinite (v) || v <= 0) || !Number.isFinite (value.clearanceMm) || value.clearanceMm < .0254 || typeof value.productId !== 'string' || (value.basis !== undefined && value.basis !== 'engineering-inside') || (value.productIds !== undefined && (!Array.isArray (value.productIds) || !value.productIds.length || value.productIds.some (id => typeof id !== 'string'))) || !Array.isArray (value.origin) || value.origin.length !== 3 || value.origin.some (v => !Number.isFinite (v))) { throw new Error ('Invalid Auto Pack metadata. Generate Auto Pack again.'); }
     return value;
 }
 // Earlier cartons packed one product; group packs list every product.
@@ -41,12 +42,20 @@ export function GuardAutoPackGeometryEdit (object)
 {
     if (object?.userData?.[AutoPackDataKey] !== undefined) { throw new Error ('This carton is fitted by Auto Pack. Change the product or generation board, then generate Auto Pack again.'); }
 }
+// Engineering cartons (0.80.0+) re-derive their fit from the board record saved in the
+// CAD profile's measurement layer; earlier cartons keep their saved score fit.
+export function AutoPackPlanInput (data, parameters, profile)
+{
+    if (data.basis !== 'engineering-inside') { return { size : data.size, thickness : parameters.thickness, clearanceMm : data.clearanceMm }; }
+    if (!profile?.engineering) { throw new Error ('The Auto Pack carton lost its board record. Generate Auto Pack again.'); }
+    return { size : data.size, clearanceMm : data.clearanceMm, material : EngineeringMeasurements (profile).material };
+}
 export function PackagingFoldRig (module, object, parameters, profile)
 {
     const data = AutoPackDefinition (object); if (!data) { return module.CreateFefcoFoldRig (parameters, profile); }
-    const plan = module.CreateAutoPackPlan ({ size : data.size, thickness : parameters.thickness, clearanceMm : data.clearanceMm });
+    const input = AutoPackPlanInput (data, parameters, profile), plan = module.CreateAutoPackPlan (input);
     if (Object.keys (plan.parameters).some (key => key !== 'closure' && parameters[key] !== plan.parameters[key])) { throw new Error ('The Auto Pack carton dimensions changed. Generate Auto Pack again.'); }
-    const rig = module.CreateAutoPackRig (plan, profile); rig.hostAutoPack = true; return rig;
+    const rig = module.CreateAutoPackRig (input, profile); rig.hostAutoPack = true; return rig;
 }
 export const PackagingFoldPose = (module, rig, progress) => rig.hostAutoPack ? module.AutoPackFoldPose (rig, progress) : module.FefcoFoldPose (rig, progress);
 export const InspectPackagingFold = (module, rig, progress) => rig.hostAutoPack ? module.InspectAutoPackFold (rig, progress) : module.InspectFefcoFold (rig, progress);

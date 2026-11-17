@@ -16,8 +16,9 @@ export class AutoPackPanel
         this.objectName = Element ('strong', this.root);
         this.product = this.Size ('Selected object · bounding box');
         this.inside = this.Size ('RSC inside size');
+        this.score = this.Size ('RSC score size');
         this.board = Element ('p', this.root, '', 'section_hint');
-        Element ('p', this.root, 'Clearance: 0.001″ (0.0254 mm) on each face. The box inside size includes clearance on both sides of each dimension and one board thickness along its longer side for the internal glue tab.', 'section_hint');
+        Element ('p', this.root, 'Clearance: 0.001″ (0.0254 mm) on each face. The inside size adds clearance on both sides of each dimension and one board thickness along the longer side for the internal glue tab. It is generated like Generate with the inside basis: the selected board record and its allowance factors convert the inside size to score dimensions, and the carton keeps that CAD measurement layer.', 'section_hint');
         Element ('p', this.root, 'The blank starts below the product. A bottom flap stays underneath as the carton folds around it.', 'section_hint');
         this.refresh = Element ('button', this.root, 'Refresh bounds'); this.refresh.type = 'button'; this.refresh.addEventListener ('click', () => { this.status.textContent = ''; this.Refresh (); });
         this.create = Element ('button', this.root, 'Auto Pack', 'packaging_auto_create'); this.create.type = 'button'; this.create.addEventListener ('click', () => this.Create ());
@@ -47,10 +48,10 @@ export class AutoPackPanel
         catch (error) { data = { available : false, reason : error.message }; }
         this.state = data; const factor = this.host.factor (), unit = Math.abs (factor - 25.4) < 1e-9 ? 'in' : 'mm';
         this.objectName.textContent = data.objectName || 'No product selected';
-        for (const [row, size] of [[this.product, data.productMm], [this.inside, data.insideMm]]) {
+        for (const [row, size] of [[this.product, data.productMm], [this.inside, data.insideMm], [this.score, data.scoreMm]]) {
             for (const [key, field] of row.fields) { field.textContent = Number.isFinite (size?.[key]) ? Number ((size[key] / factor).toFixed (6)) + ' ' + unit : '—'; }
         }
-        this.inside.section.hidden = !data.insideMm;
+        this.inside.section.hidden = !data.insideMm; this.score.section.hidden = !data.scoreMm;
         this.board.textContent = Number.isFinite (data.thicknessMm) ? 'Board caliper: ' + (data.boardName ? data.boardName + ' · ' : '') + Number ((data.thicknessMm / factor).toFixed (6)) + ' ' + unit : '';
         this.reason.textContent = data.reason || '';
         this.refresh.disabled = this.pending || this.host.blocked ();
