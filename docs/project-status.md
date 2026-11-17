@@ -2,7 +2,7 @@
 
 ## Durable CAD retry dispatch — Auto3D 0.82.1 (2026-11-17)
 
-Repairs the outbox gap found when retrying the original private X_T: queued retries now reset the old sent flag and attempt identity, and reject late acknowledgements. The corrective migration repairs only affected unclaimed queued rows, preserving two attempts, ownership, quotas and retention. Isolated PostgreSQL reproducer/recovery checks pass. PR #145 and production run 44187702251 (attempt 2) passed; Auto3D 0.82.1 is live. The retry reached OCCT topology construction and failed with `invalid_geometry`; source-file acceptance remains open. App/module versions and validation are in [release-0821.md](release-0821.md).
+Repairs the outbox gap found when retrying the original private X_T: queued retries now reset the old sent flag and attempt identity, and reject late acknowledgements. The corrective migration repairs only affected unclaimed queued rows, preserving two attempts, ownership, quotas and retention. Isolated PostgreSQL reproducer/recovery checks pass. PR #145 and production run 44187702251 (attempt 2) passed; Auto3D 0.82.1 is live. The retry reached OCCT topology construction and failed with `invalid_geometry`; source-file acceptance remains open. Cloud 3D Studio 0.3.5 also passed its native proof, actual scheduled-controller startup and full private user-API calibration with measured progress (44191600669); the separate controller check passed (44191600844). Its 71 tests pass, and temporary calibration accounts/jobs are removed. App/module versions and validation are in [release-0821.md](release-0821.md).
 
 ## CAD progress and failure diagnosis — Auto3D 0.82.0 live (2026-11-17)
 

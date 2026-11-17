@@ -1,6 +1,6 @@
 # Auto3D 0.82.1 — Durable retry dispatch
 
-Versions: Auto3D **0.82.1**, Packaging **1.14.0**, Primary Products **0.15.0**, Molded Pulp **0.1.0**; Cloud 3D Studio **0.3.4** (controller startup follow-up).
+Versions: Auto3D **0.82.1**, Packaging **1.14.0**, Primary Products **0.15.0**, Molded Pulp **0.1.0**; Cloud 3D Studio **0.3.5**.
 
 The operator retry of the original failed upload revealed a second bug: `retry` returned the job to queued but retained the previous sent dispatch flag and attempt identity. The normal API often dispatched immediately, hiding this gap; a recovered/reconciled retry could remain queued forever.
 
@@ -10,4 +10,4 @@ Validation reproduces an acknowledged failure with the old function, applies the
 
 PR [#145](https://github.com/yuttana858/Auto3D/pull/145) merged as `cc938eb66acf417880eb9e345bf3a2dd31b3b646`, reviewed tree `e09b89744781ca5369aa9366e0765f25a58cd1a7`. Hosted CI [44185225156](https://github.com/yuttana858/Auto3D/actions/runs/44185225156) passed validation and smoke. Production [44187702251](https://github.com/yuttana858/Auto3D/actions/runs/44187702251), attempt 2, passed all deployment/version/login/Meshy/MCP checks. Attempt 1 deployed successfully but the Meshy version probe briefly received cached 0.82.0; the unchanged rerun passed. Canonical Pages deployment `47a0f651-b487-4c60-8dd3-ebc002d61f54` and production profile were independently checked.
 
-The scheduled Modal controller had a separate remote-import startup defect; Cloud 3D Studio [#16](https://github.com/yuttana858/Cloud-3D-Studio/pull/16) keeps its symbol unconditional and adds an actual remote invocation deployment gate. Native release evidence lives in that repository's operations document. This infrastructure repair does not imply the reported Parasolid topology is supported.
+The scheduled Modal controller had a separate remote-import startup defect; Cloud 3D Studio [#18](https://github.com/yuttana858/Cloud-3D-Studio/pull/18) completes the repair by preserving the nonsecret configuration name so remote import reconstructs the same attached Secret dependencies. All 71 native tests pass. Hosted [44191600669](https://github.com/yuttana858/Cloud-3D-Studio/actions/runs/44191600669) passed native proof, actual remote controller startup and the full Auto3D 0.82.1 private public-calibration pipeline with negotiated progress, isolation, hashes/units and cleanup. Separate [44191600844](https://github.com/yuttana858/Cloud-3D-Studio/actions/runs/44191600844) passed API and deployed controller calls with an empty queue. Database reads independently confirmed zero temporary canary accounts/jobs. This infrastructure repair does not imply the reported Parasolid topology is supported.
