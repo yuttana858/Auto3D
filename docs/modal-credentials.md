@@ -1,73 +1,60 @@
-# Modal credential bridge
+# Modal credentials and deployment bridge
 
-Auto3D **0.77.0**, Packaging **1.12.0**, Primary Products **0.15.0**, Molded Pulp **0.1.0**. The app changes are a review candidate, not deployed. Cloud 3D Studio **0.3.0** adds the protected connection gateway and Vault deployment runner.
+Auto3D **0.79.0** candidate; Packaging **1.12.0**, Primary Products **0.15.0**, Molded Pulp **0.1.0**. Cloud 3D Studio **0.3.0** is deployed and verified; **0.3.1** adds the guarded controller and live canary. Auto3D 0.77.0's credential bridge is merged in #138; #139's Auto Pallet is preserved.
 
-## What is configured
+## Verified configuration
 
-Auto3D's Supabase project `iesepcoxqochycckbwoh` already has Vault. The two Modal migrations were applied on November 16, 2026. All three new RPCs are `SECURITY INVOKER`, have an empty search path, and are executable only by `service_role`. Browser roles cannot call them or access the Vault schema. No new table, public bucket, encryption secret or paid Modal project is required.
+The existing Supabase project is `iesepcoxqochycckbwoh`. Vault encrypts each complete target/token pair as one record. Only the server role can invoke the read/save/delete RPCs; browser database roles cannot access them or the Vault schema. No key is returned in app status, diagnostics, commands or `.auto3d` files.
 
-Supabase Vault encrypts the entire token pair and target as one secret. Pages reads it using the existing server key; the browser receives saved status and target metadata only. The existing Meshy credentials remain in their private encrypted R2 store.
+The production deployment record targets Modal workspace **`yuttana858`**, environment **`main`**, app **`cloud-3d-studio`**. GitHub [connection check 44110280460, attempt 2](https://github.com/yuttana858/Cloud-3D-Studio/actions/runs/44110280460) passed live Vault retrieval and target authentication. [Build 44131313665](https://github.com/yuttana858/Cloud-3D-Studio/actions/runs/44131313665) passed the hosted native STEP/GLB/STL proof and provisioned the runtime pair directly into Vault. Its authenticated gateway is `https://yuttana858--cloud-3d-studio-cad-gateway.us-east.modal.run`. Regional provider origins and environment suffixes are supported; arbitrary URLs, ports, credentials, paths, queries and redirects remain refused.
 
-```mermaid
-flowchart LR
-  A[Administrator] --> B[Private Auto3D connection form]
-  B --> C[Authenticated Pages API]
-  C --> D[Encrypted Supabase Vault]
-  D --> C
-  C --> E[Proxy-authenticated Modal status gateway]
-```
+## Which key goes where
 
-## Use the form after the candidate is deployed
+| Destination | Exact credential | Purpose |
+| --- | --- | --- |
+| Cloud-3D-Studio GitHub **Repository secret** `SUPABASE_SECRET_KEY` | Supabase **Secret API key**, starting `sb_secret_…` | Trusted runner reads encrypted Modal credentials and provisions runtime settings. A legacy `service_role` API JWT is also supported. |
+| Supabase Vault `auto3d/modal/v1/production/deployment` | Modal deployment ID `ak-…` and matching secret `as-…`, together with workspace/environment | Deployment and private SDK access. |
+| Supabase Vault `auto3d/modal/v1/production/runtime` | Modal Web Function proxy ID `wk-…` and matching secret `ws-…`, with gateway origin | Auto3D server calls the protected gateway. The build creates this record automatically. |
 
-Open **Preferences → Administrator → Manage Modal connections**. Select the purpose and enter the complete pair from the same Modal workspace. The form never displays saved credentials. Both fields must be re-entered together for rotation.
+A Supabase **publishable**/anon key and **JWT signing secret** are not server API keys. A Modal key does not belong in GitHub's `SUPABASE_SECRET_KEY`. The Supabase key label and GitHub secret name are separate fields.
 
-| Purpose | Token ID | Token secret | Used by |
-| --- | --- | --- | --- |
-| Deployment | `ak-…` | `as-…` | Trusted Python Vault runner; deploy/SDK access |
-| App connection | `wk-…` | `ws-…` | Pages server; protected Web Function access |
+## GitHub bootstrap: exact steps
 
-Use the workspace slug and an existing Modal environment, not a new billing workspace. The app is `cloud-3d-studio`. App connections also require the deployed gateway's base `https://<workspace>--….modal.run` URL, without a trailing slash, path or query. **Test saved app connection** verifies proxy authentication, network reachability, protocol and target identity. It starts only the small CPU status service; a small amount of Modal usage may be billed. It does not convert CAD. Save alone is not proof that the provider accepts a token.
+These steps are already completed for this build; use them when rotating or repairing the runner key.
 
-Commands use the same services: `admin.modal.open`, `admin.modal.inspect`, `admin.modal.test`, `admin.modal.remove`. Token arguments are never accepted by commands or macros. The credential dialog is excluded from app captures and clears both fields on submit, close and account change.
+1. Open [Supabase → Auto3D → API keys](https://supabase.com/dashboard/project/iesepcoxqochycckbwoh/settings/api-keys/).
+2. Select **Publishable and secret API keys**. In **Secret keys**, create a dedicated key named `cloud3d-github-runner`, or open the dedicated key already created for this runner. Copy the complete value beginning `sb_secret_`.
+3. Open [Cloud-3D-Studio → Settings → Secrets and variables → Actions](https://github.com/yuttana858/Cloud-3D-Studio/settings/secrets/actions). Select the **Secrets** tab and **New repository secret**; use the edit button instead when rotating the existing entry.
+4. Set GitHub **Name** to exactly `SUPABASE_SECRET_KEY`. Paste the copied value into **Secret**, then select **Add secret** or **Update secret**. Confirm the exact name appears under **Repository secrets**. Do not store it under a GitHub Environment unless the workflow explicitly names that environment.
+5. Open [Actions](https://github.com/yuttana858/Cloud-3D-Studio/actions), select **Check Modal connection from Vault → Run workflow → main**, profile **production**. Its success means the saved Modal deployment pair was accepted for the exact target; this check does not deploy or convert CAD.
+6. Run **Build verified Modal CAD service → Run workflow → main**. Reviewed source merges also trigger it automatically. The workflow builds the bounded CPU image, proves a synthetic 40 × 30 × 20 mm model, provisions the runtime pair directly in Vault, then waits for verified gateway readiness. The controller is installed with a health guard. The public calibration canary runs only when Auto3D's connector is ready.
 
-## Save deployment credentials now, before the UI release
+Keep real keys out of chat, repository files, command arguments, SQL Editor history and screenshots. GitHub masks its configured bootstrap secret; the runner additionally withholds provider bodies and never prints fetched Modal tokens. `sb_secret_` uses the `apikey` header; a legacy service-role JWT also uses the bearer header. No JWT signing key is needed.
 
-You can use the [Supabase Vault dashboard](https://supabase.com/dashboard/project/iesepcoxqochycckbwoh/integrations/vault/secrets) immediately. Choose **Add secret** and use the unique name:
+## Required Pages profile: exact steps
 
-`auto3d/modal/v1/production/deployment`
+Production `AUTO3D_MODAL_PROFILE=production` was verified on November 17, with existing variable names/types and R2 bindings intact. Preview is not configured and still lacks its own Auth credentials; this does not block production. Automatic approval review rejected a partial API update, so the owner used the dashboard's individual-variable editor. Use that editor for future changes:
 
-Copy [this JSON template](modal-deployment-vault-template.json) into the secret value. Replace the workspace, environment and both token placeholders **inside the Vault editor**. It is one JSON secret, not separate ID/secret rows. Keep the schema, profile, purpose, app and empty endpoint as shown. For a preview entry, change both the name's profile and the JSON `profile` to `preview`; use a separate token pair. The revision is an opaque identifier and is replaced automatically on the next form save.
+1. Open [Cloudflare → Workers & Pages → auto3d](https://dash.cloudflare.com/c24489fd32a7bebd7ff5970075c8429c/pages/view/auto3d).
+2. Open **Settings → Variables and Secrets**. Select the **Production** environment.
+3. Choose **Add**, select **Text** (this is a nonsecret selector), enter **Variable name** `AUTO3D_MODAL_PROFILE` and **Value** `production`, then save.
+4. Switch to **Preview**. Add the same text variable name with value `preview`, then save. Leave every existing entry and binding in place. This does not give preview production Supabase credentials.
+5. Confirm the exact lowercase values. The next Pages deployment picks them up; saving a setting alone does not prove the active deployment has the new binding.
 
-Do not paste real credentials into chat, SQL Editor history, a repository file, a command argument or a screenshot. Vault's editor encrypts the value on save. An authorized database owner can still access Vault secrets; this is protected application storage, not isolation from the database administrator. Do not enable request-body/header logging for these routes.
+There is no implicit fallback between profiles, and a known Pages branch/profile mismatch fails closed. Current previews lack their own Supabase/Auth credentials and cannot submit cloud conversions; do not copy production keys into previews to bypass that isolation.
 
-## Server profile setting
+## Manage saved pairs in Auto3D
 
-Pages must have `AUTO3D_MODAL_PROFILE=production` in production and `AUTO3D_MODAL_PROFILE=preview` in preview. There is deliberately no fallback. A known Pages branch/profile mismatch fails closed. Preview must also have its own existing Auth/Supabase server configuration; the current preview configuration does not contain those bindings. Do not copy production credentials into previews automatically.
+After deploying the candidate, open **Preferences → Administrator → Manage Modal connections**. Choose **Deployment · ak-/as-** or **App connection · wk-/ws-**. Enter both matching fields to replace a pair; saved values are never shown again. The token form clears on submit/close/account change and is excluded from app captures.
 
-**This configuration change has not been applied.** Automatic approval review rejected a partial Cloudflare environment update because it could replace existing variables and lacked explicit production authorization. Obtain approval and prepare an update that preserves all existing bindings and secrets. The canonical production deployment was unchanged.
+**Test saved app connection** checks provider authentication, protocol and target without converting CAD. Verified readiness is reported separately from network connection. Commands `admin.modal.open`, `inspect`, `test` and `remove` share the same underlying service; prefix each with `admin.modal.`. Tokens are never command arguments.
 
-## Deployment bridge
+Rotation uses revision checks so two administrator windows cannot mix credentials. Saving/removing a record does not revoke it at Modal. After a runtime rotation, rerun the Studio build to update the controller's derived key. To replace a revoked runtime pair automatically, remove that saved runtime entry first and run the build; a valid existing pair is reused rather than silently replaced.
 
-On a trusted machine/runner with Python 3.12 and the locked Cloud 3D Studio dependencies, configure the existing Supabase URL and **server** key through its secret manager (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`; legacy `SUPABASE_SERVICE_ROLE_KEY` is also accepted by the runner). This is the one bootstrap identity; the Modal pair is fetched from Vault each time. Never distribute the Supabase server key to end users.
+The default local runner check is `uv run python deploy/vault_modal.py --profile production`. The complete explicit deploy is `uv run python -m deploy.provision_modal --profile production --deploy`. Prefer the existing GitHub workflow when local firewalls block Modal/Supabase. Both run through the same Vault record and target checks without writing a local Modal profile or passing Supabase credentials into native containers.
 
-From Cloud 3D Studio:
+## Validation and limits
 
-```bash
-uv run python deploy/vault_modal.py --profile production
-```
+All credential/job database migrations are recorded under `supabase/migrations`; never replay historical prototypes. Synthetic service-role ownership, idempotency, queue, lease, cancellation and retry tests pass with rolled-back writes. RLS/grant checks pass; existing server-only no-policy information and the preexisting leaked-password-protection advisory remain. Native 0.3.0's 47-test baseline and hosted proof pass; the controller/canary follow-up is being validated separately.
 
-The default checks the deployment token's actual Modal workspace and available environment through the pinned SDK, and never deploys or runs conversion. Tokens remain in process memory; no `.modal.toml` profile is written. Only after target verification and spending-policy review, an authorized operator can explicitly use:
-
-```bash
-uv run python deploy/vault_modal.py --profile production --deploy
-```
-
-Deployment can incur image-build and subsequent runtime usage. The runner removes alternate Modal authentication variables from the child and does not pass Supabase credentials to it. It withholds provider logs from ordinary output. The gateway uses `requires_proxy_auth=True`, CPU 0.125, 128 MiB requested memory, zero minimum containers and one maximum container. Copy its URL from Modal, create Web Function proxy credentials, then save the app connection and test it from Auto3D.
-
-Credential storage does not remove network restrictions. The current development environment's proxy blocks Modal API access; a trusted runner must be allowed to reach Modal and Supabase. App connection tests execute from Pages, independently of the user's computer firewall. No real Modal token was provided, no Modal app was deployed, and no supplier CAD was uploaded during implementation.
-
-## Validation and current limits
-
-The database fixture [modal-credential-bridge.sql](../database/tests/modal-credential-bridge.sql) verifies encrypted storage, read-back, rotation, conflict detection and removal with rolled-back synthetic credentials. It refuses an occupied preview runtime slot. Browser-role RPC execution is denied. The post-migration security advisory review found no new warning; existing no-policy informational findings and the existing leaked-password-protection warning are unchanged.
-
-Local checks cover the administrator API, CSRF/account/revoked-session gates, token type isolation, destination restrictions, safe errors, stale edits, secret-free commands, desktop/mobile form flows, logout cleanup and the actual Workers runtime. The Studio tests cover the metadata gateway, explicit deployment gating, workspace/environment checks, header compatibility and credential handling. This proves the bridge implementation, not live Modal authentication. Owned CAD jobs, private file transfer, progress and Auto3D scene import remain the next milestone.
+The app converter has strict shared commands, active-account/origin checks, private streaming/hash validation, explicit target-safe import and one-step Undo. See [CAD conversion](cad-conversion.md) for limits, retention and formats. Supplier Parasolid acceptance still requires the private reference file. Existing CPU credits/usage apply; no billing tier, workspace, GPU or spending-limit increase is performed.

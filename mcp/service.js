@@ -16,7 +16,7 @@ const Families = Object.freeze ({
     commands : { title : 'Commands & Macros', categories : ['Commands', 'Macros', 'Messenger'] },
     capture : { title : 'Screen capture', categories : ['Capture'] },
     modules : { title : 'Modules', categories : ['Packaging', 'Primary Products', 'Molded Pulp', 'AI', 'Panels', 'Knowledge'] },
-    sessions : { title : 'Sessions & Library', categories : ['Sessions', 'Library'] },
+    sessions : { title : 'Sessions, Library & Conversion', categories : ['Sessions', 'Library', 'Conversion'] },
     settings : { title : 'Settings & Administration', categories : ['Account', 'Administration', 'Preferences', 'Diagnostics'] }
 });
 const FamilySchema = { type : 'object', properties : { category : { type : 'string', maxLength : 80 }, search : { type : 'string', maxLength : 120 }, offset : { type : 'integer', minimum : 0, maximum : 10000 }, limit : { type : 'integer', minimum : 1, maximum : 25 } }, additionalProperties : false };

@@ -2,6 +2,313 @@
   "apiVersion": 1,
   "commands": [
     {
+      "id": "conversion.open",
+      "title": "Open CAD converter",
+      "category": "Conversion",
+      "description": "Open the interactive private CAD conversion dialog. Selecting a source does not upload it. Supports a subset of Parasolid and single-file STEP.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "conversion.inspect",
+      "title": "Inspect CAD conversion window",
+      "category": "Conversion",
+      "description": "Read staged source metadata and this window/session/revision target. Does not read CAD bytes or upload files.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "conversion.capabilities",
+      "title": "Inspect CAD service readiness",
+      "category": "Conversion",
+      "description": "Read verified native readiness, supported formats, physical-unit policy and limits.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "conversion.jobs",
+      "title": "List my CAD conversions",
+      "category": "Conversion",
+      "description": "Read up to 50 recent account-owned jobs and public stages without provider credentials.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "conversion.job",
+      "title": "Inspect CAD conversion",
+      "category": "Conversion",
+      "description": "Read one owned job, validated dimensions, available downloads and retry status.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "pattern": "^[a-f0-9-]{36}$",
+            "minLength": 36,
+            "maxLength": 36
+          }
+        },
+        "required": [
+          "jobId"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "jobId": "00000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "id": "conversion.submit",
+      "title": "Convert staged CAD privately",
+      "category": "Conversion",
+      "description": "Explicitly upload the file selected in Convert CAD to private cloud processing. Parasolid requires actual source units. STEP uses embedded units. The result is never automatically inserted into a session.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceUnit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "mm",
+                  "cm",
+                  "m",
+                  "in",
+                  "ft"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quality": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "fine"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "sourceUnit": "mm",
+        "quality": "standard"
+      }
+    },
+    {
+      "id": "conversion.cancel",
+      "title": "Cancel CAD conversion",
+      "category": "Conversion",
+      "description": "Cancel this owned conversion and immediately prevent result publication/import.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "pattern": "^[a-f0-9-]{36}$",
+            "minLength": 36,
+            "maxLength": 36
+          }
+        },
+        "required": [
+          "jobId"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "jobId": "00000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "id": "conversion.retry",
+      "title": "Retry CAD conversion",
+      "category": "Conversion",
+      "description": "Retry a transiently failed owned job within its deadline and two-attempt limit.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "pattern": "^[a-f0-9-]{36}$",
+            "minLength": 36,
+            "maxLength": 36
+          }
+        },
+        "required": [
+          "jobId"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "jobId": "00000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "id": "conversion.delete",
+      "title": "Delete CAD conversion",
+      "category": "Conversion",
+      "description": "Cancel this owned job and delete its private source/results. Cannot be undone.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "pattern": "^[a-f0-9-]{36}$",
+            "minLength": 36,
+            "maxLength": 36
+          }
+        },
+        "required": [
+          "jobId"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "jobId": "00000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "id": "conversion.download",
+      "title": "Download converted CAD",
+      "category": "Conversion",
+      "description": "Download one ready owned artifact. STEP/STL coordinates are mm; GLB is meters; manifest records provenance and independent checks.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "pattern": "^[a-f0-9-]{36}$",
+            "minLength": 36,
+            "maxLength": 36
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "step",
+              "glb",
+              "stl",
+              "manifest"
+            ]
+          }
+        },
+        "required": [
+          "jobId",
+          "format"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "jobId": "00000000-0000-4000-8000-000000000001",
+        "format": "stl"
+      }
+    },
+    {
+      "id": "conversion.import",
+      "title": "Add converted CAD to this session",
+      "category": "Conversion",
+      "description": "Explicitly add a ready GLB as one Undo operation. Read conversion.inspect immediately first and supply its exact target. Refuses account/window/tab/revision changes and unknown existing scene units; normalizes meters to the current scene unit.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "pattern": "^[a-f0-9-]{36}$",
+            "minLength": 36,
+            "maxLength": 36
+          },
+          "target": {
+            "type": "object",
+            "properties": {
+              "windowId": {
+                "type": "string",
+                "pattern": "^[a-f0-9-]{36}$",
+                "minLength": 36,
+                "maxLength": 36
+              },
+              "tabId": {
+                "type": "string",
+                "pattern": "^[a-f0-9-]{36}$",
+                "minLength": 36,
+                "maxLength": 36
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "windowId",
+              "tabId",
+              "revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "jobId",
+          "target"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "jobId": "00000000-0000-4000-8000-000000000001",
+        "target": {
+          "windowId": "00000000-0000-4000-8000-000000000002",
+          "tabId": "00000000-0000-4000-8000-000000000003",
+          "revision": 0
+        }
+      }
+    },
+    {
+      "id": "conversion.sample",
+      "title": "Convert public calibration box",
+      "category": "Conversion",
+      "description": "Explicitly run the private cloud pipeline on the bundled public 40 × 30 × 20 mm STEP calibration box. Consumes a normal conversion slot; contains no customer CAD.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
       "id": "agent.access.open",
       "title": "Open agent access",
       "category": "Account",

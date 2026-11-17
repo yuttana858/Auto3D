@@ -11,3 +11,4 @@ messenger-ai-history
 ai-creations
 packaging-module
 mcp-consent
+cad-conversion

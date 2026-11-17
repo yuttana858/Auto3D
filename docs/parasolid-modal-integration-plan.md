@@ -1,5 +1,8 @@
 # Modal conversion service and Auto3D connector
 
+Implementation update, November 17, 2026: Cloud 3D Studio 0.3.0 is deployed and passed hosted native/gateway proof; 0.3.1 adds a health-guarded controller and live user-API calibration canary. Auto3D 0.79.0 implements owned jobs, private transfers, strict commands and explicit unit-safe Add. See [current implementation](cad-conversion.md), [release evidence](release-0790.md) and [exact setup steps](modal-credentials.md). The design below is retained as the original plan; current paths/contracts are in the implementation guide. Supplier Parasolid acceptance and the production connector canary remain separate gates.
+
+
 Draft implementation plan, 2026-11-16. Reviewed against Auto3D main `70601cd5cebe14104ac5b1f431ca449f129754b5`: Auto3D 0.74.0 / Packaging 1.10.7 / Primary Products 0.15.0 / Molded Pulp 0.1.0. This document proposes a service; it does not deploy Modal, apply database changes or enable production import formats.
 
 The user has chosen hosted Modal processing after evaluating local installation. Keep the [local converter download](parasolid-local-converter.md) as an alternative. Hosted processing means CAD leaves the user's computer for private processing; it does not mean publishing the model.

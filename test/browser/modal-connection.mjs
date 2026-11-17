@@ -63,7 +63,7 @@ try {
         await dialog.getByText ('Connection saved in Supabase Vault. Test the saved app connection next.', { exact : true }).waitFor ();
         assert.equal (await idInput.inputValue (), ''); assert.equal (await secretInput.inputValue (), '');
         await dialog.getByRole ('button', { name : 'Test saved app connection', exact : true }).click ();
-        await dialog.getByText ('Connected to acme / main. CAD job submission is the next milestone.', { exact : true }).waitFor (); assert.equal (tests, 1);
+        await dialog.getByText ('Connected to acme / main. Native CAD verification is pending.', { exact : true }).waitFor (); assert.equal (tests, 1);
         await dialog.getByLabel ('Connection purpose', { exact : true }).selectOption ('deployment');
         assert.equal (await dialog.getByLabel ('Modal gateway URL', { exact : true }).isVisible (), false);
         await fill ('deployment'); await dialog.getByRole ('button', { name : 'Save connection', exact : true }).click ();
