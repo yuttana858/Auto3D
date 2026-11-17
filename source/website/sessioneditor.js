@@ -724,6 +724,8 @@ export class SessionEditor
     {
         this.SyncInputs ();
         this.UpdateDetails ();
+        // Auto Pack and Auto pallet show sizes and the height limit in display units.
+        if (this.website?.packagingPanel?.workspace?.InspectTab ().tab === 'auto') { this.website.packagingPanel.workspace.autoPanel.Refresh (); }
     }
     RefreshButtons ()
     {
@@ -731,6 +733,7 @@ export class SessionEditor
         this.website?.primaryProductsPanel?.RefreshAvailability (); this.website?.moldedPulpPanel?.RefreshAvailability ();
         this.processing?.Sync (this.busy && !this.packaging?.foldOperation && !this.packaging?.dimensionUpdating && this.arrayOperation?.stage !== 'revealing' && !this.website?.rendering?.running); this.commandBar?.SetBusy (this.busy);
         this.website?.packagingPanel?.fefcoPanel?.SetDisabled ();
+        if (this.website?.packagingPanel?.workspace?.InspectTab ().tab === 'auto') { this.website.packagingPanel.workspace.autoPanel.Refresh (); }
         for (const [key, button] of this.buttons) {
             button.disabled = this.ToolDisabled (key) || button.hasAttribute?.('aria-busy') === true;
             if (key === 'dimension') { button.setAttribute ('aria-pressed', String (this.website.dimensions?.active === true)); }

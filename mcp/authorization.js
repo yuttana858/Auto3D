@@ -23,7 +23,7 @@ function Page (html, headers = new Headers (), status = 200, validatedRedirectUr
     // no-referrer makes browser form POSTs serialize their Origin as "null".
     // Keep the same-origin Origin check working without leaking OAuth URLs cross-site.
     headers.set ('X-Content-Type-Options', 'nosniff'); headers.set ('Referrer-Policy', 'same-origin');
-    return new Response ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connect Auto3D</title><link rel="stylesheet" href="/assets/css/mcp-consent.css"></head><body><main class="agent-consent"><header class="agent-brand"><img src="/assets/images/auto3d-mark.svg" alt=""><span>SW Auto3D</span></header><section class="agent-card">' + html + '</section></main></body></html>', { status, headers });
+    return new Response ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connect Auto3D</title><link rel="stylesheet" href="/assets/css/mcp-consent.css"></head><body><main class="agent-consent"><header class="agent-brand"><img src="/assets/images/auto3d-mark.svg" alt=""><span>Auto3D</span></header><section class="agent-card">' + html + '</section></main></body></html>', { status, headers });
 }
 async function ConsentKey (env)
 {

@@ -45,6 +45,7 @@ export function CreateEngineeringLanding (root, { panel, onSignIn, version = '' 
                     <div class="entry_eyebrow">YOUR ENGINEERING WORKSPACE</div>
                     <div class="entry_auth_mount"></div>
                     <div class="entry_session"></div>
+                    <div class="entry_swis" role="img" aria-label="SWIS, SW Innovation Systems"><img src="assets/images/swis-mark-dark.png" alt="" width="110" height="32"><span aria-hidden="true">SW Innovation Systems</span></div>
                 </aside>
             </main>
             <footer class="entry_footer"><span>Auto3D <b>·</b> Agentic packaging engineering</span><span class="entry_study_note">Animated workflow</span><span class="entry_version"></span></footer>

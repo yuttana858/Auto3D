@@ -1,3 +1,4 @@
+import { AIHistoryRow } from './messengeraistory.js';
 // Messages remain in the authenticated conversation store. The archive groups each
 // page by the viewer's local calendar date; no background deletion or copy is needed.
 export class MessengerArchive
@@ -38,7 +39,8 @@ export class MessengerArchive
         this.list.replaceChildren (); let previous = '';
         for (const entry of [...this.messages].reverse ()) { const date = new Date (entry.created_at); const day = Number.isNaN (date.valueOf ()) ? 'Unknown date' : date.toLocaleDateString (undefined, { year : 'numeric', month : 'long', day : 'numeric' });
             if (day !== previous) { const heading = document.createElement ('h3'); heading.textContent = day; this.list.appendChild (heading); previous = day; }
-            const row = document.createElement ('p'), who = document.createElement ('strong'); who.textContent = this.tab === 'ai' ? (entry.origin === 'agent' ? 'Agent' : 'You') + ': ' : (entry.sender_id === this.owner ? 'You' : entry.sender_email || entry.sender_id) + ': '; row.append (who, document.createTextNode (entry.body)); this.list.appendChild (row);
+            if (this.tab === 'ai') { this.list.appendChild (AIHistoryRow (entry)); continue; }
+            const row = document.createElement ('p'), who = document.createElement ('strong'); who.textContent = (entry.sender_id === this.owner ? 'You' : entry.sender_email || entry.sender_id) + ': '; row.append (who, document.createTextNode (entry.body)); this.list.appendChild (row);
         }
     }
     Close () { this.closed = true; this.sequence++; }

@@ -2,7 +2,7 @@
 
 PR #134 also carries #128 (AI and Library usability, see [release-0730.md](release-0730.md)) and #132 (Messenger daily history, see [release-0711.md](release-0711.md)), so the three share one CI run and one merge.
 
-Primary Products 0.15.0, Packaging 1.10.7 and Molded Pulp 0.1.0 are unchanged. Based on main after #133 (0.72.0). Numbered after the 0.73.0 draft (#128). Not deployed.
+Primary Products 0.15.0, Packaging 1.10.7 and Molded Pulp 0.1.0 are unchanged. Based on main after #133 (0.72.0). Numbered after the 0.73.0 draft (#128).
 
 ## Change
 

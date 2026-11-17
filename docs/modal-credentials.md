@@ -1,6 +1,6 @@
 # Modal credential bridge
 
-Auto3D **0.75.0**, Packaging **1.10.7**, Primary Products **0.15.0**, Molded Pulp **0.1.0**. The app changes are a review candidate, not deployed. Cloud 3D Studio **0.2.0** adds the protected connection gateway and Vault deployment runner.
+Auto3D **0.77.0**, Packaging **1.12.0**, Primary Products **0.15.0**, Molded Pulp **0.1.0**. The app changes are a review candidate, not deployed. Cloud 3D Studio **0.3.0** adds the protected connection gateway and Vault deployment runner.
 
 ## What is configured
 

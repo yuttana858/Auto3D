@@ -8,7 +8,7 @@ import { Unit } from '../engine/model/unit.js';
 import { OpenCommandPanel } from './commandpanel.js';
 import { OpenModalConnection } from './modalconnection.js';
 
-export const AppVersion = '0.75.0';
+export const AppVersion = '0.77.0';
 
 export function AppBuildInfo ()
 {
@@ -143,7 +143,7 @@ export class Preferences
         const syncStatus = document.createElement ('p'); syncStatus.setAttribute ('role', 'status'); syncStatus.textContent = 'Theme and units are saved automatically to your account.'; this.syncStatus = syncStatus;
         display.appendChild (syncStatus);
         const about = document.createElement ('p'); about.className = 'preferences_about';
-        about.textContent = 'SW Auto3D v' + AppVersion + ' · Build ' + AppBuildInfo ().build + ' — A browser workspace for inspecting, arranging and reviewing 3D models, materials, lighting and reusable layouts. Dimensions use the units declared by the source model; unspecified units remain model units.';
+        about.textContent = 'Auto3D v' + AppVersion + ' · Build ' + AppBuildInfo ().build + ' — A browser workspace for inspecting, arranging and reviewing 3D models, materials, lighting and reusable layouts. Dimensions use the units declared by the source model; unspecified units remain model units.';
         const tools = section ('Tools');
         const toolActions = document.createElement ('div'); toolActions.className = 'preferences_actions';
         const commands = document.createElement ('button'); commands.textContent = 'Commands and macros'; commands.className = 'workspace_primary'; commands.addEventListener ('click', () => { dialog.close (); OpenCommandPanel (this.website); });

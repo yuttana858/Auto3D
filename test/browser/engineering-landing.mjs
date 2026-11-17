@@ -27,6 +27,9 @@ try {
         await dialog.getByRole ('button', { name : 'Submit account request', exact : true }).click (); await dialog.getByRole ('status').filter ({ hasText : 'received' }).waitFor (); assert.equal (requests, 1);
         await page.keyboard.press ('Escape'); await execute ('landing.open');
         assert.equal (await entry.evaluate (e => e.scrollWidth > e.clientWidth), false);
+        // Brand: no "SW Auto3D" text; the SWIS mark with "SW Innovation Systems" sits under sign-in.
+        const brand = page.locator ('.entry_swis'); assert.equal (await brand.innerText (), 'SW Innovation Systems'); assert.equal (await brand.locator ('img').evaluate (image => image.complete && image.naturalWidth > 0), true);
+        assert.doesNotMatch (await page.locator ('body').innerText (), /SW Auto3D/);
         await page.screenshot ({ path : `work/landing-verified-${viewport.width}.png` }); assert.deepEqual (errors, []); await page.close ();
         console.log ('Landing interaction, reduced motion, request and auth boundaries passed at ' + viewport.width + 'px');
     }

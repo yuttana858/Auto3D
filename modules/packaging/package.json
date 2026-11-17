@@ -1,6 +1,6 @@
 {
   "name": "@auto3d/packaging",
-  "version": "1.10.7",
+  "version": "1.12.0",
   "private": true,
   "type": "module",
   "license": "MIT",
