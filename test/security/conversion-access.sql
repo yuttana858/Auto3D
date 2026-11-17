@@ -54,10 +54,13 @@ begin
  j:=public.auto3d_conversion_create(b,request||jsonb_build_object('requestKey',gen_random_uuid())); attempt:=gen_random_uuid();
  perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'uploaded');
  perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'dispatch',null,null,jsonb_build_object('attemptId',attempt,'tokenHash',repeat('d',64)));
+ perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'ack',null,attempt,jsonb_build_object('callId','fc-OldRetry123456'));
  perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'failure',null,attempt,jsonb_build_object('code','conversion_failed'));
  update public.auto3d_conversion_jobs set deadline_at=now()-interval '1 minute' where id=(j->>'id')::uuid;
  r:=public.auto3d_conversion_transition(b,(j->>'id')::uuid,'retry');
  if (r#>>'{job,deadline_at}')::timestamptz<=now() or r#>>'{job,state}'<>'queued' then raise exception 'Bounded retry did not renew its processing deadline'; end if;
+ if r#>>'{job,dispatch_state}'<>'pending' or r#>>'{job,provider_call_id}' is not null or r#>>'{job,active_attempt}' is not null then raise exception 'Retry retained old dispatch identity'; end if;
+ begin perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'ack',null,attempt,jsonb_build_object('callId','fc-LateOldRetry123456')); raise exception 'Late acknowledgement restored the old dispatch'; exception when sqlstate 'PT409' then null; end;
  perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'cancel');
  j:=public.auto3d_conversion_create(b,request||jsonb_build_object('requestKey',gen_random_uuid())); attempt:=gen_random_uuid();
  perform public.auto3d_conversion_transition(b,(j->>'id')::uuid,'uploaded');
