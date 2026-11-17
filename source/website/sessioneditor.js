@@ -724,6 +724,8 @@ export class SessionEditor
     {
         this.SyncInputs ();
         this.UpdateDetails ();
+        // Auto Pack and Auto pallet show sizes and the height limit in display units.
+        if (this.website?.packagingPanel?.workspace?.InspectTab ().tab === 'auto') { this.website.packagingPanel.workspace.autoPanel.Refresh (); }
     }
     RefreshButtons ()
     {

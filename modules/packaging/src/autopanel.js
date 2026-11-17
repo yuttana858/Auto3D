@@ -1,3 +1,5 @@
+import { AutoPalletPanel } from './palletpanel.js';
+
 function Element (tag, parent, text, className)
 {
     const node = document.createElement (tag); if (text !== undefined) { node.textContent = text; } if (className) { node.className = className; } parent.appendChild (node); return node;
@@ -29,6 +31,7 @@ export class AutoPackPanel
         this.reason = Element ('p', this.root, '', 'section_hint');
         this.status = Element ('p', this.root, '', 'section_hint'); this.status.setAttribute ('role', 'status'); this.status.setAttribute ('aria-live', 'polite');
         this.Refresh ();
+        this.palletPanel = new AutoPalletPanel (host, this.root);
     }
     Size (title)
     {
@@ -53,6 +56,7 @@ export class AutoPackPanel
         this.refresh.disabled = this.pending || this.host.blocked ();
         this.create.disabled = this.pending || this.host.blocked () || !data.available || !this.host.autoPack;
         this.RefreshPlayback ();
+        this.palletPanel?.Refresh ();
     }
     RefreshPlayback ()
     {

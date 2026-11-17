@@ -1,5 +1,11 @@
 # Auto3D development log and handoff
 
+## Auto pallet — Auto3D 0.76.0 / Packaging 1.12.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-17)
+
+Based on main after #136 (0.75.0). Not deployed.
+
+- **Auto pallet.** The Packaging Auto tab gains an Auto pallet section and button. It column-stacks the selected box on a 40 × 48 × 5 in pallet (blue, brown or black) under a maximum overall height (default 55 in), using a guillotine dynamic-programming layer search that mixes orientations when that fits more. The demo 0201 box gives 20 × 8 = 160 boxes, 54.13 in overall. New commands: `packaging.pallet.plan`, `packaging.pallet.inspect` and `packaging.pallet.generate`. See [release-0760.md](release-0760.md).
+
 ## Connected AI prompt, SWIS branding and Auto Pack — Auto3D 0.75.0 / Packaging 1.11.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-16)
 
 PR #136, based on main after #134 (0.74.0). Stacks #135 (Auto Pack) and #137 (Parasolid converter docs) so they share one CI run and one merge. Not deployed.
