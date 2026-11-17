@@ -33,7 +33,7 @@ Keep real keys out of chat, repository files, command arguments, SQL Editor hist
 
 ## Required Pages profile: exact steps
 
-The Pages profile update is still pending. Automatic approval review rejected the API PATCH because its partial environment payload could overwrite existing variables/bindings. Cloudflare returns saved secret values as empty strings, so blindly writing a fetched full configuration back is also unsafe. Use the dashboard's individual-variable editor to preserve existing settings:
+Production `AUTO3D_MODAL_PROFILE=production` was verified on November 17, with existing variable names/types and R2 bindings intact. Preview is not configured and still lacks its own Auth credentials; this does not block production. Automatic approval review rejected a partial API update, so the owner used the dashboard's individual-variable editor. Use that editor for future changes:
 
 1. Open [Cloudflare → Workers & Pages → auto3d](https://dash.cloudflare.com/c24489fd32a7bebd7ff5970075c8429c/pages/view/auto3d).
 2. Open **Settings → Variables and Secrets**. Select the **Production** environment.
