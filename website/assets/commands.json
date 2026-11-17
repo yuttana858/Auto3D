@@ -9017,7 +9017,7 @@
       "id": "ai.mode.set",
       "title": "Choose AI generation type",
       "category": "AI",
-      "description": "Select the generation type at the top of the Create panel (text3d, image3d, multiimage3d, textimage or texture). Shows only the inputs that type uses. Does not submit anything.",
+      "description": "Select the generation type at the top of the Create panel (text3d, image3d, multiimage3d, textimage or texture). Shows only the inputs that type uses; Image to 3D and Multi-image to 3D turn the viewer into an image drop zone (click, drop or Ctrl+V paste) until a reference is chosen. Does not submit anything.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -9079,6 +9079,36 @@
       },
       "example": {
         "prompt": "A ceramic coffee mug with a handle"
+      }
+    },
+    {
+      "id": "ai.reference.add_image",
+      "title": "Add AI reference image",
+      "category": "AI",
+      "description": "Same as dropping or pasting (Ctrl+V) an image on the Image to 3D drop zone: set the Image to 3D reference, or add a Multi-image to 3D view, from a base64 PNG, JPEG or WebP data URL (up to 20 MB of images in total). Switches to Image to 3D when another type is selected. Does not submit anything to the provider.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dataUrl": {
+            "type": "string",
+            "minLength": 22,
+            "maxLength": 28000000
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "dataUrl"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "dataUrl": "data:image/png;base64,iVBORw0KGgo…",
+        "name": "mug.png"
       }
     },
     {

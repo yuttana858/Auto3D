@@ -82,3 +82,4 @@ workspace-editing
 workspace-optimization
 packaging-auto-pack
 packaging-auto-pallet
+ai-image-dropzone
