@@ -17,7 +17,7 @@ export async function onRequest ({ request, env })
                 job = (await ChangeJob (env, job, 'expire')).job;
                 if (job.state === 'queued') {
                     if (job.dispatch_state === 'pending' && (!job.dispatched_at || Date.parse (job.dispatched_at) < Date.now () - 120000)) {
-                        if (job.attempts >= 2) { await ChangeJob (env, job, 'failure', { code : 'dispatch_failed' }); }
+                        if ((job.purpose === 'diagnostic' ? job.diagnostic_attempts : job.attempts) >= 2) { await ChangeJob (env, job, 'failure', { code : 'dispatch_failed' }); }
                         else { await DispatchJob (env, job, 'https://auto3d-5av.pages.dev'); }
                     }
                 } else if (['cancelled', 'expired'].includes (job.state) || Date.parse (job.expires_at) <= Date.now ()) { await DeleteJobObjects (env, job); if (Date.parse (job.expires_at) <= Date.now ()) { await ChangeJob (env, job, 'delete'); } }

@@ -22,3 +22,7 @@
 @keyframes cad_progress_shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 @media (prefers-reduced-motion: reduce) { .cad_conversion_progress_fill, .cad_conversion_progress_fill::after { animation: none !important; transition: none; } .cad_conversion_progress.indeterminate .cad_conversion_progress_fill { opacity: .6; } }
 @media (max-width: 560px) { .cad_conversion_options { grid-template-columns: 1fr; } .cad_conversion_jobs { padding: 0 14px 14px; } }
+.cad_conversion_diagnostic { margin: 0.6em 0; padding: 0.7em; border: 1px solid rgba(115, 157, 210, 0.25); border-radius: 8px; background: rgba(30, 53, 82, 0.12); }
+.cad_conversion_diagnostic summary { cursor: pointer; font-weight: 600; }
+.cad_conversion_diagnostic p { overflow-wrap: anywhere; }
+.cad_conversion_diagnostic_code { font-family: monospace; font-size: 0.9em; }

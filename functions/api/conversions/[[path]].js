@@ -44,14 +44,20 @@ export async function onRequest (context)
             const object = await JobBucket (env).get (ArtifactKey (job, parts[2])); if (!object?.body) { throw CadError ('not_found', 404); }
             return new Response (object.body, { headers : { 'Content-Type' : CadArtifacts[parts[2]].type, 'Content-Length' : String (object.size), 'Content-Disposition' : 'attachment; filename="' + CadArtifacts[parts[2]].file + '"', 'Cache-Control' : 'private, no-store', 'X-Content-Type-Options' : 'nosniff' } });
         }
-        if (parts.length !== 2 || request.method !== 'POST' || !['submit', 'cancel', 'retry'].includes (parts[1])) { throw CadError ('invalid_request', 405); }
+        if (parts.length !== 2 || request.method !== 'POST' || !['submit', 'cancel', 'retry', 'diagnose'].includes (parts[1])) { throw CadError ('invalid_request', 405); }
         const body = CadExact (await JsonBody (request, 1024), ['revision']);
         // The revision is required on user mutations; worker heartbeats may have advanced it.
         const revision = body.revision;
         if (!Number.isSafeInteger (revision) || revision !== job.revision) { throw CadError ('conflict', 409); }
         if (parts[1] === 'cancel') { job = await RequestJobCancel (env, job); }
         else {
-            if (parts[1] === 'submit') {
+            if (parts[1] === 'diagnose') {
+                const capabilities = await JobCapabilities (env);
+                if (origin !== 'https://auto3d-5av.pages.dev' || !capabilities.ready || capabilities.diagnosticProtocol !== 1) { throw CadError ('not_ready', 503); }
+                const source = await JobBucket (env).head (SourceKey (job));
+                if (!source || source.size !== job.source_bytes || source.customMetadata?.sha256 !== job.source_sha256) { throw CadError ('source_mismatch'); }
+                job = (await ChangeJob (env, job, 'diagnose', {}, revision)).job;
+            } else if (parts[1] === 'submit') {
                 if (job.state === 'awaiting_upload') { const source = await JobBucket (env).head (SourceKey (job)); if (!source || source.size !== job.source_bytes || source.customMetadata?.sha256 !== job.source_sha256) { throw CadError ('source_mismatch'); } job = (await ChangeJob (env, job, 'uploaded', {}, revision)).job; }
                 else if (job.state !== 'queued') { return Reply ({ job : PublicJob (job) }); }
             } else { job = (await ChangeJob (env, job, 'retry', {}, revision)).job; }
