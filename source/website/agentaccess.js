@@ -46,13 +46,43 @@ export function AgentAccessFor (website)
     if (!website.agentAccess) { website.agentAccess = new AgentAccess (website); }
     return website.agentAccess;
 }
+const LiveControlKey = 'auto3d-live-control', LiveControlMs = 24 * 60 * 60 * 1000;
+// Per browser tab (sessionStorage): the account, window identity and expiry of Live Control.
+function Remembered ()
+{
+    try {
+        const value = JSON.parse (window.sessionStorage.getItem (LiveControlKey) || 'null');
+        if (!value || typeof value.accountId !== 'string' || typeof value.instanceId !== 'string' || !Number.isFinite (value.until)) { return null; }
+        if (value.until <= Date.now ()) { Forget (); return null; }
+        return value;
+    } catch { return null; }
+}
+function Remember (value) { try { window.sessionStorage.setItem (LiveControlKey, JSON.stringify (value)); } catch { /* Live Control then lasts for this page only. */ } }
+function Forget () { try { window.sessionStorage.removeItem (LiveControlKey); } catch { /* Nothing stored. */ } }
+
 export class AgentAccess
 {
     constructor (website)
     {
-        this.website = website; this.socket = null; this.instanceId = crypto.randomUUID (); this.generation = 0; this.status = 'Disconnected'; this.statusElement = null; this.reconnectEnabled = false; this.reconnectAttempts = 0; this.allowSelect = false; this.running = new Map (); this.codeViews = new Set ();
-        website.auth.Subscribe (user => { if (!user || this.accountId && user.id !== this.accountId) { this.Disconnect (); } });
+        this.website = website; this.socket = null; this.instanceId = Remembered ()?.instanceId || crypto.randomUUID (); this.generation = 0; this.status = 'Disconnected'; this.statusElement = null; this.reconnectEnabled = false; this.reconnectAttempts = 0; this.allowSelect = false; this.running = new Map (); this.codeViews = new Set ();
+        website.auth.Subscribe (user => {
+            if (!user || this.accountId && user.id !== this.accountId) { this.Stop (); return; }
+            this.Resume (user.id);
+        });
     }
+    // Live Control stays on in this browser tab for 24 hours: the window keeps its identity across reloads and
+    // reconnects by itself, so agent pairings resume without a new code. Disconnect or sign-out ends it.
+    Resume (owner)
+    {
+        const remembered = Remembered ();
+        if (!remembered || remembered.accountId !== owner || this.socket || this.reconnectTimer) { return; }
+        this.instanceId = remembered.instanceId; this.accountId = owner; this.reconnectEnabled = true; this.reconnectAttempts = 0; this.ScheduleReconnect (owner, remembered.allowSelect);
+    }
+    Stop ()
+    {
+        this.Disconnect (); Forget (); this.instanceId = crypto.randomUUID ();
+    }
+    LiveControlUntil () { const remembered = Remembered (); return remembered && remembered.instanceId === this.instanceId ? remembered.until : null; }
     Account ()
     {
         const user = this.website.auth?.user;
@@ -65,7 +95,7 @@ export class AgentAccess
         if (!response.ok) { throw new Error ('Agent access unavailable. Check staging setup and permissions.'); }
         const result = await response.json (); if (this.Account () !== owner) { throw new Error ('Account changed.'); } return result;
     }
-    Inspect () { const connected = this.socket?.readyState === 1; return { status : this.status, connected, screenshots : connected, permissionPolicy : ConnectionPolicy, allowSelect : this.allowSelect === true, connectionId : this.connectionId || null, windowCodeState : this.CodeState (), windowCodeExpiresAt : this.windowCodeExpiresAt || null }; }
+    Inspect () { const connected = this.socket?.readyState === 1; return { status : this.status, connected, liveControlUntil : this.LiveControlUntil (), screenshots : connected, permissionPolicy : ConnectionPolicy, allowSelect : this.allowSelect === true, connectionId : this.connectionId || null, windowCodeState : this.CodeState (), windowCodeExpiresAt : this.windowCodeExpiresAt || null }; }
     CodeState ()
     {
         if (this.socket?.readyState !== 1) { return 'disconnected'; }
@@ -176,7 +206,9 @@ export class AgentAccess
         if (retry && (!this.reconnectEnabled || this.generation !== initialGeneration)) { throw new Error ('Reconnect cancelled.'); }
         if (!config.pilot || !['https://auto3d-mcp-pilot.pages.dev', 'https://auto3d-5av.pages.dev'].includes (location.origin) || config.mcpUrl !== location.origin + '/mcp') { throw new Error ('MCP access is unavailable here.'); }
         // A reconnect keeps the window identity so an existing pairing resumes.
-        this.Disconnect ({ preserveRetry : retry }); if (!retry) { this.instanceId = crypto.randomUUID (); } this.accountId = owner; this.allowSelect = allowSelect; this.status = 'Connecting'; const generation = this.generation;
+        // A reconnect, or a reload within the 24-hour Live Control window, keeps the window identity.
+        const remembered = Remembered (); if (!retry && !(remembered?.accountId === owner && remembered.instanceId === this.instanceId)) { this.instanceId = crypto.randomUUID (); }
+        this.Disconnect ({ preserveRetry : retry }); this.accountId = owner; this.allowSelect = allowSelect; this.status = 'Connecting'; const generation = this.generation;
         const socket = new WebSocket (location.origin.replace ('https:', 'wss:') + '/api/agent/connect'); this.socket = socket;
         // Only protocol violations end the connection; command failures are returned as results.
         socket.addEventListener ('message', event => { this.Message (event, socket, generation).catch (() => { if (this.socket === socket) { this.ConnectionLost (); } }); });
@@ -197,8 +229,8 @@ export class AgentAccess
                 socket.send (JSON.stringify ({ type : 'sessions', instanceId : this.instanceId, sessions : this.Sessions () }));
             } catch { this.ConnectionLost (); }
         }, 1000);
-        this.renew = setInterval (() => { this.Request ('renew', { connectionId : this.connectionId, instanceId : this.instanceId }).catch (() => this.ConnectionLost ()); }, 60000);
-        this.reconnectEnabled = true; this.reconnectAttempts = 0;
+        this.renew = setInterval (() => { if (!Remembered ()) { this.Stop (); return; } this.Request ('renew', { connectionId : this.connectionId, instanceId : this.instanceId }).catch (() => this.ConnectionLost ()); }, 60000);
+        this.reconnectEnabled = true; this.reconnectAttempts = 0; Remember ({ accountId : owner, instanceId : this.instanceId, allowSelect, until : retry && Remembered ()?.instanceId === this.instanceId ? Remembered ().until : Date.now () + LiveControlMs });
         if (this.statusElement) { this.statusElement.textContent = retry ? 'Reconnected. Existing agent pairings resume; a new code is available for new agents.' : 'Connected'; }
         return { ...this.Inspect (), windowCode : this.windowCode };
     }
@@ -262,7 +294,7 @@ export class AgentAccess
         const access = document.createElement ('p'); access.textContent = 'Live Control shares this window with your approved agents, including read, write and screenshot access.';
         const status = document.createElement ('p'); status.setAttribute ('role', 'status'); status.textContent = this.status; this.statusElement = status;
         const connect = document.createElement ('button'); connect.textContent = 'Live Control'; connect.onclick = () => { this.Connect ().then (() => { status.textContent = 'Connected'; }).catch (error => { this.Disconnect (); status.textContent = error.message; }); };
-        const disconnect = document.createElement ('button'); disconnect.textContent = 'Disconnect'; disconnect.onclick = () => { this.Disconnect (); status.textContent = this.status; };
+        const disconnect = document.createElement ('button'); disconnect.textContent = 'Disconnect'; disconnect.onclick = () => { this.Stop (); status.textContent = this.status; };
         const list = document.createElement ('div');
         const refresh = async () => {
             const result = await this.Request ('registrations'); list.replaceChildren ();

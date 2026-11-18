@@ -40,7 +40,9 @@ describe ('Packaging adapter and unfolding', () => {
     it ('Uses shared commands, typed phrases and macros; respects selection, scale, read-only, account and schema checks', async () => {
         const editor = Editor (); const registry = CreateAgentCommands (editor.website); assert.equal ((await registry.Execute ('packaging.fefco.unfold')).ok, false);
         const macro = await registry.RunMacro ({ version : 1, steps : [{ id : 'box', command : 'packaging.fefco.generate', arguments : { code : '0200' } }, { id : 'flat', command : 'packaging.fefco.unfold', arguments : { objectId : { $ref : 'box.objectId' } } }] }); assert.equal (macro.ok, true, JSON.stringify (macro));
-        assert.equal ((await registry.Execute ('packaging.fefco.unfold')).ok, false); await editor.history.Undo (); editor.selected.scale = [2, 1, 1]; assert.equal ((await registry.Execute ('packaging.fefco.unfold')).ok, false); editor.selected.scale = [1, 1, 1];
+        assert.equal ((await registry.Execute ('packaging.fefco.unfold')).ok, false);
+        // One Undo reverses the whole macro; generate a folded box again for the guard checks.
+        assert.equal (editor.history.undo.at (-1).steps, 2); await editor.history.Undo (); assert.equal ((await registry.Execute ('packaging.fefco.generate', { code : '0200' })).ok, true); editor.selected.scale = [2, 1, 1]; assert.equal ((await registry.Execute ('packaging.fefco.unfold')).ok, false); editor.selected.scale = [1, 1, 1];
         editor.readOnly = true; assert.equal ((await registry.Execute ('packaging.fefco.unfold')).ok, false); editor.readOnly = false; const user = editor.website.auth.user; editor.website.auth.user = null; assert.equal ((await registry.Execute ('packaging.fefco.unfold')).ok, false); editor.website.auth.user = user;
         assert.equal ((await registry.Execute ('packaging.fefco.unfold', { extra : true })).ok, false); assert.equal ((await registry.Execute ('commands.text', { text : 'unfold box' })).ok, true);
     });

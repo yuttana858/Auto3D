@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Integration release in #155 — Auto3D 0.91.0 / Packaging 1.16.1 (2026-11-18)
+
+Primary Products 0.15.0 / Molded Pulp 0.3.0 are preserved; Packaging 1.16.1 is #156's Auto Pack change on top of #161's 1.16.0. Based on main after #161 (0.90.0); renumbered from 0.89.0 and 0.90.0. #156 (Auto Pack compact controls and fold timeline, prepared as 0.88.1) and #157 (macro animation recording and collapsible tracks) are stacked here; a macro recording is one Undo step. Based on main after #154 (0.89.0). Not deployed. Agent pairings last 24 hours, follow the window's active tab and survive reloads (these commits missed the #148 merge). Read-only Supabase tools are auto-approved in `.claude/settings.json`. Macro steps wait for playback, one Undo reverses a run, tab changes are allowed only as the last step, saved macros can be deleted and exported, and saving warns about account-specific IDs. The Advance animation controls are one minimal toolbar line. See [release-0910.md](release-0910.md). Next: store macros in the account.
+
 ## Auto Pack assembly sequence, motion easing, Assign facing — Auto3D 0.90.0 / Packaging 1.16.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0 (2026-11-18)
 
 Candidate on `claude/dazzling-faraday-rhti3h`, not deployed. Auto Pack plays the real packing order (lift, erect with lid open 90°, pads, partitions, products one at a time with acceleration for large counts, top pad, close) as one Undo step; Accessories pads and partitions drop in; automatic modelling motion ramps in and out with the new Motion easing preference (Smooth default, Strong, Linear); Assign facing joins the Model spec preview buttons. New commands: `packaging.auto.sequence.inspect`, `preferences.motion_easing`, `object.facing.*` (394 commands). See docs/release-0900.md.

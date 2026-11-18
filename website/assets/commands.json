@@ -419,7 +419,7 @@
       "id": "agent.access.connect",
       "title": "Connect this browser window",
       "category": "Account",
-      "description": "Same as Live Control. Share this window with this account's approved MCP agents, including read, write and screenshot access. Agents select it with auto3d.sessions.select. Returns a short-lived single-use code for auto3d.sessions.pair_code; allowSelect false requires that code. Legacy screenshots argument is accepted but no longer changes access.",
+      "description": "Same as Live Control. Live Control stays on in this browser tab for 24 hours: the window keeps its identity across reloads and reconnects by itself, so paired agents resume without a new code until Disconnect, sign-out or expiry. Share this window with this account's approved MCP agents, including read, write and screenshot access. Agents select it with auto3d.sessions.select. Returns a short-lived single-use code for auto3d.sessions.pair_code; allowSelect false requires that code. Legacy screenshots argument is accepted but no longer changes access.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -442,7 +442,7 @@
       "id": "agent.access.disconnect",
       "title": "Disconnect this browser window",
       "category": "Account",
-      "description": "End this browser window agent connection. Does not revoke independent OAuth registrations.",
+      "description": "End this browser window agent connection and its 24-hour Live Control, so existing agent pairings stop and the next Live Control starts a new window identity. Does not revoke independent OAuth registrations.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -2954,6 +2954,50 @@
         "partitions": true,
         "boardId": "nominal-b",
         "grade": "32 ECT"
+      }
+    },
+    {
+      "id": "packaging.auto.explanation",
+      "title": "Show Auto Pack explanation",
+      "category": "Packaging",
+      "description": "Open or close the sizing, folding and packed contents explanation in the Auto Pack panel.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "open"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "open": true
+      }
+    },
+    {
+      "id": "packaging.auto.contents_panel",
+      "title": "Show Auto Pack pads and partitions",
+      "category": "Packaging",
+      "description": "Open or close the Auto Pack Pads and Partitions controls without changing their settings.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "open"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "open": true
       }
     },
     {
@@ -6499,6 +6543,55 @@
       "example": {}
     },
     {
+      "id": "animation.tracks.inspect",
+      "title": "Inspect animation tracks",
+      "category": "Animation",
+      "description": "List scene, camera, action and per-object track keyframes and expansion state.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "animation.tracks.expand",
+      "title": "Expand animation object tracks",
+      "category": "Animation",
+      "description": "Expand or collapse the object track list or one object track in the Advance animation panel.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "boolean"
+          },
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "track": {
+            "type": "string",
+            "enum": [
+              "scene",
+              "camera",
+              "actions",
+              "objects"
+            ]
+          }
+        },
+        "required": [
+          "open"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "open": true
+      }
+    },
+    {
       "id": "animation.action.open",
       "title": "Open Action keyframe options",
       "category": "Animation",
@@ -7141,6 +7234,37 @@
       }
     },
     {
+      "id": "animation.macro.record",
+      "title": "Run macro and record animation",
+      "category": "Animation",
+      "description": "Run a saved or supplied macro and record object transforms and camera views as sequential keyframes. Requires an empty stopped timeline and 1–100 existing objects. Unsupported commands, including creation, deletion, materials and procedural animation, are rejected before execution. Completed macro steps remain if a later step fails. Object/camera changes are interpolated over stepSeconds; the recorded timeline is one undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "definition": {
+            "type": "string",
+            "maxLength": 262144
+          },
+          "stepSeconds": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 30
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "name": "Demo",
+        "stepSeconds": 2
+      }
+    },
+    {
       "id": "macro.design.edit",
       "title": "Edit visual macro",
       "category": "Macros",
@@ -7189,7 +7313,7 @@
       "id": "macro.cancel",
       "title": "Cancel running macro",
       "category": "Macros",
-      "description": "Request cancellation of the running macro or typed command sequence. Stops before the next step; completed steps are not undone.",
+      "description": "Request cancellation of the running macro or typed command sequence. Stops before the next step, including while a step waits for its playback; completed steps stay applied and one history.undo reverses them.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -7217,7 +7341,7 @@
       "id": "macro.save",
       "title": "Save macro",
       "category": "Macros",
-      "description": "Save a named version 1 macro locally. Definition is a JSON string; matching names are replaced.",
+      "description": "Save a named version 1 macro locally. Definition is a JSON string; matching names are replaced. The macro is checked before saving (unique step IDs, known commands, session tab changes only as the last step). warnings list arguments that name account- or scene-specific records another account cannot replay.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -7240,6 +7364,52 @@
       "example": {
         "name": "Fit and inspect",
         "definition": "{\"version\":1,\"steps\":[{\"id\":\"fit\",\"command\":\"view.fit\",\"arguments\":{}}]}"
+      }
+    },
+    {
+      "id": "macro.delete",
+      "title": "Delete saved macro",
+      "category": "Macros",
+      "description": "Delete a macro saved in this browser by name (case-insensitive).",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "name": "Fit and inspect"
+      }
+    },
+    {
+      "id": "macro.export",
+      "title": "Export saved macro",
+      "category": "Macros",
+      "description": "Return a saved macro as a portable JSON definition (for macro.save in another browser), with replay warnings.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "name": "Fit and inspect"
       }
     },
     {
