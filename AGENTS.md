@@ -44,6 +44,8 @@ Molded Pulp 0.2.0 (Auto3D 0.83.0 / Packaging 1.14.0 / Primary Products 0.15.0, b
 
 Auto3D 0.84.1 (Packaging 1.14.1 / Primary Products 0.15.0 / Molded Pulp 0.1.0, based on main after #147) gives Auto Pack cartons the standard RSC presentation through the shared `FoldDisplayPose` (trimmed panels, crease bends, glue-tab shift). `DisplayClearance` guards it, panel bow can be turned off in the saved appearance, and exact panels remain the fallback. Every fold route should use `FoldDisplayPose` for display. See docs/release-0841.md.
 
+Auto3D 0.85.0 (Packaging 1.14.1 / Primary Products 0.15.0 / Molded Pulp 0.1.0, based on main after #147, with the 0.84.1 Auto Pack presentation fix) makes agent pairings last 24 hours (`PairLifetimeMs`, no 1-hour idle drop). A pairing follows its window's active tab, and Live Control is remembered for 24 hours in the browser tab (stable window identity across reloads; `liveControlUntil` in `agent.access.inspect`). Disconnect, sign-out or revoke ends it; window codes stay single-use, valid for 10 minutes. See docs/release-0850.md.
+
 # Agent-accessible features
 
 The server diagnostic release in PR #147 is Auto3D 0.84.0 / Packaging 1.14.0 / Primary Products 0.15.0 / Molded Pulp 0.2.0 with Cloud 3D Studio 0.4.0 (#19). `conversion.diagnose` reuses a failed owned upload on the private server; `conversion.diagnostics` reads only the strict geometry-free report. Raw failure diagnostics stay server-only. Never add source contents, arbitrary messages/logs or geometry to report fields. Diagnostic attempts do not reset conversion attempts, extend source retention or publish a model. See docs/release-0840.md.

@@ -36,11 +36,11 @@ try {
         }
         const response = await route.fetch ({ url : 'http://127.0.0.1:' + server.address ().port + url.pathname + url.search }); await route.fulfill ({ response });
     });
-    let wire, helloSeen; const hello = new Promise (resolve => { helloSeen = resolve; });
+    const hellos = []; let wire, helloSeen; const hello = new Promise (resolve => { helloSeen = resolve; });
     await page.routeWebSocket (origin.replace ('https:', 'wss:') + '/api/agent/connect', ws => {
         wire = ws; ws.onMessage (text => {
             const message = JSON.parse (text);
-            if (message.type === 'hello') { assert.equal (message.windowCode, undefined); ws.send (JSON.stringify ({ type : 'hello_ack', connectionId : 'connection-a', expiresAt : Date.now () + 300000, windowCode : windowCodes[codeIndex], windowCodeExpiresAt : Date.now () + 600000, windowCodeId : 'code-' + codeIndex })); helloSeen (); }
+            if (message.type === 'hello') { hellos.push (message.instanceId); assert.equal (message.windowCode, undefined); ws.send (JSON.stringify ({ type : 'hello_ack', connectionId : 'connection-a', expiresAt : Date.now () + 300000, windowCode : windowCodes[codeIndex], windowCodeExpiresAt : Date.now () + 600000, windowCodeId : 'code-' + codeIndex })); helloSeen (); }
             if (message.type === 'window_code') { codeIndex++; ws.send (JSON.stringify ({ type : 'window_code', requestId : message.requestId, windowCode : windowCodes[codeIndex], windowCodeExpiresAt : Date.now () + 600000, windowCodeId : 'code-' + codeIndex })); }
             if (message.type === 'result') { results.push (message); nextResult?.(); }
         });
@@ -103,14 +103,24 @@ try {
     const message = bar.entries.find (entry => entry.kind === 'message'); assert.equal (message?.text, 'make the box taller please');
     await call ('ui.command_bar.respond', { message : 'Working on it.', replyTo : message.id });
     assert.equal (await page.locator ('.scene_command_bar .scene_status').textContent (), 'Agent: Working on it.');
+    // Live Control lasts 24 hours in this browser tab: a reload reconnects by itself with the same window identity,
+    // so existing agent pairings resume without a new code.
+    const until = (await call ('agent.access.inspect')).liveControlUntil; assert.ok (until > Date.now () + 86000000 && until <= Date.now () + 86400000, String (until));
+    const identity = hellos.at (-1), seen = hellos.length;
+    await page.reload (); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
+    await page.waitForFunction (async () => (await Auto3D.execute ('agent.access.inspect', {})).result.connected === true, null, { timeout : 30000 });
+    for (let i = 0; i < 300 && hellos.length === seen; i++) { await page.waitForTimeout (50); } /* the socket opens before its hello reaches the route handler */
+    assert.equal (hellos.length, seen + 1); assert.equal (hellos.at (-1), identity); assert.equal ((await call ('agent.access.inspect')).liveControlUntil, until);
     registrationScopes = ['auto3d.read'];
     await call ('agent.access.open'); await dialog.waitFor ();
     await dialog.getByText ('Named review agent · Reconnect this agent to enable all tools and screenshots', { exact : false }).waitFor ();
     await dialog.getByRole ('button', { name : 'Disconnect', exact : true }).click (); assert.equal ((await call ('agent.access.inspect')).connected, false);
+    // Disconnect ends the 24-hour Live Control: no automatic reconnect, and the next Live Control is a new window.
+    assert.equal ((await call ('agent.access.inspect')).liveControlUntil, null);
     assert.equal (await codeInput.inputValue (), ''); assert.equal (await badge.isVisible (), false);
     await dialog.getByRole ('button', { name : 'Revoke', exact : true }).click ();
     await page.evaluate (() => document.querySelector ('dialog[aria-label="MCP connections"]').close ());
     await call ('admin.agents.open'); const admin = page.getByRole ('dialog', { name : 'Agent administration', exact : true }); await admin.getByLabel ('Pilot account ID').fill ('test-owner'); await admin.getByRole ('button', { name : 'Inspect account' }).click ();
     await admin.getByRole ('status').filter ({ hasText : 'Agent access enabled' }).waitFor ();
-    assert.deepEqual (errors, []); console.log ('Server-issued window codes in header/Preferences/connection controls, clipboard copy, renewal/used states, mobile fit, unified access, real 12-inch RSC generation, PNG capture, restricted-grant guidance, command bar replies, disconnect, revoke and admin UI passed.');
+    assert.deepEqual (errors, []); console.log ('24-hour Live Control across reload with the same window identity, Disconnect ending it, server-issued window codes in header/Preferences/connection controls, clipboard copy, renewal/used states, mobile fit, unified access, real 12-inch RSC generation, PNG capture, restricted-grant guidance, command bar replies, disconnect, revoke and admin UI passed.');
 } finally { await browser.close (); await new Promise (resolve => server.close (resolve)); }

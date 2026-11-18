@@ -390,7 +390,7 @@
       "id": "agent.access.connect",
       "title": "Connect this browser window",
       "category": "Account",
-      "description": "Same as Live Control. Share this window with this account's approved MCP agents, including read, write and screenshot access. Agents select it with auto3d.sessions.select. Returns a short-lived single-use code for auto3d.sessions.pair_code; allowSelect false requires that code. Legacy screenshots argument is accepted but no longer changes access.",
+      "description": "Same as Live Control. Live Control stays on in this browser tab for 24 hours: the window keeps its identity across reloads and reconnects by itself, so paired agents resume without a new code until Disconnect, sign-out or expiry. Share this window with this account's approved MCP agents, including read, write and screenshot access. Agents select it with auto3d.sessions.select. Returns a short-lived single-use code for auto3d.sessions.pair_code; allowSelect false requires that code. Legacy screenshots argument is accepted but no longer changes access.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -413,7 +413,7 @@
       "id": "agent.access.disconnect",
       "title": "Disconnect this browser window",
       "category": "Account",
-      "description": "End this browser window agent connection. Does not revoke independent OAuth registrations.",
+      "description": "End this browser window agent connection and its 24-hour Live Control, so existing agent pairings stop and the next Live Control starts a new window identity. Does not revoke independent OAuth registrations.",
       "mutates": true,
       "inputSchema": {
         "type": "object",

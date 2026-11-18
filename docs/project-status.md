@@ -1,5 +1,11 @@
 # Auto3D development log and handoff
 
+## 24-hour agent pairing and Live Control — Auto3D 0.85.0 / Packaging 1.14.1 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-18)
+
+Based on main after #147 (0.84.0); includes the 0.84.1 Auto Pack presentation fix. Not deployed.
+
+- **Pairings last 24 hours.** They survive inactivity, follow the paired window's active tab, and resume after a reload, because Live Control is remembered in the browser tab for 24 hours with a stable window identity. Disconnect, sign-out or revoke ends them. See [release-0850.md](release-0850.md).
+
 ## Auto Pack edges match generated RSC boxes — Auto3D 0.84.1 / Packaging 1.14.1 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-18)
 
 Based on main after #147 (0.84.0). Not deployed.
