@@ -148,3 +148,16 @@ export function KnotSpans (knots, p = Degree)
 {
     const spans = []; for (let i = p; i < knots.length - p - 1; i++) { if (knots[i + 1] > knots[i]) { spans.push ([knots[i], knots[i + 1]]); } } return spans;
 }
+
+// Least-squares fit of several value columns along one axis: values[k * columns + c] at the axis samples (AxisBasis).
+// Returns control values, index b * columns + c.
+export function FitAxis (values, columns, basis)
+{
+    const p = basis.degree, count = basis.count, out = new Float64Array (count * columns), rhs = new Float64Array (count);
+    for (let c = 0; c < columns; c++) {
+        rhs.fill (0);
+        for (let k = 0; k < basis.spans.length; k++) { const s = basis.spans[k] - p, v = values[k * columns + c]; for (let r = 0; r <= p; r++) { rhs[s + r] += basis.values[k * (p + 1) + r] * v; } }
+        BandSolve (basis.factor, count, p, rhs); for (let b = 0; b < count; b++) { out[b * columns + c] = rhs[b]; }
+    }
+    return out;
+}

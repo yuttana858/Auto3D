@@ -141,6 +141,35 @@ Starting from the review field, for each shell:
 - **Browser:** `molded-pulp-export` grows a solid-view check: the default view is the B-rep tessellation, and Review mesh still shows the field.
 - **Results:** recorded in a Phase 2 table in this document, in the same format as Phase 1.
 
+### Phase 2 progress
+
+#### Step 1 (done): lofted pocket walls
+
+The code is `nurbs/contours.js` (marching squares with saddle resolution), `nurbs/periodic.js` (periodic cubic outline fits with a shared +x seam and chord-length parameters), `nurbs/loft.js` (`LoftPocketWalls`) and `nurbs/measure.js` (true 3D distance to the review surface).
+
+Each pocket wall is one cubic B-spline surface:
+- periodic around the pocket, with m outline controls;
+- clamped in height, with n controls, so y equals the height parameter exactly.
+
+| Case | Walls | Controls (all walls) | Max 3D distance to review | Time | Target |
+| --- | --- | --- | --- | --- | --- |
+| T1 6 cans, 86 mm pitch, Type 2, standard (513 nodes) | 6, each 16–24 × 4 | 408 (Phase 1: 263,169 per face) | 0.268 mm | 1.3 s | ≤ 0.3125 mm ✔ |
+| T3 the same at fine (1025 nodes) | 6 | 648 (1.6× standard) | 0.157 mm | 5.4 s | Distance ✔. Growth ≤ 1.5× ✘ (1.6×). Time ≤ 2 s ✘ |
+| T2 6 cans, 70 mm pitch | none | none | none | 0.1 s | Named failure: pockets join about 13 mm up ✔ |
+
+What we learned while building it:
+- The review outlines carry about ±0.35 mm of grid ripple from the octagonal clearance filter. The outline fit tolerance is therefore 0.6 × cell (at least 0.15 mm). Fitting tighter only chases grid noise; the smooth loft is closer to the design intent than the review field is.
+- Error must be measured in 3D. A slope-scaled vertical estimate overstated wall error by about 10× near the floor crease.
+
+#### Next steps
+
+1. Speed up contour extraction: per-pocket windows instead of the full grid at every level. Target: T3 under 2 s.
+2. Floors and plateau as trimmed planes, plus the outer skirt wall (the outermost contour, ground high inside).
+3. Rim and floor fillets as the loft's end sections.
+4. Tool side by offsetting the outlines by the thickness in plan.
+5. Faces with inner loops in `brep.js`, sewing, and STEP output of the lofted shell. Then the OpenCASCADE gate.
+6. T2: split walls into bands at the join height, plus a saddle patch. Until then, the shell keeps the Phase 1 output and reports why.
+
 ## Phase 3: Cloud 3D Studio
 
 Cloud 3D Studio already runs OpenCASCADE for CAD conversion, using the private, owned, expiring `conversion.*` job pattern. It can take the heavy and authoritative steps:

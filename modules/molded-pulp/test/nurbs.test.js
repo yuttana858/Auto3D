@@ -5,6 +5,12 @@ import { ClampedKnots, Greville, FindSpan, BasisFuns, CurvePoint, SurfacePoint, 
 import { NurbsShell, MaxOutputSide } from '../src/nurbs/shell.js';
 import { ShellBrep, BrepEdgeUses } from '../src/nurbs/brep.js';
 import { WriteStep, StepReal } from '../src/nurbs/step.js';
+import { FormShell } from '../src/plan.js';
+import { PulpTypes } from '../src/state.js';
+import { IsoContours, PolygonArea } from '../src/nurbs/contours.js';
+import { SeamOrder, FitPeriodic, PeriodicPoint, OutlineDeviation } from '../src/nurbs/periodic.js';
+import { SurfaceDistance } from '../src/nurbs/measure.js';
+import { LoftPocketWalls } from '../src/nurbs/loft.js';
 
 function Cylinder (cx, cz, radius, height, out, segments = 48)
 {
@@ -14,7 +20,7 @@ function Cylinder (cx, cz, radius, height, out, segments = 48)
     }
     return out;
 }
-const SixPack = () => { const out = []; for (let i = 0; i < 3; i++) { for (let j = 0; j < 2; j++) { Cylinder (i * 86, j * 86, 33, 122, out); } } return Float32Array.from (out); };
+const SixPack = (pitch = 86, segments = 48) => { const out = []; for (let i = 0; i < 3; i++) { for (let j = 0; j < 2; j++) { Cylinder (i * pitch, j * pitch, 33, 122, out, segments); } } return Float32Array.from (out); };
 
 // Signed volume of a shell's B-rep from its oriented faces (each bilinear cell split in two triangles, wound
 // counter-clockwise in parameter space and flipped for reversed faces). Positive means outward-facing faces.
@@ -103,5 +109,34 @@ describe ('Molded Pulp NURBS output and STEP', function () {
         }
         assert.deepEqual ([1, 0, -0, 0.5, 1e-7, 1e21].map (StepReal), ['1.', '0.', '0.', '0.5', '1.E-7', '1.E+21']);
         assert.throws (() => WriteStep ([]), /Form a sheet or tray/);
+    });
+});
+
+describe ('Molded Pulp Phase 2: lofted pocket walls', function () {
+    this.timeout (120000);
+    it ('traces closed iso-contours and fits them with periodic cubics', () => {
+        const n = 65, grid = { nx : n, nz : n, dx : 1, dz : 1, x0 : -32, z0 : -32 }, cone = new Float32Array (n * n);
+        for (let j = 0; j < n; j++) { for (let i = 0; i < n; i++) { cone[j * n + i] = Math.hypot (i - 32, j - 32); } }
+        const [ring] = IsoContours (cone, grid, 20); assert.equal (ring.closed, true); assert.ok (Math.abs (Math.abs (PolygonArea (ring.points)) - Math.PI * 400) < 4);
+        const o = SeamOrder (ring.points, [0, 0]); assert.ok (o.points[0][0] > 19.5 && Math.abs (o.points[0][1]) < 1, 'seam on +x'); assert.ok (o.params.every ((t, k) => k === 0 || t > o.params[k - 1]));
+        const fit = FitPeriodic (o.points, o.params, 16); assert.ok (OutlineDeviation (o.points, fit) < 0.05);
+        const p = PeriodicPoint (fit, 0.25); assert.ok (Math.abs (Math.hypot (p[0], p[1]) - 20) < 0.05 && p[1] > 19, 'counter-clockwise in (x, z)');
+        const distance = SurfaceDistance (grid, cone); assert.ok (Math.abs (distance (0, 25, 20) - 5 / Math.SQRT2) < 0.05, 'true 3D distance to a 45° cone');
+    });
+    it ('lofts each pocket wall as one cubic surface within a quarter of the Type 2 tolerance (T1)', () => {
+        const draft = { ...DefaultPulpDraft ('type2'), formDepthMm : 35, ribs : 'off', lugs : 'off' }, shell = FormShell (SixPack (86, 96), draft, { keepSurfaces : true });
+        const result = LoftPocketWalls (shell.grid, shell.surfaces.top, { depthMm : shell.metrics.achievedDepthMm, wallToleranceMm : 0.25 * PulpTypes.type2.toleranceMm });
+        assert.equal (result.ok, true, result.reason); assert.equal (result.walls.length, 6); assert.deepEqual (result.merges, []);
+        assert.ok (result.maxDistanceMm <= 0.3125, 'max ' + result.maxDistanceMm); assert.ok (result.controls < 1000, result.controls + ' controls vs ' + shell.grid.n ** 2 + ' per Phase 1 face');
+        for (const wall of result.walls) {
+            const s = wall.surface; assert.equal (s.countU, wall.outlineControls + 3); assert.equal (s.knotsU.length, s.countU + 4); assert.equal (s.knotsV.length, s.countV + 4);
+            for (const [t, h] of [[0, 1], [0.37, 17], [0.9, 33]]) { assert.ok (Math.abs (SurfacePoint (s, t, h)[1] - h) < 1e-9, 'y follows the height parameter'); }
+            const a = SurfacePoint (s, 0, 10), b = SurfacePoint (s, 1 - 1e-12, 10); assert.ok (Math.hypot (a[0] - b[0], a[2] - b[2]) < 1e-6, 'closed around the pocket');
+        }
+    });
+    it ('reports pockets that join below the plateau instead of writing a wrong wall (T2)', () => {
+        const shell = FormShell (SixPack (70, 48), { ...DefaultPulpDraft ('type2'), formDepthMm : 35, detail : 'draft', ribs : 'off', lugs : 'off' }, { keepSurfaces : true });
+        const result = LoftPocketWalls (shell.grid, shell.surfaces.top, { depthMm : shell.metrics.achievedDepthMm });
+        assert.equal (result.ok, false); assert.match (result.reason, /join below the plateau/); assert.ok (result.merges.length > 0); assert.deepEqual (result.walls, []);
     });
 });
