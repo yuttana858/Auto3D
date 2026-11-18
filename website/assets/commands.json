@@ -2953,6 +2953,50 @@
       }
     },
     {
+      "id": "packaging.auto.explanation",
+      "title": "Show Auto Pack explanation",
+      "category": "Packaging",
+      "description": "Open or close the sizing, folding and packed contents explanation in the Auto Pack panel.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "open"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "open": true
+      }
+    },
+    {
+      "id": "packaging.auto.contents_panel",
+      "title": "Show Auto Pack pads and partitions",
+      "category": "Packaging",
+      "description": "Open or close the Auto Pack Pads and Partitions controls without changing their settings.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "open"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "open": true
+      }
+    },
+    {
       "id": "packaging.auto.styles",
       "title": "List Auto Pack box styles",
       "category": "Packaging",

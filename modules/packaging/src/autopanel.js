@@ -21,11 +21,13 @@ export class AutoPackPanel
         this.inside = this.Size ('Inside size');
         this.score = this.Size ('Score size');
         this.board = Element ('p', this.root, '', 'section_hint');
-        Element ('p', this.root, 'Clearance: 0.001″ (0.0254 mm) on each face. The inside size adds clearance on both sides of each dimension and one board thickness along the longer side for the internal glue tab. It is generated like Generate with the inside basis: the selected board record and its allowance factors convert the inside size to score dimensions, and the carton keeps that CAD measurement layer.', 'section_hint');
-        Element ('p', this.root, 'The blank starts below the product. A bottom flap stays underneath as the carton folds around it.', 'section_hint');
+        this.explanation = Element ('details', this.root, undefined, 'packaging_auto_explanation');
+        Element ('summary', this.explanation, 'How Auto Pack works');
+        Element ('p', this.explanation, 'Clearance: 0.001″ (0.0254 mm) on each face. The inside size adds clearance on both sides of each dimension and one board thickness along the longer side for the internal glue tab. It is generated like Generate with the inside basis: the selected board record and its allowance factors convert the inside size to score dimensions, and the carton keeps that CAD measurement layer.', 'section_hint');
+        Element ('p', this.explanation, 'The blank starts below the product. A bottom flap stays underneath as the carton folds around it.', 'section_hint');
         // Packed contents: nested partitions between the products and pads around them, fitted with them.
-        const contents = Element ('section', this.root, undefined, 'packaging_auto_contents'); contents.setAttribute ('aria-label', 'Packed contents'); Element ('h4', contents, 'Packed contents');
-        Element ('p', contents, 'Partitions nest between the products: the layout is read from the products, gaps too narrow for the board are opened, and one interlocking set goes in each layer. Pads wrap the products and partitions. The carton is fitted around everything and folds with the contents in place.', 'section_hint');
+        const contents = Element ('details', this.root, undefined, 'packaging_auto_contents'); this.contentsSection = contents; Element ('summary', contents, 'Pads and Partitions');
+        Element ('p', this.explanation, 'Partitions nest between the products: the layout is read from the products, gaps too narrow for the board are opened, and one interlocking set goes in each layer. Pads wrap the products and partitions. The carton is fitted around everything and folds with the contents in place.', 'section_hint');
         const choices = Element ('div', contents, undefined, 'packaging_accessory_options');
         this.partitions = this.Check (choices, 'Partitions between products');
         this.pads = new Map (['top', 'bottom', 'front', 'back'].map (position => [position, this.Check (choices, position[0].toUpperCase () + position.slice (1) + ' pad')]));
@@ -40,10 +42,10 @@ export class AutoPackPanel
         this.create = Element ('button', this.root, 'Auto Pack', 'packaging_auto_create'); this.create.type = 'button'; this.create.addEventListener ('click', () => this.Create ());
         this.playback = Element ('section', this.root, undefined, 'packaging_auto_playback'); this.playback.setAttribute ('aria-label', 'Auto Pack folding');
         this.playbackStatus = Element ('p', this.playback, '', 'section_hint'); this.playbackStatus.setAttribute ('role', 'status');
-        this.progress = Element ('progress', this.playback); this.progress.max = 1; this.progress.setAttribute ('aria-label', 'Auto Pack folding progress');
-        const buttons = Element ('div', this.playback, undefined, 'packaging_auto_playback_buttons');
-        this.pause = Element ('button', buttons, 'Pause folding'); this.pause.type = 'button'; this.pause.addEventListener ('click', () => this.Control (this.host.playback?.().state === 'paused' ? 'resume' : 'pause'));
-        this.cancel = Element ('button', buttons, 'Cancel folding'); this.cancel.type = 'button'; this.cancel.addEventListener ('click', () => this.Control ('cancel'));
+        this.progress = Element ('input', this.playback); this.progress.type = 'range'; this.progress.min = '0'; this.progress.max = '1'; this.progress.step = '0.001'; this.progress.setAttribute ('aria-label', 'Auto Pack fold timeline');
+        this.scrubQueue = Promise.resolve (); this.scrubbing = false;
+        const scrub = commit => { const value = Number (this.progress.value); this.scrubbing = !commit; this.scrubQueue = this.scrubQueue.catch (() => {}).then (() => this.host.scrub (value, commit)).catch (error => { this.status.textContent = error.message; }).finally (() => { if (commit) { this.RefreshPlayback (); } }); };
+        this.progress.addEventListener ('input', () => scrub (false)); this.progress.addEventListener ('change', () => scrub (true));
         this.fold = Element ('button', this.root, 'Fold carton'); this.fold.type = 'button'; this.fold.addEventListener ('click', () => this.ToggleFold ());
         // Open top: the packed carton's top flaps swing 120° open (and back), for loading or showing the product.
         this.top = Element ('button', this.root, 'Open top'); this.top.type = 'button'; this.top.hidden = true; this.top.addEventListener ('click', () => this.ToggleTop ());
@@ -51,6 +53,16 @@ export class AutoPackPanel
         this.status = Element ('p', this.root, '', 'section_hint'); this.status.setAttribute ('role', 'status'); this.status.setAttribute ('aria-live', 'polite');
         this.Refresh ();
         this.palletPanel = new AutoPalletPanel (host, this.root);
+    }
+    SetExplanation (open)
+    {
+        if (typeof open !== 'boolean') { throw new Error ('Choose whether the Auto Pack explanation is open.'); }
+        this.explanation.open = open; return { open : this.explanation.open };
+    }
+    SetContentsOpen (open)
+    {
+        if (typeof open !== 'boolean') { throw new Error ('Choose whether Pads and Partitions is open.'); }
+        this.contentsSection.open = open; return { open : this.contentsSection.open };
     }
     Check (parent, title)
     {
@@ -101,7 +113,7 @@ export class AutoPackPanel
         }
         this.inside.section.hidden = !data.insideMm; this.score.section.hidden = !data.scoreMm;
         this.board.textContent = Number.isFinite (data.thicknessMm) ? 'Board caliper: ' + (data.boardName ? data.boardName + ' · ' : '') + Number ((data.thicknessMm / factor).toFixed (6)) + ' ' + unit : '';
-        this.reason.textContent = data.reason || '';
+        this.reason.textContent = data.fitted || /^Select one visible product,/.test (data.reason || '') ? '' : (data.reason || '');
         if (this.contents) {
             const c = data.contents, mm = value => Number ((value / factor).toFixed (unit === 'in' ? 3 : 1)) + ' ' + unit;
             this.contents.textContent = !c ? '' : c.reason ? c.reason : [c.partitions && c.partitions.layout.columns + ' × ' + c.partitions.layout.rows + ' × ' + c.partitions.layout.layers + ' products (columns × rows × layers) · ' + c.partitions.strips + ' partition strips' + (c.partitions.moves ? ' · gaps opened by ' + mm (c.partitions.growthMm.length) + ' × ' + mm (c.partitions.growthMm.width) : ' · gaps already fit'), c.pads.length && c.pads.length + ' pads', c.board + ' (' + mm (c.thicknessMm) + ')', 'carton inside ' + ['width', 'length', 'height'].map (k => mm (c.insideMm[k])).join (' × ')].filter (Boolean).join (' · ');
@@ -114,10 +126,11 @@ export class AutoPackPanel
     RefreshPlayback ()
     {
         const state = this.host.playback?.() || { state : 'idle', progress : 0 };
-        this.playback.hidden = state.state === 'idle'; this.progress.value = Number.isFinite (state.progress) ? state.progress : 0;
-        this.playbackStatus.textContent = [state.state, state.stage, Math.round (this.progress.value * 100) + '%'].filter (Boolean).join (' · ');
-        const controllable = ['playing', 'paused'].includes (state.state) && !this.host.playbackBlocked?.() && Boolean (this.host.control);
-        this.pause.textContent = state.state === 'paused' ? 'Resume folding' : 'Pause folding'; this.pause.disabled = !controllable; this.cancel.disabled = !controllable;
+        const scrub = this.host.scrubInspect?.(); const active = ['playing', 'paused', 'preparing', 'finishing', 'cancelling', 'restoring'].includes (state.state);
+        this.playback.hidden = !scrub?.available && state.state === 'idle';
+        if (!this.scrubbing && document.activeElement !== this.progress) { this.progress.value = String (active ? state.progress || 0 : scrub?.progress ?? 0); }
+        this.progress.disabled = active || this.pending || this.host.blocked () || !this.host.scrub || !scrub?.available;
+        this.playbackStatus.textContent = active ? state.state + ' · ' + (state.stage || 'folding') + ' · ' + Math.round ((state.progress || 0) * 100) + '%' : 'Fold position · ' + Math.round ((scrub?.progress ?? 0) * 100) + '%';
         const canFold = Boolean (this.host.canAnimate?.() && this.host.toggleFold); this.fold.hidden = !canFold;
         this.fold.textContent = this.host.animation?.()?.action === 'unfold' ? 'Unfold carton' : 'Fold carton';
         this.fold.disabled = this.pending || this.host.blocked () || !canFold;
@@ -156,7 +169,7 @@ export class AutoPackPanel
         this.pending = true; this.status.textContent = 'Checking fit and preparing Auto Pack…'; this.Refresh ();
         try {
             const action = async () => {
-                try { const result = await this.host.autoPack (this.ContentOptions () || {}); this.status.textContent = result?.message || 'Auto Pack complete.'; return result; }
+                try { const result = await this.host.autoPack (this.ContentOptions () || {}); this.status.textContent = ''; return result; }
                 catch (error) { this.status.textContent = error.message; throw error; }
             };
             await (this.host.run ? this.host.run (action) : action ());

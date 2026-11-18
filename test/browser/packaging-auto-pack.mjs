@@ -50,14 +50,12 @@ try {
     assert.match (await auto.getByRole ('region', { name : 'Selected object · bounding box' }).textContent (), /in/);
     await call ('preferences.units', { units : 'metric' });
     await page.setViewportSize ({ width : 390, height : 844 }); assert.equal (await page.evaluate (() => document.documentElement.scrollWidth > innerWidth), false); await page.setViewportSize ({ width : 1500, height : 1000 });
-    // Pause through the actual button on its first enabled frame, before software GPU
-    // rendering delays can consume the animation between Playwright actions.
+    // Pause and cancel remain available as agent commands while the panel uses a timeline.
     await page.evaluate (() => { window.autoPackPauseFixture = new Promise (resolve => {
-        const check = async () => { const state = (await Auto3D.execute ('packaging.fefco.playback.inspect')).result; const button = document.querySelector ('.packaging_auto_playback_buttons button'); if (state?.state === 'playing' && button && !button.disabled) { button.click (); resolve (); } else { setTimeout (check, 10); } }; check ();
+        const check = async () => { const state = (await Auto3D.execute ('packaging.fefco.playback.inspect')).result; if (state?.state === 'playing') { await Auto3D.execute ('packaging.fefco.playback', { action : 'pause' }); resolve (); } else { setTimeout (check, 10); } }; check ();
     }); });
     await auto.getByRole ('button', { name : 'Auto Pack', exact : true }).click ();
-    await waitPlayback (['paused']); await page.evaluate (() => window.autoPackPauseFixture); assert.equal ((await call ('packaging.fefco.playback.inspect')).state, 'paused');
-    await auto.getByRole ('button', { name : 'Cancel folding', exact : true }).click (); const cancelled = await waitPlayback (['cancelled']);
+    await waitPlayback (['paused']); await page.evaluate (() => window.autoPackPauseFixture); await call ('packaging.fefco.playback', { action : 'cancel' }); const cancelled = await waitPlayback (['cancelled']);
     const flatScene = await call ('scene.inspect'), carton = flatScene.objects.find (item => item.id === cancelled.objectId);
     assert.equal (flatScene.objects.length, before.objects.length + 1); assert.ok (carton); assert.equal (carton.userData._auto3dPackagingState, 'flat');
     assert.deepEqual (flatScene.objects.find (item => item.id === product.objectId), original);
@@ -73,6 +71,9 @@ try {
     assert.equal (closed.userData._auto3dPackagingState, 'folded'); assert.equal (JSON.parse (closed.userData._auto3dFefco).closure, 'closed');
     assert.deepEqual (finalScene.objects.find (item => item.id === product.objectId), original);
     assert.equal (await auto.getByRole ('button', { name : 'Unfold carton', exact : true }).isEnabled (), true);
+    const timeline = auto.getByRole ('slider', { name : 'Auto Pack fold timeline' }); await timeline.waitFor (); assert.equal (await timeline.isEnabled (), true);
+    for (const position of ['0.25', '0.75']) { await timeline.fill (position); await page.waitForFunction (expected => Math.abs (Number (document.querySelector ('[aria-label="Auto Pack fold timeline"]')?.value) - expected) < 0.001, Number (position)); await (async () => { for (let i = 0; i < 100; i++) { const pose = await call ('packaging.fefco.scrub.inspect'); if (Math.abs (pose.progress - Number (position)) < .001) { return; } await page.waitForTimeout (100); } throw new Error ('Fold timeline did not reach ' + position); }) (); }
+    await call ('history.undo'); await call ('history.undo');
     await page.screenshot ({ path : 'work/auto-pack-review/closed-around-product.png' });
     await call ('history.undo'); assert.equal ((await call ('scene.inspect')).objects.find (item => item.id === carton.id).userData._auto3dPackagingState, 'flat');
     await call ('history.undo'); assert.equal ((await call ('scene.inspect')).objects.length, before.objects.length);
@@ -84,9 +85,10 @@ try {
     assert.ok (group.productMm.width > fit.productMm.width * 2.5, 'combined bounds cover the array');
     assert.equal (await auto.getByRole ('button', { name : 'Auto Pack', exact : true }).isEnabled (), true); assert.match (await auto.textContent (), /3 products/);
     // Packed contents: partitions between the array members and top/bottom pads, previewed then packed.
+    await auto.getByText ('Pads and Partitions', { exact : true }).click ();
     await auto.getByLabel ('Partitions between products', { exact : true }).check (); await auto.getByLabel ('Top pad', { exact : true }).check (); await auto.getByLabel ('Bottom pad', { exact : true }).check ();
     await auto.getByLabel ('Contents flute', { exact : true }).selectOption ('nominal-e');
-    assert.match (await auto.getByRole ('region', { name : 'Packed contents', exact : true }).textContent (), /3 × 1 × 1 products .* 2 partition strips .* 2 pads/);
+    assert.match (await auto.locator ('details.packaging_auto_contents').textContent (), /3 × 1 × 1 products .* 2 partition strips .* 2 pads/);
     const beforeContents = (await call ('scene.inspect')).objects.length;
     await auto.getByRole ('button', { name : 'Auto Pack', exact : true }).click ();
     // Mid-fold, the walls rise around the products, partitions and pads.

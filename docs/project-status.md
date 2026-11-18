@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Auto Pack compact help — Auto3D 0.88.1 / Packaging 1.15.1 candidate
+
+Auto Pack sizing and contents explanations are grouped in a collapsed How Auto Pack works disclosure. Pads and Partitions is a separate collapsed section retaining all existing settings. Agent commands open and close each section. The folding progress bar is a manual fold-pose timeline after playback; pause/cancel buttons and repeated folding descriptions are removed from the Auto panel. Primary Products 0.15.0 and Molded Pulp 0.3.0 are unchanged. See release-0881.md. Not deployed.
+
 ## Molded Pulp output: STEP and GLB on a NURBS B-rep — Auto3D 0.88.0 / Molded Pulp 0.3.0 (2026-11-18)
 
 Packaging 1.15.0 / Primary Products 0.15.0 are preserved. Based on main after #152 (0.87.1). Not deployed.

@@ -116,6 +116,8 @@ export const CommandIds = Object.freeze ([
     'packaging.load_selected',
     'packaging.export',
     'packaging.auto.inspect',
+    'packaging.auto.explanation',
+    'packaging.auto.contents_panel',
     'packaging.auto.styles',
     'packaging.auto.style',
     'packaging.auto.refresh_bounds',
