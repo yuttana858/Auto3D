@@ -9605,6 +9605,32 @@
       "example": {}
     },
     {
+      "id": "pulp.export",
+      "title": "Export molded pulp output",
+      "category": "Molded Pulp",
+      "description": "Download the formed sheet or tray (selected pulp object, else the current one) for tooling or review. step: a closed B-rep solid per shell (AP214, millimetres, absolute positions matching the products) built on the internal review surfaces; the clamshell hinge bead is display only. glb: the formed shape with its pulp material in metres, for customer review. A pulp object from a saved session is formed again from its definition first. Local download only; nothing is uploaded. Does not change the scene.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "step",
+              "glb"
+            ]
+          }
+        },
+        "required": [
+          "format"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "format": "step"
+      }
+    },
+    {
       "id": "pulp.selected.load",
       "title": "Load selected pulp object",
       "category": "Molded Pulp",

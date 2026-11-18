@@ -6,6 +6,8 @@ import { Coord2D } from '../engine/geometry/coord2d.js';
 import { PhysicalMaterial } from '../engine/model/material.js';
 import { RGBColor } from '../engine/model/color.js';
 import { Unit } from '../engine/model/unit.js';
+import * as THREE from 'three';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 
 export const PulpMillimeters = { [Unit.Millimeter] : 1, [Unit.Centimeter] : 10, [Unit.Meter] : 1000, [Unit.Inch] : 25.4, [Unit.Foot] : 304.8 };
 
@@ -57,4 +59,24 @@ function MoldedPulpModelBuild (plan, unit, roughness, onSlice)
     };
     if (!onSlice) { for (const step of build ()) { void step; } return result; }
     return (async () => { for (const step of build ()) { void step; await onSlice (); } return result; }) ();
+}
+
+// Customer-review GLB of a plan: every shell (and hinge) mesh with the pulp material, in metres (glTF units), at its world
+// position. Built from the plan alone, so it is independent of scene units, selection highlights and editor helpers.
+export async function MoldedPulpGlb (plan, roughness)
+{
+    if (plan.apiVersion !== 1 || plan.units !== 'mm') { throw new Error ('Unsupported Molded Pulp geometry.'); }
+    const scene = new THREE.Scene (), root = new THREE.Group (); root.name = plan.kind === 'sheet' ? 'Molded pulp sheet' : plan.clamshell !== 'none' ? 'Molded pulp clamshell' : 'Molded pulp tray'; scene.add (root);
+    const material = new THREE.MeshStandardMaterial ({ color : new THREE.Color (plan.draft.color), roughness, metalness : 0, side : THREE.FrontSide });
+    material.name = 'Molded pulp · ' + plan.draft.pulpType;
+    for (const component of plan.components) {
+        const positions = new Float32Array (component.positions.length);
+        for (let i = 0; i < positions.length; i += 3) { for (let a = 0; a < 3; a++) { positions[i + a] = (component.positions[i + a] + plan.origin[a]) / 1000; } }
+        const geometry = new THREE.BufferGeometry (); geometry.setAttribute ('position', new THREE.BufferAttribute (positions, 3)); geometry.setAttribute ('normal', new THREE.BufferAttribute (Float32Array.from (component.normals), 3));
+        if (component.uvs?.length) { geometry.setAttribute ('uv', new THREE.BufferAttribute (Float32Array.from (component.uvs), 2)); }
+        geometry.setIndex (new THREE.BufferAttribute (component.indices.length > 65535 && !(component.indices instanceof Uint32Array) ? Uint32Array.from (component.indices) : component.indices.slice (), 1));
+        const mesh = new THREE.Mesh (geometry, material); mesh.name = component.id; root.add (mesh);
+    }
+    root.userData = { units : 'm', source : 'Auto3D Molded Pulp', pulpType : plan.draft.pulpType, thicknessMm : plan.draft.thicknessMm };
+    return new GLTFExporter ().parseAsync (scene, { binary : true, onlyVisible : true });
 }

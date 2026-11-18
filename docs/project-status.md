@@ -1,5 +1,17 @@
 # Auto3D development log and handoff
 
+## Molded Pulp output: STEP and GLB on a NURBS B-rep — Auto3D 0.87.0 / Molded Pulp 0.3.0 (2026-11-18)
+
+Packaging 1.15.0 / Primary Products 0.15.0 are preserved. Based on main after #149 (0.86.0). Not deployed.
+
+- **Review vs output.** The formed field stays the internal review model; output is a NURBS B-rep built on it.
+- **Exports.** **Export STEP** (closed solid per shell, AP214, mm) and **Export GLB** (pulp material, m), in the panel and through `pulp.export`.
+- **NURBS core.** The B-spline core, B-rep topology and STEP writer live in `modules/molded-pulp/src/nurbs/`.
+- **Validation.** OpenCASCADE reads the STEP as valid solids (6-can tray: 0 open edges, volume within 0.1%).
+- **Next step.** Phase 2 (smooth cubic lofts), with its test cases and pass criteria, in docs/molded-pulp-nurbs.md.
+
+See docs/release-0870.md.
+
 ## Animation panel and video export — Auto3D 0.86.0 (2026-11-18)
 
 Packaging 1.15.0 / Primary Products 0.15.0 / Molded Pulp 0.2.0 are preserved. Stacked on 0.85.0. Not deployed.

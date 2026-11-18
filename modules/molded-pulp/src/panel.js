@@ -75,6 +75,13 @@ export class MoldedPulpPanel
         this.resultText = Element ('p', 'mp_readout', '', results);
         this.checks = Element ('ul', 'mp_checks', undefined, results);
         this.why = Element ('details', 'mp_why', undefined, results); Element ('summary', null, 'Why: rule base decisions', this.why); this.trace = Element ('ol', 'mp_trace', undefined, this.why);
+        // Output: the review mesh above stays the internal model; tooling gets a closed B-rep STEP (mm) built on it, and
+        // customers a GLB with the pulp material (m).
+        const output = this.Section ('Output');
+        Element ('p', 'mp_help', 'STEP: a closed solid per shell in millimetres, for tooling and CAD. GLB: the formed shape with its pulp material, for customer review.', output);
+        const outputRow = Element ('div', 'mp_row', undefined, output);
+        this.stepButton = this.Button (outputRow, 'Export STEP', () => this.host.exportOutput ('step'));
+        this.glbButton = this.Button (outputRow, 'Export GLB', () => this.host.exportOutput ('glb'));
         const footer = Element ('div', 'mp_footer', undefined, this.root);
         this.resetButton = this.Button (footer, 'Reset draft', () => this.host.reset ());
         this.status = Element ('p', 'mp_status', '', this.root); this.status.setAttribute ('role', 'status');
@@ -162,7 +169,7 @@ export class MoldedPulpPanel
         this.checks.replaceChildren (...(state.result?.checks || []).map (c => { const li = Element ('li', 'mp_check mp_' + c.severity); li.textContent = c.message; li.title = c.id + ' · ' + c.basis; return li; }));
         const trace = state.result?.trace || []; this.why.hidden = !trace.length;
         this.trace.replaceChildren (...trace.map (t => { const li = Element ('li', 'mp_trace_item'); Element ('strong', null, t.rule + ' · ' + t.title, li); Element ('span', null, t.decision, li); li.title = t.basis; return li; }));
-        const acting = blocked || state.generating; this.senseButton.disabled = acting; this.sheetButton.disabled = acting || !state.sensed; this.depthButton.disabled = acting; this.trayButton.disabled = acting || !state.sensed; this.resetButton.disabled = acting;
+        const acting = blocked || state.generating; this.senseButton.disabled = acting; this.sheetButton.disabled = acting || !state.sensed; this.depthButton.disabled = acting; this.trayButton.disabled = acting || !state.sensed; this.stepButton.disabled = this.glbButton.disabled = acting || Boolean (refining) || !state.pulpObjectId || !this.host.exportOutput; this.resetButton.disabled = acting;
         if (this.busyText) { this.status.textContent = this.busyText; } else if (refining) { this.status.textContent = `Refining ${PulpDetail[refining.detail]?.name || ''} shape · ${refining.phase || 'starting'} ${Math.round ((refining.progress || 0) * 100)}%`; } else if (state.unavailableReason && !this.status.textContent) { this.status.textContent = state.unavailableReason; }
         this.Drawing (state);
     }

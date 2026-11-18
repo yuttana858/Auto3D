@@ -342,6 +342,7 @@ export const CommandIds = Object.freeze ([
     'pulp.sheet.generate',
     'pulp.form_depth.set',
     'pulp.tray.form',
+    'pulp.export',
     'pulp.selected.load',
     'pulp.reset',
     'ui.packaging',

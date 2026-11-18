@@ -9,3 +9,7 @@ export { AdaptiveShellMesh } from './rtin.js';
 export { PlanSheet, PlanTray, PlanPulp, PulpChecks } from './plan.js';
 export { PulpRuleBase, PulpRuleList, PlanFeatures } from './rules.js';
 export { PulpDefinition, ValidatePulpDefinition, MaxStoredProducts } from './definition.js';
+export { NurbsShell, MaxOutputSide } from './nurbs/shell.js';
+export { ShellBrep, BrepEdgeUses } from './nurbs/brep.js';
+export { WriteStep, StepReal } from './nurbs/step.js';
+export { Degree, ClampedKnots, Greville, FindSpan, BasisFuns, CurvePoint, SurfacePoint, AxisBasis, FitGrid, EvalGrid, KnotSpans } from './nurbs/bspline.js';

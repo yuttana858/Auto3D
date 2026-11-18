@@ -112,7 +112,7 @@ export function MinFilterOctagon (values, grid, radius)
 }
 
 // Exact ball erosion on a (possibly coarser) grid: L(p) = min over |q − p| <= t of H(q) − sqrt(t² − |q − p|²).
-function BallErosion (top, grid, thickness)
+export function BallErosion (top, grid, thickness)
 {
     const { nx, nz, dx, dz } = grid, ri = Math.floor (thickness / dx), rj = Math.floor (thickness / dz), offsets = [];
     for (let b = -rj; b <= rj; b++) { for (let a = -ri; a <= ri; a++) { const d = Math.hypot (a * dx, b * dz); if (d <= thickness) { offsets.push (a, b, Math.sqrt (thickness * thickness - d * d)); } } }

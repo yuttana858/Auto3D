@@ -48,6 +48,8 @@ Auto3D 0.85.0 (Packaging 1.15.0 / Primary Products 0.15.0 / Molded Pulp 0.2.0, b
 
 Auto3D 0.86.0 (Packaging 1.15.0 / Primary Products 0.15.0 / Molded Pulp 0.2.0, stacked on 0.85.0) adds the Animation module panel (`animationpanel.js`, module id `animation`) and frame-accurate video export (`videoexport.js`: `timeline.Seek (t, false, true)` per frame, offscreen render with `HideRenderHelpers`, WebCodecs + mp4-muxer/webm-muxer; commands `animation.video.*`). Keep new animation sources deterministic in timeline time so they appear in exported video. See docs/release-0860.md.
 
+Auto3D 0.87.0 (Molded Pulp 0.3.0 / Packaging 1.15.0 / Primary Products 0.15.0, based on main after #149 (0.86.0)) adds Molded Pulp output. The formed heightfields stay the internal review model (display and checks); `plan.nurbs` is a closed B-rep per shell (`modules/molded-pulp/src/nurbs/`: B-spline core, `ShellBrep`, `WriteStep` AP214) exported as STEP (mm) and GLB (pulp material, m) through the panel Output section and `pulp.export`. Keep the NURBS files free of forming imports (solid modeling foundation) and validate STEP changes with OpenCASCADE. See docs/molded-pulp-nurbs.md and docs/release-0870.md.
+
 # Agent-accessible features
 
 The server diagnostic release in PR #147 is Auto3D 0.84.0 / Packaging 1.14.0 / Primary Products 0.15.0 / Molded Pulp 0.2.0 with Cloud 3D Studio 0.4.0 (#19). `conversion.diagnose` reuses a failed owned upload on the private server; `conversion.diagnostics` reads only the strict geometry-free report. Raw failure diagnostics stay server-only. Never add source contents, arbitrary messages/logs or geometry to report fields. Diagnostic attempts do not reset conversion attempts, extend source retention or publish a model. See docs/release-0840.md.

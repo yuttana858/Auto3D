@@ -1,4 +1,4 @@
-# Molded Pulp 0.2.0
+# Molded Pulp 0.3.0
 
 Independent molded pulp tray UI and neutral geometry package, API 1. No Auto3D engine, account, Packaging or Primary Products imports. Auto3D integrates its lazy module bundle through `moldedpulpadapter.js`, `MoldedPulpWorkspace` and `moldedpulppanel.js`, the same boundary as Primary Products.
 
@@ -27,6 +27,16 @@ Both plans return `metrics` (sheet size, achieved depth, pocket count, narrowest
 ## Clamshells (0.2.0)
 
 `clamshell` is `none`, `top-bottom`, `side-x` or `side-z`. Each shell is formed in its own pull frame (`orient.js`, proper rotations) toward a parting plane at `partingFraction` of the product extent, and the flanges meet there. `hinge` adds a half-cylinder bead along the longer flange edge. Components: `pulp-shell-a`, optional `pulp-hinge`, `pulp-shell-b`; `PlanSheet` places a sheet per shell.
+
+## Output: NURBS B-rep, STEP and GLB (0.3.0)
+
+The formed heightfields stay the review model. Every plan also carries `plan.nurbs`: `{ apiVersion : 1, units : 'mm', representation : 'brep', degree : 1, shells }`.
+- **Shells.** Each shell (`NurbsShell`, `nurbs/shell.js`) has product-side and tool-side degree-1 B-spline faces through the review nodes, in world mm, at most 513 nodes per side.
+- **Topology.** `ShellBrep` (`nurbs/brep.js`) closes each shell with four ruled sides: 6 faces, 12 shared edges, outward orientation.
+- **STEP.** `WriteStep (shells, { name })` (`nurbs/step.js`) writes STEP AP214 with one `MANIFOLD_SOLID_BREP` per shell.
+- **Foundation.** `nurbs/bspline.js` is a degree-generic B-spline core (knots, basis, evaluation, least-squares grid fitting) meant as the foundation of a future solid modeling module.
+
+The NURBS faces are built in the worker with the plan, and their buffers are transferred. Phase 2 (smooth cubic lofts) is specified, with its test, in Auto3D `docs/molded-pulp-nurbs.md`.
 
 ## Pulp types and DFM checks
 
