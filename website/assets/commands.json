@@ -108,6 +108,31 @@
       }
     },
     {
+      "id": "conversion.appearance",
+      "title": "Read CAD appearance report",
+      "category": "Conversion",
+      "description": "Read fixed counts and preservation status for source colors, transparency, render materials and image texture availability on an owned job. Does not download geometry or images.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "pattern": "^[a-f0-9-]{36}$",
+            "minLength": 36,
+            "maxLength": 36
+          }
+        },
+        "required": [
+          "jobId"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "jobId": "00000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
       "id": "conversion.diagnose",
       "title": "Diagnose CAD on the private server",
       "category": "Conversion",

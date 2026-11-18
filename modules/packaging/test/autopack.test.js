@@ -7,7 +7,9 @@ const bounds = (rig, pose, kind, index) => {
     const i = rig.panels.findIndex (p => p.kind === kind && p.index === index);
     return new THREE.Box3 ().setFromPoints (rig.panels[i].solid.vertices.map (p => new THREE.Vector3 (...p).applyMatrix4 (new THREE.Matrix4 ().fromArray (pose.matrices[i]))));
 };
-describe ('Auto Pack presentation matches generated RSC boxes', () => {
+describe ('Auto Pack presentation matches generated RSC boxes', function () {
+    // DisplayClearance samples the fold route and the Open top route (242 display poses) per carton.
+    this.timeout (60000);
     const material = { caliperMm : 3, insideFactors : [1, 1, 2], calibrated : false };
     it ('uses the standard trimmed panels and crease bends on engineering cartons', () => {
         const rig = CreateAutoPackRig ({ size : [50, 80, 30], clearanceMm : .0254, material });

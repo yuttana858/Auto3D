@@ -5,6 +5,7 @@ export const CommandIds = Object.freeze ([
     'conversion.jobs',
     'conversion.job',
     'conversion.diagnostics',
+    'conversion.appearance',
     'conversion.diagnose',
     'conversion.submit',
     'conversion.cancel',

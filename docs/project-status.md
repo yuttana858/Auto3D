@@ -1,8 +1,8 @@
 # Auto3D development log and handoff
 
-## Molded Pulp output: STEP and GLB on a NURBS B-rep — Auto3D 0.87.0 / Molded Pulp 0.3.0 (2026-11-18)
+## Molded Pulp output: STEP and GLB on a NURBS B-rep — Auto3D 0.88.0 / Molded Pulp 0.3.0 (2026-11-18)
 
-Packaging 1.15.0 / Primary Products 0.15.0 are preserved. Based on main after #149 (0.86.0). Not deployed.
+Packaging 1.15.0 / Primary Products 0.15.0 are preserved. Based on main after #152 (0.87.1). Not deployed.
 
 - **Review vs output.** The formed field stays the internal review model; output is a NURBS B-rep built on it.
 - **Exports.** **Export STEP** (closed solid per shell, AP214, mm) and **Export GLB** (pulp material, m), in the panel and through `pulp.export`.
@@ -10,7 +10,15 @@ Packaging 1.15.0 / Primary Products 0.15.0 are preserved. Based on main after #1
 - **Validation.** OpenCASCADE reads the STEP as valid solids (6-can tray: 0 open edges, volume within 0.1%).
 - **Next step.** Phase 2 (smooth cubic lofts), with its test cases and pass criteria, in docs/molded-pulp-nurbs.md.
 
-See docs/release-0870.md.
+See docs/release-0880.md.
+
+## Appearance capability bridge — Auto3D 0.87.1 live (2026-11-18)
+
+Passes the exact supported appearance API flag through the sanitized Modal bridge so the public conversion API can advertise it. Live 0.87.0 conversion/diagnostic checks found 16 source colors in the retained STEP; the stricter appearance-aware public gate caught this metadata omission. See [release-0871.md](release-0871.md). PR #152 / deployed commit `b6865eb67b971b358a798506c733817891c36279`; CI 44347073226 and deployment 44348738348 (attempt 2) passed. The appearance-aware private pipeline 44345807731 (attempt 2) passed actual public GLB color/alpha, hashes/units, account isolation and diagnostic checks. No customer CAD was downloaded to the agent workspace.
+
+## CAD appearance — Auto3D 0.87.0 candidate (2026-11-18)
+
+Packaging 1.15.0 / Primary Products 0.15.0 / Molded Pulp 0.2.0 are preserved. Based on main 94918fe / 0.86.0. Adds a strict appearance report and read-only `conversion.appearance`, plus the service-only source inventory companion for Cloud 3D Studio 0.5.0. STEP colors/alpha are retained; bitmap images/UVs are reported unavailable to the current reader. See [release-0870.md](release-0870.md). Local tests/builds and all 90 distinct browser checks passed across the 89/90 full run and unchanged dimensions rerun; see release notes for exact evidence. Hosted migration, native 0.5.0 deployment and Auto3D 0.87.0 deployment passed (PR #151 / run 44345035739). The appearance-aware gate prompted the 0.87.1 bridge correction.
 
 ## Animation panel and video export — Auto3D 0.86.0 (2026-11-18)
 

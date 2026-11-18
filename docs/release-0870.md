@@ -1,43 +1,11 @@
-# Auto3D 0.87.0 / Molded Pulp 0.3.0 / Packaging 1.15.0 / Primary Products 0.15.0
+# Auto3D 0.87.0 / Packaging 1.15.0 / Primary Products 0.15.0 / Molded Pulp 0.2.0
 
-Molded Pulp output for tooling and customers. Based on main after #149 (0.86.0). The plan, the measurements and the next test are in [docs/molded-pulp-nurbs.md](molded-pulp-nurbs.md).
+Private CAD conversions previously retained geometry but discarded STEP appearance. With Cloud 3D Studio 0.5.0, GLB and colored STEP retain body/face colors, occurrence overrides and transparency. The converter independently reopens the outputs and checks material bindings, body identities, dimensions, units and mesh integrity. STL remains geometry-only.
 
-## Review model and output model
+Convert CAD shows an **Appearance report**, also available through the strict read-only `conversion.appearance { jobId }` command. Only bounded counts and fixed statuses leave the private server. New reports are required from worker 0.5.0 onward; older jobs remain readable. Detected render materials report partial support: base color, metallic and roughness. Image texture availability is explicitly unknown when the CAD reader does not expose images/UVs. A textured GLB from the originating CAD application is the current route for image artwork; dropping an image beside a STEP cannot recover missing UV mapping.
 
-- **Review model.** The formed heightfields stay the internal model. The viewer shows them, and DFM, rib, lug and nesting checks run on them.
-- **Output model.** A NURBS B-rep built on the review model:
-  - **Export STEP:** a closed solid per shell (AP214, mm, positions matching the products).
-  - **Export GLB:** the formed shape with its pulp material, in metres, for customer review.
-- **Where.** Both are in the new **Output** section of the Molded Pulp panel, and in `pulp.export { format }`.
-- **Clamshells** export two solids. The hinge bead is display only for now.
-- **Saved objects.** A pulp object from a saved session, or one restored by Undo, is formed again from its saved definition before export, in the worker.
+An explicit diagnostic on a retained failed upload can also inventory its appearance. It uses the existing owned job, leases, queue, expiry and separate attempt budget and publishes no model. Its inventory is separate from the unchanged nine-field CAD report. The service-only migration adds strict inventory validation and stores the source-only report in existing summary metadata; it adds no public read grant or column. Ready jobs and existing artifact keys are untouched.
 
-## NURBS core (foundation for the solid modeling module)
+Based on main `94918fe7b06d33ce8d3a468ca5b7d201cf65220a`, including Auto Pack styles and Animation/video export. The independent packaging modules are unchanged. Local validation: **1,022 app/module tests**, **73 MCP tests**, **11 backend tests**, lint, licenses, production audit (zero vulnerabilities), engine/module/website/Pages builds, both Workers runtime tests and the isolated conversion SQL suite pass. The real 0.5.0 synthetic GLB passes Auto3D color/alpha import and desktop/mobile conversion checks. The full browser run at local commit `061b439f31f1910378abe7400593e252b9b23328` completed **89/90 passing**. `dimensions` initially timed out because its Pages build was not prepared at suite startup; after the Pages build, its unchanged standalone test passed. All **90 distinct browser checks** therefore passed across the full run and that rerun; the initial full report remains recorded as 89/90. The final desktop/mobile CAD appearance test also passed separately. See [browser evidence](validation/appearance-browser.md).
 
-`modules/molded-pulp/src/nurbs/` contains:
-- the B-spline core (`bspline.js`: knots, basis, evaluation, separable least-squares fitting);
-- the shell builder (`shell.js`: degree-1 faces through the review nodes, at most 513 per side);
-- B-rep topology (`brep.js`: 6 faces, 12 shared edges, outward orientation);
-- the STEP AP214 writer (`step.js`).
-
-None of these import forming code. All are exported from the module API.
-
-## Validation
-
-- `npm test`, including the new `nurbs.test.js`:
-  - B-spline partition of unity, linear precision and exact bicubic reproduction;
-  - closed topology;
-  - outward orientation by signed volume for a tray, three clamshell modes and sheets;
-  - volume within 2% of review;
-  - exact subsampling;
-  - STEP references, header and units.
-- Browser test `molded-pulp-export` (in the CI suite):
-  - STEP (1 solid, 6 faces, mm) and GLB (glTF 2.0, pulp material, metres) from the panel buttons;
-  - clamshell STEP with 2 solids;
-  - export after Undo re-forms from the saved definition.
-- OpenCASCADE reads Auto3D's STEP as valid solids: a 9 × 9 dish in four pull directions, and the 6-can tray (1 solid, 6 faces, 0 open edges, 288.00 cm³ vs review 288.3 cm³). Details are in the plan document.
-
-## Known limits (Phase 2 addresses them)
-
-- Faces are degree 1 on the review nodes. They are exact at the nodes but faceted between them, and dense: 2 MB for a draft-detail tray, and slow for CAD kernels to mesh.
-- Phase 2 replaces them with height-parameterized cubic lofts (smooth, compact, with fillets). The test cases and pass criteria are in the plan document.
+The hosted appearance migration was applied as `20261118144715_conversion_appearance_inventory`. The prior transition definition exactly matched the tested local baseline hash. Validators remain service-only and invoker-rights functions. Native companion [PR #22](https://github.com/yuttana858/Cloud-3D-Studio/pull/22) is merged. Modal deployment run **44327961340** passed the colored/transparent three-body native proof, controller and existing live public user-API canary. The final appearance-aware production canary passed with the 0.87.1 bridge correction; see [release-0871.md](release-0871.md).
