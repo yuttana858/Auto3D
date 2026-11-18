@@ -6,6 +6,7 @@ import { chromium } from 'playwright-core';
 
 // Public synthetic box generated/reimported by Cloud 3D Studio 0.3.0; no customer CAD.
 const glb = Buffer.from ((await readFile ('test/testfiles/cad-conversion-box.glb.b64', 'utf8')).trim (), 'base64');
+const diagnosticReport = { schemaVersion : 1, versions : { worker : '0.4.0', reader : '0.3.17', occt : '7.9.3.1.1' }, outcome : 'error_detected', phase : 'build_geometry', failureCode : 'invalid_geometry', readerCode : 'occt.construction_failed', exception : 'Standard_ConstructionError', frames : ['conversion:292'], checks : { sourceRead : 'passed', geometryBuild : 'failed', geometryValidation : 'not_run', stepExport : 'not_run', stepReimport : 'not_run' } };
 const root = process.cwd (), types = { '.html' : 'text/html', '.js' : 'text/javascript', '.css' : 'text/css', '.json' : 'application/json', '.png' : 'image/png', '.svg' : 'image/svg+xml', '.woff' : 'font/woff', '.ttf' : 'font/ttf' };
 const browser = await chromium.launch ({ executablePath : process.env.BROWSER_EXECUTABLE || '/usr/bin/chromium', args : ['--no-sandbox', '--enable-unsafe-swiftshader'] });
 try {
@@ -22,7 +23,7 @@ try {
             if (pathname.startsWith ('/api/conversions')) {
                 assert.equal (request.headers ()['x-auto3d-account'], owner);
                 const parts = pathname.slice ('/api/conversions'.length).split ('/').filter (Boolean);
-                if (parts[0] === 'capabilities') { return route.fulfill ({ json : { ready : true, version : '0.3.0' } }); }
+                if (parts[0] === 'capabilities') { return route.fulfill ({ json : { ready : true, version : '0.4.0', diagnosticProtocol : 1 } }); }
                 if (!parts.length && request.method () === 'GET') { return route.fulfill ({ json : { jobs : [...jobs.values ()] } }); }
                 if (!parts.length) {
                     const body = request.postDataJSON (); assert.equal (body.sourceUnit, 'mm'); assert.equal (body.extension, 'x_t'); assert.ok (body.origin.windowId && body.origin.tabId);
@@ -37,6 +38,11 @@ try {
                     return route.fulfill ({ json : { job } });
                 }
                 if (parts[1] === 'artifacts') { downloaded++; return route.fulfill ({ body : glb, contentType : 'model/gltf-binary', headers : { 'Content-Length' : String (glb.length) } }); }
+                if (parts[1] === 'diagnose') {
+                    assert.equal (request.postDataJSON ().revision, job.revision);
+                    Object.assign (job, { state : 'running', stage : 'converting', purpose : 'diagnostic', progress : { phase : 'read_source', completed : null, total : null, unit : null }, diagnostics : { status : 'running', canRun : false, report : null, errorCode : null } }); job.revision++;
+                    return route.fulfill ({ json : { job } });
+                }
                 if (request.method () === 'DELETE') { jobs.delete (job.id); return route.fulfill ({ json : { deleted : true } }); }
                 return route.fulfill ({ json : { job } });
             }
@@ -84,6 +90,20 @@ try {
             const input = page.getByLabel ('W dimension in mm', { exact : true });
             if (await input.count ()) { assert.ok (Math.abs (Number (await input.inputValue ()) - 40) < 0.001); }
         }
+        Object.assign (active, { state : 'failed', stage : 'failed', purpose : 'conversion', errorCode : 'invalid_geometry', artifacts : {}, summary : null, progress : { phase : 'build_geometry', completed : null, total : null, unit : null }, diagnostics : { status : 'not_run', canRun : true, report : null, errorCode : null } });
+        await call ('conversion.open');
+        await dialog.getByRole ('button', { name : 'Diagnose on server', exact : true }).click ();
+        await dialog.getByRole ('progressbar', { name : 'Server diagnostic · Reading CAD format', exact : true }).waitFor ();
+        assert.equal ((await call ('conversion.diagnostics', { jobId : active.id })).status, 'running');
+        Object.assign (active, { state : 'failed', stage : 'failed', purpose : 'conversion', progress : { phase : 'build_geometry', completed : null, total : null, unit : null }, diagnostics : { status : 'completed', canRun : true, report : diagnosticReport, errorCode : null } });
+        await dialog.getByText ('Server diagnostic report', { exact : true }).click ();
+        await dialog.getByText ('Build geometry · failed', { exact : true }).waitFor ();
+        assert.ok ((await dialog.innerText ()).includes ('occt.construction_failed'));
+        assert.equal ((await call ('conversion.diagnostics', { jobId : active.id })).report.exception, 'Standard_ConstructionError');
+        assert.equal (uploads, 1, 'diagnosis reuses the existing upload'); assert.equal (downloaded, 2, 'report inspection never downloads source or output geometry');
+        assert.equal (await dialog.getByRole ('button', { name : 'Add to current session', exact : true }).count (), 0);
+        assert.equal ((await call ('scene.inspect')).objects.length, 1, 'diagnostic report must not create a model');
+        await page.screenshot ({ path : 'work/cad-conversion/diagnostics-' + width + '.png' });
         assert.deepEqual (errors, []); await page.close ();
     }
     console.log ('CAD desktop/mobile passed: explicit private upload, required units, real calibration GLB import, account-bound transfer, downloads, one-step Undo/Redo and no automatic scene changes.');

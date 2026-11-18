@@ -1,12 +1,36 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { CreateAutoPackPlan, CreateAutoPackRig, AutoPackFoldPose, AutoPackFrame, InspectAutoPackFold, AutoPackFoldContacts, AutoPackStyles, FefcoStyles, CreateFefcoFoldRig } from '../src/index.js';
+import { CreateAutoPackPlan, CreateAutoPackRig, AutoPackFoldPose, AutoPackFrame, InspectAutoPackFold, AutoPackFoldContacts, DisplayClearance, FefcoFoldPose, AutoPackStyles, FefcoStyles, CreateFefcoFoldRig } from '../src/index.js';
 
 const near = (a, b) => assert.ok (Math.abs (a - b) < 1e-8, `${a} != ${b}`);
 const bounds = (rig, pose, kind, index) => {
     const i = rig.panels.findIndex (p => p.kind === kind && p.index === index);
     return new THREE.Box3 ().setFromPoints (rig.panels[i].solid.vertices.map (p => new THREE.Vector3 (...p).applyMatrix4 (new THREE.Matrix4 ().fromArray (pose.matrices[i]))));
 };
+describe ('Auto Pack presentation matches generated RSC boxes', () => {
+    const material = { caliperMm : 3, insideFactors : [1, 1, 2], calibrated : false };
+    it ('uses the standard trimmed panels and crease bends on engineering cartons', () => {
+        const rig = CreateAutoPackRig ({ size : [50, 80, 30], clearanceMm : .0254, material });
+        assert.equal (rig.autoPackPresentation, 'standard'); assert.notEqual (rig.presentationMeshes, rig.meshes); assert.ok (rig.visualMeshes.length > 0);
+        for (const progress of [.5, 1]) {
+            const frame = AutoPackFrame (rig, progress);
+            // Same crease bends as the standard fold route at the closed pose: one per score the panels share.
+            assert.equal (frame.visualMeshes.length, FefcoFoldPose (rig, 1).visualMeshes.length);
+        }
+        assert.equal (DisplayClearance (rig).clear, true);
+    });
+    it ('turns panel bow off in the saved appearance when bow would bulge into a tight product', () => {
+        const rig = CreateAutoPackRig ({ size : [300, 150, 200], clearanceMm : .0254, material });
+        assert.equal (rig.autoPackPresentation, 'standard without panel bow'); assert.equal (rig.profile.appearance.panelBow, 0); assert.ok (rig.visualMeshes.length > 0);
+        // Rebuilding from the saved profile (replay) gives the same presentation directly.
+        assert.equal (CreateAutoPackRig ({ size : [300, 150, 200], clearanceMm : .0254, material }, rig.profile).autoPackPresentation, 'standard');
+    });
+    it ('keeps exact panels for cartons fitted before the engineering basis', () => {
+        const rig = CreateAutoPackRig ({ size : [50, 80, 30], thickness : 3, clearanceMm : .0254 });
+        assert.equal (rig.autoPackPresentation, 'exact panels'); assert.equal (rig.presentationMeshes, rig.meshes); assert.deepEqual (AutoPackFrame (rig, 1).visualMeshes, []);
+    });
+});
+
 describe ('Auto Pack plan on the engineering system', () => {
     const material = { caliperMm : 3, insideFactors : [1, 1, 2], calibrated : false };
     it ('drives inside targets through the board allowance factors like Generate with the inside basis', () => {
@@ -63,7 +87,8 @@ describe ('Auto Pack stationary-product RSC', () => {
         }
     });
     it ('presents the Packaging generator carton (board appearance and rounded crease joins) while auditing exact panels', () => {
-        const rig = CreateAutoPackRig ({ size : [80, 150, 100], thickness : 3 }), generator = CreateFefcoFoldRig (rig.parameters, rig.profile);
+        const rig = CreateAutoPackRig ({ size : [80, 150, 100], clearanceMm : .0254, material : { caliperMm : 3, insideFactors : [1, 1, 2], calibrated : false } }), generator = CreateFefcoFoldRig (rig.parameters, rig.profile);
+        assert.notEqual (rig.autoPackPresentation, 'exact panels');
         // Cheap structural fingerprint (vertex count and coordinate sum) instead of deep-comparing large arrays.
         const print = meshes => meshes.map (m => m.vertices.length + ':' + m.vertices.flat ().reduce ((s, v) => s + v, 0).toFixed (6)).join ('|');
         assert.equal (print (rig.presentationMeshes), print (generator.presentationMeshes), 'same presentation meshes as Generate');
@@ -79,7 +104,8 @@ describe ('Auto Pack stationary-product RSC', () => {
         this.timeout (120000);
         assert.deepEqual (AutoPackStyles ().map (s => s.code), FefcoStyles.map (s => s.code));
         for (const { code } of AutoPackStyles ()) {
-            const plan = CreateAutoPackPlan ({ size : [140, 90, 100], thickness : 3, code }), rig = CreateAutoPackRig ({ size : [140, 90, 100], thickness : 3, code });
+            const plan = CreateAutoPackPlan ({ size : [140, 90, 100], thickness : 3, code }), rig = CreateAutoPackRig ({ size : [140, 90, 100], clearanceMm : .0254, material : { caliperMm : 3, insideFactors : [1, 1, 2], calibrated : false }, code });
+            assert.notEqual (rig.autoPackPresentation, 'exact panels', code + ' uses the generator presentation'); assert.equal (rig.autoPackDisplayCheck.clear, true);
             assert.equal (plan.parameters.code, code); assert.equal (rig.parameters.code, code);
             assert.equal (plan.flapStack.top, code === '0200' ? 0 : plan.flapStack.base);
             const report = await InspectAutoPackFold (rig); assert.equal (report.clear, true, code + ' ' + JSON.stringify (report).slice (0, 300)); assert.equal (report.code, code);
