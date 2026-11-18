@@ -190,8 +190,37 @@ On real Primary Products cans (3 × 2, 20 mm gap, Type 2, 35 mm, standard):
      | Real Primary Products cans | 4 sides, 48–72 × 4 controls, within 0.15–0.18 mm | ok |
 
    - **To do:** straight sides still use 32–72 outline controls because the fit follows the review grid's ripple. A side tolerance tied to straightness, or a line or arc check, should bring a straight side down to about 4 controls.
-3. Floors and plateau as trimmed planes.
-4. Rim and floor fillets as the loft's end sections.
+3. ✔ Compact walls and the complete product side.
+   - **Control counts:** the outline count m and the height count n now grow only until the wall is within the 3D distance tolerance (a failed try stops at its first sample beyond it), instead of until the outline matches the review grid's ripple. Straight skirt sides drop to 4 × 4 controls.
+
+     | Case | Controls | Max distance |
+     | --- | --- | --- |
+     | T1 standard, skirt on | 472 | 0.294 mm |
+     | T1 fine, skirt on | 424 | 0.198 mm |
+
+     Fine is now smaller than standard, which meets the "output tracks shape, not grid" target.
+   - **Exact span:** walls run exactly from the floor (y = 0) to the plateau (y = depth). Each traced level is mapped proportionally, a sideways change of hundredths of a millimetre.
+   - **Flat faces:** pocket floors and the plateau are planes bounded by the walls' end curves. These are exactly the walls' first and last control rows, so faces and walls share edges.
+
+     | Face (T1 standard) | From the boundary curves | Review field |
+     | --- | --- | --- |
+     | Plateau | 16,902 mm² | 17,091 mm² |
+     | Each floor | about 3,590 mm² | |
+
+   - **Raised floors:** a floor that is not flat (a domed can base) is reported as `patch-needed` with its height, not flattened.
+4. Tool side: **finding, decision needed.** The loft generalizes to any floor height (`floorMm`). Tracing the review tool-side field, however, shows a different topology from the product side.
+   - On T1 the plateau strip between each edge pocket and the skirt is about 5 mm wide on the product side. On the tool side both walls move about 3 mm into it (the 3 mm wall thickness), so the strip vanishes and the pocket wall meets the skirt in a sharp ridge.
+   - At the tool side's top level only four small plateau islands and one larger outline remain, and the edge pockets have no closed rim of their own.
+   - The tool side is therefore an offset of the product side, with ridges where neighbouring offsets collide. That is the "thicken / shell" operation of a CAD kernel, and robust self-intersection handling is kernel work.
+
+   Options:
+
+   | Option | What it is | Trade-off |
+   | --- | --- | --- |
+   | (a) Local | Tool side from the review field as Phase 1 degree-1 faces, joined to the smooth product side by a foot band at the sheet edge | Valid now, but the tool side stays dense |
+   | (b) Cloud (recommended) | Cloud 3D Studio's OpenCASCADE thickens the smooth product-side shell (`BRepOffsetAPI_MakeThickSolid`) and returns a validated STEP | Compact and smooth on both sides, with ridges handled by the kernel |
+   | (c) Local offset | Offset each product-side face and intersect neighbours ourselves | The most work and the least robust |
+5. Rim and floor fillets as the loft's end sections.
 5. Tool side by offsetting the outlines by the thickness in plan.
 6. Faces with inner loops in `brep.js`, sewing, and STEP output of the lofted shell. Then the OpenCASCADE gate.
 7. T2: split walls into bands at the join height, plus a saddle patch. Until then, the shell keeps the Phase 1 output and reports why.

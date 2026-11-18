@@ -153,7 +153,7 @@ export function PlanSheet (triangles, draft)
 // now), in world millimetres (absolute, matching the sensed products).
 function LoftSummary (result, shell)
 {
-    return { shell, ok : result.ok, reason : result.reason, controls : result.controls ?? 0, maxDistanceMm : result.maxDistanceMm ?? null, toleranceMm : result.wallToleranceMm ?? null, merges : result.merges?.length || 0, walls : result.walls.map (w => ({ id : w.id, kind : w.kind, outlineControls : w.outlineControls, heightControls : w.heightControls, maxDistanceMm : w.maxDistanceMm, withinTolerance : w.withinTolerance })) };
+    return { shell, ok : result.ok, reason : result.reason, controls : result.controls ?? 0, maxDistanceMm : result.maxDistanceMm ?? null, toleranceMm : result.wallToleranceMm ?? null, merges : result.merges?.length || 0, faces : (result.faces || []).map (f => ({ id : f.id, kind : f.kind, holes : f.holes.length, ...(f.raisedMm !== undefined ? { raisedMm : f.raisedMm } : {}) })), walls : result.walls.map (w => ({ id : w.id, kind : w.kind, outlineControls : w.outlineControls, heightControls : w.heightControls, maxDistanceMm : w.maxDistanceMm, withinTolerance : w.withinTolerance })) };
 }
 function PlanNurbs (shells) { return { apiVersion : 1, units : 'mm', representation : 'brep', degree : 1, shells }; }
 

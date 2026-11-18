@@ -170,5 +170,9 @@ describe ('Molded Pulp smooth wall check and the outer skirt option', function (
         const sides = on.walls.filter (w => w.kind === 'skirt');
         assert.deepEqual (sides.map (w => w.id), ['Outer skirt side 1', 'Outer skirt side 2', 'Outer skirt side 3', 'Outer skirt side 4']);
         assert.equal (on.ok, true, on.reason); assert.ok (sides.every (w => w.withinTolerance && w.maxDistanceMm <= 0.3125), JSON.stringify (sides));
+        // Straight sides stay at the minimum control count; walls span floor (y = 0) to plateau (y = depth) exactly.
+        assert.ok (sides.every (w => w.outlineControls === 4), JSON.stringify (sides.map (w => w.outlineControls)));
+        assert.deepEqual (on.faces.map (f => f.kind), ['plane', 'plane', 'plane', 'plane', 'plane', 'plane', 'plane']);
+        assert.equal (on.faces.at (-1).id, 'Plateau'); assert.equal (on.faces.at (-1).holes, 6);
     });
 });
