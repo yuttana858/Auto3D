@@ -18,12 +18,12 @@ const runtime = new Miniflare (convertV4MiniflareOptions ({ workers : [{ name : 
             return Response.json ({ schema : 1, profile : 'preview', purpose : 'runtime', settings, revision : '00000000-0000-4000-8000-000000000001' });
         }
         assert.equal (request.url, settings.endpoint + '/connection'); assert.equal (request.headers.get ('Modal-Key'), settings.tokenId); assert.equal (request.headers.get ('Modal-Secret'), settings.tokenSecret);
-        return redirect ? new Response (null, { status : 302, headers : { Location : 'https://evil.test/' } }) : Response.json ({ service : 'cloud-3d-studio', protocol : 1, version : '0.2.0', workspace : 'fixture', environment : 'main', app : 'cloud-3d-studio', conversionReady : false });
+        return redirect ? new Response (null, { status : 302, headers : { Location : 'https://evil.test/' } }) : Response.json ({ service : 'cloud-3d-studio', protocol : 1, version : '0.5.0', workspace : 'fixture', environment : 'main', app : 'cloud-3d-studio', conversionReady : false, appearanceApiVersion : 1 });
     }
 }] }));
 try {
     let response = await runtime.dispatchFetch ('https://auto3d.test/'); assert.equal (response.status, 200); const result = await response.json ();
-    assert.equal (result.connected, true); assert.equal (result.conversionReady, false); assert.ok (!JSON.stringify (result).includes (settings.tokenSecret));
+    assert.equal (result.connected, true); assert.equal (result.conversionReady, false); assert.equal (result.appearanceApiVersion, 1); assert.ok (!JSON.stringify (result).includes (settings.tokenSecret));
     redirect = true; requests.length = 0;
     response = await runtime.dispatchFetch ('https://auto3d.test/'); assert.equal (response.status, 502); assert.equal ((await response.json ()).code, 'MODAL_NETWORK_FAILED');
     assert.equal (requests.length, 2); assert.ok (!requests.some (url => url.startsWith ('https://evil.test')));
