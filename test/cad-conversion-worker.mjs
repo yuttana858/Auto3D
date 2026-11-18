@@ -3,6 +3,10 @@ import { createHash } from 'node:crypto';
 import { build } from 'esbuild';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 
+const appearance = { schemaVersion : 1, sourceFormat : 'step', colors : { detected : 2, glb : 'preserved', step : 'preserved' }, transparency : { detected : 1, glb : 'preserved', step : 'preserved' }, materials : { detected : 0, glb : 'not_present', step : 'not_present' }, imageTextures : { detected : null, status : 'not_exposed_by_reader' }, stl : 'geometry_only', validation : 'passed' };
+const inventory = structuredClone (appearance); inventory.validation = 'not_run';
+for (const key of ['colors', 'transparency', 'materials']) { inventory[key].glb = inventory[key].step = 'not_run'; }
+
 const owner = '00000000-0000-4000-8000-000000000001', jobId = '00000000-0000-4000-8000-000000000002', attempt = '00000000-0000-4000-8000-000000000003', token = 'a'.repeat (43);
 const hash = data => createHash ('sha256').update (data).digest ('hex');
 const report = { schemaVersion : 1, versions : { worker : '0.4.0', reader : '0.3.17', occt : '7.9.3.1.1' }, outcome : 'error_detected', phase : 'build_geometry', failureCode : 'invalid_geometry', readerCode : 'occt.construction_failed', exception : 'Standard_ConstructionError', frames : ['surfaces:100'], checks : { sourceRead : 'passed', geometryBuild : 'failed', geometryValidation : 'not_run', stepExport : 'not_run', stepReimport : 'not_run' } };
@@ -39,9 +43,10 @@ try {
     assert.equal ((await callback ('complete')).status, 400, 'incomplete artifacts cannot publish'); assert.equal (published, 0);
     const artifacts = {};
     for (const [kind, units] of [['step', 'mm'], ['glb', 'm'], ['stl', 'mm']]) { const data = 'public-' + kind; const key = prefix + attempt + '/model.' + kind; assert.equal ((await put (data, key)).status, 200); artifacts[kind] = { filename : 'model.' + kind, bytes : data.length, sha256 : hash (data), units }; }
-    const manifest = { schema_version : 1, producer : 'cloud-3d-studio', producer_version : '0.3.0', status : 'validated', source : { sha256 : job.source_sha256 }, artifacts, cad_validation : { passed : true }, mesh_validation : { passed : true }, cad : { dimensions_mm : [40, 30, 20], topology : { solids : 1, shells : 1, faces : 6, edges : 12, vertices : 8 } } };
+    const manifest = { schema_version : 1, producer : 'cloud-3d-studio', producer_version : '0.5.0', appearance, status : 'validated', source : { sha256 : job.source_sha256 }, artifacts, cad_validation : { passed : true }, mesh_validation : { passed : true }, cad : { dimensions_mm : [40, 30, 20], topology : { solids : 1, shells : 1, faces : 6, edges : 12, vertices : 8 } } };
     assert.equal ((await put (JSON.stringify (manifest), prefix + attempt + '/manifest.json')).status, 200);
     response = await callback ('complete'); assert.equal (response.status, 200); assert.equal ((await response.json ()).state, 'ready'); assert.equal (published, 1);
+    const validated = await (await runtime.dispatchFetch (origin + '/validate')).json (); assert.deepEqual (validated.summary.appearance, appearance);
     assert.equal ((await callback ('complete', { arbitrary : 'private' })).status, 400);
     job.purpose = 'diagnostic';
     assert.equal ((await (await callback ('claim', {}, token, null)).json ()).accepted, false, 'an older worker must not claim diagnostic work');
@@ -51,6 +56,8 @@ try {
     assert.equal ((await callback ('complete', { report : { ...report, text : 'private raw log' } })).status, 400);
     assert.equal ((await callback ('complete', { report : { ...report, frames : ['/private/source.x_t:1'] } })).status, 400);
     response = await callback ('complete', { report }); assert.equal (response.status, 200); assert.equal ((await response.json ()).state, 'failed'); assert.equal (reports, 1); assert.equal (published, 1);
+    assert.equal ((await callback ('complete', { report, appearance : { ...inventory, path : '/private' } })).status, 400);
+    assert.equal ((await callback ('complete', { report, appearance : inventory })).status, 200); assert.equal (reports, 2); assert.equal (published, 1);
     job.deadline_at = new Date (Date.now () - 1).toISOString ();
     assert.equal ((await callback ('claim')).status, 410, 'diagnostic deadline revokes the worker capability');
     assert.equal ((await runtime.dispatchFetch (origin + '/' + jobId + '/' + attempt + '/source', { headers : { Authorization : 'Bearer ' + token } })).status, 410, 'expired diagnostic capability cannot stream the retained source');

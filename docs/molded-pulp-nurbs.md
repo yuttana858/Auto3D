@@ -1,6 +1,6 @@
 # Molded Pulp: review model and NURBS output
 
-Status: Phase 1 shipped in Auto3D 0.87.0 / Molded Pulp 0.3.0. Phase 2 is the next step to build and test.
+Status: Phase 1 shipped in Auto3D 0.88.0 / Molded Pulp 0.3.0. Phase 2 is the next step to build and test.
 
 ## Decision
 

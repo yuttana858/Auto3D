@@ -48,3 +48,7 @@ Validation includes two-owner service-role SQL fixtures; actual workerd/R2 lengt
 Production rollout needs the explicit Pages profile in [credential setup](modal-credentials.md), matching Supabase project and installed database migrations. Preview has its own profile and must have separate Auth/Vault credentials; current previews are not automatically given production credentials or enabled remote submissions.
 
 The progress and retry deployments, exact validation scope and unresolved supplier-file geometry error are recorded in [0.82.0 notes](release-0820.md) and [0.82.1 notes](release-0821.md). A successful public calibration does not certify every Parasolid source.
+
+## Appearance — 0.87.0 / worker 0.5.0
+
+Use GLB to retain supported STEP colors, face overrides and alpha. Colored STEP retains those assignments; STL stores geometry only. The Appearance report and read-only `conversion.appearance` command expose fixed counts/statuses, never source RGB values, images or geometry. Bitmap assets/UVs not exposed by the CAD reader are reported unknown, not absent; use a textured GLB export from the source application for artwork. Explicit failed-job server diagnostics may return a separate source-only inventory without publishing a model or changing retention/attempts. See [release-0870.md](release-0870.md).
