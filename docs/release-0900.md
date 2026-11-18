@@ -1,6 +1,6 @@
 # Auto3D 0.90.0 / Packaging 1.15.1 / Primary Products 0.15.0 / Molded Pulp 0.3.0
 
-One integration release (PR #155) for reliable macros, 24-hour agent pairing, read-only database auto-approval, a one-line Advance animation toolbar, macro animation recording with collapsible tracks (from #157) and compact Auto Pack controls (from #156, prepared as 0.88.1 / Packaging 1.15.1; #157 was prepared as 0.89.0). Based on main after #154 (0.89.0, automatic CAD import). Prepared as 0.89.0 and renumbered when #154 shipped 0.89.0. Packaging 1.15.1; the other modules are unchanged.
+One integration release (PR #155) for reliable macros, 24-hour agent pairing, read-only database auto-approval, a one-line Advance animation toolbar, macro animation recording with collapsible tracks (from #157) and compact Auto Pack controls (from #156, prepared as 0.88.1 / Packaging 1.15.1). Based on main after #154 (0.89.0, automatic private CAD conversion). Prepared as 0.89.0 and renumbered to 0.90.0 after #154 shipped as 0.89.0. Packaging 1.15.1; the other modules are unchanged.
 
 The pairing and database commits were pushed to #148 after its head was read for merge, so #148 merged only the 0.84.1 Auto Pack fix. They are included here, and the pairing notes that were written for 0.85.0 are below.
 
