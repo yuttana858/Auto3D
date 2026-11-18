@@ -4,8 +4,9 @@ import { readFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright-core';
 
-// Public synthetic box generated/reimported by Cloud 3D Studio 0.3.0; no customer CAD.
+// Public synthetic box generated/reimported by Cloud 3D Studio 0.5.0; no customer CAD.
 const glb = Buffer.from ((await readFile ('test/testfiles/cad-conversion-box.glb.b64', 'utf8')).trim (), 'base64');
+const appearance = { schemaVersion : 1, sourceFormat : 'step', colors : { detected : 2, glb : 'preserved', step : 'preserved' }, transparency : { detected : 1, glb : 'preserved', step : 'preserved' }, materials : { detected : 0, glb : 'not_present', step : 'not_present' }, imageTextures : { detected : null, status : 'not_exposed_by_reader' }, stl : 'geometry_only', validation : 'passed' };
 const diagnosticReport = { schemaVersion : 1, versions : { worker : '0.4.0', reader : '0.3.17', occt : '7.9.3.1.1' }, outcome : 'error_detected', phase : 'build_geometry', failureCode : 'invalid_geometry', readerCode : 'occt.construction_failed', exception : 'Standard_ConstructionError', frames : ['conversion:292'], checks : { sourceRead : 'passed', geometryBuild : 'failed', geometryValidation : 'not_run', stepExport : 'not_run', stepReimport : 'not_run' } };
 const root = process.cwd (), types = { '.html' : 'text/html', '.js' : 'text/javascript', '.css' : 'text/css', '.json' : 'application/json', '.png' : 'image/png', '.svg' : 'image/svg+xml', '.woff' : 'font/woff', '.ttf' : 'font/ttf' };
 const browser = await chromium.launch ({ executablePath : process.env.BROWSER_EXECUTABLE || '/usr/bin/chromium', args : ['--no-sandbox', '--enable-unsafe-swiftshader'] });
@@ -73,14 +74,18 @@ try {
         active.progress.completed = 9;
         await page.waitForFunction (() => document.querySelector ('.cad_conversion_job [role="progressbar"]')?.getAttribute ('aria-valuenow') === '75');
         assert.equal (await measured.getAttribute ('data-progress-identity'), 'retained');
-        Object.assign (active, { state : 'ready', stage : 'ready', revision : 3, artifacts : { step : { bytes : 100, units : 'mm' }, glb : { bytes : glb.length, units : 'm' }, stl : { bytes : 100, units : 'mm' }, manifest : { bytes : 100, units : null } }, summary : { dimensionsMm : [40, 30, 20], topology : { solids : 1 }, producerVersion : '0.3.0' }, updatedAt : new Date ().toISOString () });
+        Object.assign (active, { state : 'ready', stage : 'ready', revision : 3, artifacts : { step : { bytes : 100, units : 'mm' }, glb : { bytes : glb.length, units : 'm' }, stl : { bytes : 100, units : 'mm' }, manifest : { bytes : 100, units : null } }, summary : { dimensionsMm : [40, 30, 20], topology : { solids : 1 }, producerVersion : '0.5.0', appearance }, updatedAt : new Date ().toISOString () });
         await dialog.getByRole ('button', { name : 'Add to current session', exact : true }).waitFor ({ timeout : 15000 }).catch (async error => { console.log ({ width, uploads, jobs : [...jobs.values ()], ui : await dialog.innerText (), errors }); throw error; }); assert.equal (uploads, 1);
         assert.equal (await dialog.getByRole ('progressbar', { name : 'Ready · independently validated', exact : true }).getAttribute ('aria-valuenow'), '100');
         assert.equal ((await call ('scene.inspect')).objects.length, 0, 'completed jobs must never import themselves');
+        const appearanceResult = await call ('conversion.appearance', { jobId : active.id }); assert.deepEqual (appearanceResult.report, appearance);
+        await dialog.getByText ('Appearance report', { exact : true }).click ();
+        await dialog.getByText ('Source colors: 2 · GLB preserved · STEP preserved.', { exact : true }).waitFor ();
+        await dialog.getByText ('STL contains geometry only; use GLB to retain supported appearance.', { exact : true }).waitFor ();
         await dialog.getByRole ('button', { name : 'Add to current session', exact : true }).click ();
         await dialog.getByText ('Added to the current session. Undo is available.', { exact : true }).waitFor ();
         const scene = await call ('scene.inspect'); assert.equal (scene.objects.length, 1); assert.deepEqual (scene.objects[0].scale, [1, 1, 1]);
-        assert.ok (scene.objects[0].userData.cadConversion.includes ('0.3.0')); assert.ok (!JSON.stringify (scene).includes ('Modal-Secret'));
+        assert.ok (scene.objects[0].userData.cadConversion.includes ('0.5.0')); assert.ok (!JSON.stringify (scene).includes ('Modal-Secret'));
         await mkdir ('work/cad-conversion', { recursive : true }); await page.screenshot ({ path : 'work/cad-conversion/' + width + '.png' });
         const [download] = await Promise.all ([page.waitForEvent ('download'), dialog.getByRole ('button', { name : 'GLB · m', exact : true }).click ()]); assert.equal (download.suggestedFilename (), 'model.glb'); assert.equal (downloaded, 2);
         await dialog.getByRole ('button', { name : 'Close Convert CAD', exact : true }).click ();

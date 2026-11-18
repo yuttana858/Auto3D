@@ -76,7 +76,7 @@ jobs:
         run: |
           set -euo pipefail
           docker exec '${{ job.services.postgres.id }}' createdb -U postgres conversion_test
-          for script in test/security/conversion-bootstrap.sql supabase/migrations/20261117162751_owned_conversion_jobs.sql supabase/migrations/20261117210611_conversion_progress_and_failure_retry.sql test/security/conversion-retry-seed.sql supabase/migrations/20261117215236_conversion_retry_dispatch_outbox.sql test/security/conversion-retry-check.sql supabase/migrations/20261117231653_conversion_server_diagnostics.sql test/security/conversion-access.sql test/security/conversion-diagnostics.sql; do
+          for script in test/security/conversion-bootstrap.sql supabase/migrations/20261117162751_owned_conversion_jobs.sql supabase/migrations/20261117210611_conversion_progress_and_failure_retry.sql test/security/conversion-retry-seed.sql supabase/migrations/20261117215236_conversion_retry_dispatch_outbox.sql test/security/conversion-retry-check.sql supabase/migrations/20261117231653_conversion_server_diagnostics.sql supabase/migrations/20261118144715_conversion_appearance_inventory.sql test/security/conversion-access.sql test/security/conversion-diagnostics.sql test/security/conversion-appearance.sql; do
             docker exec -i '${{ job.services.postgres.id }}' psql -U postgres -d conversion_test -v ON_ERROR_STOP=1 < "$script"
           done
       - run: npm --prefix backend test

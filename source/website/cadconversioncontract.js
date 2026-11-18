@@ -17,7 +17,7 @@ export const CadMessages = Object.freeze ({
     invalid_geometry : 'The source did not produce complete valid geometry. No partial model was published.',
     complexity_limit : 'This model exceeded the bounded conversion resource limits. Try a simpler source or a STEP export.',
     timeout : 'Native conversion exceeded its time limit. Try a simpler source or a STEP export.',
-    unsupported_format : 'This CAD format is not enabled.', unsupported_entity : 'The open source Parasolid reader does not support an entity in this file.',
+    unsupported_format : 'This CAD format is not enabled.', unsupported_entity : 'The CAD reader cannot import an entity or external reference in this file. Export a self-contained STEP from the original CAD system.',
     source_units_required : 'Select the actual Parasolid coordinate units.', validation_failed : 'Independent geometry validation failed; no result was published.',
     wrong_target : 'The active account or session changed. Select the intended session and try Add again.',
     unknown_units : 'Set the existing scene units before adding the converted model.'
