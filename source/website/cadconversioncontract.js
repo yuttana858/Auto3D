@@ -5,6 +5,7 @@ export const CadMessages = Object.freeze ({
     invalid_request : 'Check the file, source units and conversion options.',
     unauthenticated : 'Sign in to convert CAD.', forbidden : 'This conversion is unavailable for this account.',
     conflict : 'This conversion changed. Refresh its status before retrying.', not_found : 'Conversion not found.',
+    import_busy : 'A CAD import is already running. Wait for it or cancel it before starting another.',
     expired : 'This conversion has expired. Submit the source again.', queue_full : 'Conversion queue limit reached. Try again after a job finishes.',
     unavailable : 'CAD conversion is temporarily unavailable. Try again shortly.', not_ready : 'The CAD service has not completed its native verification.',
     too_large : 'The file exceeds the conversion size limit.', source_mismatch : 'The uploaded file does not match this submission.',
