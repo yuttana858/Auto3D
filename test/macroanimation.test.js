@@ -23,6 +23,16 @@ describe ('Macro animation recording', () => {
     it ('records visibility changes as discrete keys with transform and camera states', async () => {
         const { editor, registry, object } = fixture (); object.visible = true; const result = await RecordMacroAnimation (editor, registry, { version : 1, steps : [{ id : 'hide', command : 'object.visibility', arguments : { visible : false } }, { id : 'show', command : 'object.visibility', arguments : { visible : true } }] }, 2); assert.equal (result.recorded, true); assert.deepEqual (object.visibilityKeys.map (key => [key.time, key.visible]), [[0, true], [2, false], [4, true]]);
     });
+    it ('records per-step durations and holds without changing the app lighting', async () => {
+        const { editor, registry, object } = fixture (); const lighting = { ambient : 0.4, environment : 'studio' }; editor.website.lightingPanel = { Capture : () => structuredClone (lighting) };
+        const macro = { version : 1, steps : [{ id : 'move', command : 'object.transform', arguments : { x : 4 }, animation : { duration : 1, pauseAfter : 2 } }, { id : 'camera', command : 'camera.fov', arguments : { fov : 60 }, animation : { duration : 3 } }] };
+        const result = await RecordMacroAnimation (editor, registry, macro); assert.equal (result.duration, 6); assert.deepEqual (object.keyframes.map (key => key.time), [0, 1, 3, 6]); assert.equal (editor.timeline.ObjectStateAt (object, 2).position[0], 4); assert.deepEqual (editor.website.lightingPanel.Capture (), lighting); assert.equal (result.completed[1].start, 3);
+    });
+    it ('validates timing before executing the macro', async () => {
+        const { editor, registry, object } = fixture (); const macro = { version : 1, steps : [{ id : 'move', command : 'object.transform', arguments : { x : 4 }, animation : { duration : -1 } }] };
+        await assert.rejects (RecordMacroAnimation (editor, registry, macro), /duration/); assert.equal (object.position[0], 0);
+        macro.steps[0].animation = { overlap : 1 }; await assert.rejects (RecordMacroAnimation (editor, registry, macro), /timing supports/); assert.equal (object.position[0], 0);
+    });
     it ('rejects unsupported operations before executing any step', async () => {
         const { editor, registry, object } = fixture (); await assert.rejects (RecordMacroAnimation (editor, registry, { version : 1, steps : [{ id : 'move', command : 'object.transform', arguments : { x : 4 } }, { id : 'remove', command : 'object.delete', arguments : {} }] }), /Cannot record/); assert.equal (object.position[0], 0); assert.equal (object.keyframes.length, 0);
     });

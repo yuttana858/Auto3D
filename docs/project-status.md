@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Macro step timing — Auto3D 0.93.0 candidate
+
+Stacked on PR #160. Recorded macros support per-step durations and pauses; timing is editable in the macro builder and available to agents. Lighting remains under the app’s existing lighting settings. Overlapping steps, automatic creation/deletion, and procedural recording remain open; see release-0930.md. Not deployed.
+
 ## Array reveal on the shared timeline — Auto3D 0.92.0 candidate
 
 Stacked on PR #159. Existing selected objects can receive staggered reveal motion and visibility tracks; standard macros can create an array and pass copy IDs to the scheduler. The active object can remain in place. UX review clarified selection, timing and hidden-before-reveal behavior. Existing tracks are protected. See release-0920.md. Not deployed.

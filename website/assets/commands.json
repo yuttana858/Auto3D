@@ -7302,7 +7302,7 @@
       "id": "animation.macro.record",
       "title": "Run macro and record animation",
       "category": "Animation",
-      "description": "Run a saved or supplied macro and record object transforms, visibility and camera views as sequential keyframes. Requires an empty stopped timeline and 1–100 existing objects. Unsupported commands, including creation, deletion, materials and procedural animation, are rejected before execution. Completed macro steps remain if a later step fails. Object/camera changes are interpolated over stepSeconds; the recorded timeline is one undo step.",
+      "description": "Run a saved or supplied macro and record object transforms, visibility and camera views as sequential keyframes. Set step.animation.duration and pauseAfter in seconds, or use stepSeconds as the default duration. Requires an empty stopped timeline and 1–100 existing objects. Unsupported commands, including creation, deletion, materials and procedural animation, are rejected before execution. Completed macro steps remain if a later step fails. The recorded timeline is one undo step.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
