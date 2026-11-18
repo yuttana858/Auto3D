@@ -179,6 +179,14 @@ export class SceneHistory
     Changed () { if (this.onChange) { this.onChange (); } }
     Push (command) { this.undo.push (command); if (this.undo.length > 50) { this.undo.shift (); } this.redo = []; this.Changed (); }
     async Undo () { const command = this.undo.pop (); if (command) { await command.undo (); this.redo.push (command); this.Changed (); } }
+    // Merge every step pushed since `start` (an earlier undo.length) into one Undo step.
+    Group (start)
+    {
+        if (!Number.isInteger (start) || start < 0 || start >= this.undo.length) { return false; }
+        const steps = this.undo.splice (start); if (steps.length === 1) { this.undo.push (steps[0]); return true; }
+        this.undo.push ({ undo : async () => { for (const step of [...steps].reverse ()) { await step.undo (); } }, redo : async () => { for (const step of steps) { await step.redo (); } } });
+        this.Changed (); return true;
+    }
     async Redo () { const command = this.redo.pop (); if (command) { await command.redo (); this.undo.push (command); this.Changed (); } }
 }
 

@@ -1,3 +1,4 @@
+import { DropIn } from './dropin.js';
 import * as THREE from 'three';
 import { CreatePadPlan, CreatePartitionPlan, PadPositions, BoardGrades } from '../../modules/packaging/src/accessories.js';
 import { DefaultBoardDatabase } from '../../modules/packaging/src/boarddatabase.js';
@@ -144,7 +145,7 @@ export class AccessoriesWorkspace
         // World axes for the carton's length and width; the carton's inside corner in world mm.
         const axis = { length : c.lengthAxis, width : c.lengthAxis === 0 ? 2 : 0 };
         const corner = [c.center[0] - (axis.length === 0 ? c.inside.length : c.inside.width) / 2, 0, c.center[1] - (axis.length === 2 ? c.inside.length : c.inside.width) / 2];
-        const added = []; const firstIndex = target.objects.length; editor.busy = true; editor.RefreshButtons?.();
+        const added = []; const firstIndex = target.objects.length; let dropIn = { animated : false }; editor.busy = true; editor.RefreshButtons?.();
         try {
             const module = await LoadPackagingModule (); unchanged ();
             for (const piece of pieces) {
@@ -155,7 +156,11 @@ export class AccessoriesWorkspace
                 unchanged ();
             }
             carton.userData = { ...carton.userData, ...group };
-            editor.selected = carton; await editor.Render?.(); editor.busy = true; unchanged ();
+            // The new pieces stay hidden through the rebuild, then lower in from above instead of appearing in place.
+            editor.motionOverride = () => added.forEach (object => { if (object.threeObject) { object.threeObject.visible = false; } });
+            try { editor.selected = carton; await editor.Render?.(); editor.busy = true; unchanged (); dropIn = await DropIn (editor, added, f, { data : AccessoryData, easing : editor.website.preferences?.motionEasing || 'smooth' }); }
+            finally { editor.motionOverride = null; added.forEach (object => { if (object.threeObject) { object.threeObject.visible = object.visible !== false; object.threeObject.position?.fromArray?.(object.position); } }); }
+            unchanged ();
             const after = { ...carton.userData };
             const apply = async add => {
                 if (editor.document !== target) { throw new Error ('These accessories belong to another session.'); }
@@ -168,7 +173,7 @@ export class AccessoriesWorkspace
             if (editor.document === target) { editor.selected = carton; try { await editor.Render?.(); } catch { /* Keep the original failure. */ } }
             throw error;
         } finally { editor.busy = false; editor.RefreshButtons?.(); editor.website.packagingPanel?.Refresh?.(); }
-        return { cartonId : carton.id, objectIds : added.map (object => object.id), pieces : added.length, units : 'mm', thicknessMm : t, boardName : c.material.name };
+        return { cartonId : carton.id, objectIds : added.map (object => object.id), pieces : added.length, units : 'mm', thicknessMm : t, boardName : c.material.name, dropIn };
     }
 }
 

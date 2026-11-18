@@ -1,62 +1,102 @@
-# Auto3D 0.90.0 / Packaging 1.15.1 / Primary Products 0.15.0 / Molded Pulp 0.3.0
+# Auto3D 0.90.0 — Auto Pack assembly sequence, motion easing, drop-in accessories, Assign facing
 
-One integration release (PR #155) for reliable macros, 24-hour agent pairing, read-only database auto-approval, a one-line Advance animation toolbar, macro animation recording with collapsible tracks (from #157) and compact Auto Pack controls (from #156, prepared as 0.88.1 / Packaging 1.15.1). Based on main after #154 (0.89.0, automatic private CAD conversion). Prepared as 0.89.0 and renumbered to 0.90.0 after #154 shipped as 0.89.0. Packaging 1.15.1; the other modules are unchanged.
+Packaging **1.16.0**, Primary Products 0.15.0, Molded Pulp 0.3.0. Based on main after Auto3D 0.89.0. Not deployed.
 
-The pairing and database commits were pushed to #148 after its head was read for merge, so #148 merged only the 0.84.1 Auto Pack fix. They are included here, and the pairing notes that were written for 0.85.0 are below.
+## Auto Pack assembly sequence
 
-## What changed
+Auto Pack now plays the order real cartons are packed in. Before, the carton folded around products that never moved, and the pads and partitions appeared instantly. Now:
 
-- **Steps wait for playback.** Commands such as `packaging.fefco.toggle` start an animation and return. Each macro step now waits until the viewer is no longer busy (up to 5 minutes) before the next step runs. Previously the next step failed with "The viewer is busy". `macro.cancel` also stops a run while it waits.
-- **One Undo per run.** The history entries a macro adds are grouped into one Undo step, including the steps completed before a failure. One `history.undo` reverses the whole run. Grouping is skipped if the run itself undid or redid entries.
-- **Tab changes only as the last step.** `session.tabs.new`, `session.tabs.switch` and `session.tabs.close` move the run to another tab, so later steps would act on the wrong scene. They are refused before any step runs, unless they are the last step. The check applies when a macro is run and when it is saved.
-- **Delete and export saved macros.** New commands `macro.delete { name }` and `macro.export { name }` (export returns a portable JSON definition for `macro.save` in another browser). The Commands and macros dialog has **Delete saved macro** and **Export saved macro** buttons.
-- **Replay warnings.** `macro.save` and `macro.export` return `warnings` for arguments named `id`, `…Id` or `…Ids` that hold a literal value (not a `$ref`, not a `nominal-` board). These usually exist only in one account or scene.
+1. **Lift.** Products rise above the flat blank. With partitions, they spread apart into their cells in the air.
+2. **Erect.** The carton folds its walls and closes its bottom. The top flaps stand upright, so the lid is open at 90°: the fold holds at the Auto Pack pose 0.76.
+3. **Bottom pad**, then the **front/back pads**, then the **partition layers**, one layer after another. Each lowers into the open carton.
+4. **Products** drop in one at a time, lowest layer first and back to front. Up to six products get even slots, slots shorten gently up to 12, and larger counts speed up so the stage stays bounded.
+5. **Top pad** lowers on.
+6. **Close.** The lid folds shut. A carton set to Open top ends open.
 
-Macros are still stored only in this browser (`auto3d-macros-v1`). Account storage needs a new table and is the next step.
+How it works:
 
-## 24-hour agent pairing and Live Control
+- **Planner.** `modules/packaging/src/packsequence.js` (`CreatePackSequence`, `SamplePackSequence`, `ProductDropSlots`) is a pure plan in world millimetres. It refuses a layout where a pad or partition is in a product's drop path, so products only ever move straight down.
+- **Playback.** `source/website/autopacksequence.js` (`PackSequencePlayback`) draws each object at its saved packed placement plus the sampled offset. `PackagingWorkspace.AnimateFold` accepts a `sequence` that drives the carton fold, the stage label, per-frame placement and camera bounds.
+- **No early flash.** The editor reapplies the in-flight placement after every rebuild (`SessionEditor.motionOverride`), so nothing appears packed before the animation starts.
+- **Cancel and failure.** Pause, resume and cancel are unchanged. Cancel or failure leaves products and pieces in their packed placement.
+- **One Undo step.** A completed Auto Pack is one Undo step for contents, carton and fold (`SceneHistory.Group`). Before, it was three.
+- **Replay.** Folding an Auto Pack carton up from flat replays its sequence from its saved products and tagged pieces. The carton's saved fit ids include the pieces, and replay excludes them.
+- **Duration.** The default is 14 s (1–30 s).
 
-Before this change a pairing was lost after 1 hour idle, when the user switched session tabs, and when the page reloaded. Each case needed a new window code.
+## Motion easing (ramp in/out)
 
-- **24-hour pairing.** A pairing lasts 24 hours from pairing (`PairLifetimeMs` in `mcp/broker-core.js`), capped by the agent registration's own expiry. Inactivity no longer ends it early.
-- **Pairing follows the window's active tab.** When the user switches session tabs, the pairing moves to that window's active tab. Another window or account still can't take it over: only the same connection, or the same window identity on the same login session, qualifies.
-- **24-hour Live Control.** Turning Live Control on is remembered in that browser tab (`sessionStorage` key `auto3d-live-control`) for 24 hours, with the account, window identity and expiry. After a reload the window reconnects by itself with the same identity, so pairings resume without a new code. `agent.access.inspect` reports `liveControlUntil`.
-- **Disconnect still means stop.** The Disconnect button, `agent.access.disconnect`, and signing out or changing account clear it, and the next Live Control uses a new window identity. Revoking an agent still ends it immediately.
-- **Unchanged:** window codes stay single-use and valid for 10 minutes; connections renew every minute; OAuth scopes and account isolation.
+New account preference **Motion easing**, in Preferences next to Viewport quality:
 
-## Read-only database auto-approval
+- **Smooth** (default): smootherstep.
+- **Strong:** quintic in-out, with longer ramps.
+- **Linear:** constant speed.
 
-`.claude/settings.json` auto-approves the read-only Supabase MCP tools (list and get projects, tables, migrations, extensions, branches and edge functions; advisors; logs; docs search; type generation; reading notebooks) for every Claude Code session on this repository. SQL execution, migrations, edge function deploys and secrets, branch changes, project create/pause/restore and notebook writes are listed under `ask` and keep asking each time.
+It is server-validated (`motionEasing` in `functions/_lib/accountstorage.js`) and set by agents with `preferences.motion_easing`. It applies to modelling motion only:
 
-## One-line Advance animation toolbar
+- the overall carton fold and unfold timing, which was linear before; each panel still eases within its phase
+- the Auto Pack sequence
+- array reveal drops
+- accessory drop-ins
 
-The Advance animation panel used five rows for its controls (title and camera readout, Duration/Tween/Loop, three full-width keyframe buttons, Play/Reset, Auto-fit, then In/Out fields), with 7 px labels, white range inputs and a Close button floating outside the box. They are now one toolbar line (`.timeline_toolbar`, `role="toolbar"`):
+The landing page and AI previews are unchanged. The shared curve is `modules/packaging/src/easing.js` (`EaseMotion`, `EaseSpan`).
 
-**▶ / ❚❚ · ↺ · time** │ **Length · In · Out · Tween · Loop** │ **+ Scene · + Camera · + Fold** │ **Auto-fit fold · camera readout · Camera…** │ **×**
+## Accessories drop in
 
-- Same handlers as before; every control keeps its accessible name (`Play`/`Pause`, `Reset`, `Keyframe scene state`, `Keyframe camera`, `Action`, `Camera settings`, `Close Advance animation`, `Timeline duration in seconds`, `Beginning/End of animation`, `Keyframe interpolation`, `Auto-fit folding camera`), so commands, agents and tests are unaffected. Longer explanations moved to tooltips.
-- `CreateTimelineTracks (editor, parent, { ranges, camera })` puts the In/Out fields and Auto-fit into the toolbar groups; without slots it keeps its own rows.
-- The panel is 300 px tall (was 330) with no inner border. On narrow screens the toolbar scrolls sideways and the Close button stays pinned in view.
+Pads and partitions added from the Accessories tab stay hidden through the rebuild, then lower into place in packing order: bottom, sides, partitions, top. The drops overlap, total at most 1.8 s, and are skipped for reduced motion. The add result reports `dropIn: { animated, seconds }`.
 
-## Macro animation recording and collapsible tracks (from #157)
+## Assign facing (Model spec)
 
-`animation.macro.record` runs a saved or supplied macro and records object transforms and camera views as sequential keyframes on an empty, stopped timeline. Advance animation has collapsible scene, camera and action tracks and one expandable track per object. An open track is one row: its toggle replaces the duplicate row label (`animation.tracks.inspect`, `animation.tracks.expand`). See `docs/agent-interface.md` for the workflow and limits.
+**Assign facing** is a new button under the Model spec preview, next to Rotate, Update and ×. It shows a placement visual for the selected model:
 
-- Only a restricted set of steps can be recorded (transforms, selection, view and camera commands). Creation, deletion, visibility, materials, arrays and procedural animation are rejected before the macro runs.
-- Each step waits for its playback (`Settle`) before its keyframe is captured, so the recorded pose is the settled one.
-- **One Undo.** A recording is one Undo step: it removes the recorded keyframes and reverses the macro's scene changes; Redo restores both. (`CommandRegistry.lastRun` exposes the history entry for the run, and `RecordMacroAnimation` folds it into its own entry.)
+- a glowing, transparent blue **ground rectangle** around the model's footprint
+- a blue **Front** arrow along the ground and a green **Up** arrow
+- a highlight on the face of the model's bounding box under the pointer: blue in Front mode, green in Up mode
 
-## Compact Auto Pack controls (from #156; Packaging 1.15.1)
+A hint bar over the viewer has **Front** / **Up** mode buttons, **⟲ 90°** / **⟳ 90°** turn buttons and **Done**. Escape also finishes. Choosing another selection, or none, ends the tool. Clicks that miss the model still orbit and select as usual. Clicks on the model's bounds assign that face and keep the selection.
 
-The Auto Pack explanation is collapsed under **How Auto Pack works**. The packed contents controls are renamed **Pads and Partitions** and are separately collapsible. Flute and board record controls use the account board catalog for the next carton and show the selected record's thickness. **Inside Dimensions** replaces the redundant bounding-box and score-size cards. Catalog record names are displayed as provided; nominal records do not imply a certified strength grade. Settings and sizing behavior are unchanged.
+Rules:
 
-The fold progress indicator is now a draggable fold-pose timeline, available after automatic playback; it saves the pose through the existing undoable fold scrub. The Auto panel no longer shows pause/cancel buttons (still available as `packaging.fefco.playback`) or repeated status. `packaging.auto.explanation` and `packaging.auto.contents_panel` open and close the sections.
+- **Front.** Clicking a face in Front mode turns the model so that face points to the world front. The world front is toward the default camera: +Z when Y is up, −Y when X or Z is up. The viewer's up vector, including flipped up, is respected.
+- **Up.** Shift+click, or Up mode, turns the clicked face to world up.
+- **Smallest turn.** The tool uses the smallest rotation. A side face becomes Front with a turn about up. The back face makes a half turn about up, never upside down. Making the top or bottom the Front tips the model.
+- **Placement.** The model turns about its bounds centre and is then set on the floor. Rotations within 0.0001° of a whole degree are snapped (a quarter turn is stored as −90, not −89.999999).
+- **Undo.** Each assignment or turn is one Undo step that restores both the transform and the saved facing.
+- **Saved facing.** The model's local front and up axes are saved as `userData._auto3dFacing` (for example `{"front":"+x","up":"+y"}`), so later tools (arrays, pallets, labels) can know its front.
+
+Shift is now passed to viewer click handlers along with Ctrl and Meta (`navigation.js`).
+
+##### Agent commands
+
+- `object.facing.open { objectId? }` and `object.facing.close` show and hide the visual.
+- `object.facing.assign { front | up }` uses axis names `+x`, `-x`, `+y`, `-y`, `+z`, `-z` for the side's current world direction.
+- `object.facing.turn { degrees: 90 | -90 | 180 }` turns the model.
+- `object.facing.mode { front | up }` sets the picking mode.
+- `object.facing.inspect` returns whether the tool is active, the model, mode, hovered face, world front/up, the saved facing, and the world size and floor offset.
+
+All of these use the same `FacingTool` (`source/website/facingtool.js`) as the buttons.
+
+##### Not in this release
+
+- Opening the placement visual automatically after import, instead of models appearing directly, is the next step if wanted.
+- Using the saved facing in arrays and pallets is also future work.
+
+## Agent commands
+
+- `packaging.auto.sequence.inspect` returns stages and spans, the current stage, fold progress, product drop order and entry height. It is allowed while the viewer is busy.
+- `preferences.motion_easing`.
+- `object.facing.open/assign/turn/mode/inspect/close`.
+- `packaging.auto.generate` defaults to 14 s and describes the sequence and one Undo step.
+- The catalog has 394 commands.
 
 ## Validation
 
-- Unit tests, including the new `test/macro-run.test.js` (playback wait, cancel while waiting, one Undo after success and after failure, tab-step rule, save/export/delete with warnings). Three tests that counted one Undo per macro step now expect the grouped step.
-- MCP tests (73): a tab switch moves the pairing to the new active tab; routing, replay and revocation are still refused; a pairing survives an hour idle and ends at 24 hours.
-- Browser `mcp-access`: Live Control reports a 24-hour expiry, a reload reconnects with the same window identity, and Disconnect clears it.
-- Stacked branch (#155 + #156 + #157, one-Undo recording): lint and lint_mcp pass; 1,039 unit, 73 MCP and 91 Packaging module tests pass; all builds succeed; browser smoke suite 11/11, plus `animation`, `animation-video`, `command-design`, `mcp-access`, `module-panels`, `packaging-auto-pack` and `packaging-auto-styles`.
-- Browser `animation`: the toolbar is one line (≤ 40 px), Close is in view, and every control is found by its accessible name. `animation-video`, `workspace-editing`, `module-panels` and `packaging-module` pass.
-- Browser `command-design`: a macro creates a 0201, toggles the fold, then runs `view.fit` and `packaging.fefco.playback.inspect` (state `completed`). One Undo leaves an empty scene. A macro with a tab change before the last step is refused.
+- `npm test`: 1064 passing. New unit tests:
+  - `packsequence.test.js`: stage order, hover and lid-open fold, ending in place, drop order, accelerating slots, drop-path refusal
+  - `motion-easing.test.js`
+  - `dropin.test.js`
+  - `facing.test.js`
+  - an Auto Pack integration test for the sequence, one Undo and replay
+- `npm --prefix modules/packaging test`: passing. `npm run test_mcp`: passing. Lint is clean.
+- Browser tests `autopack-sequence` and `assign-facing` are in the CI suite. `autopack-sequence` covers stage order, the lid open at 0.76 while packing, one Undo restoring the products, accessory drop-in and the easing preference.
+- Full local browser suite (93 tests): 92 passed on the first run; `packaging-auto-pack` still expected three Undo steps and now checks one Undo plus Redo, and passes.
+- In a real browser, a 3 × 2 product pack with four pads and partitions ran lift → erect → pads → partitions → products one at a time → top pad → close, with no page errors.
