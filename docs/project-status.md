@@ -1,8 +1,8 @@
 # Auto3D development log and handoff
 
-## Appearance capability bridge — Auto3D 0.87.1 candidate (2026-11-18)
+## Appearance capability bridge — Auto3D 0.87.1 live (2026-11-18)
 
-Passes the exact supported appearance API flag through the sanitized Modal bridge so the public conversion API can advertise it. Live 0.87.0 conversion/diagnostic checks found 16 source colors in the retained STEP; the stricter appearance-aware public gate caught this metadata omission. See [release-0871.md](release-0871.md).
+Passes the exact supported appearance API flag through the sanitized Modal bridge so the public conversion API can advertise it. Live 0.87.0 conversion/diagnostic checks found 16 source colors in the retained STEP; the stricter appearance-aware public gate caught this metadata omission. See [release-0871.md](release-0871.md). PR #152 / deployed commit `b6865eb67b971b358a798506c733817891c36279`; CI 44347073226 and deployment 44348738348 (attempt 2) passed. The appearance-aware private pipeline 44345807731 (attempt 2) passed actual public GLB color/alpha, hashes/units, account isolation and diagnostic checks. No customer CAD was downloaded to the agent workspace.
 
 ## CAD appearance — Auto3D 0.87.0 candidate (2026-11-18)
 
