@@ -133,3 +133,7 @@ Commands: shared local dev/Packaging servers, then `node tools/run_browser_suite
 | molded-pulp | pass | 400 |
 | primary-contents | pass | 83 |
 | packaging-auto-pack | pass | 99 |
+
+## Hosted release verification
+
+PR #154 merged as `6bdb3c321cfcf9f97bf29739fdd521969e44cba6` (tree `3565dee68d2fd8e7f1b811a79e4a7b6c48bb0b99`, only validation documentation added after the tested code). [CI 44380198211](https://github.com/yuttana858/Auto3D/actions/runs/44380198211) passed both validation and the 11-check browser smoke job. [Production deployment 44381827086](https://github.com/yuttana858/Auto3D/actions/runs/44381827086), attempt 1 / job 135075871425, passed all steps, including the actual served version and asset hashes, landing/login routes, credential authentication boundary and live MCP discovery/authentication. Auto3D 0.89.0 is live. No native image, database migration or provider/SDK credentials changed.
