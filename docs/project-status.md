@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Array reveal on the shared timeline — Auto3D 0.92.0 candidate
+
+Stacked on PR #159. Existing selected objects can receive staggered reveal motion and visibility tracks; standard macros can create an array and pass copy IDs to the scheduler. The active object can remain in place. UX review clarified selection, timing and hidden-before-reveal behavior. Existing tracks are protected. See release-0920.md. Not deployed.
+
 ## Embedded clips on the shared timeline — Auto3D 0.91.0 candidate
 
 Stacked on PR #158. Schedules paused embedded clips on the shared timeline with start, duration, speed and looping; seeking, playback and video export sample the same timeline. Adds an Animation panel control, object-track clip spans, agent commands and archive persistence. Unmanaged clips retain their existing independent behavior. Array recording and macro-generated procedural actions remain future work. See release-0910.md. Not deployed.

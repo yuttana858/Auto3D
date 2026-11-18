@@ -1,4 +1,5 @@
 import { VideoExport, VideoSizes, VideoFrameRates, VideoFrameTimes } from './videoexport.js';
+import { ScheduleArrayReveal } from './timelinearray.js';
 
 function Element (tag, className, text, parent)
 {
@@ -98,6 +99,13 @@ export class AnimationPanel
         const clipButtons = Element ('div', 'animation_buttons', undefined, embedded);
         this.clipAdd = this.Button (clipButtons, 'Add clip at playhead', () => { const object = this.editor.selected; if (!object?.player || !this.clipDuration.value.trim () || !this.clipSpeed.value.trim ()) { throw new Error ('Choose a paused clip, duration and speed.'); } this.timeline.AddEmbeddedClip ({ objectId : object.id, clip : Number (this.clipChoice.value), time : this.timeline.time, duration : Number (this.clipDuration.value), speed : Number (this.clipSpeed.value), loop : this.clipLoop.checked }); this.clipStatus.textContent = 'Clip added to timeline.'; }, null, this.clipStatus);
 
+        const array = Element ('details', 'animation_array_section', undefined, keys); Element ('summary', null, 'Array reveal', array);
+        this.arrayTarget = Element ('p', 'animation_summary', '', array); Element ('p', 'animation_help', 'Scheduled objects are hidden from the start until their reveal. They appear in scene-list order. No models are created.', array);
+        this.arrayStatus = Element ('p', 'animation_summary', '', array); this.arrayStatus.setAttribute ('role', 'status');
+        const keepLabel = Element ('label', 'animation_check', undefined, array); this.arrayKeepActive = Element ('input', null, undefined, keepLabel); this.arrayKeepActive.type = 'checkbox'; this.arrayKeepActive.checked = true; keepLabel.appendChild (document.createTextNode (' Keep active object in place')); this.arrayKeepActive.addEventListener ('change', () => this.Refresh ());
+        const arrayGrid = Element ('div', 'animation_grid', undefined, array); this.arrayDuration = this.Number (arrayGrid, 'Reveal duration (s)', 1, 15, .1); this.arrayDuration.value = '4'; this.arrayHeight = this.Number (arrayGrid, 'Drop distance (model units)', .000001, 1000000, .1); this.arrayHeight.value = '1';
+        const arrayButtons = Element ('div', 'animation_buttons', undefined, array); this.arraySchedule = this.Button (arrayButtons, 'Schedule reveal', () => { const selected = this.ArrayTargets (); if (!this.arrayDuration.value.trim () || !this.arrayHeight.value.trim ()) { throw new Error ('Enter a duration and drop distance.'); } ScheduleArrayReveal (this.editor, { objectIds : selected.map (item => item.id), time : this.timeline.time, duration : Number (this.arrayDuration.value), dropHeight : Number (this.arrayHeight.value) }); this.arrayStatus.textContent = 'Array reveal scheduled.'; }, null, this.arrayStatus);
+
         const video = this.Section ('Export video', 'Records the range frame by frame, so no frame is dropped. The video stays in this browser until you download it.');
         const videoGrid = Element ('div', 'animation_grid', undefined, video);
         this.size = this.Select (videoGrid, 'Video size', Object.keys (VideoSizes).map (key => [key, SizeLabels[key]]));
@@ -116,6 +124,8 @@ export class AnimationPanel
         this.timeline.Subscribe ((type) => { if (!this.Visible ()) { return; } if (type === 'time') { this.RefreshTime (); } else { this.Refresh (); } });
     }
 
+    ArrayTargets () { const objects = this.editor.SelectedObjects?.() || []; return this.arrayKeepActive.checked ? objects.filter (item => item !== this.editor.selected) : objects; }
+
     async ExportVideo () { const result = await this.video.Export ({ ...this.options }); this.status.textContent = ''; return result; }
 
     RefreshTime ()
@@ -131,6 +141,9 @@ export class AnimationPanel
         const clipPlayer = editor.selected?.player, clipId = editor.selected?.id || null;
         if (clipId !== this.clipObjectId || clipPlayer !== this.clipPlayer) { this.clipObjectId = clipId; this.clipPlayer = clipPlayer; this.clipChoice.replaceChildren (); clipPlayer?.clips.forEach ((clip, index) => this.clipChoice.add (new Option (clip.name || 'Clip ' + (index + 1), String (index)))); if (clipPlayer) { this.clipChoice.value = String (clipPlayer.state.clip); this.clipDuration.value = String (Number (clipPlayer.clips[clipPlayer.state.clip].duration.toFixed (3))); } else { this.clipDuration.value = ''; } this.clipSpeed.value = '1'; this.clipLoop.checked = false; this.clipStatus.textContent = ''; }
         this.clipTarget.textContent = !clipPlayer ? 'Select a model with an embedded clip.' : locked ? 'Selected: ' + editor.selected.name + ' · Editing unavailable.' : editor.busy ? 'Selected: ' + editor.selected.name + ' · Wait for the current operation.' : t.playing ? 'Selected: ' + editor.selected.name + ' · Pause the timeline to add a clip.' : clipPlayer.state.playing ? 'Selected: ' + editor.selected.name + ' · Pause the embedded clip first.' : 'Selected: ' + editor.selected.name; [this.clipChoice, this.clipDuration, this.clipSpeed, this.clipLoop, this.clipAdd].forEach (control => { control.disabled = locked || editor.busy || t.playing || !clipPlayer || clipPlayer.state.playing; });
+        const targets = this.ArrayTargets (), selectedCount = targets.length; const invalid = targets.some (item => !item.threeObject || item.visible === false || item.keyframes?.length || item.visibilityKeys?.length || item.userData?._auto3dFoldPreview !== undefined || editor.packaging?.presentation?.records?.get (item.id)?.preview?.visible || t.actions.some (action => action.objectId === item.id));
+        this.arrayTarget.textContent = locked ? 'Editing is unavailable.' : editor.busy ? 'Wait for the current operation.' : t.playing ? 'Pause the timeline first.' : !selectedCount ? (this.arrayKeepActive.checked && editor.selected ? 'Keeping ' + editor.selected.name + ' in place. Select more objects or include the active object.' : 'Select objects to reveal.') : invalid ? 'Use visible objects without motion, visibility or active fold previews.' : (this.arrayKeepActive.checked && editor.selected ? 'Keeping ' + editor.selected.name + ' in place. ' : '') + selectedCount + ' object' + (selectedCount === 1 ? '' : 's') + ' will be scheduled.';
+        [this.arrayKeepActive, this.arrayDuration, this.arrayHeight, this.arraySchedule].forEach (control => { control.disabled = locked || editor.busy || t.playing; }); this.arraySchedule.disabled ||= !selectedCount || invalid;
         this.RefreshTime (); this.play.textContent = t.playing ? 'Pause' : 'Play';
         for (const [input, value] of [[this.duration, t.duration], [this.rangeStart, t.rangeStart], [this.rangeEnd, t.rangeEnd]]) { if (document.activeElement !== input) { input.value = String (Number (value.toFixed (3))); } }
         this.tween.value = t.interpolation; this.loop.checked = t.loop;

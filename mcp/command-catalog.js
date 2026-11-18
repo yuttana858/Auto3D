@@ -237,6 +237,7 @@ export const CommandIds = Object.freeze ([
     'animation.visibility.keyframe',
     'animation.visibility.lifetime',
     'animation.visibility.clear',
+    'animation.array.schedule',
     'animation.clip.add',
     'animation.clip.delete',
     'animation.action.open',

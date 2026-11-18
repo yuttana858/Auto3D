@@ -28,13 +28,15 @@ export class ArrayRevealPlayer
     Inspect () { return { state : this.state, progress : this.progress, duration : this.duration }; }
 }
 
+export function ArrayRevealTiming (index, count)
+{
+    if (!Number.isInteger (index) || !Number.isInteger (count) || index < 0 || index >= count || count < 1) { throw new Error ('Invalid array reveal index.'); }
+    const fraction = count === 1 ? 0 : index / (count - 1); return { start : 0.08 + 0.8 * Math.pow (fraction, 0.45), duration : 0.16 - 0.10 * fraction };
+}
 export function ArrayRevealSample (index, count, progress)
 {
-    if (!Number.isInteger (index) || !Number.isInteger (count) || index < 0 || index >= count || count < 1 || !Number.isFinite (progress)) { throw new Error ('Invalid array reveal sample.'); }
-    const fraction = count === 1 ? 0 : index / (count - 1);
-    const start = 0.08 + 0.8 * Math.pow (fraction, 0.45); const duration = 0.16 - 0.10 * fraction;
-    const u = Math.max (0, Math.min (1, (progress - start) / duration));
-    // Accelerating fall, then a short ease into exact contact; no bounce/interpenetration.
+    if (!Number.isFinite (progress)) { throw new Error ('Invalid array reveal sample.'); }
+    const { start, duration } = ArrayRevealTiming (index, count); const u = Math.max (0, Math.min (1, (progress - start) / duration));
     const fall = u * u * (3 - 2 * u);
     return { visible : progress >= start, offset : 1 - Math.max (0, Math.min (1, fall)), settled : u === 1, start };
 }

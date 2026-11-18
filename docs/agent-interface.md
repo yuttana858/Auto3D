@@ -145,3 +145,15 @@ Agents use `animation.visibility.inspect`, `animation.visibility.keyframe`, `ani
 ### Embedded clips on the shared timeline
 
 Pause the model's independent clip, select the model, and open Animation → Keyframes → Embedded clip. Move the playhead and choose a clip, timeline duration, speed and loop setting, then add it. Agents call `animation.clip.add` with objectId, clip index, duration and optional time, speed and loop. Clips on the same object cannot overlap. Before its first action, the saved paused baseline is shown; between and after actions, the preceding action holds its last sampled frame. Timeline seeking, playback and video export sample the scheduled clip at the same timeline time. Inspect `animation.timeline.inspect`; remove an action with `animation.clip.delete` or its timeline-editor delete control. Actions are undoable and included in session/recovery archives. Remove all actions for that object to return it to independent clip controls. Unscheduled clips retain the legacy export behavior. Procedural clip steps are not yet captured automatically by macro recording.
+
+### Array reveal on the timeline
+
+Select existing visible objects and open Animation → Keyframes → Array reveal. The active object is kept in place by default; remaining objects reveal in scene-list order. Set duration and vertical drop distance in model units, then schedule at the playhead. Scheduled objects are hidden from timeline start until their reveal. They must have no motion, visibility or fold tracks; the operation is undoable and creates no models.
+
+Agents use `animation.array.schedule` with ordered `objectIds`, optional start `time`, `duration` and `dropHeight`. An ordinary macro can create and schedule copies in one run:
+
+```json
+{"version":1,"steps":[{"id":"array","command":"object.array","arguments":{"width":3,"length":1,"height":1,"animate":false}},{"id":"reveal","command":"animation.array.schedule","arguments":{"objectIds":{"$ref":"array.objectIds"},"time":0,"duration":4,"dropHeight":1}}]}
+```
+
+Use the regular **Run macro**, then play the timeline. This explicit schedule is distinct from **Run and record animation**, which still rejects procedural array creation. The tracks use the existing array drop timing; automatic camera fitting is not recorded, so add camera keyframes separately.
