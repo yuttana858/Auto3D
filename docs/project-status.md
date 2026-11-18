@@ -1,5 +1,11 @@
 # Auto3D development log and handoff
 
+## Auto Pack edges match generated RSC boxes — Auto3D 0.84.1 / Packaging 1.14.1 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-18)
+
+Based on main after #147 (0.84.0). Not deployed.
+
+- **Auto Pack presentation.** Auto Pack cartons drew raw collision panels: square edges, exposed flute, no crease bends. They now use the standard presentation through the shared `FoldDisplayPose`, guarded by a display clearance check. Panel bow is turned off in the saved appearance if it would bulge into the product, and exact panels remain the fallback for score-fit cartons. See [release-0841.md](release-0841.md).
+
 ## Server CAD diagnostics — Auto3D 0.84.0 live (2026-11-17)
 
 Integrates main through #146 / 0.83.0; Packaging 1.14.0 / Primary Products 0.15.0 / Molded Pulp 0.2.0 are preserved. Adds automatic geometry-free failure reports, a bounded **Diagnose on server** pass using the original private upload, and `conversion.diagnose` / `conversion.diagnostics`. The same worker and account/queue/retention controls apply; diagnostic attempts are separate from conversion attempts. Reports cannot publish a model. Native companion is Cloud 3D Studio 0.4.0. See [release-0840.md](release-0840.md).

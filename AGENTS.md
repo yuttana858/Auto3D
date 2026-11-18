@@ -42,6 +42,8 @@ Auto3D 0.81.0 (Packaging 1.14.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0, b
 
 Molded Pulp 0.2.0 (Auto3D 0.83.0 / Packaging 1.14.0 / Primary Products 0.15.0, based on main after #145 (0.82.1)) adds a knowledge-base rule base for ribs and denest lugs (`modules/molded-pulp/src/rules.js`, traced decisions), live preview with one Undo step per burst, worker-based progressive detail (Draft/Standard/Fine/Ultra, `molded-pulp.worker.js`) and top-bottom/side clamshells. Keep heavy forming in the worker and new geometry on the adaptive shell mesher. See docs/release-0830.md.
 
+Auto3D 0.84.1 (Packaging 1.14.1 / Primary Products 0.15.0 / Molded Pulp 0.1.0, based on main after #147) gives Auto Pack cartons the standard RSC presentation through the shared `FoldDisplayPose` (trimmed panels, crease bends, glue-tab shift). `DisplayClearance` guards it, panel bow can be turned off in the saved appearance, and exact panels remain the fallback. Every fold route should use `FoldDisplayPose` for display. See docs/release-0841.md.
+
 # Agent-accessible features
 
 The server diagnostic release in PR #147 is Auto3D 0.84.0 / Packaging 1.14.0 / Primary Products 0.15.0 / Molded Pulp 0.2.0 with Cloud 3D Studio 0.4.0 (#19). `conversion.diagnose` reuses a failed owned upload on the private server; `conversion.diagnostics` reads only the strict geometry-free report. Raw failure diagnostics stay server-only. Never add source contents, arbitrary messages/logs or geometry to report fields. Diagnostic attempts do not reset conversion attempts, extend source retention or publish a model. See docs/release-0840.md.

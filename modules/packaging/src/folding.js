@@ -98,6 +98,13 @@ export function FefcoFoldPose (rig, progress)
 {
     const pose = FoldPose (rig, progress); const contacts = FefcoFoldContacts (rig, pose);
     if (!contacts.clear) { const pair = contacts.intersections[0]; throw new Error ('Fold blocked: ' + pair.panels.join (' / ') + ' intersect at ' + (progress * 100).toFixed (2) + '%.'); }
+    return { ...FoldDisplayPose (rig, pose), contacts };
+}
+
+// Display pose shared by every fold route (standard FEFCO and Auto Pack): the trimmed, bowed board
+// panels plus crease bends that join them, from the collision pose's matrices.
+export function FoldDisplayPose (rig, pose)
+{
     // Collision solids retain the clearance needed by the folding audit. For
     // display, move only the glue tab back to its shared score so its tighter
     // visual arc joins both trimmed panels without a perpendicular step.
@@ -106,7 +113,7 @@ export function FefcoFoldPose (rig, progress)
         const wall = rig.panels.findIndex (panel => panel.kind === 'wall' && panel.index === 0), joint = rig.panels.findIndex (panel => panel.kind === 'joint');
         if (wall >= 0 && joint >= 0) { const root = new THREE.Matrix4 ().fromArray (pose.matrices[wall]), tab = new THREE.Matrix4 ().fromArray (pose.matrices[joint]); const normal = new THREE.Vector3 (0, 1, 0).transformDirection (root); const origin = new THREE.Vector3 ().setFromMatrixPosition (root), tabOrigin = new THREE.Vector3 ().setFromMatrixPosition (tab); const shift = tabOrigin.sub (origin).dot (normal); const offset = normal.multiplyScalar (-shift); tab.premultiply (translate (offset.x, offset.y, offset.z)); displayMatrices[joint] = tab.toArray (); }
     }
-    const displayPose = { ...pose, displayMatrices }; return { ...displayPose, contacts, visualMeshes : CreaseVisualMeshes (rig, displayPose) };
+    const displayPose = { ...pose, displayMatrices }; return { ...displayPose, visualMeshes : CreaseVisualMeshes (rig, displayPose) };
 }
 
 // Audit independently of display frame rate, before replacing the original.
