@@ -19,7 +19,8 @@ try {
         catch { return route.fulfill ({ status : 404, body : 'Missing fixture asset' }); }
     });
     await page.goto ('https://auto3d.test/'); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
-    const call = async (id, args = {}) => { const response = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (response.ok, true, id + ': ' + JSON.stringify (response)); return response.result; };
+    // Forming refines the tray to the requested detail in place after it appears, so retry while the viewer is busy.
+    const call = async (id, args = {}) => { let response; for (let i = 0; i < 300; i++) { response = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); if (response.ok || !/busy/.test (response.error?.message || '')) { break; } await page.waitForTimeout (100); } assert.equal (response.ok, true, id + ': ' + JSON.stringify (response)); return response.result; };
     // Poll a command result from Node: waitForFunction would treat the returned Promise itself as truthy.
     const until = async (id, test, timeout = 60000) => { const end = Date.now () + timeout; for (;;) { const r = await page.evaluate (id => Auto3D.execute (id), id); if (r?.ok && test (r.result)) { return r.result; } if (Date.now () > end) { throw new Error ('Timed out waiting on ' + id + ': ' + JSON.stringify ({ stage : r?.result?.stage, result : r?.result?.result, generating : r?.result?.generating, reason : r?.result?.unavailableReason, ok : r?.ok, error : r?.error }).slice (0, 900) + ' status=' + await page.locator ('.mp_status').textContent ()); } await page.waitForTimeout (150); } };
     const group = page.getByRole ('group', { name : 'Generation modules', exact : true });
