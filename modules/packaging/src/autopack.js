@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { CreateFefcoFoldRig, FefcoFoldPose } from './folding.js';
+import { CreateFefcoFoldRig, FefcoFoldPose, FoldDisplayPose } from './folding.js';
 import { CreateAutoPackPlan } from './autopackplan.js';
 export { AutoPackClearanceMm, CreateAutoPackPlan } from './autopackplan.js';
 import { PanelSolid, SolidIntersections } from './solid.js';
 import { TransformAppearanceMesh } from './boardappearance.js';
+import { ValidateBoardAppearance } from './appearancesettings.js';
 
 const translate = (x, y, z) => new THREE.Matrix4 ().makeTranslation (x, y, z);
 const hinge = (matrix, pivot, rotation) => matrix.clone ().multiply (translate (...pivot)).multiply (rotation).multiply (translate (...pivot.map (v => -v)));
@@ -12,19 +13,34 @@ const phase = (progress, start, end) => { const t = Math.max (0, Math.min (1, (p
 export function CreateAutoPackRig (input, savedProfile = null)
 {
     const plan = CreateAutoPackPlan ({ size : input.size, clearanceMm : input.clearanceMm, ...(input.material ? { material : input.material } : { thickness : input.thickness }) });
-    const rig = CreateFefcoFoldRig (plan.parameters, savedProfile);
-    rig.autoPack = plan;
-    // Cosmetic bow and crease arcs can leave the audited prisms by more than
-    // the requested clearance. Keep exact panel geometry for this tight fit;
-    // existing material grain/texture maps remain available.
-    rig.presentationMeshes = rig.meshes; rig.visualMeshes = [];
-    const anchorIndex = rig.panels.findIndex (panel => panel.kind === 'base' && panel.index === 1);
-    const final = FefcoFoldPose (rig, 1);
-    const alignment = new THREE.Matrix4 ().makeRotationY (plan.swapped ? Math.PI / 2 : 0).multiply (translate (0, -(2 * plan.thickness + plan.clearanceMm), plan.thickness / 2));
-    rig.autoPackAnchor = alignment.multiply (new THREE.Matrix4 ().fromArray (final.matrices[anchorIndex])).toArray ();
-    const [x, y, z] = plan.size;
-    rig.autoPackProduct = PanelSolid ([[-x / 2, -z / 2], [x / 2, -z / 2], [x / 2, z / 2], [-x / 2, z / 2]], y);
-    return rig;
+    const build = profile => {
+        const rig = CreateFefcoFoldRig (plan.parameters, profile);
+        rig.autoPack = plan;
+        const anchorIndex = rig.panels.findIndex (panel => panel.kind === 'base' && panel.index === 1);
+        const final = FefcoFoldPose (rig, 1);
+        const alignment = new THREE.Matrix4 ().makeRotationY (plan.swapped ? Math.PI / 2 : 0).multiply (translate (0, -(2 * plan.thickness + plan.clearanceMm), plan.thickness / 2));
+        rig.autoPackAnchor = alignment.multiply (new THREE.Matrix4 ().fromArray (final.matrices[anchorIndex])).toArray ();
+        const [x, y, z] = plan.size;
+        rig.autoPackProduct = PanelSolid ([[-x / 2, -z / 2], [x / 2, -z / 2], [x / 2, z / 2], [-x / 2, z / 2]], y);
+        return rig;
+    };
+    const exact = rig => Object.assign (rig, { presentationMeshes : rig.meshes, visualMeshes : [], autoPackPresentation : 'exact panels' });
+    const rig = build (savedProfile);
+    // Earlier score-equals-inside cartons have no room for display curvature: exact panel geometry.
+    if (plan.basis !== 'engineering-inside') { return exact (rig); }
+    // Engineering-inside cartons keep at least one caliper between the score panels and the product, so they
+    // use the standard presentation like Generate (trimmed panels joined by crease bends, board finish) when
+    // DisplayClearance proves no display vertex enters the product. Panel bow is cosmetic and can bulge into a
+    // tight fit; if it does, bow is turned off in the carton's saved appearance and the check runs again.
+    const check = CachedDisplayClearance (rig); rig.autoPackDisplayCheck = check;
+    if (check.clear) { rig.autoPackPresentation = 'standard'; return rig; }
+    const appearance = ValidateBoardAppearance (rig.profile.appearance);
+    if (appearance.enabled && appearance.panelBow > 0) {
+        const flat = build ({ ...rig.profile, appearance : { ...appearance, panelBow : 0 } }), retry = CachedDisplayClearance (flat);
+        flat.autoPackDisplayCheck = retry;
+        if (retry.clear) { flat.autoPackPresentation = 'standard without panel bow'; return flat; }
+    }
+    return exact (rig);
 }
 
 function Pose (rig, progress)
@@ -61,7 +77,33 @@ export function AutoPackFoldPose (rig, progress)
 {
     const pose = Pose (rig, progress), contacts = AutoPackFoldContacts (rig, pose);
     if (!contacts.clear) { throw new Error ('Auto Pack blocked: ' + contacts.intersections[0].panels.join (' / ') + ' intersect at ' + (100 * progress).toFixed (2) + '%.'); }
-    return { ...pose, contacts, visualMeshes : [] };
+    return rig.autoPackPresentation !== 'exact panels' ? { ...FoldDisplayPose (rig, pose), contacts } : { ...pose, contacts, visualMeshes : [] };
+}
+
+// Hosts rebuild the rig for every presentation; the check depends only on the fit and the appearance.
+const displayChecks = new Map ();
+function CachedDisplayClearance (rig)
+{
+    const key = JSON.stringify ([rig.autoPack.parameters, rig.autoPack.size, rig.autoPack.clearanceMm, rig.profile.appearance || null, rig.profile.engineering?.materials || null]);
+    if (!displayChecks.has (key)) { if (displayChecks.size >= 64) { displayChecks.delete (displayChecks.keys ().next ().value); } displayChecks.set (key, DisplayClearance (rig)); }
+    return displayChecks.get (key);
+}
+// Proves the standard presentation never shows board inside the product: every presentation and crease
+// bend vertex, at sampled fold poses (every 1/120 of the route plus flat and closed), stays outside the
+// product bounds. Display meshes only; the collision audit (InspectAutoPackFold) is unchanged.
+export function DisplayClearance (rig, samples = 120)
+{
+    const box = new THREE.Box3 ().setFromArray (rig.autoPackProduct.vertices.flat ()), inner = box.clone ().expandByScalar (-1e-6), point = new THREE.Vector3 ();
+    const inside = vertices => vertices.some (v => inner.containsPoint (point.set (v[0], v[1], v[2])));
+    for (let i = 0; i <= samples; i++) {
+        const progress = i / samples, display = FoldDisplayPose (rig, Pose (rig, progress));
+        for (const [index, mesh] of rig.presentationMeshes.entries ()) {
+            const matrix = new THREE.Matrix4 ().fromArray (display.displayMatrices[index]);
+            if (mesh.vertices.some (v => inner.containsPoint (point.set (v[0], v[1], v[2]).applyMatrix4 (matrix)))) { return { clear : false, progress, mesh : mesh.name }; }
+        }
+        for (const mesh of display.visualMeshes) { if (inside (mesh.vertices)) { return { clear : false, progress, mesh : mesh.name }; } }
+    }
+    return { clear : true, samples : samples + 1 };
 }
 
 // Audit is independent of display frame rate. Maximum hinge speed is 3375
