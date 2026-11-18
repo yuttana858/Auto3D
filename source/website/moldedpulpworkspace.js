@@ -14,7 +14,7 @@ export class PulpJobs
     constructor (url) { this.url = url; this.worker = null; this.pending = null; this.seq = 0; }
     Run (module, message, onProgress)
     {
-        if (typeof Worker !== 'function' || !this.url) { return Promise.resolve (module.PlanPulp (message.stage, message.triangles, message.draft, { detail : message.detail, onProgress })); }
+        if (typeof Worker !== 'function' || !this.url) { return Promise.resolve (module.PlanPulp (message.stage, message.triangles, message.draft, { detail : message.detail, loftCheck : message.loftCheck === true, onProgress })); }
         this.Cancel (); const id = ++this.seq, worker = this.worker ||= new Worker (this.url ());
         return new Promise ((resolve, reject) => {
             this.pending = { id, reject };
@@ -217,6 +217,27 @@ export class MoldedPulpWorkspace
         return { formDepthMm : mm, updated : false, message : `Form depth set to ${mm} mm. Form tray pulls the sheet up to this height.` };
     }
     Reset () { this.token++; this.jobs.Cancel (); clearTimeout (this.liveTimer); this.sensed = null; this.result = null; this.pulpId = null; this.refining = null; this.liveEntry = null; }
+    // Phase 2 check: build the smooth lofted walls of the current tray in the worker and report each wall against the
+    // review surface (3D distance, control counts) without changing the scene. The draft's skirtWall option decides
+    // whether the outer skirt wall is included (experimental).
+    async CheckLoft ()
+    {
+        const panel = this.panel, editor = this.editor;
+        if (!panel.website.auth?.user || panel.website.accountReady === false) { throw new Error ('Sign in to check molded pulp walls.'); }
+        if (this.active || this.refining) { throw new Error ('Wait for forming to finish.'); }
+        const object = this.IsPulp (editor.selected) ? editor.selected : this.Current (); if (!object) { throw new Error ('Form a tray first.'); }
+        const definition = ValidatePulpDefinition (JSON.parse (object.userData[MoldedPulpDataKey]));
+        if (definition.stage !== 'tray') { throw new Error ('Form a tray first: a flat sheet has no walls.'); }
+        if (!definition.productIds.length) { throw new Error ('This pulp object was formed over more than ' + MaxStoredProducts + ' products. Select them and form again.'); }
+        const module = await this.load (), draft = { ...definition.draft, skirtWall : panel.draft.skirtWall === true };
+        // Draft detail (about 2 mm cells) is too coarse for walls a few millimetres wide; check at Standard or finer.
+        const plan = await this.jobs.Run (module, { stage : 'tray', triangles : SessionTrianglesMm (editor.document, this.Products (definition.productIds)), draft, detail : draft.detail === 'draft' ? 'standard' : draft.detail, loftCheck : true });
+        const shells = plan.loft || [], walls = shells.reduce ((n, s) => n + s.walls.length, 0), ok = shells.every (s => s.ok);
+        const worst = Math.max (0, ...shells.map (s => s.maxDistanceMm || 0)), tolerance = shells[0]?.toleranceMm;
+        const message = ok ? `Smooth walls: ${walls} wall${walls === 1 ? '' : 's'}, ${shells.reduce ((n, s) => n + s.controls, 0)} control points, within ${worst.toFixed (2)} mm of the review surface (limit ${tolerance?.toFixed (2)} mm).`
+            : 'Smooth walls not ready: ' + shells.filter (s => !s.ok).map (s => s.reason).join (' ') + (shells.some (s => s.walls.some (w => w.kind === 'skirt' && !w.withinTolerance)) ? ' The outer skirt has sharp plan corners; turn it off or wait for corner-aware skirts.' : '');
+        return { ok, skirtWall : draft.skirtWall, shells, message };
+    }
     // Output for tooling and customers: STEP (closed B-rep per shell, mm, from the NURBS output) or GLB (the formed shell
     // with its pulp material, metres). Uses the plan behind the pulp object on screen; a pulp object from a saved session
     // is formed again from its saved definition and products first (in the worker, at its saved detail).

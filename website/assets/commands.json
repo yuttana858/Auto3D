@@ -9533,6 +9533,9 @@
           "hinge": {
             "type": "boolean"
           },
+          "skirtWall": {
+            "type": "boolean"
+          },
           "live": {
             "type": "boolean"
           }
@@ -9654,6 +9657,20 @@
       "example": {
         "format": "step"
       }
+    },
+    {
+      "id": "pulp.loft.check",
+      "title": "Check smooth pulp walls",
+      "category": "Molded Pulp",
+      "description": "Phase 2 (experimental): build the smooth lofted walls of the current tray in the worker and report each wall (outline and height control counts, true 3D distance to the review surface, within tolerance) without changing the scene. Pocket walls are always included; the outer skirt wall only when the draft has skirtWall true (pulp.configure). The skirt is not yet within tolerance on rectangular sheets: its outlines have sharp plan corners.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
     },
     {
       "id": "pulp.selected.load",

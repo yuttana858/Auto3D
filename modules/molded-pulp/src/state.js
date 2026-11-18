@@ -22,13 +22,13 @@ export const PulpDetail = Object.freeze ({
 // Clamshell modes: none (single tray), top-bottom (base formed from below, lid from above) or side-to-side halves split
 // across the X or Z axis. Each shell is formed toward a parting plane at partingFraction of the product extent.
 export const PulpClamshellModes = Object.freeze ({ none : 'Single tray', 'top-bottom' : 'Clamshell · top and bottom', 'side-x' : 'Clamshell · side to side (X)', 'side-z' : 'Clamshell · side to side (Z)' });
-const fields = ['pulpType', 'thicknessMm', 'extraLengthMm', 'extraWidthMm', 'formDepthMm', 'clearanceMm', 'draftDeg', 'resolutionMm', 'color', 'detail', 'ribs', 'lugs', 'ribDepthMm', 'ribWidthMm', 'lugStandoffMm', 'clamshell', 'partingFraction', 'hinge'];
+const fields = ['pulpType', 'thicknessMm', 'extraLengthMm', 'extraWidthMm', 'formDepthMm', 'clearanceMm', 'draftDeg', 'resolutionMm', 'color', 'detail', 'ribs', 'lugs', 'ribDepthMm', 'ribWidthMm', 'lugStandoffMm', 'clamshell', 'partingFraction', 'hinge', 'skirtWall'];
 
 export function DefaultPulpDraft (pulpType = 'type2')
 {
     if (!Object.hasOwn (PulpTypes, pulpType)) { throw new Error ('Choose Type 1, Type 2, Type 3 wet-pressed or Type 3 dry-pressed pulp.'); }
     const preset = PulpTypes[pulpType];
-    return { pulpType, thicknessMm : preset.thicknessMm, extraLengthMm : 20, extraWidthMm : 20, formDepthMm : 30, clearanceMm : 1, draftDeg : preset.draftDeg, resolutionMm : null, color : preset.color, detail : 'standard', ribs : 'auto', lugs : 'auto', ribDepthMm : null, ribWidthMm : null, lugStandoffMm : 1.5, clamshell : 'none', partingFraction : 0.5, hinge : true };
+    return { pulpType, thicknessMm : preset.thicknessMm, extraLengthMm : 20, extraWidthMm : 20, formDepthMm : 30, clearanceMm : 1, draftDeg : preset.draftDeg, resolutionMm : null, color : preset.color, detail : 'standard', ribs : 'auto', lugs : 'auto', ribDepthMm : null, ribWidthMm : null, lugStandoffMm : 1.5, clamshell : 'none', partingFraction : 0.5, hinge : true, skirtWall : false };
 }
 
 function Range (value, [min, max], message)
@@ -63,6 +63,8 @@ export function UpdatePulpDraft (current, changes)
     if (!Object.hasOwn (PulpClamshellModes, next.clamshell)) { throw new Error ('Clamshell must be none, top-bottom, side-x or side-z.'); }
     next.partingFraction = Range (next.partingFraction, PulpLimits.partingFraction, 'Parting plane must be 10–90% of the product extent.');
     if (typeof next.hinge !== 'boolean') { throw new Error ('Hinge must be true or false.'); }
+    // Experimental: include the outer skirt wall in the smooth (lofted) wall check.
+    if (typeof next.skirtWall !== 'boolean') { throw new Error ('Outer skirt wall must be true or false.'); }
     return next;
 }
 

@@ -140,3 +140,24 @@ describe ('Molded Pulp Phase 2: lofted pocket walls', function () {
         assert.equal (result.ok, false); assert.match (result.reason, /join below the plateau/); assert.ok (result.merges.length > 0); assert.deepEqual (result.walls, []);
     });
 });
+
+describe ('Molded Pulp smooth wall check and the outer skirt option', function () {
+    this.timeout (180000);
+    it ('keeps the skirt option off by default and validates it', async () => {
+        const { UpdatePulpDraft } = await import ('../src/state.js');
+        const draft = DefaultPulpDraft ('type2'); assert.equal (draft.skirtWall, false);
+        assert.equal (UpdatePulpDraft (draft, { skirtWall : true }).skirtWall, true);
+        assert.throws (() => UpdatePulpDraft (draft, { skirtWall : 'yes' }), /Outer skirt wall must be true or false/);
+    });
+    it ('reports pocket walls only with the skirt off, and the skirt wall when it is on', () => {
+        // Standard detail: at Draft (about 2 mm cells) a 4° wall is about one cell wide, too coarse to judge a smooth wall.
+        const base = { ...DefaultPulpDraft ('type2'), formDepthMm : 35, detail : 'standard', ribs : 'off', lugs : 'off' };
+        const off = PlanTray (SixPack (86, 48), base, { loftCheck : true }).loft[0];
+        assert.equal (off.ok, true, off.reason); assert.equal (off.walls.length, 6); assert.ok (off.walls.every (w => w.kind === 'pocket'));
+        assert.equal (PlanTray (SixPack (86, 48), base).loft, undefined, 'no check unless asked');
+        const on = PlanTray (SixPack (86, 48), { ...base, skirtWall : true }, { loftCheck : true }).loft[0];
+        const skirt = on.walls.find (w => w.kind === 'skirt'); assert.ok (skirt, 'skirt wall included');
+        // Rectangular sheets give the skirt sharp plan corners: reported, not hidden.
+        if (!skirt.withinTolerance) { assert.equal (on.ok, false); assert.match (on.reason, /outside the tolerance/); }
+    });
+});

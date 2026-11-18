@@ -161,6 +161,20 @@ What we learned while building it:
 - The review outlines carry about ±0.35 mm of grid ripple from the octagonal clearance filter. The outline fit tolerance is therefore 0.6 × cell (at least 0.15 mm). Fitting tighter only chases grid noise; the smooth loft is closer to the design intent than the review field is.
 - Error must be measured in 3D. A slope-scaled vertical estimate overstated wall error by about 10× near the floor crease.
 
+#### Panel option and check (experimental)
+
+The Output section of the Molded Pulp panel has two Phase 2 controls:
+- an **Outer skirt wall (experimental)** checkbox, saved in the draft as `skirtWall` (off by default);
+- a **Check smooth walls** button (agents: `pulp.loft.check`).
+
+The check builds the smooth walls of the current tray in the worker and reports each wall's control counts and true 3D distance to the review surface. It never changes the scene. It runs at Standard detail when the tray is at Draft, because about 2 mm cells are too coarse for walls a few millimetres wide (on T1 at Draft, walls miss by 0.87–1.11 mm).
+
+Pockets are recognised by the ground just inside their lowest outline, not at its centre. Real Primary Products cans have a domed base, and the centre test found no pockets at all.
+
+On real Primary Products cans (3 × 2, 20 mm gap, Type 2, 35 mm, standard):
+- the six pocket walls use 12–18 × 8 controls and stay within 0.24–0.31 mm (limit 0.3125 mm);
+- with the skirt on, the skirt needs the 256-control cap and misses by 1.56 mm, and the check reports it as outside the tolerance.
+
 #### Next steps
 
 1. ✔ Speed-up (identical output): contours scan a per-pocket window between floor and rim outlines; outline checks search the curve near each point's parameter; the 3D distance search reaches only as far as the tolerance needs. T1 standard: 1.3 s → 0.85 s. T3 fine: 5.4 s → 2.2 s.

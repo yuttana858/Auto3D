@@ -56,7 +56,7 @@ export class MoldedPulpPanel
                 }
                 const url = new URL (moduleUrl); if (this.attempts) { url.searchParams.set ('retry', String (this.attempts)); } this.attempts = (this.attempts || 0) + 1;
                 const module = await import (url.href); if (module.MoldedPulpAPIVersion !== 1) { throw new Error ('Unsupported Molded Pulp module.'); } this.module = module; this.panel.replaceChildren ();
-                this.workspace = new module.MoldedPulpPanel ({ inspect : () => this.Inspect (), configure : (changes, options) => this.Configure (changes, options), sense : () => this.pulp.Sense (), generateSheet : () => this.pulp.Build ('sheet'), setFormDepth : mm => this.pulp.SetFormDepth (mm), formTray : () => this.pulp.Build ('tray'), exportOutput : format => this.pulp.Export (format), reset : () => this.Reset (), units : () => this.website.preferences.units, blocked : () => this.Blocked () }, this.panel);
+                this.workspace = new module.MoldedPulpPanel ({ inspect : () => this.Inspect (), configure : (changes, options) => this.Configure (changes, options), sense : () => this.pulp.Sense (), generateSheet : () => this.pulp.Build ('sheet'), setFormDepth : mm => this.pulp.SetFormDepth (mm), formTray : () => this.pulp.Build ('tray'), exportOutput : format => this.pulp.Export (format), checkLoft : () => this.pulp.CheckLoft (), reset : () => this.Reset (), units : () => this.website.preferences.units, blocked : () => this.Blocked () }, this.panel);
             })().catch (error => { this.loading = null; this.panel.textContent = error.message; throw error; });
         }
         await this.loading; this.Refresh ();

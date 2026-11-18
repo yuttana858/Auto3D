@@ -5,8 +5,8 @@ import { PlanPulp } from './plan.js';
 
 export function HandlePulpJob (message, post = () => {})
 {
-    const { id, stage, triangles, draft, detail } = message;
-    const plan = PlanPulp (stage, triangles, draft, { detail, onProgress : (phase, value) => post ({ id, progress : value, phase }) });
+    const { id, stage, triangles, draft, detail, loftCheck = false } = message;
+    const plan = PlanPulp (stage, triangles, draft, { detail, loftCheck, onProgress : (phase, value) => post ({ id, progress : value, phase }) });
     const transfer = [];
     for (const component of plan.components) { for (const key of ['positions', 'normals', 'uvs', 'indices']) { transfer.push (component[key].buffer); } }
     for (const shell of plan.nurbs?.shells || []) { for (const face of [shell.top, shell.bottom]) { transfer.push (face.points.buffer, face.knotsU.buffer, face.knotsV.buffer); } }

@@ -8,6 +8,7 @@ import { PlanFeatures } from './rules.js';
 import { ApplyRibs, ApplyLugs } from './features.js';
 import { ClamshellShells, ToLocal, ComponentToWorld } from './orient.js';
 import { NurbsShell } from './nurbs/shell.js';
+import { LoftPocketWalls } from './nurbs/loft.js';
 
 const kb = 'MP knowledge base · mp-des-dfm-rules-by-process-type';
 const r1 = v => Math.round (v * 10) / 10;
@@ -68,11 +69,13 @@ export function FormShell (triangles, draft, options = {})
     progress ('meshing', 0.85); const surfaces = { top, bottom }, display = DisplaySurfaces (grid, surfaces), component = AdaptiveShellMesh (display.grid, display.surfaces, origin, options.id || 'pulp-tray', grid.toleranceMm, Math.max (0.5, draft.thicknessMm / 2));
     // NURBS output (STEP and future solid modeling) from the same surfaces the review mesh shows, in world mm.
     const nurbs = NurbsShell (grid, surfaces, { baseY : rect.baseY, direction : options.direction || '+y', id : options.shellName || 'Tray' });
+    // Phase 2 check (on request): smooth lofted walls built from this shell's review field, reported without geometry.
+    const loft = options.loftCheck ? LoftSummary (LoftPocketWalls (grid, top, { depthMm : achieved, wallToleranceMm : 0.25 * PulpTypes[draft.pulpType].toleranceMm, skirtWall : draft.skirtWall === true }), options.shellName || 'Tray') : null;
     const volume = ShellVolume (surfaces, grid);
     const metrics = { lengthMm : r1 (rect.lengthMm), widthMm : r1 (rect.widthMm), thicknessMm : draft.thicknessMm, formDepthMm : r1 (depth), achievedDepthMm : r1 (achieved), overallHeightMm : r1 (achieved + draft.thicknessMm), footprintLengthMm : r1 (bounds.size[0]), footprintWidthMm : r1 (bounds.size[2]), productHeightMm : r1 (bounds.size[1]), pocketCount : pockets.pocketCount, productIslands : islands.count, narrowestProductMm : islands.narrowestMm === null ? null : r1 (islands.narrowestMm), minRibMm : pockets.minRibMm === null ? null : r1 (pockets.minRibMm), detail, cellMm : Math.round (grid.cell * 1000) / 1000, gridNodes : grid.nx * grid.nz, triangles : component.triangleCount, fullGridTriangles : component.gridTriangles, volumeCm3 : r1 (volume / 1000), estimatedMassG : r1 (volume / 1000 * PulpTypes[draft.pulpType].densityGcm3), ribCount : features.ribs.length, lugCount : features.lugs.length, nestingPitchMm : features.nesting?.pitchMm ?? null, nestingRatio : features.nesting?.ratio ?? null };
     const checks = [...PulpChecks (draft, bounds, rect, metrics), ...features.warnings.map (w => ({ id : w.id, severity : w.severity || 'warning', message : w.message, basis : 'MP knowledge base · mp-des-structural-features' }))];
     progress ('done', 1);
-    return { bounds, rect, origin, grid, metrics, checks, nurbs, features : { ribs : features.ribs, lugs : features.lugs, rib : features.rib, nesting : features.nesting, hinge : features.hinge, trace : features.trace }, component, ...(options.keepSurfaces ? { surfaces, field } : {}) };
+    return { bounds, rect, origin, grid, metrics, checks, nurbs, loft, features : { ribs : features.ribs, lugs : features.lugs, rib : features.rib, nesting : features.nesting, hinge : features.hinge, trace : features.trace }, component, ...(options.keepSurfaces ? { surfaces, field } : {}) };
 }
 
 // Living hinge bead: a solid half-cylinder of radius ~ wall thickness along the longer flange edge (KB: hinge axis in the
@@ -111,7 +114,7 @@ export function PlanTray (triangles, draft, options = {})
     const worldRect = SheetRect (world, draft), origin = Origin (worldRect);
     if (mode === 'none') {
         const shell = FormShell (triangles, draft, options);
-        return { apiVersion : 1, units : 'mm', kind : 'tray', clamshell : 'none', draft : { ...draft }, bounds : shell.bounds, rect : shell.rect, origin : shell.origin, metrics : shell.metrics, checks : shell.checks, features : shell.features, components : [shell.component], nurbs : PlanNurbs ([shell.nurbs]) };
+        return { apiVersion : 1, units : 'mm', kind : 'tray', clamshell : 'none', draft : { ...draft }, bounds : shell.bounds, rect : shell.rect, origin : shell.origin, metrics : shell.metrics, checks : shell.checks, features : shell.features, components : [shell.component], nurbs : PlanNurbs ([shell.nurbs]), ...(shell.loft ? { loft : [shell.loft] } : {}) };
     }
     const axis = { 'top-bottom' : 1, 'side-x' : 0, 'side-z' : 2 }[mode], parting = world.min[axis] + world.size[axis] * draft.partingFraction;
     const shells = [], components = [];
@@ -126,7 +129,7 @@ export function PlanTray (triangles, draft, options = {})
     const metrics = { ...shells[0].shell.metrics, shells : shells.map (({ direction, shell }) => ({ direction, ...shell.metrics })), partingMm : r1 (parting - world.min[axis]), hinge : Boolean (shells[0].shell.features.hinge), triangles : components.reduce ((sum, c) => sum + c.triangleCount, 0), volumeCm3 : r1 (shells.reduce ((s, x) => s + x.shell.metrics.volumeCm3, 0)), estimatedMassG : r1 (shells.reduce ((s, x) => s + x.shell.metrics.estimatedMassG, 0)), pocketCount : shells.reduce ((s, x) => s + x.shell.metrics.pocketCount, 0) };
     const checks = shells.flatMap (({ direction, shell }) => shell.checks.map (c => ({ ...c, message : `Shell ${direction}: ${c.message}` })));
     checks.push ({ id : 'MP-CL1', severity : 'note', message : 'Clamshell flanges meet at the parting plane; a friction fit typically needs 0.2–0.5 mm interference (typical industry value), set in tooling.', basis : 'MP knowledge base · mp-des-structural-features (snap, lock and click features)' });
-    return { apiVersion : 1, units : 'mm', kind : 'tray', clamshell : mode, draft : { ...draft }, bounds : world, rect : worldRect, origin, metrics, checks, features : { shells : shells.map (({ direction, shell }) => ({ direction, ...shell.features })), trace : shells[0].shell.features.trace }, components, nurbs : PlanNurbs (shells.map (({ shell }) => shell.nurbs)) };
+    return { apiVersion : 1, units : 'mm', kind : 'tray', clamshell : mode, draft : { ...draft }, bounds : world, rect : worldRect, origin, metrics, checks, features : { shells : shells.map (({ direction, shell }) => ({ direction, ...shell.features })), trace : shells[0].shell.features.trace }, components, nurbs : PlanNurbs (shells.map (({ shell }) => shell.nurbs)), ...(options.loftCheck ? { loft : shells.map (({ shell }) => shell.loft) } : {}) };
 }
 
 // Flat sheet(s) under the grouped products (one per shell for a clamshell), sized to the exact footprint plus the
@@ -148,6 +151,10 @@ export function PlanSheet (triangles, draft)
 
 // NURBS output of a plan: one closed B-rep shell per formed shell or sheet (the clamshell hinge bead is display only for
 // now), in world millimetres (absolute, matching the sensed products).
+function LoftSummary (result, shell)
+{
+    return { shell, ok : result.ok, reason : result.reason, controls : result.controls ?? 0, maxDistanceMm : result.maxDistanceMm ?? null, toleranceMm : result.wallToleranceMm ?? null, merges : result.merges?.length || 0, walls : result.walls.map (w => ({ id : w.id, kind : w.kind, outlineControls : w.outlineControls, heightControls : w.heightControls, maxDistanceMm : w.maxDistanceMm, withinTolerance : w.withinTolerance })) };
+}
 function PlanNurbs (shells) { return { apiVersion : 1, units : 'mm', representation : 'brep', degree : 1, shells }; }
 
 export function PlanPulp (stage, triangles, draft, options = {}) { return stage === 'tray' ? PlanTray (triangles, draft, options) : PlanSheet (triangles, draft); }

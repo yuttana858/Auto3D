@@ -31,11 +31,22 @@ export function LoftPocketWalls (grid, H, { depthMm, outlineToleranceMm = Math.m
     const count = Math.max (8, Math.ceil ((hi - lo) / levelStepMm)) + 1, levels = Float64Array.from ({ length : count }, (_, k) => lo + (hi - lo) * k / (count - 1));
     const closed = (h, window = null) => IsoContours (H, grid, h, window).filter (c => c.closed && c.points.length >= 8);
     const height = (x, z) => { const i = Math.min (grid.nx - 1, Math.max (0, Math.round ((x - grid.x0) / grid.dx))), j = Math.min (grid.nz - 1, Math.max (0, Math.round ((z - grid.z0) / grid.dz))); return H[j * grid.nx + i]; };
-    const owns = (c, level, seed) => height (...Centroid (c.points)) < level && Inside (c.points, seed[0], seed[1]);
+    // An outline encloses low ground (a pocket) when the ground just inside it is below its level. Sampled next to the
+    // outline, not at its centre, so a raised floor (a domed can base) still counts as a pocket.
+    const step = 1.5 * Math.max (grid.dx, grid.dz);
+    const enclosesLow = (c, level) => {
+        const [cx, cz] = Centroid (c.points); let low = 0, n = 0;
+        for (let q = 0; q < 12; q++) {
+            const [x, z] = c.points[Math.floor (q * c.points.length / 12)], d = Math.hypot (cx - x, cz - z) || 1;
+            if (d <= step) { continue; } n++; if (height (x + (cx - x) * step / d, z + (cz - z) * step / d) < level) { low++; }
+        }
+        return n > 0 && low * 2 > n;
+    };
+    const owns = (c, level, seed) => enclosesLow (c, level) && Inside (c.points, seed[0], seed[1]);
     // Pockets: closed outlines at the lowest level that enclose low ground (a floor), not islands of plateau. Only the
     // lowest and highest levels scan the whole grid; every pocket's levels scan a window around its floor and rim.
     const bottom = closed (lo), top = closed (hi);
-    const pockets = bottom.filter (c => height (...Centroid (c.points)) < lo).map ((c, index) => {
+    const pockets = bottom.filter (c => enclosesLow (c, lo)).map ((c, index) => {
         const seed = Centroid (c.points), rim = top.find (t => owns (t, hi, seed));
         return { index, seed, outlines : [], window : OutlineWindow (rim ? [c.points, rim.points] : [c.points], grid, 3) };
     });
@@ -100,5 +111,6 @@ export function LoftPocketWalls (grid, H, { depthMm, outlineToleranceMm = Math.m
     }
     if (skirt.length === count) { walls.push (loft (skirt, centre, 'Outer skirt', 'skirt')); }
     const controls = walls.reduce ((s, w) => s + w.surface.countU * w.surface.countV, 0), maxDistanceMm = Math.max (0, ...walls.map (w => w.maxDistanceMm));
+    if (!pockets.length) { return { ok : false, reason : 'No pockets were found below the plateau.', walls, merges, levels : count, range : [lo, hi], controls : 0, maxDistanceMm : 0, outlineToleranceMm, wallToleranceMm }; }
     return { ok : walls.every (w => w.withinTolerance) && (!skirtWall || walls.some (w => w.kind === 'skirt')), reason : walls.every (w => w.withinTolerance) ? (skirtWall && !walls.some (w => w.kind === 'skirt') ? 'No closed outer skirt outline at every level.' : null) : 'A wall is outside the tolerance.', walls, merges, levels : count, range : [lo, hi], controls, maxDistanceMm, outlineToleranceMm, wallToleranceMm };
 }

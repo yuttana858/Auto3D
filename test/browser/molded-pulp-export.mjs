@@ -44,6 +44,18 @@ try {
     assert.ok (json.materials.some (m => /Molded pulp/.test (m.name)), 'pulp material'); assert.ok (json.meshes.length >= 1);
     const position = json.accessors[json.meshes[0].primitives[0].attributes.POSITION]; assert.ok (Math.max (...position.max.map ((v, a) => v - position.min[a])) < 1, 'metres: the tray is under 1 m');
 
+    // Phase 2 check: smooth walls with the outer skirt off (default), then on. The tray stays unchanged either way.
+    const skirt = panel.getByRole ('checkbox', { name : 'Outer skirt wall (experimental)', exact : true }); assert.equal (await skirt.isChecked (), false);
+    const objectsBefore = (await call ('scene.inspect')).objects.length;
+    await panel.getByRole ('button', { name : 'Check smooth walls', exact : true }).click ();
+    await page.waitForFunction (() => /Smooth walls/.test (document.querySelector ('.mp_status')?.textContent || ''), null, { timeout : 120000 });
+    assert.match (await panel.locator ('.mp_status').textContent (), /Smooth walls: 6 walls, \d+ control points, within [\d.]+ mm of the review surface/);
+    await skirt.check (); assert.equal ((await call ('pulp.inspect')).draft.skirtWall, true);
+    const withSkirt = await call ('pulp.loft.check'); assert.equal (withSkirt.skirtWall, true); assert.ok (withSkirt.shells[0].walls.some (w => w.kind === 'skirt'), 'skirt reported when on');
+    assert.equal ((await call ('scene.inspect')).objects.length, objectsBefore, 'the check does not change the scene');
+    console.log ('Smooth walls (skirt off): ' + await panel.locator ('.mp_status').textContent ()); console.log ('Smooth walls (skirt on): ' + JSON.stringify (withSkirt.shells[0].walls.map (w => w.id + ' ' + w.outlineControls + 'x' + w.heightControls + ' ' + w.maxDistanceMm.toFixed (2) + (w.withinTolerance ? '' : ' (outside)'))) + ' ok=' + withSkirt.ok);
+    await skirt.uncheck (); assert.equal ((await call ('pulp.loft.check')).shells[0].walls.some (w => w.kind === 'skirt'), false);
+
     // A clamshell exports two solids; the agent command returns the same summary as the panel.
     await call ('pulp.configure', { clamshell : 'top-bottom' }); await call ('pulp.tray.form'); await until ('pulp.inspect', r => r.result?.clamshell === 'top-bottom' && !r.generating && !r.refining);
     const [clam] = await Promise.all ([page.waitForEvent ('download'), raw ('pulp.export', { format : 'step' })]);
