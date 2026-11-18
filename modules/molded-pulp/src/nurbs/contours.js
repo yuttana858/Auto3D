@@ -4,9 +4,11 @@
 
 function Lerp (a, b, level) { const d = b - a; return Math.abs (d) < 1e-12 ? 0.5 : (level - a) / d; }
 
-export function IsoContours (values, grid, level)
+// window (optional): { i0, i1, j0, j1 } node range to scan; outlines that leave it come back open.
+export function IsoContours (values, grid, level, window = null)
 {
     const { nx, nz, dx, dz, x0, z0 } = grid, segments = new Map (), point = new Map ();
+    const i0 = Math.max (0, window?.i0 ?? 0), i1 = Math.min (nx - 1, window?.i1 ?? nx - 1), j0 = Math.max (0, window?.j0 ?? 0), j1 = Math.min (nz - 1, window?.j1 ?? nz - 1);
     // Edge ids: horizontal edge (i, j)→(i+1, j) = 2 * (j * nx + i); vertical edge (i, j)→(i, j+1) = 2 * (j * nx + i) + 1.
     const at = edge => {
         if (point.has (edge)) { return point.get (edge); }
@@ -15,8 +17,8 @@ export function IsoContours (values, grid, level)
         const p = vertical ? [x0 + i * dx, z0 + (j + t) * dz] : [x0 + (i + t) * dx, z0 + j * dz]; point.set (edge, p); return p;
     };
     const link = (a, b) => { (segments.get (a) || segments.set (a, []).get (a)).push (b); (segments.get (b) || segments.set (b, []).get (b)).push (a); };
-    for (let j = 0; j + 1 < nz; j++) {
-        for (let i = 0; i + 1 < nx; i++) {
+    for (let j = j0; j < j1; j++) {
+        for (let i = i0; i < i1; i++) {
             const k = j * nx + i, v0 = values[k], v1 = values[k + 1], v2 = values[k + nx + 1], v3 = values[k + nx];
             const c = (v0 >= level ? 1 : 0) | (v1 >= level ? 2 : 0) | (v2 >= level ? 4 : 0) | (v3 >= level ? 8 : 0);
             if (c === 0 || c === 15) { continue; }
@@ -61,4 +63,12 @@ export function PolygonArea (points)
 export function Centroid (points)
 {
     let x = 0, z = 0; for (const p of points) { x += p[0]; z += p[1]; } return [x / points.length, z / points.length];
+}
+
+// Node window around outlines (mm points), padded by a number of cells.
+export function OutlineWindow (outlines, grid, padCells = 3)
+{
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const points of outlines) { for (const [x, z] of points) { x0 = Math.min (x0, x); x1 = Math.max (x1, x); z0 = Math.min (z0, z); z1 = Math.max (z1, z); } }
+    return { i0 : Math.floor ((x0 - grid.x0) / grid.dx) - padCells, i1 : Math.ceil ((x1 - grid.x0) / grid.dx) + padCells, j0 : Math.floor ((z0 - grid.z0) / grid.dz) - padCells, j1 : Math.ceil ((z1 - grid.z0) / grid.dz) + padCells };
 }

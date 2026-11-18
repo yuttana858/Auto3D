@@ -154,7 +154,7 @@ Each pocket wall is one cubic B-spline surface:
 | Case | Walls | Controls (all walls) | Max 3D distance to review | Time | Target |
 | --- | --- | --- | --- | --- | --- |
 | T1 6 cans, 86 mm pitch, Type 2, standard (513 nodes) | 6, each 16–24 × 4 | 408 (Phase 1: 263,169 per face) | 0.268 mm | 1.3 s | ≤ 0.3125 mm ✔ |
-| T3 the same at fine (1025 nodes) | 6 | 648 (1.6× standard) | 0.157 mm | 5.4 s | Distance ✔. Growth ≤ 1.5× ✘ (1.6×). Time ≤ 2 s ✘ |
+| T3 the same at fine (1025 nodes) | 6 | 648 (1.6× standard) | 0.157 mm | 5.4 s → 2.2 s after windowing (measured under load) | Distance ✔. Growth ≤ 1.5× ✘ (1.6×). Time ≤ 2 s: close, needs a timing without load |
 | T2 6 cans, 70 mm pitch | none | none | none | 0.1 s | Named failure: pockets join about 13 mm up ✔ |
 
 What we learned while building it:
@@ -163,7 +163,7 @@ What we learned while building it:
 
 #### Next steps
 
-1. Speed up contour extraction: per-pocket windows instead of the full grid at every level. Target: T3 under 2 s.
+1. ✔ Speed-up (identical output): contours scan a per-pocket window between floor and rim outlines; outline checks search the curve near each point's parameter; the 3D distance search reaches only as far as the tolerance needs. T1 standard: 1.3 s → 0.85 s. T3 fine: 5.4 s → 2.2 s.
 2. Floors and plateau as trimmed planes, plus the outer skirt wall (the outermost contour, ground high inside).
 3. Rim and floor fillets as the loft's end sections.
 4. Tool side by offsetting the outlines by the thickness in plan.

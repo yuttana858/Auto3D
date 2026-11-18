@@ -66,13 +66,18 @@ function Solve (L, m, b)
 }
 
 // Largest distance from the outline points to the fitted curve, sampled densely (point-to-polyline of the curve).
-export function OutlineDeviation (points, controls, samples = 8)
+// With params (the points' chord-length parameters, as fitted), only the curve near each point's own parameter is
+// searched (a window of two control spans each way), which keeps it linear in the outline size.
+export function OutlineDeviation (points, controls, samples = 8, params = null)
 {
-    const m = controls.length, curve = []; for (let i = 0; i < m * samples; i++) { curve.push (PeriodicPoint (controls, i / (m * samples))); }
+    const m = controls.length, count = m * samples, curve = []; for (let i = 0; i < count; i++) { curve.push (PeriodicPoint (controls, i / count)); }
+    const reach = params ? Math.min (count, 2 * samples + 2) : null;
     let max = 0;
-    for (const p of points) {
-        let best = Infinity;
-        for (let i = 0; i < curve.length; i++) {
+    for (let k = 0; k < points.length; k++) {
+        const p = points[k]; let best = Infinity;
+        const centre = params ? Math.round (params[k] * count) : 0, from = params ? centre - reach : 0, to = params ? centre + reach : count - 1;
+        for (let w = from; w <= to; w++) {
+            const i = ((w % count) + count) % count;
             const a = curve[i], b = curve[(i + 1) % curve.length], ex = b[0] - a[0], ez = b[1] - a[1], len = ex * ex + ez * ez;
             const t = len > 0 ? Math.max (0, Math.min (1, ((p[0] - a[0]) * ex + (p[1] - a[1]) * ez) / len)) : 0, d = Math.hypot (a[0] + t * ex - p[0], a[1] + t * ez - p[1]);
             if (d < best) { best = d; }

@@ -3,7 +3,7 @@
 // pocket (periodic cubic, uniform knots) and h is the height (clamped cubic; y = h exactly through Greville
 // placement). Outlines come from iso-contours of the review field; the result is checked by true 3D distance to it.
 import { Degree, ClampedKnots, Greville, AxisBasis, FitAxis, FindSpan, BasisFuns } from './bspline.js';
-import { IsoContours, Centroid, PolygonArea } from './contours.js';
+import { IsoContours, Centroid, PolygonArea, OutlineWindow } from './contours.js';
 import { SeamOrder, FitPeriodic, PeriodicPoint, OutlineDeviation } from './periodic.js';
 import { SurfaceDistance } from './measure.js';
 
@@ -29,15 +29,22 @@ export function LoftPocketWalls (grid, H, { depthMm, outlineToleranceMm = Math.m
     const lo = insetMm, hi = depthMm - insetMm;
     if (!(hi - lo > 2 * levelStepMm)) { return { ok : false, reason : 'The form depth is too shallow for lofted walls.', walls : [], merges : [] }; }
     const count = Math.max (8, Math.ceil ((hi - lo) / levelStepMm)) + 1, levels = Float64Array.from ({ length : count }, (_, k) => lo + (hi - lo) * k / (count - 1));
-    const contours = Array.from (levels, h => IsoContours (H, grid, h).filter (c => c.closed && c.points.length >= 8));
+    const closed = (h, window = null) => IsoContours (H, grid, h, window).filter (c => c.closed && c.points.length >= 8);
     const height = (x, z) => { const i = Math.min (grid.nx - 1, Math.max (0, Math.round ((x - grid.x0) / grid.dx))), j = Math.min (grid.nz - 1, Math.max (0, Math.round ((z - grid.z0) / grid.dz))); return H[j * grid.nx + i]; };
-    // Pockets: closed outlines at the lowest level that enclose low ground (a floor), not islands of plateau.
-    const pockets = contours[0].filter (c => height (...Centroid (c.points)) < lo).map ((c, index) => ({ index, seed : Centroid (c.points), outlines : [] }));
+    const owns = (c, level, seed) => height (...Centroid (c.points)) < level && Inside (c.points, seed[0], seed[1]);
+    // Pockets: closed outlines at the lowest level that enclose low ground (a floor), not islands of plateau. Only the
+    // lowest and highest levels scan the whole grid; every pocket's levels scan a window around its floor and rim.
+    const bottom = closed (lo), top = closed (hi);
+    const pockets = bottom.filter (c => height (...Centroid (c.points)) < lo).map ((c, index) => {
+        const seed = Centroid (c.points), rim = top.find (t => owns (t, hi, seed));
+        return { index, seed, outlines : [], window : OutlineWindow (rim ? [c.points, rim.points] : [c.points], grid, 3) };
+    });
     const merges = [];
     for (let k = 0; k < count; k++) {
         for (const pocket of pockets) {
             if (pocket.mergedAt !== undefined) { continue; }
-            const owner = contours[k].find (c => height (...Centroid (c.points)) < levels[k] && Inside (c.points, pocket.seed[0], pocket.seed[1]));
+            const here = k === 0 ? bottom : k === count - 1 ? top : closed (levels[k], pocket.window);
+            const owner = here.find (c => owns (c, levels[k], pocket.seed));
             const shared = owner && pockets.filter (other => other !== pocket && Inside (owner.points, other.seed[0], other.seed[1]));
             if (!owner || shared.length) { pocket.mergedAt = levels[k]; if (shared?.length) { merges.push ({ heightMm : levels[k], pockets : [pocket.index, ...shared.map (o => o.index)] }); } continue; }
             pocket.outlines.push (SeamOrder (owner.points, pocket.seed));
@@ -47,13 +54,14 @@ export function LoftPocketWalls (grid, H, { depthMm, outlineToleranceMm = Math.m
         const at = Math.min (...pockets.filter (p => p.mergedAt !== undefined).map (p => p.mergedAt));
         return { ok : false, reason : `Pockets join below the plateau (about ${at.toFixed (1)} mm up): the land between them is too narrow for separate walls.`, walls : [], merges, pockets : pockets.length };
     }
-    const distance = SurfaceDistance (grid, H), walls = [];
+    // Search only as far as the tolerance needs: anything farther fails the check either way.
+    const distance = SurfaceDistance (grid, H, Math.min (2.5, 3 * wallToleranceMm + 2 * Math.max (grid.dx, grid.dz))), walls = [];
     for (const pocket of pockets) {
         // Outline controls: the smallest m (growing ×1.5) that fits every level within the outline tolerance.
         let m = 12, fits;
         for (;;) {
             fits = pocket.outlines.map (o => FitPeriodic (o.points, o.params, m));
-            const worst = Math.max (...pocket.outlines.map ((o, k) => OutlineDeviation (o.points, fits[k], 4)));
+            const worst = Math.max (...pocket.outlines.map ((o, k) => OutlineDeviation (o.points, fits[k], 4, o.params)));
             if (worst <= outlineToleranceMm || m >= maxOutlineControls) { break; }
             m = Math.min (maxOutlineControls, Math.ceil (m * 1.5));
         }
