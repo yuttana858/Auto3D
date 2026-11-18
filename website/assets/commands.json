@@ -2942,6 +2942,35 @@
       }
     },
     {
+      "id": "packaging.auto.top",
+      "title": "Open or close Auto Pack top",
+      "category": "Packaging",
+      "description": "Swing the top flaps of a packed Auto Pack carton 120° open (open true) or closed again (open false); omit open to toggle. Only the top flaps move, on the audited fold route (no board or product intersections). Returns when playback starts; inspect with packaging.fefco.playback.inspect. Completion adds one Undo step and saves the carton as Open or Closed; unfold and regeneration keep the open top. Not available for 0200 HSC, which has no top flaps.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "open": {
+            "type": "boolean"
+          },
+          "duration": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 30
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "open": true
+      }
+    },
+    {
       "id": "packaging.auto.generate",
       "title": "Auto Pack selected product",
       "category": "Packaging",

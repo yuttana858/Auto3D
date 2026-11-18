@@ -55,6 +55,24 @@ try {
     const carton = (await call ('scene.inspect')).objects.find (o => o.userData?._auto3dAutoPack !== undefined);
     assert.ok (carton, 'the carton was added'); assert.equal (JSON.parse (carton.userData._auto3dFefco).code, '0203');
     await mkdir ('work/auto-pack-review', { recursive : true }); await call ('view.fit'); await page.waitForTimeout (300); await page.screenshot ({ path : 'work/auto-pack-review/styles-0203.png' });
+
+    // Open top: the packed carton's top flaps swing 120° open from the panel, and close again; Undo restores each step.
+    const waitFold = async () => { for (let i = 0; i < 1800; i++) { const s = await call ('packaging.fefco.playback.inspect'); if (['completed', 'failed', 'cancelled'].includes (s.state) && i > 2) { return s; } await page.waitForTimeout (100); } throw new Error ('playback did not finish'); };
+    await call ('object.select', { objectId : carton.id });
+    const openTop = auto.getByRole ('button', { name : 'Open top', exact : true }); await openTop.waitFor (); await openTop.click ();
+    const opened = await waitFold (); assert.equal (opened.state, 'completed', opened.error); assert.equal (opened.action, 'open top');
+    let box = (await call ('scene.inspect')).objects.find (o => o.userData?._auto3dAutoPack !== undefined);
+    assert.equal (JSON.parse (box.userData._auto3dFefco).closure, 'open'); assert.match (box.name, / · Open$/); assert.equal (box.id, carton.id);
+    await call ('view.fit'); await page.waitForTimeout (300); await page.screenshot ({ path : 'work/auto-pack-review/open-top-0203.png' });
+    await call ('object.select', { objectId : carton.id }); assert.equal (await auto.getByRole ('button', { name : 'Close top', exact : true }).isVisible (), true);
+    await call ('history.undo'); box = (await call ('scene.inspect')).objects.find (o => o.userData?._auto3dAutoPack !== undefined); assert.equal (JSON.parse (box.userData._auto3dFefco).closure, 'closed');
+    await call ('history.redo'); await call ('object.select', { objectId : carton.id });
+    // The agent command closes it again; an open top unfolds along its open route.
+    await call ('packaging.auto.top', { open : false, duration : 1 }); assert.equal ((await waitFold ()).action, 'close top');
+    box = (await call ('scene.inspect')).objects.find (o => o.userData?._auto3dAutoPack !== undefined); assert.equal (JSON.parse (box.userData._auto3dFefco).closure, 'closed'); assert.match (box.name, / · Closed$/);
+    await call ('object.select', { objectId : carton.id }); await call ('packaging.auto.top', { open : true, duration : 1 }); await waitFold ();
+    await call ('object.select', { objectId : carton.id }); await call ('packaging.fefco.animate', { duration : 1 }); const unfolded = await waitFold (); assert.equal (unfolded.state, 'completed', unfolded.error); assert.equal (unfolded.action, 'unfold');
+    await call ('object.select', { objectId : carton.id }); assert.equal ((await raw ('packaging.auto.top', { open : true })).ok, false, 'a flat carton has no top to open');
     assert.deepEqual (errors, []);
-    console.log ('Auto Pack units and styles passed: unitless STL guidance, Refresh bounds unit assignment with Undo/Redo, generator styles, 0203 fold.');
+    console.log ('Auto Pack units and styles passed: unitless STL guidance, Refresh bounds unit assignment with Undo/Redo, generator styles, 0203 fold, Open top 120°, Close top, Undo and unfold from an open top.');
 } finally { await browser.close (); }

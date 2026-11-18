@@ -20,6 +20,26 @@ Before this release Auto Pack built only an RSC (0201) and showed the raw fold p
 - `packaging.auto.style { code }` (non-mutating; changes what the next inspect and generate use).
 - `packaging.auto.inspect` reports `code`.
 
+## Open top
+
+A packed Auto Pack carton has an **Open top** button beside **Fold carton** / **Unfold carton**. It swings only the top flaps 120° open from closed, which is 30° outward past upright. When the carton is open, the button becomes **Close top**.
+
+**How the flaps move**
+- Flaps open in reverse closing order, so the outer flap goes first.
+- Each flap swings up to upright, leaves its closed stack offset while exactly upright, and then leans outward.
+- The outward lean hinges on the outside score face, as the generator's outward lean does, so the board never rolls into its own wall.
+- Each flap moves on its own, so neighbours never cross at the corners.
+- `InspectAutoPackFold (rig, yield, 'top')` audits this route with the same 3601-sample check as folding. 0201, 0202 and 0203 are clear.
+
+**What gets saved**
+- Completion replaces the carton with one Undo step and saves it with `closure: 'open'` (name " · Open"). Close top returns it to `closure: 'closed'` (" · Closed").
+- An open-top carton unfolds and refolds along its open route: the top flaps stay open at the end of the fold.
+- Regenerating the carton and timeline fold actions keep the open top (`rig.autoPackOpenTop`).
+
+**Availability and command**
+- Not offered for 0200 HSC (no top flaps) or for a flat carton.
+- `packaging.auto.top { open?, duration? }` toggles when `open` is omitted. It returns when playback starts, and `packaging.fefco.playback.inspect` reports the `open top` or `close top` action.
+
 ## Refresh bounds on any model
 
 STL, OBJ and many older or CAD exports carry no units. Auto Pack previously refused these scenes and gave no way forward. The Auto tab now explains that the scene has no units and shows a **Model units** select (mm, cm, m, in, ft). **Assign units and refresh bounds** assigns that unit to the scene and its unitless objects in one Undo step, then re-measures the selection.
@@ -41,4 +61,6 @@ STL, OBJ and many older or CAD exports carry no units. Auto Pack previously refu
   - selects 0203 from the panel;
   - checks that the FOL is taller than the RSC;
   - folds and checks the saved code.
+- `packaging-auto-styles` also covers Open top from the panel (closure `open`, " · Open"), Undo/Redo, Close top through the command, and unfolding from an open top.
+- Module test: every style's top route is clear; each top flap turns exactly 120° from closed and stands above and outside the walls; the open-top fold route is clear and keeps the flat pose unchanged.
 - The existing `packaging-auto-pack` browser test passes.
