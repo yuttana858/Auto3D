@@ -1,15 +1,27 @@
 # Auto3D development log and handoff
 
-## Auto Pack on the Packaging generator, Refresh bounds units — Auto3D 0.84.0 / Packaging 1.15.0 (2026-11-18)
+## Auto Pack generator styles, Open top, Refresh bounds units — Auto3D 0.85.0 / Packaging 1.15.0 (2026-11-18)
 
-Primary Products 0.15.0 / Molded Pulp 0.2.0 are preserved. Based on main after #146 (0.83.0). Not deployed.
+Primary Products 0.15.0 / Molded Pulp 0.2.0 are preserved. Based on main after #148 (0.84.1). Not deployed.
 
-- **Generator carton.** The Auto Pack carton now uses the Packaging generator's board appearance and crease visuals instead of raw panels with exposed edges.
-- **Styles.** Box styles come from the generator catalog: 0200, 0201, 0202 and 0203, and any style added later.
-- **Refresh bounds.** It assigns units to unitless models (STL, OBJ, older exports) in one Undo step.
-- **Commands.** `packaging.auto.styles`, `packaging.auto.style` and `packaging.auto.refresh_bounds`.
+- **Styles.** Auto Pack fits every Packaging generator style (0200, 0201, 0202, 0203, and any style added later) on the shared flap layering, with the 0.84.1 presentation.
+- **Open top.** Swings a packed carton's top flaps 120° open on an audited route.
+- **Refresh bounds.** Assigns units to unitless models in one Undo step.
+- **Commands.** `packaging.auto.styles`, `packaging.auto.style`, `packaging.auto.refresh_bounds` and `packaging.auto.top`.
 
-See docs/release-0840.md.
+See docs/release-0850.md.
+
+## Auto Pack edges match generated RSC boxes — Auto3D 0.84.1 / Packaging 1.14.1 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-18)
+
+Based on main after #147 (0.84.0). Not deployed.
+
+- **Auto Pack presentation.** Auto Pack cartons drew raw collision panels: square edges, exposed flute, no crease bends. They now use the standard presentation through the shared `FoldDisplayPose`, guarded by a display clearance check. Panel bow is turned off in the saved appearance if it would bulge into the product, and exact panels remain the fallback for score-fit cartons. See [release-0841.md](release-0841.md).
+
+## Server CAD diagnostics — Auto3D 0.84.0 live (2026-11-17)
+
+Integrates main through #146 / 0.83.0; Packaging 1.14.0 / Primary Products 0.15.0 / Molded Pulp 0.2.0 are preserved. Adds automatic geometry-free failure reports, a bounded **Diagnose on server** pass using the original private upload, and `conversion.diagnose` / `conversion.diagnostics`. The same worker and account/queue/retention controls apply; diagnostic attempts are separate from conversion attempts. Reports cannot publish a model. Native companion is Cloud 3D Studio 0.4.0. See [release-0840.md](release-0840.md).
+
+Local: 1,009 app/module tests, 26 final focused CAD checks, 73 MCP tests, real workerd and isolated SQL checks pass. The full 88-check browser scope plus retries has 87 distinct passing checks, including desktop/mobile diagnostics. The Molded Pulp software-renderer refinement benchmark remains failing after a synchronization fix; its runtime is identical to 0.83.0. Keep the FPS assertion and profile that separate follow-up; later subcases are not verified. Native has 77 passing tests. PR #147, hosted CI 44212580363 and production deployment 44213677044 passed for app commit `d5d222f`. Cloud 3D Studio #19 / `ed68d5a` passed deployment 44214197321, actual controller startup, full calibration and automatic/manual diagnostic privacy gates. Temporary accounts/jobs were independently confirmed removed. The original private upload was diagnosed successfully through the scheduled worker: reading passed; construction failed at the reader's parametric face validity check (`occt.construction_failed`, `ValueError`); later checks did not run. Conversion attempts remain two and one separate diagnostic completed. No customer CAD entered the agent workspace and no model was published. Source conversion acceptance and the face-construction compatibility repair remain open; see the safe report evidence in release-0840.md.
 
 ## Durable CAD retry dispatch — Auto3D 0.82.1 (2026-11-17)
 

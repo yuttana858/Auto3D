@@ -2,6 +2,7 @@ import { WorkspaceDialog } from './modellibrary.js';
 import { AgentError } from '../../mcp/common.js';
 import { CadLimits, CadArtifacts, CadMessages, CadUuid, CadRequest, CadProgressView, CadPhases } from './cadconversioncontract.js';
 import { ParseConvertedGlb, AddConvertedModel } from './cadconversionimport.js';
+import { CadDiagnosticReport, CadDiagnosticAdvice, CadDiagnosticChecks } from './cadconversiondiagnostics.js';
 
 function ClientError (code)
 {
@@ -113,10 +114,16 @@ export class CadConversions
     }
     async Action (id, action)
     {
-        if (!['cancel', 'retry', 'delete'].includes (action) || this.website.sessionEditor.readOnly) { throw ClientError ('invalid_request'); }
+        if (!['cancel', 'retry', 'delete', 'diagnose'].includes (action) || this.website.sessionEditor.readOnly) { throw ClientError ('invalid_request'); }
         const path = this.JobPath (id);
         if (action === 'delete') { return this.Request (path, 'DELETE'); }
         const job = await this.Get (id); return this.Request (path + '/' + action, 'POST', { revision : job.revision });
+    }
+    async Diagnostics (id)
+    {
+        const job = await this.Get (id), value = job.diagnostics;
+        return { jobId : job.id, status : value?.status || 'not_run', errorCode : value?.errorCode || null,
+            canRun : value?.canRun === true, report : value?.report ? CadDiagnosticReport (value.report) : null };
     }
     async Artifact (id, kind)
     {
@@ -175,7 +182,7 @@ export class CadConversions
         this.updateProgress = value => { submission.root.hidden = !value; if (value) { submission.update (value); } }; this.updateProgress (this.submissionProgress);
         const jobs = Element ('div', null, dialog); jobs.className = 'cad_conversion_jobs'; jobs.setAttribute ('aria-label', 'My CAD conversions');
         const empty = Element ('p', 'Your conversions will appear here.', jobs), rows = new Map ();
-        let closed = false, busy = false, ready = false, timer = null, pollDelay = 1500;
+        let closed = false, busy = false, ready = false, diagnosticsReady = false, timer = null, pollDelay = 1500;
         const update = () => { const parasolid = /\.(x_t|x_b)$/i.test (this.file?.name || ''); filename.textContent = this.file ? this.file.name + ' · ' + (this.file.size / 1048576).toFixed (2) + ' MiB' : 'Choose a file or convert the public sample.'; units.disabled = busy || !parasolid; quality.disabled = busy; picker.disabled = busy; submit.disabled = busy || !ready || !this.file || parasolid && !units.value; sample.disabled = busy || !ready; };
         this.updateFile = update;
         const run = async action => { if (closed || busy) { return; } busy = true; update (); try { await action (); if (!closed) { await refresh (); } } catch (error) { if (!closed) { status.textContent = error.message || CadMessages.unavailable; } } finally { busy = false; if (!closed) { update (); } } };
@@ -198,17 +205,36 @@ export class CadConversions
                 let record = rows.get (job.id);
                 if (!record) {
                     const row = Element ('article', null, jobs); row.className = 'cad_conversion_job'; row.dataset.jobId = job.id;
-                    const title = Element ('strong', '', row), progress = ProgressElement (row), elapsed = Element ('span', '', row), message = Element ('p', '', row), summary = Element ('p', '', row), controls = Element ('div', null, row);
-                    elapsed.className = 'cad_conversion_elapsed'; controls.className = 'mode_buttons'; record = { row, title, progress, elapsed, message, summary, controls }; rows.set (job.id, record);
+                    const title = Element ('strong', '', row), progress = ProgressElement (row), elapsed = Element ('span', '', row), message = Element ('p', '', row), summary = Element ('p', '', row), diagnostic = Element ('details', null, row), controls = Element ('div', null, row);
+                    diagnostic.className = 'cad_conversion_diagnostic'; diagnostic.hidden = true;
+                    elapsed.className = 'cad_conversion_elapsed'; controls.className = 'mode_buttons'; record = { row, title, progress, elapsed, message, summary, diagnostic, controls }; rows.set (job.id, record);
                 }
                 const { row, controls } = record; if (anchor.nextSibling !== row) { anchor.after (row); } anchor = row; row.dataset.state = job.state;
-                record.title.textContent = job.source.name; record.progress.update (CadProgressView (job));
+                record.title.textContent = job.source.name;
+                const view = CadProgressView (job); if (job.purpose === 'diagnostic' && view.active) { view.label = 'Server diagnostic · ' + view.label; } record.progress.update (view);
                 record.started = Date.parse (job.createdAt); record.finished = liveStates.has (job.state) ? null : Date.parse (job.updatedAt);
-                record.message.hidden = !job.errorCode; record.message.textContent = job.errorCode ? (CadMessages[job.errorCode] || CadMessages.conversion_failed) + (CadPhases[job.progress?.phase] ? ' Stopped during: ' + CadPhases[job.progress.phase].toLowerCase () + '.' : '') : '';
+                record.message.hidden = !job.errorCode || job.purpose === 'diagnostic'; record.message.textContent = job.errorCode ? (CadMessages[job.errorCode] || CadMessages.conversion_failed) + (CadPhases[job.progress?.phase] ? ' Stopped during: ' + CadPhases[job.progress.phase].toLowerCase () + '.' : '') : '';
                 record.summary.hidden = !job.summary; record.summary.textContent = job.summary ? 'X × Y × Z: ' + job.summary.dimensionsMm.map (n => Number (n.toFixed (3))).join (' × ') + ' mm · ' + job.summary.topology.solids + ' solids · independently validated' : '';
-                const signature = JSON.stringify ([job.state, job.canRetry, Object.keys (job.artifacts)]); if (record.signature === signature) { continue; } record.signature = signature; controls.replaceChildren ();
+                const reportKey = JSON.stringify ([job.diagnostics?.report, job.diagnostics?.errorCode]);
+                if (record.reportKey !== reportKey) {
+                    record.reportKey = reportKey; record.diagnostic.replaceChildren (); record.diagnostic.hidden = !job.diagnostics?.report && !job.diagnostics?.errorCode;
+                    Element ('summary', 'Server diagnostic report', record.diagnostic);
+                    if (job.diagnostics?.report) {
+                        try {
+                            const report = CadDiagnosticReport (job.diagnostics.report);
+                            Element ('p', CadDiagnosticAdvice (report), record.diagnostic);
+                            const checks = Element ('ul', null, record.diagnostic);
+                            for (const [key, text] of Object.entries (CadDiagnosticChecks)) { Element ('li', text + ' · ' + report.checks[key].replace ('_', ' '), checks); }
+                            Element ('p', 'Worker ' + report.versions.worker + ' · Reader ' + (report.versions.reader || 'unknown') + ' · OCCT ' + (report.versions.occt || 'unknown'), record.diagnostic);
+                            if (report.readerCode || report.exception) { Element ('p', [report.readerCode, report.exception, ...report.frames].filter (Boolean).join (' · '), record.diagnostic).className = 'cad_conversion_diagnostic_code'; }
+                            Element ('p', 'Source geometry and raw logs stay on the private server. This report contains only checks and library error locations.', record.diagnostic);
+                        } catch { Element ('p', 'The server report could not be verified.', record.diagnostic); }
+                    } else if (job.diagnostics?.errorCode) { Element ('p', 'The diagnostic run could not complete. ' + (CadMessages[job.diagnostics.errorCode] || CadMessages.unavailable), record.diagnostic); }
+                }
+                const signature = JSON.stringify ([job.state, job.canRetry, job.diagnostics?.canRun, job.purpose, Object.keys (job.artifacts)]); if (record.signature === signature) { continue; } record.signature = signature; controls.replaceChildren ();
                 if (liveStates.has (job.state)) { button ('Cancel', controls, () => this.Action (job.id, 'cancel')); }
                 if (job.canRetry) { button ('Retry', controls, () => this.Action (job.id, 'retry')); }
+                if (job.diagnostics?.canRun && diagnosticsReady) { button ('Diagnose on server', controls, async () => { await this.Action (job.id, 'diagnose'); status.textContent = 'Inspecting the existing private upload on the server. No source file is sent to the agent.'; }); }
                 if (job.state === 'ready') {
                     button ('Add to current session', controls, async () => { const target = this.Origin (); await this.Import (job.id, target); status.textContent = 'Added to the current session. Undo is available.'; });
                     for (const kind of Object.keys (job.artifacts)) { button (kind.toUpperCase () + (CadArtifacts[kind].units ? ' · ' + CadArtifacts[kind].units : ''), controls, () => this.Download (job.id, kind)); }
@@ -223,7 +249,7 @@ export class CadConversions
         sample.onclick = () => run (async () => { status.textContent = 'Converting the public sample…'; await this.Sample (); this.ClearFile (); status.textContent = 'Sample submitted. Expected size: 40 × 30 × 20 mm.'; });
         dialog.addEventListener ('close', () => { closed = true; clearTimeout (timer); clearInterval (clock); this.ClearFile (); this.dialog = null; this.picker = null; this.updateFile = null; this.updateProgress = null; this.notice = null; }, { once : true });
         update ();
-        try { const caps = await this.Capabilities (); if (!closed) { ready = caps.ready; status.textContent = ready ? 'CAD service ready · STEP/STL in mm · GLB in meters.' : 'The CAD service is not ready yet.'; await refresh (); } }
+        try { const caps = await this.Capabilities (); if (!closed) { ready = caps.ready; diagnosticsReady = ready && caps.diagnosticProtocol === 1; status.textContent = ready ? 'CAD service ready · STEP/STL in mm · GLB in meters.' : 'The CAD service is not ready yet.'; await refresh (); } }
         catch (error) { if (!closed) { status.textContent = error.message; } }
         if (!closed) { update (); } return { opened : !closed, interactive : true };
     }

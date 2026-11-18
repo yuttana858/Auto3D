@@ -1,6 +1,16 @@
-# Private CAD conversion — Auto3D 0.82.1
+# Private CAD conversion — Auto3D 0.84.0
 
-Cloud 3D Studio reuses the existing Modal workspace, Supabase identity/database and private `AUTO3D_LIBRARY_R2` bucket. Auto3D 0.82.1 and the native service are live; the full public-calibration pipeline passed. There is no new login system, paid workspace, GPU or permanent warm pool. CPU/build/idle usage still consumes the existing workspace's allowance; billing tiers and limits are unchanged.
+## Server diagnostics
+
+1. Upload explicitly through **Convert privately**. The source is already in private server storage; selecting a local file alone still does not upload it.
+2. When conversion fails, expand **Server diagnostic report** if the native worker supplied one automatically.
+3. Choose **Diagnose on server** to inspect the same failed upload again. No re-upload or CAD download to an agent is required. At most two diagnostic passes share the existing worker queue, with cancellation and the source's original expiry.
+4. Read the source/geometry/STEP checks and reader failure. These are reports, not conversion outputs: a validated diagnostic cannot add a model to the scene or claim mesh conversion succeeded.
+5. A connected agent can call `conversion.diagnostics` with the job ID to inspect the geometry-free report. `conversion.diagnose` queues the same bounded server operation and requires write access. Poll the read command for completion. It returns no CAD, raw logs, coordinates, private names or exception messages.
+
+The Modal worker reads the private upload into its temporary server filesystem and deletes temporary diagnostic files when the pass ends. Only allowlisted report fields leave that worker for the owned API. Source CAD is never transferred into the agent's diagnostic workspace. See [0.84.0 release notes](release-0840.md) for limits and validation.
+
+Cloud 3D Studio reuses the existing Modal workspace, Supabase identity/database and private `AUTO3D_LIBRARY_R2` bucket. Auto3D 0.84.0 and Cloud 3D Studio 0.4.0 are live; full calibration and automatic/manual diagnostic privacy gates passed. The bucket has no enabled public managed domain or custom domain. There is no new login system, paid workspace, GPU or permanent warm pool. CPU/build/idle usage still consumes the existing workspace's allowance; billing tiers and limits are unchanged.
 
 ## Use Convert CAD
 
@@ -19,7 +29,7 @@ Parasolid coverage is a supported subset of reader schemas/entities. No compatib
 ## Server contract
 
 - `GET /api/conversions/capabilities`, `GET/POST /api/conversions`, `GET/DELETE /api/conversions/{id}`.
-- `PUT /api/conversions/{id}/source`, `POST …/{submit,cancel,retry}` with the current revision, `GET …/artifacts/{step,glb,stl,manifest}`.
+- `PUT /api/conversions/{id}/source`, `POST …/{submit,cancel,retry,diagnose}` with the current revision, `GET …/artifacts/{step,glb,stl,manifest}`. The owned job response includes the strict diagnostic report; diagnostics add no source-download route.
 - Existing cookie authentication and active-session verification are authoritative; every route requires matching `X-Auto3D-Account`. Writes require the exact Auto3D origin. Every job query is owner-scoped; foreign jobs return 404. RLS is enabled and browser database grants are revoked; only the server role can call job RPCs.
 - 20 creations/hour/account; two active jobs/account; eight globally queued/running; one native worker; at most two application attempts. Deadline 30 minutes. Transient transfer/dispatch/lease failures can retry; geometry/units/validation failures cannot.
 - Worker callbacks live outside the browser middleware at `/internal/conversion-worker/{job}/{attempt}/…`. A random, expiring per-attempt capability is stored only as SHA-256. Claim is atomic, heartbeats renew a two-minute lease, and stale/cancelled/expired attempts cannot publish.
@@ -31,7 +41,7 @@ Parasolid coverage is a supported subset of reader schemas/entities. No compatib
 
 The host adapter is `cadconversion.js`, with a separate `cadconversionimport.js` for unit-safe scene/history insertion and a small shared `cadconversioncontract.js`. Conversion is independent of the AI and packaging modules. Pages uses `_lib/conversionjobs.js`, `_lib/conversionworker.js` and the public/internal routes; native computation stays in Cloud 3D Studio. New formats extend the native registry rather than changing authentication/storage ownership.
 
-Commands: `conversion.open`, `inspect`, `capabilities`, `jobs`, `job`, `submit`, `cancel`, `retry`, `delete`, `download`, `import`, `sample`. Prefix every name with `conversion.`. `open` is interactive; `submit` uses an already selected local file. Commands never accept provider tokens, arbitrary source URLs or filesystem paths. `import` requires the exact target returned by `conversion.inspect` immediately before the action. Normal read-only, account and busy checks apply.
+Commands: `conversion.open`, `inspect`, `capabilities`, `jobs`, `job`, `submit`, `cancel`, `retry`, `diagnose`, `diagnostics`, `delete`, `download`, `import`, `sample`. Prefix every name with `conversion.`. `open` is interactive; `submit` uses an already selected local file. Commands never accept provider tokens, arbitrary source URLs or filesystem paths. `import` requires the exact target returned by `conversion.inspect` immediately before the action. Normal read-only, account and busy checks apply.
 
 Validation includes two-owner service-role SQL fixtures; actual workerd/R2 length/checksum and capability tests; desktop/mobile conversion/calibration import/download/Undo; cross-scene mm/cm/m/in/ft physical-size checks and failed-import rollback. CI runs the owned-job SQL in an isolated Postgres database; never run its bootstrap on production. Hosted native proof and the successful live user-API canary are recorded in [0.79.0 notes](release-0790.md). The canary used two temporary confirmed test accounts, verified isolation and all artifact hashes/units, then deleted identities and files; Admin create-user sends no confirmation email. Follow-up database and private-object reads confirmed cleanup.
 

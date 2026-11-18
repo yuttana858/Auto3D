@@ -1,5 +1,6 @@
 import { JsonBody } from './accountstorage.js';
 import { CadExact, CadFailureCode, CadProgress } from '../../source/website/cadconversioncontract.js';
+import { CadDiagnosticReport } from '../../source/website/cadconversiondiagnostics.js';
 import { JobDatabase, JobOwnerActive, JobBucket, GetJob, ChangeJob, PublicJob, SourceKey, ArtifactKey, Sha256, SafeEqual, UploadJobObject, CadArtifacts, CadLimits, CadUuid, CadHash, CadError } from './conversionjobs.js';
 
 export async function WorkerJob (env, request, id, attempt)
@@ -9,7 +10,7 @@ export async function WorkerJob (env, request, id, attempt)
     const rows = await JobDatabase (env, 'auto3d_conversion_jobs?select=*&id=eq.' + id + '&active_attempt=eq.' + attempt + '&limit=1');
     const job = rows[0];
     if (!job?.token_hash || !SafeEqual (await Sha256 (new TextEncoder ().encode (token.slice (7))), job.token_hash)) { throw CadError ('not_found', 404); }
-    if (!['queued', 'running', 'cancelling'].includes (job.state) || PublicJob (job).state === 'expired') { throw CadError ('expired', 410); }
+    if (!['queued', 'running', 'cancelling'].includes (job.state) || Date.parse (job.deadline_at) <= Date.now () || PublicJob (job).state === 'expired') { throw CadError ('expired', 410); }
     await JobOwnerActive (env, job.owner_id);
     return job;
 }
@@ -51,6 +52,7 @@ export async function WorkerOperation (env, request, parts)
         return new Response (object.body, { headers : { 'Content-Type' : 'application/octet-stream', 'Content-Length' : String (object.size), 'Cache-Control' : 'private, no-store', 'X-Content-Type-Options' : 'nosniff' } });
     }
     if (operation === 'artifacts' && request.method === 'PUT' && parts.length === 4 && Object.hasOwn (CadArtifacts, parts[3])) {
+        if (job.purpose === 'diagnostic') { throw CadError ('conflict', 409); }
         ActiveLease (job); const kind = parts[3], size = Number (request.headers.get ('Content-Length'));
         const limit = kind === 'manifest' ? CadLimits.manifestBytes : CadLimits.artifactBytes;
         if (!Number.isSafeInteger (size) || size <= 0 || size > limit) { throw CadError ('too_large', 413); }
@@ -63,11 +65,12 @@ export async function WorkerOperation (env, request, parts)
         return { stored : true };
     }
     if (request.method !== 'POST' || parts.length !== 3) { throw CadError ('invalid_request', 405); }
-    const body = await JsonBody (request, 1024);
+    const body = await JsonBody (request, 12288);
     if (operation === 'claim') {
+        if (job.purpose === 'diagnostic' && request.headers.get ('X-Auto3D-Diagnostic-Protocol') !== '1') { return { accepted : false }; }
         CadExact (body, []); const result = await ChangeJob (env, job, 'claim');
         if (!result.claimed) { return { accepted : false }; }
-        return { accepted : true, progressProtocol : 1, source : { extension : job.source_extension, bytes : job.source_bytes, sha256 : job.source_sha256, unit : job.source_unit }, quality : job.quality };
+        return { accepted : true, progressProtocol : 1, diagnosticProtocol : 1, purpose : job.purpose || 'conversion', source : { extension : job.source_extension, bytes : job.source_bytes, sha256 : job.source_sha256, unit : job.source_unit }, quality : job.quality };
     }
     if (operation === 'progress') {
         CadExact (body, Object.hasOwn (body, 'progress') ? ['stage', 'progress'] : ['stage']);
@@ -76,14 +79,20 @@ export async function WorkerOperation (env, request, parts)
         const result = await ChangeJob (env, job, 'progress', { stage : body.stage, ...(progress ? { progress } : {}) }); return { state : result.job.state };
     }
     if (operation === 'complete') {
+        if (job.purpose === 'diagnostic') {
+            CadExact (body, ['report']); const report = CadDiagnosticReport (body.report);
+            const result = await ChangeJob (env, job, 'complete', { report }); return { state : result.job.state };
+        }
         CadExact (body, []); const evidence = await ValidateJobResult (env, job);
         const result = await ChangeJob (env, job, 'complete', evidence); return { state : result.job.state };
     }
     if (operation === 'failure') {
-        CadExact (body, Object.hasOwn (body, 'diagnostic') ? ['code', 'diagnostic'] : ['code']);
+        CadExact (body, ['code', ...(Object.hasOwn (body, 'diagnostic') ? ['diagnostic'] : []), ...(Object.hasOwn (body, 'report') ? ['report'] : [])]);
+        const report = Object.hasOwn (body, 'report') ? CadDiagnosticReport (body.report) : null;
+        if (report && (report.outcome !== 'error_detected' || report.failureCode !== CadFailureCode (body.code))) { throw CadError ('invalid_request'); }
         const diagnostic = body.diagnostic;
         if (diagnostic) { CadExact (diagnostic, ['exception', 'frames']); if (!['TypeError', 'ValueError', 'AttributeError', 'RuntimeError', 'MemoryError', 'OSError', 'ConversionError', 'SchemaError', 'ParseError', 'LimitExceededError', 'OcctConversionError', 'InteropError', 'NativeError'].includes (diagnostic.exception) || !Array.isArray (diagnostic.frames) || diagnostic.frames.length > 4 || !diagnostic.frames.every (frame => typeof frame === 'string' && /^[A-Za-z0-9_]{1,64}:[0-9]{1,8}$/.test (frame))) { throw CadError ('invalid_request'); } }
-        const result = await ChangeJob (env, job, 'failure', { code : CadFailureCode (body.code), ...(diagnostic ? { diagnostic } : {}) }); return { state : result.job.state };
+        const result = await ChangeJob (env, job, 'failure', { code : CadFailureCode (body.code), ...(diagnostic ? { diagnostic } : {}), ...(report ? { report } : {}) }); return { state : result.job.state };
     }
     throw CadError ('not_found', 404);
 }

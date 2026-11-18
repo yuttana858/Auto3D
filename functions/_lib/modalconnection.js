@@ -107,5 +107,5 @@ export async function TestModalConnection (env)
     if (result?.service !== 'cloud-3d-studio' || result.protocol !== 1 || typeof result.version !== 'string' || !/^\d+\.\d+\.\d+$/.test (result.version) || typeof result.conversionReady !== 'boolean' || result.conversionReady === true && result.jobApiVersion !== 1) { throw ModalFailure ('MODAL_RESPONSE_INVALID', 502); }
     if (['workspace', 'environment', 'app'].some (key => result[key] !== record[key])) { throw ModalFailure ('MODAL_TARGET_MISMATCH', 502); }
     // Explicit allowlist: a provider cannot inject secrets or arbitrary text into the UI/agent log.
-    return { connected : true, profile : ModalProfile (env), workspace : record.workspace, environment : record.environment, app : record.app, version : result.version, conversionReady : result.conversionReady, ...(result.jobApiVersion === 1 ? { jobApiVersion : 1 } : {}) };
+    return { connected : true, profile : ModalProfile (env), workspace : record.workspace, environment : record.environment, app : record.app, version : result.version, conversionReady : result.conversionReady, ...(result.jobApiVersion === 1 ? { jobApiVersion : 1 } : {}), ...(result.diagnosticApiVersion === 1 ? { diagnosticApiVersion : 1 } : {}) };
 }

@@ -83,6 +83,56 @@
       }
     },
     {
+      "id": "conversion.diagnostics",
+      "title": "Read server CAD diagnostic",
+      "category": "Conversion",
+      "description": "Read an account-owned geometry-free server report: stage checks, fixed reader error and public library code locations. Does not download CAD or raw logs.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "pattern": "^[a-f0-9-]{36}$",
+            "minLength": 36,
+            "maxLength": 36
+          }
+        },
+        "required": [
+          "jobId"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "jobId": "00000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "id": "conversion.diagnose",
+      "title": "Diagnose CAD on the private server",
+      "category": "Conversion",
+      "description": "Explicitly inspect an existing failed private upload using the bounded server worker. Returns queued status; poll conversion.diagnostics for the report. Shares queue and retention limits, with two diagnostic attempts separate from conversion attempts. Never downloads source CAD to the agent or publishes a model.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "pattern": "^[a-f0-9-]{36}$",
+            "minLength": 36,
+            "maxLength": 36
+          }
+        },
+        "required": [
+          "jobId"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "jobId": "00000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
       "id": "conversion.submit",
       "title": "Convert staged CAD privately",
       "category": "Conversion",

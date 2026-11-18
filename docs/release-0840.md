@@ -1,66 +1,23 @@
-# Auto3D 0.84.0 / Packaging 1.15.0 / Primary Products 0.15.0 / Molded Pulp 0.2.0
+# Auto3D 0.84.0 — Private server CAD diagnostics
 
-Auto Pack builds its carton with the Packaging generator and works on models without unit information. Based on main after #146 (0.83.0).
+Versions: Auto3D **0.84.0**, Packaging **1.14.0**, Primary Products **0.15.0**, Molded Pulp **0.2.0**; Cloud 3D Studio **0.4.0**. Released through [#147](https://github.com/yuttana858/Auto3D/pull/147) and [Cloud 3D Studio #19](https://github.com/yuttana858/Cloud-3D-Studio/pull/19). Integrates merged main through #146 / 0.83.0, preserving molded-pulp ribs/lugs, worker detail and clamshells.
 
-## Auto Pack uses the Packaging generator
+Hosted [CI 44212580363](https://github.com/yuttana858/Auto3D/actions/runs/44212580363) passed validation and browser smoke. Production [deployment 44213677044](https://github.com/yuttana858/Auto3D/actions/runs/44213677044) passed for `d5d222f457361878cf6e35cdb3f71e283d74e8cd`, including the served version/bundle, animated landing/login, Meshy and MCP authentication boundaries. Cloudflare independently reports that exact production commit deployed successfully. Native [deployment 44214197321](https://github.com/yuttana858/Cloud-3D-Studio/actions/runs/44214197321), source `ed68d5a3a82223ce7cab307ca72289d4baba5c63`, passed native proof, protected gateway, Vault reuse, actual controller startup and the real user-API calibration. Its live diagnostic gate passed automatic reports, a second diagnostic using the same private upload, cross-account denial and no model publication. Independent database reads confirmed zero temporary canary accounts/jobs. These successes are separate from the actual supplier-file outcome.
 
-Before this release Auto Pack built only an RSC (0201) and showed the raw fold panels. Their cut edges were sharp and exposed because the generator's board appearance and crease visuals were dropped. Now:
+The retained supplier upload was then inspected through the scheduled private worker, without downloading CAD into the agent workspace. The validated report records source reading passed, geometry construction failed with `occt.construction_failed` / `ValueError`, and later checks not run. Its public locations (`conversion:292`, `conversion:176`, `parametric:215`, `parametric:248`) identify the installed reader's constructed-face validity check. Versions are worker 0.4.0, parasolid-kit 0.3.17 and OCCT binding 7.9.3.1.1. The original conversion remains failed with two conversion attempts; one separate diagnostic completed without a diagnostic infrastructure error. No partial model was published. This narrows the compatibility repair to OCCT parametric face construction/validation; it does not establish source CAD corruption or successful supplier-file conversion. Do not bypass validity checks or enable partial-face output as a workaround.
 
-- The carton uses the generator's presentation: the same `CreateFefcoFoldRig` board appearance meshes, and the crease visuals (`FefcoDisplayPose` → `CreaseVisualMeshes`) during and after folding. A test checks that the Auto Pack presentation matches the generator's rig for the same parameters.
-- The style list is the generator catalog (`FefcoStyles`, exposed as `AutoPackStyles`). Today that is 0200 HSC, 0201 RSC, 0202 OSC and 0203 FOL. A style added to the generator catalog appears in Auto Pack with no Auto Pack change.
-- Flap layering comes from the generator (`FefcoFlapLayers` / `FefcoFlapLayer`, shared with `FoldPose`). The fitted height reserves each style's flap stack, so the inside height is unchanged when a style has more or fewer flap layers. For example, an HSC is 2 board layers shorter than an RSC, and an FOL is taller because its outer flaps overlap completely.
-- Allowances: every style uses the RSC (FEFCO reference) body allowances from the generation board, and the plan adds each style's extra flap layers itself.
-- Saved cartons keep their code. Cartons from before 0.84.0 replay as 0201.
+Convert CAD can inspect an existing failed private upload on the server. **Diagnose on server** uses the same owned source, queue, worker, expiring capability, heartbeat and cancellation paths. A separate counter permits at most two diagnostic dispatches; it never resets or consumes the two conversion attempts. The source expires at its original deadline for retention. The inspection deadline is ten minutes, with the native diagnostic subprocess bounded to four minutes. No separate Modal project or warm pool is created.
 
-**Panel:** the Auto tab has a **Box style** select.
+Future native conversion failures automatically attach a strict geometry-free report. A manual diagnostic checks source reading, geometry construction/validation and STEP export/reimport, then returns only fixed outcomes, library versions, a public reader error code, an allowlisted exception category and public package file/line labels. It never returns source contents, dimensions, coordinates, names, entity identifiers, exception messages, raw logs or arbitrary JSON fields. The server validates the report before persistence; the API and browser validate it again. Raw failure diagnostics remain server-only. Reports remain owned and expire with the source.
 
-**Commands:**
+A diagnostic can validate CAD without proving mesh generation. Its completion preserves the original conversion failure and never marks the job ready, uploads a model or changes a scene. **Add to current session** remains available only for an independently validated conversion. A report panel explains the result without declaring a supplier CAD file corrupt merely because the installed reader fails to construct it.
 
-- `packaging.auto.styles` (read).
-- `packaging.auto.style { code }` (non-mutating; changes what the next inspect and generate use).
-- `packaging.auto.inspect` reports `code`.
+New commands: `conversion.diagnose` explicitly queues inspection of an existing owned failed upload; `conversion.diagnostics` reads its report without downloading CAD. Both use strict job-ID schemas. Read-only sessions can inspect reports but cannot queue compute. The existing upload workflow remains explicit; no new source download route or arbitrary remote execution API is added.
 
-## Open top
+The MCP also exposes `conversion.jobs` and `conversion.diagnostics` as direct read tools. A read grant can locate an owned job and inspect its report through the connected window without gaining write access. Queuing a pass still requires a write grant; no separate diagnostic preference or credential is introduced.
 
-A packed Auto Pack carton has an **Open top** button beside **Fold carton** / **Unfold carton**. It swings only the top flaps 120° open from closed, which is 30° outward past upright. When the carton is open, the button becomes **Close top**.
+Validation includes separate owner/revision checks, source hash/length identity, negotiated native support, strict report egress, account changes, real workerd capability/streaming checks, isolated PostgreSQL capacity/attempt/cancellation/deadline/retention fixtures, native subprocess checks and desktop/mobile report behavior. Hosted proof must test automatic reports, a second diagnostic using the same server upload, cross-account report denial, no model publication and cleanup. The reported supplier file remains a separate acceptance gate; no source CAD is downloaded into the diagnostic workspace.
 
-**How the flaps move**
-- Flaps open in reverse closing order, so the outer flap goes first.
-- Each flap swings up to upright, leaves its closed stack offset while exactly upright, and then leans outward.
-- The outward lean hinges on the outside score face, as the generator's outward lean does, so the board never rolls into its own wall.
-- Each flap moves on its own, so neighbours never cross at the corners.
-- `InspectAutoPackFold (rig, yield, 'top')` audits this route with the same 3601-sample check as folding. 0201, 0202 and 0203 are clear.
+Local validation: the integrated app passed **1,009 application/module tests**, then **26 focused CAD tests** after final backend changes; **73 MCP tests**, lint, licenses, zero-vulnerability production audit, 11 backend tests and website/Pages builds passed. Actual workerd verified protocol negotiation, denied model uploads, strict report egress and capability expiry even while the source remains retained. All existing and new SQL fixtures passed in isolated PostgreSQL/PGlite; the hosted migration is `20261117231653` and its service-only permissions were independently checked. Cloud 3D Studio passed **77 tests**, Ruff and the offline lock check.
 
-**What gets saved**
-- Completion replaces the carton with one Undo step and saves it with `closure: 'open'` (name " · Open"). Close top returns it to `closure: 'closed'` (" · Closed").
-- An open-top carton unfolds and refolds along its open route: the top flaps stay open at the end of the fold.
-- Regenerating the carton and timeline fold actions keep the open top (`rig.autoPackOpenTop`).
-
-**Availability and command**
-- Not offered for 0200 HSC (no top flaps) or for a flat carton.
-- `packaging.auto.top { open?, duration? }` toggles when `open` is omitted. It returns when playback starts, and `packaging.fefco.playback.inspect` reports the `open top` or `close top` action.
-
-## Refresh bounds on any model
-
-STL, OBJ and many older or CAD exports carry no units. Auto Pack previously refused these scenes and gave no way forward. The Auto tab now explains that the scene has no units and shows a **Model units** select (mm, cm, m, in, ft). **Assign units and refresh bounds** assigns that unit to the scene and its unitless objects in one Undo step, then re-measures the selection.
-
-- **Refresh bounds** with known units just re-measures.
-- A scene that already has units is never reassigned.
-- **Command:** `packaging.auto.refresh_bounds { units? }` (mutating only when it assigns units). `packaging.auto.inspect` reports `unitsUnknown`.
-
-## Validation
-
-- Unit tests: 1005 passing, including Packaging's "presents the Packaging generator carton" and "fits every Packaging generator style".
-- Lint is clean.
-- New browser test `test/browser/packaging-auto-styles.mjs` (in the CI suite):
-  - starts with a unitless STL;
-  - checks the guidance;
-  - assigns units through the panel;
-  - checks Undo/Redo;
-  - lists the 4 styles;
-  - selects 0203 from the panel;
-  - checks that the FOL is taller than the RSC;
-  - folds and checks the saved code.
-- `packaging-auto-styles` also covers Open top from the panel (closure `open`, " · Open"), Undo/Redo, Close top through the command, and unfolding from an open top.
-- Module test: every style's top route is clear; each top flap turns exactly 120° from closed and stands above and outside the walls; the open-top fold route is clear and keeps the flat pose unchanged.
-- The existing `packaging-auto-pack` browser test passes.
+The full browser suite ran in three local shards on `5ab0b2e`: **82 passed, 6 failed, none unrun**. Five failures passed individual retries (artwork timing, measurements, Packaging module, Primary Products and contents). The CAD test passed desktop/mobile upload reuse, strict report reads, no diagnostic model insertion and normal import/Undo/Redo. Together **87 distinct browser checks passed**; this is not a single all-green integrated run. The Molded Pulp test was synchronized with its intended background refinement. It then reached its existing software-renderer FPS assertion and failed (26–28 FPS while refining versus 62 idle; longest observed main-thread task 7.576 seconds). Later subcases in that test are unverified. The Molded Pulp runtime files are identical to merged 0.83.0; no assertion was weakened to report success. That rendering benchmark remains a separate follow-up; the diagnostic flow is passing. Reports are under `work/cad084-browser-*.md/json`, `work/cad084-browser-retries.md` and `work/cad084-pulp-metrics.md` in the validation worktree.
