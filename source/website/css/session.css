@@ -691,3 +691,15 @@ div.main_viewer
 .details_mesh_group[open] > .details_mesh_summary::before { transform: rotate(90deg); }
 .details_mesh_summary:hover { color: var(--ov_button_color); }
 .details_mesh_rows { padding-left: 11px; }
+
+.animation_object_tracks, .animation_object_track { padding: 4px 0; }
+.animation_scene_track > summary, .animation_object_tracks > summary, .animation_object_track > summary { cursor: pointer; }
+.animation_object_track { margin-left: 12px; }
+/* An open track is one row: its toggle sits in the label column, replacing the duplicate label. */
+.animation_scene_track, .animation_object_track { position: relative; }
+.animation_scene_track[open] > summary, .animation_object_track[open] > summary { position: absolute; top: 0; left: 0; z-index: 1; display: flex; align-items: center; width: 140px; height: 38px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.animation_object_track[open] > summary { width: 128px; }
+.animation_scene_track[open] > summary::before, .animation_object_track[open] > summary::before { content: "▾"; flex: none; width: 14px; }
+.animation_scene_track[open] > .advance_animation_track > strong, .animation_object_track[open] > .advance_animation_track > strong { visibility: hidden; }
+.animation_scene_track > summary, .animation_object_tracks > summary, .animation_object_track > summary { color: var(--ov_light_icon_color); }
+@media (max-width: 650px) { .animation_scene_track[open] > summary { width: 86px; } .animation_object_track[open] > summary { width: 74px; } }

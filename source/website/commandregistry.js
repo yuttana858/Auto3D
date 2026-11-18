@@ -91,11 +91,11 @@ export class CommandRegistry
             await new Promise ((resolve) => setTimeout (resolve, MacroSettlePollMs));
         }
     }
-    async InvokeMacro (macro)
+    async InvokeMacro (macro, observer = null)
     {
         if (this.running) { return { ok : false, error : { code : 'NESTED_MACRO', message : 'A macro is already running. Nested macros are not supported.' }, completed : [] }; }
         const completed = []; const results = Object.create (null); const token = { cancelled : false }; this.running = token;
-        const history = this.context?.history, recorded = [], push = history?.Push, ownPush = !!history && Object.hasOwn (history, 'Push');
+        this.lastRun = null; const history = this.context?.history, recorded = [], push = history?.Push, ownPush = !!history && Object.hasOwn (history, 'Push');
         try {
             CheckMacro (macro, this.commands);
             for (const step of macro.steps) {
@@ -104,18 +104,19 @@ export class CommandRegistry
             }
             // Record the history entries the run adds so one Undo reverses the whole macro.
             if (push) { history.Push = function (entry) { recorded.push (entry); return push.call (this, entry); }; }
+            if (observer?.start) { await observer.start (); }
             for (const step of macro.steps) {
                 if (token.cancelled) { return { ok : false, cancelled : true, completed }; }
                 try {
                     const result = await this.Invoke (step.command, Resolve (step.arguments || {}, results));
                     await this.Settle (token);
-                    results[step.id] = result; completed.push ({ id : step.id, command : step.command, result });
+                    results[step.id] = result; completed.push ({ id : step.id, command : step.command, result }); if (observer?.step) { await observer.step (step, result, completed.length); }
                 } catch (error) { this.context?.website?.errorLogs?.Record ('error', 'macro', step.command + ': ' + error.message); return { ok : false, failedStep : step.id, error : { code : 'STEP_FAILED', message : error.message }, completed }; }
             }
             return { ok : true, completed };
         } catch (error) { this.context?.website?.errorLogs?.Record ('error', 'macro', error.message); return { ok : false, error : { code : 'INVALID_MACRO', message : error.message }, completed }; }
         finally {
-            if (push) { if (ownPush) { history.Push = push; } else { delete history.Push; } GroupHistory (history, recorded); }
+            if (push) { if (ownPush) { history.Push = push; } else { delete history.Push; } this.lastRun = { history, entry : GroupHistory (history, recorded) }; }
             this.running = null;
         }
     }
@@ -154,16 +155,19 @@ export function MacroWarnings (macro)
 }
 
 // Replace the entries a macro added with one entry, when they are still the newest in order.
+// Returns the entry that now represents the run (null when the run's entries are no longer the newest).
 function GroupHistory (history, recorded)
 {
-    if (recorded.length < 2) { return; }
+    if (!recorded.length || !Array.isArray (history.undo)) { return null; }
     const tail = history.undo.slice (-recorded.length);
-    if (tail.length !== recorded.length || tail.some ((entry, i) => entry !== recorded[i])) { return; }
+    if (tail.length !== recorded.length || tail.some ((entry, i) => entry !== recorded[i])) { return null; }
+    if (recorded.length === 1) { return recorded[0]; }
     history.undo.splice (-recorded.length, recorded.length);
-    history.undo.push ({
+    const entry = {
         macro : true, steps : recorded.length,
         undo : async () => { for (const entry of [...recorded].reverse ()) { await entry.undo (); } },
         redo : async () => { for (const entry of recorded) { await entry.redo (); } }
-    });
-    history.Changed?.();
+    };
+    history.undo.push (entry); history.Changed?.();
+    return entry;
 }

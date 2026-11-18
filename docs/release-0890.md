@@ -1,6 +1,6 @@
-# Auto3D 0.89.0 / Packaging 1.15.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0
+# Auto3D 0.89.0 / Packaging 1.15.1 / Primary Products 0.15.0 / Molded Pulp 0.3.0
 
-Reliable macros, 24-hour agent pairing, read-only database auto-approval, and a one-line Advance animation toolbar. Based on main after #153 (0.88.0). No module changes.
+One integration release (PR #155) for reliable macros, 24-hour agent pairing, read-only database auto-approval, a one-line Advance animation toolbar, macro animation recording with collapsible tracks (from #157) and compact Auto Pack controls (from #156, prepared as 0.88.1 / Packaging 1.15.1). Based on main after #153 (0.88.0). Packaging 1.15.1; the other modules are unchanged.
 
 The pairing and database commits were pushed to #148 after its head was read for merge, so #148 merged only the 0.84.1 Auto Pack fix. They are included here, and the pairing notes that were written for 0.85.0 are below.
 
@@ -38,10 +38,25 @@ The Advance animation panel used five rows for its controls (title and camera re
 - `CreateTimelineTracks (editor, parent, { ranges, camera })` puts the In/Out fields and Auto-fit into the toolbar groups; without slots it keeps its own rows.
 - The panel is 300 px tall (was 330) with no inner border. On narrow screens the toolbar scrolls sideways and the Close button stays pinned in view.
 
+## Macro animation recording and collapsible tracks (from #157)
+
+`animation.macro.record` runs a saved or supplied macro and records object transforms and camera views as sequential keyframes on an empty, stopped timeline. Advance animation has collapsible scene, camera and action tracks and one expandable track per object. An open track is one row: its toggle replaces the duplicate row label (`animation.tracks.inspect`, `animation.tracks.expand`). See `docs/agent-interface.md` for the workflow and limits.
+
+- Only a restricted set of steps can be recorded (transforms, selection, view and camera commands). Creation, deletion, visibility, materials, arrays and procedural animation are rejected before the macro runs.
+- Each step waits for its playback (`Settle`) before its keyframe is captured, so the recorded pose is the settled one.
+- **One Undo.** A recording is one Undo step: it removes the recorded keyframes and reverses the macro's scene changes; Redo restores both. (`CommandRegistry.lastRun` exposes the history entry for the run, and `RecordMacroAnimation` folds it into its own entry.)
+
+## Compact Auto Pack controls (from #156; Packaging 1.15.1)
+
+The Auto Pack explanation is collapsed under **How Auto Pack works**. The packed contents controls are renamed **Pads and Partitions** and are separately collapsible. Flute and board record controls use the account board catalog for the next carton and show the selected record's thickness. **Inside Dimensions** replaces the redundant bounding-box and score-size cards. Catalog record names are displayed as provided; nominal records do not imply a certified strength grade. Settings and sizing behavior are unchanged.
+
+The fold progress indicator is now a draggable fold-pose timeline, available after automatic playback; it saves the pose through the existing undoable fold scrub. The Auto panel no longer shows pause/cancel buttons (still available as `packaging.fefco.playback`) or repeated status. `packaging.auto.explanation` and `packaging.auto.contents_panel` open and close the sections.
+
 ## Validation
 
 - Unit tests, including the new `test/macro-run.test.js` (playback wait, cancel while waiting, one Undo after success and after failure, tab-step rule, save/export/delete with warnings). Three tests that counted one Undo per macro step now expect the grouped step.
 - MCP tests (73): a tab switch moves the pairing to the new active tab; routing, replay and revocation are still refused; a pairing survives an hour idle and ends at 24 hours.
 - Browser `mcp-access`: Live Control reports a 24-hour expiry, a reload reconnects with the same window identity, and Disconnect clears it.
+- Stacked branch (#155 + #156 + #157, one-Undo recording): lint and lint_mcp pass; 1,039 unit, 73 MCP and 91 Packaging module tests pass; all builds succeed; browser smoke suite 11/11, plus `animation`, `animation-video`, `command-design`, `mcp-access`, `module-panels`, `packaging-auto-pack` and `packaging-auto-styles`.
 - Browser `animation`: the toolbar is one line (≤ 40 px), Close is in view, and every control is found by its accessible name. `animation-video`, `workspace-editing`, `module-panels` and `packaging-module` pass.
 - Browser `command-design`: a macro creates a 0201, toggles the fold, then runs `view.fit` and `packaging.fefco.playback.inspect` (state `completed`). One Undo leaves an empty scene. A macro with a tab change before the last step is refused.
