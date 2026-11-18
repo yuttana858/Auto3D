@@ -1,8 +1,10 @@
 .cad_conversion_dialog { width: min(820px, calc(100vw - 32px)); }
 .cad_conversion_dialog p { line-height: 1.5; overflow-wrap: anywhere; }
 .cad_conversion_note { opacity: .75; font-size: var(--workspace-help-font-size, 12px); }
+.cad_conversion_automatic { color: #9bc3ff; font-size: var(--workspace-help-font-size, 12px); }
 .cad_conversion_options { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .cad_conversion_options select { width: 100%; }
+.cad_conversion_options > label[hidden] { display: none; }
 .cad_conversion_jobs { padding: 0 24px 24px; display: grid; gap: 12px; }
 .cad_conversion_job { border: 1px solid var(--ov_border_color, #455066); border-radius: 8px; padding: 14px; }
 .cad_conversion_stage { display: block; margin-top: 5px; color: #83b5ff; font-size: var(--workspace-meta-font-size, 12px); }
