@@ -44,6 +44,8 @@ Molded Pulp 0.2.0 (Auto3D 0.83.0 / Packaging 1.14.0 / Primary Products 0.15.0, b
 
 Auto3D 0.84.0 (Packaging 1.15.0 / Primary Products 0.15.0 / Molded Pulp 0.2.0, based on main after #146 (0.83.0)) builds Auto Pack cartons with the Packaging generator: board appearance and crease visuals (`FefcoDisplayPose`), flap layering (`FefcoFlapLayers`) and the style catalog (`AutoPackStyles` = `FefcoStyles`), so new generator styles reach Auto Pack automatically. Refresh bounds assigns units to unitless scenes (`packaging.auto.refresh_bounds { units }`). Keep Auto Pack on these shared generator paths. See docs/release-0840.md.
 
+Auto3D 0.85.0 (Packaging 1.15.0 / Primary Products 0.15.0 / Molded Pulp 0.2.0, stacked on 0.84.0) adds the Animation module panel (`animationpanel.js`, module id `animation`) and frame-accurate video export (`videoexport.js`: `timeline.Seek (t, false, true)` per frame, offscreen render with `HideRenderHelpers`, WebCodecs + mp4-muxer/webm-muxer; commands `animation.video.*`). Keep new animation sources deterministic in timeline time so they appear in exported video. See docs/release-0850.md.
+
 # Agent-accessible features
 
 The conversion progress candidate is Auto3D 0.82.0 / Packaging 1.14.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 with Cloud 3D Studio 0.3.3. Percentages describe measured current-stage work; indeterminate native operations must remain indeterminate. Keep failure diagnostics geometry-free and server-only. Generic/worker failures may retry once, with two total attempts and quota/retention checks. See docs/release-0820.md.

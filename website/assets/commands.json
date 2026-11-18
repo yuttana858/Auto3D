@@ -3371,7 +3371,8 @@
               "ai",
               "packaging",
               "primary-products",
-              "molded-pulp"
+              "molded-pulp",
+              "animation"
             ]
           }
         },
@@ -6378,6 +6379,103 @@
       "title": "Inspect selected box fold pose",
       "category": "Packaging",
       "description": "Read selected box visual fold progress without modifying CAD or geometry.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "animation.video.export",
+      "title": "Export animation video",
+      "category": "Animation",
+      "description": "Record the animation range (or start/end seconds) as a video: the timeline is stepped frame by frame (object and camera keyframes, fold actions with their automatic camera framing, embedded clips) and each frame is rendered without editor helpers, then encoded with WebCodecs. format auto prefers MP4 (H.264) and falls back to WebM (VP9/VP8) when the browser cannot encode H.264. Waits for completion and returns the video metadata; the file stays in this browser until animation.video.download. Requires sign-in. Does not change the scene.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "size": {
+            "type": "string",
+            "enum": [
+              "viewport",
+              "720p",
+              "1080p",
+              "4k"
+            ]
+          },
+          "fps": {
+            "type": "integer",
+            "enum": [
+              24,
+              25,
+              30,
+              60
+            ]
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "mp4",
+              "webm"
+            ]
+          },
+          "start": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000000
+          },
+          "end": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000000
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "size": "1080p",
+        "fps": 30,
+        "format": "auto"
+      }
+    },
+    {
+      "id": "animation.video.inspect",
+      "title": "Inspect video export",
+      "category": "Animation",
+      "description": "Read video export status (idle, encoding, completed, failed or cancelled), frame progress and the last finished video (filename, container, codec, size, fps, frames, duration, bytes).",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "animation.video.cancel",
+      "title": "Cancel video export",
+      "category": "Animation",
+      "description": "Stop a running video export. The scene and playhead are restored.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "animation.video.download",
+      "title": "Download exported video",
+      "category": "Animation",
+      "description": "Save the last exported video to this computer as a file download. Nothing is uploaded.",
       "mutates": false,
       "inputSchema": {
         "type": "object",

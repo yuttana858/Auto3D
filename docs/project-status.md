@@ -1,5 +1,15 @@
 # Auto3D development log and handoff
 
+## Animation panel and video export — Auto3D 0.85.0 (2026-11-18)
+
+Packaging 1.15.0 / Primary Products 0.15.0 / Molded Pulp 0.2.0 are preserved. Stacked on 0.84.0. Not deployed.
+
+- **Animation panel.** A new module panel with playback, sequence settings and keyframes.
+- **Video export.** Frame-accurate export of the timeline range to MP4 (H.264), or WebM when H.264 isn't available, using WebCodecs. It offers Viewport, 720p, 1080p and 4K sizes and 24–60 fps.
+- **Commands.** `animation.video.export`, `animation.video.inspect`, `animation.video.cancel` and `animation.video.download`.
+
+See docs/release-0850.md.
+
 ## Auto Pack on the Packaging generator, Refresh bounds units — Auto3D 0.84.0 / Packaging 1.15.0 (2026-11-18)
 
 Primary Products 0.15.0 / Molded Pulp 0.2.0 are preserved. Based on main after #146 (0.83.0). Not deployed.
