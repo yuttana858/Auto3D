@@ -1,5 +1,17 @@
 # Auto3D development log and handoff
 
+## Molded Pulp output: STEP and GLB on a NURBS B-rep — Auto3D 0.88.0 / Molded Pulp 0.3.0 (2026-11-18)
+
+Packaging 1.15.0 / Primary Products 0.15.0 are preserved. Based on main after #152 (0.87.1). Not deployed.
+
+- **Review vs output.** The formed field stays the internal review model; output is a NURBS B-rep built on it.
+- **Exports.** **Export STEP** (closed solid per shell, AP214, mm) and **Export GLB** (pulp material, m), in the panel and through `pulp.export`.
+- **NURBS core.** The B-spline core, B-rep topology and STEP writer live in `modules/molded-pulp/src/nurbs/`.
+- **Validation.** OpenCASCADE reads the STEP as valid solids (6-can tray: 0 open edges, volume within 0.1%).
+- **Next step.** Phase 2 (smooth cubic lofts), with its test cases and pass criteria, in docs/molded-pulp-nurbs.md.
+
+See docs/release-0880.md.
+
 ## Appearance capability bridge — Auto3D 0.87.1 live (2026-11-18)
 
 Passes the exact supported appearance API flag through the sanitized Modal bridge so the public conversion API can advertise it. Live 0.87.0 conversion/diagnostic checks found 16 source colors in the retained STEP; the stricter appearance-aware public gate caught this metadata omission. See [release-0871.md](release-0871.md). PR #152 / deployed commit `b6865eb67b971b358a798506c733817891c36279`; CI 44347073226 and deployment 44348738348 (attempt 2) passed. The appearance-aware private pipeline 44345807731 (attempt 2) passed actual public GLB color/alpha, hashes/units, account isolation and diagnostic checks. No customer CAD was downloaded to the agent workspace.

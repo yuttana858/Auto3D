@@ -48,6 +48,7 @@ mini-presentation
 model-spec
 module-panels
 molded-pulp
+molded-pulp-export
 multiwall-glue
 packaging-cleanup
 packaging-effects

@@ -1,6 +1,6 @@
 import { PulpDefinition, ValidatePulpDefinition, MaxStoredProducts } from '../../modules/molded-pulp/src/definition.js';
 import { PulpTypes } from '../../modules/molded-pulp/src/state.js';
-import { MoldedPulpModelAsync, SessionTrianglesMm, PulpMillimeters } from './moldedpulpadapter.js';
+import { MoldedPulpModelAsync, SessionTrianglesMm, PulpMillimeters, MoldedPulpGlb } from './moldedpulpadapter.js';
 const nextFrame = () => new Promise (resolve => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame : setTimeout) (() => resolve ()));
 
 export const MoldedPulpDataKey = '_auto3dMoldedPulp';
@@ -174,6 +174,8 @@ export class MoldedPulpWorkspace
         editor.busy = true;
         try { await editor.Render (); } finally { editor.busy = false; editor.RefreshButtons?.(); }
         this.pulpId = object.id;
+        // The plan behind the object on screen: STEP and GLB export use exactly this geometry.
+        this.output = { object, plan, stage, draft : { ...draft } };
         const top = editor.history.undo.at (-1), merging = into || (live && this.liveEntry && top === this.liveEntry.entry && this.liveEntry.record.after === source ? this.liveEntry : null);
         if (merging) { merging.record.after = object; merging.time = Date.now (); merging.plan = plan; return merging; }
         const record = { before : source, after : object, index };
@@ -215,5 +217,34 @@ export class MoldedPulpWorkspace
         return { formDepthMm : mm, updated : false, message : `Form depth set to ${mm} mm. Form tray pulls the sheet up to this height.` };
     }
     Reset () { this.token++; this.jobs.Cancel (); clearTimeout (this.liveTimer); this.sensed = null; this.result = null; this.pulpId = null; this.refining = null; this.liveEntry = null; }
+    // Output for tooling and customers: STEP (closed B-rep per shell, mm, from the NURBS output) or GLB (the formed shell
+    // with its pulp material, metres). Uses the plan behind the pulp object on screen; a pulp object from a saved session
+    // is formed again from its saved definition and products first (in the worker, at its saved detail).
+    async Export (format)
+    {
+        if (!['step', 'glb'].includes (format)) { throw new Error ('Choose STEP or GLB.'); }
+        const panel = this.panel, editor = this.editor; if (!panel.website.auth?.user || panel.website.accountReady === false) { throw new Error ('Sign in to export molded pulp.'); }
+        if (this.active) { throw new Error ('Wait for forming to finish.'); }
+        const object = this.IsPulp (editor.selected) ? editor.selected : this.Current (); if (!object) { throw new Error ('Form or select a molded pulp sheet or tray first.'); }
+        const module = await this.load ();
+        let output = this.output?.object === object ? this.output : null;
+        if (!output) {
+            const definition = ValidatePulpDefinition (JSON.parse (object.userData[MoldedPulpDataKey]));
+            if (!definition.productIds.length) { throw new Error ('This pulp object was formed over more than ' + MaxStoredProducts + ' products. Select them and form again to export.'); }
+            const triangles = SessionTrianglesMm (editor.document, this.Products (definition.productIds)), draft = definition.draft;
+            const plan = definition.stage === 'sheet' ? module.PlanSheet (triangles, draft) : await this.jobs.Run (module, { stage : 'tray', triangles, draft, detail : draft.detail });
+            output = { object, plan, stage : definition.stage, draft };
+        }
+        if (this.refining) { throw new Error ('Wait for the detailed shape to finish refining before exporting.'); }
+        const plan = output.plan, base = (object.name || 'Molded pulp').replace (/[^\w .-]+/g, ' ').replace (/\s+/g, ' ').trim () || 'Molded pulp';
+        if (format === 'step') {
+            const text = module.WriteStep (plan.nurbs.shells, { name : base }), filename = base + '.step';
+            editor.Download (text, filename, 'model/step');
+            return { format, filename, bytes : text.length, units : 'mm', solids : plan.nurbs.shells.length, faces : 6 * plan.nurbs.shells.length, nodes : plan.nurbs.shells.map (s => [...s.nodes]), message : 'STEP downloaded: ' + plan.nurbs.shells.length + ' closed solid' + (plan.nurbs.shells.length === 1 ? '' : 's') + ' in mm.' };
+        }
+        const bytes = await MoldedPulpGlb (plan, PulpTypes[output.draft.pulpType].roughness), filename = base + '.glb';
+        editor.Download (bytes, filename, 'model/gltf-binary');
+        return { format, filename, bytes : bytes.byteLength, units : 'm', triangles : plan.metrics.triangles ?? plan.components.reduce ((s, c) => s + c.indices.length / 3, 0), message : 'GLB downloaded for review (metres, pulp material).' };
+    }
     UnitFactor () { return PulpMillimeters[this.editor.document.model.GetUnit ()] || null; }
 }

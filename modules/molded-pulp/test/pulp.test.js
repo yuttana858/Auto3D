@@ -241,7 +241,7 @@ describe ('Molded Pulp clamshells, detail and worker', function () {
     });
     it ('forms at fine detail within budget and transfers results from the worker handler', () => {
         const started = Date.now (), { message, transfer } = HandlePulpJob ({ id : 7, stage : 'tray', triangles : SixPack (), draft : UpdatePulpDraft (base, { resolutionMm : null, detail : 'fine' }), detail : 'fine' });
-        assert.equal (message.id, 7); assert.equal (message.plan.metrics.pocketCount, 6); assert.ok (message.plan.metrics.cellMm <= 0.5); assert.ok (transfer.length === 4);
+        assert.equal (message.id, 7); assert.equal (message.plan.metrics.pocketCount, 6); assert.ok (message.plan.metrics.cellMm <= 0.5); assert.equal (transfer.length, 4 + 6, 'mesh buffers plus the NURBS faces (points and knots of top and bottom)'); assert.ok (transfer.includes (message.plan.nurbs.shells[0].top.points.buffer));
         assert.ok (Date.now () - started < 30000, 'fine detail stays interactive in a worker: ' + (Date.now () - started) + ' ms');
     });
     it ('still validates drafts saved by 0.1.0', () => {
