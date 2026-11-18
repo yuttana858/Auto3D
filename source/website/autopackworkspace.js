@@ -196,6 +196,19 @@ export class AutoPackWorkspace
         const reach = Math.min (products.plan.parameters.width, products.plan.parameters.length);
         return new PackSequencePlayback (this.editor, { products : productBoxes, pads, partitions, spreads, packedTopMm : top, flapReachMm : reach, closeLid : true, easing : this.editor.website.preferences?.motionEasing || 'smooth' }, items, f);
     }
+    // Rebuild the assembly sequence of a packed carton from what it saved: its products and the pads and partitions tagged
+    // with its id. Products are already in their packed places, so they rise and drop straight back in. Null if anything is missing.
+    ReplaySequence (carton)
+    {
+        const saved = AutoPackDefinition (carton); if (!saved) { return null; }
+        const document = this.editor.document, factor = PackagingUnitMM[document.model.GetUnit ()]; if (!factor) { return null; }
+        const tagged = item => { try { return JSON.parse (item.userData?._auto3dAccessory || 'null')?.cartonId === carton.id; } catch { return false; } };
+        const pieces = document.objects.filter (tagged), pieceIds = new Set (pieces.map (item => item.id));
+        // The carton was fitted around products and contents together, so its saved ids include the pieces; keep only products.
+        const ids = (saved.productIds?.length ? saved.productIds : [saved.productId]).filter (id => !pieceIds.has (id)), objects = ids.map (id => document.objects.find (item => item.id === id));
+        if (!objects.length || objects.some (item => !item || item.visible === false)) { return null; }
+        return this.PackSequence ({ objects, factor, document, plan : { parameters : JSON.parse (carton.userData._auto3dFefco) } }, { added : pieces });
+    }
     async Generate ({ duration = 14, ...contentOptions } = {})
     {
         this.packaging.Editable ();

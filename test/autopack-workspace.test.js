@@ -139,6 +139,10 @@ describe ('Auto Pack scene integration', function () {
         const operation = editor.packaging.foldOperation; operation.player.now = () => operation.player.last + 2000; operation.player.Tick (); await operation.completion;
         assert.equal (editor.packaging.FoldInspect ().state, 'completed', JSON.stringify (editor.packaging.lastFold)); assert.equal (editor.history.undo.length, 1, 'contents, carton and fold are one Undo step');
         [...products, ...pieces].forEach (o => { const at = drawn (o); o.position.forEach ((v, axis) => near (at[axis], v)); assert.equal (o.threeObject.visible, true); });
+        // The packed carton can replay its sequence from what it saved (no spread: products are already packed).
+        const carton = editor.document.objects.find (o => o.userData?._auto3dAutoPack !== undefined), replay = auto.ReplaySequence (carton).Inspect ();
+        assert.deepEqual (replay.stages.map (s => s.name), info.stages.map (s => s.name)); assert.deepEqual (replay.order, info.order);
+        assert.ok (auto.ReplaySequence (carton).plan.tracks.filter (t => t.kind === 'product').every (t => t.rise.from.every (v => v === 0)));
         await editor.history.Undo (); assert.deepEqual (editor.document.objects, products); products.forEach ((item, i) => assert.deepEqual (item.position, original[i]));
     });
     it ('packs an array with nested partitions and pads: opens gaps, nests strips, fits the carton around everything', async () => {
