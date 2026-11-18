@@ -305,7 +305,7 @@ export class PackagingWorkspace
     async SelectBoard (id, target = 'generation')
     {
         this.Editable (); if (!['generation', 'selected'].includes (target)) { throw new Error ('Choose generation or selected board.'); } const store = await this.BoardStore (); this.Editable (); const record = store.records.find (item => item.id === id); if (!record) { throw new Error ('Choose an existing board record.'); }
-        if (target === 'generation') { this.generationBoard = structuredClone (record); this.Refresh (); return { target, boardId : id, caliperMm : record.caliperMm }; }
+        if (target === 'generation') { this.generationBoard = structuredClone (record); this.Refresh (); this.editor.website.packagingPanel?.workspace?.autoPanel?.Refresh (); return { target, boardId : id, caliperMm : record.caliperMm }; }
         if (!this.editor.selected?.packagingProfile) { throw new Error ('Select a packaging model first.'); }
         if (JSON.stringify (this.Design ()) !== JSON.stringify (this.editor.selected.packagingProfile)) { throw new Error ('Apply or load the selected CAD profile before changing its board.'); }
         const inspection = this.EngineeringInspect (), base = inspection.material, basis = this.dimensionBasis || 'inside';

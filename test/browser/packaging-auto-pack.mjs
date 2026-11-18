@@ -42,12 +42,16 @@ try {
     const auto = panel.getByRole ('tabpanel', { name : 'Auto', exact : true }); await auto.waitFor ();
     assert.equal (await panel.getByRole ('tab', { name : 'Auto', exact : true }).getAttribute ('aria-selected'), 'true');
     assert.equal (await panel.getByRole ('tabpanel', { name : 'Packaging', exact : true }).isVisible (), false);
+    assert.equal (await auto.getByRole ('region', { name : 'Selected object · bounding box' }).count (), 0); assert.equal (await auto.getByRole ('region', { name : 'Score size' }).count (), 0);
+    const flute = auto.getByLabel ('Flute', { exact : true }); const grade = auto.getByLabel ('Board grade', { exact : true });
+    await flute.selectOption ('E'); await page.waitForFunction (() => document.querySelector ('[aria-label="Board grade"]')?.value === 'nominal-e'); assert.match (await auto.textContent (), /Board thickness: 1\.5 mm/); assert.equal ((await call ('packaging.auto.inspect')).thicknessMm, 1.5);
+    await flute.selectOption ('B'); await page.waitForFunction (() => document.querySelector ('[aria-label="Board grade"]')?.value === 'nominal-b'); assert.match (await auto.textContent (), /Board thickness: 3 mm/); assert.equal ((await call ('packaging.auto.inspect')).thicknessMm, 3); assert.equal (await grade.inputValue (), 'nominal-b');
     const fit = await call ('packaging.auto.inspect'); assert.equal (fit.available, true); assert.equal (fit.objectId, product.objectId); assert.equal (fit.clearanceMm, .0254);
     const glueAxis = fit.productMm.width > fit.productMm.length ? 'width' : 'length';
     for (const key of ['width', 'length', 'height']) { assert.ok (fit.productMm[key] > 0); assert.ok (Math.abs (fit.insideMm[key] - fit.productMm[key] - .0508 - (key === glueAxis ? fit.thicknessMm : 0)) < 1e-8); }
-    assert.match (await auto.getByRole ('region', { name : 'Selected object · bounding box' }).textContent (), /mm/);
+    assert.match (await auto.getByRole ('region', { name : 'Inside Dimensions' }).textContent (), /mm/);
     await call ('preferences.units', { units : 'standard' });
-    assert.match (await auto.getByRole ('region', { name : 'Selected object · bounding box' }).textContent (), /in/);
+    assert.match (await auto.getByRole ('region', { name : 'Inside Dimensions' }).textContent (), /in/);
     await call ('preferences.units', { units : 'metric' });
     await page.setViewportSize ({ width : 390, height : 844 }); assert.equal (await page.evaluate (() => document.documentElement.scrollWidth > innerWidth), false); await page.setViewportSize ({ width : 1500, height : 1000 });
     // Pause and cancel remain available as agent commands while the panel uses a timeline.
@@ -90,9 +94,10 @@ try {
     await auto.getByLabel ('Contents flute', { exact : true }).selectOption ('nominal-e');
     assert.match (await auto.locator ('details.packaging_auto_contents').textContent (), /3 × 1 × 1 products .* 2 partition strips .* 2 pads/);
     const beforeContents = (await call ('scene.inspect')).objects.length;
+    // Start observing before the click returns: software rendering can consume the animation while Playwright waits.
+    await page.evaluate (() => { window.autoPackContentsPause = new Promise ((resolve, reject) => { const started = Date.now (); let seen = false; const check = async () => { const s = (await Auto3D.execute ('packaging.fefco.playback.inspect')).result; if (s.state === 'playing') { seen = true; } if (s.state === 'playing' && s.progress > .3) { await Auto3D.execute ('packaging.fefco.playback', { action : 'pause' }); resolve (); } else if (Date.now () - started > 180000 || (seen && s.state === 'completed')) { reject (new Error ('Fold did not pause mid-way: ' + s.state)); } else { setTimeout (check, 5); } }; check (); }); });
     await auto.getByRole ('button', { name : 'Auto Pack', exact : true }).click ();
-    // Mid-fold, the walls rise around the products, partitions and pads.
-    await page.evaluate (() => new Promise ((resolve, reject) => { const started = Date.now (); const check = async () => { const s = (await Auto3D.execute ('packaging.fefco.playback.inspect')).result; if (s.state === 'playing' && s.progress > .3) { await Auto3D.execute ('packaging.fefco.playback', { action : 'pause' }); resolve (); } else if (Date.now () - started > 180000 || s.state === 'completed') { reject (new Error ('Fold did not pause mid-way: ' + s.state)); } else { setTimeout (check, 5); } }; check (); }));
+    await page.evaluate (() => window.autoPackContentsPause);
     await page.screenshot ({ path : 'work/auto-pack-review/array-contents-mid-fold.png' });
     await call ('packaging.fefco.playback', { action : 'resume' }); await waitPlayback (['completed']);
     const packedScene = await call ('scene.inspect'); assert.equal (packedScene.objects.length, beforeContents + 2 + 2 + 1);

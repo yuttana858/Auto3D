@@ -1,4 +1,5 @@
 import { AutoPalletPanel } from './palletpanel.js';
+import { BoardFlutes, DefaultBoardDatabase } from './boarddatabase.js';
 
 function Element (tag, parent, text, className)
 {
@@ -16,11 +17,13 @@ export class AutoPackPanel
         // Styles are the Packaging generator's catalog, so new generator styles appear here automatically.
         const style = Element ('div', this.root, undefined, 'packaging_accessory_options');
         this.style = this.Select (style, 'Box style', false); this.style.addEventListener ('change', () => { try { this.host.autoStyle?.(this.style.value); } catch (error) { this.status.textContent = error.message; } this.Refresh (); });
+        const boardChoice = Element ('div', this.root, undefined, 'packaging_accessory_options');
+        this.flute = this.Select (boardChoice, 'Flute', false); this.boardGrade = this.Select (boardChoice, 'Board grade', false);
+        this.flute.addEventListener ('change', () => { const record = this.BoardRecords ().find (item => item.flute === this.flute.value); if (record) { this.SelectBoard (record.id); } });
+        this.boardGrade.addEventListener ('change', () => this.SelectBoard (this.boardGrade.value));
+        this.boardThickness = Element ('p', this.root, '', 'section_hint'); this.boardThickness.setAttribute ('aria-live', 'polite');
         this.objectName = Element ('strong', this.root);
-        this.product = this.Size ('Selected object · bounding box');
-        this.inside = this.Size ('Inside size');
-        this.score = this.Size ('Score size');
-        this.board = Element ('p', this.root, '', 'section_hint');
+        this.inside = this.Size ('Inside Dimensions');
         this.explanation = Element ('details', this.root, undefined, 'packaging_auto_explanation');
         Element ('summary', this.explanation, 'How Auto Pack works');
         Element ('p', this.explanation, 'Clearance: 0.001″ (0.0254 mm) on each face. The inside size adds clearance on both sides of each dimension and one board thickness along the longer side for the internal glue tab. It is generated like Generate with the inside basis: the selected board record and its allowance factors convert the inside size to score dimensions, and the carton keeps that CAD measurement layer.', 'section_hint');
@@ -54,6 +57,15 @@ export class AutoPackPanel
         this.Refresh ();
         this.palletPanel = new AutoPalletPanel (host, this.root);
     }
+    BoardRecords () { const records = this.host.boards?.().records; return records?.length ? records : DefaultBoardDatabase (); }
+    async SelectBoard (id)
+    {
+        if (this.boardSelecting || this.host.blocked ()) { this.Refresh (); return; }
+        this.boardSelecting = true; this.flute.disabled = true; this.boardGrade.disabled = true;
+        try { if (this.host.selectBoard) { await this.host.selectBoard (id, 'generation'); } else { const record = this.BoardRecords ().find (item => item.id === id); if (!record) { throw new Error ('Choose an available board.'); } this.localGenerationBoardId = id; await this.host.configure ({ thickness : record.caliperMm }); } this.status.textContent = ''; }
+        catch (error) { this.status.textContent = error.message; }
+        finally { this.boardSelecting = false; this.Refresh (); }
+    }
     SetExplanation (open)
     {
         if (typeof open !== 'boolean') { throw new Error ('Choose whether the Auto Pack explanation is open.'); }
@@ -75,7 +87,7 @@ export class AutoPackPanel
     }
     Fill (select, items, fallback)
     {
-        const keys = items.map (item => item.value).join ('|');
+        const keys = JSON.stringify (items.map (item => [item.value, item.label]));
         if (select.dataset.keys !== keys) { const current = select.value; select.replaceChildren (...items.map (item => { const option = document.createElement ('option'); option.value = item.value; option.textContent = item.label; return option; })); select.dataset.keys = keys; select.value = items.some (item => item.value === current) ? current : fallback; }
     }
     ContentOptions ()
@@ -108,11 +120,16 @@ export class AutoPackPanel
         if (styles.length) { this.style.value = styles.find (s => s.selected)?.code || this.style.value; }
         this.unitsRow.hidden = !data.unitsUnknown; this.refresh.textContent = data.unitsUnknown ? 'Assign units and refresh bounds' : 'Refresh bounds';
         this.objectName.textContent = data.objectName || 'No product selected';
-        for (const [row, size] of [[this.product, data.productMm], [this.inside, data.insideMm], [this.score, data.scoreMm]]) {
-            for (const [key, field] of row.fields) { field.textContent = Number.isFinite (size?.[key]) ? Number ((size[key] / factor).toFixed (6)) + ' ' + unit : '—'; }
-        }
-        this.inside.section.hidden = !data.insideMm; this.score.section.hidden = !data.scoreMm;
-        this.board.textContent = Number.isFinite (data.thicknessMm) ? 'Board caliper: ' + (data.boardName ? data.boardName + ' · ' : '') + Number ((data.thicknessMm / factor).toFixed (6)) + ' ' + unit : '';
+        const records = this.BoardRecords (), preferred = this.host.generationBoard?.() || this.localGenerationBoardId, currentThickness = this.host.inspect?.().thickness;
+        const active = records.find (record => record.id === preferred) || (!preferred ? records.find (record => record.caliperMm === currentThickness) : null);
+        this.Fill (this.flute, BoardFlutes.filter (flute => records.some (record => record.flute === flute)).map (flute => ({ value : flute, label : flute + ' flute' })), active?.flute || '');
+        if (active) { this.flute.value = active.flute; }
+        const choices = records.filter (record => record.flute === this.flute.value); this.Fill (this.boardGrade, choices.map (record => ({ value : record.id, label : record.name })), active?.id || '');
+        if (active && active.flute === this.flute.value) { this.boardGrade.value = active.id; } else { this.boardGrade.value = ''; }
+        this.flute.disabled = this.boardSelecting || this.pending || this.host.blocked () || !records.length; this.boardGrade.disabled = this.flute.disabled || !choices.length;
+        const thickness = active?.caliperMm ?? currentThickness; this.boardThickness.textContent = Number.isFinite (thickness) ? 'Board thickness: ' + Number ((thickness / factor).toFixed (6)) + ' ' + unit : 'Board thickness: unavailable';
+        for (const [key, field] of this.inside.fields) { field.textContent = Number.isFinite (data.insideMm?.[key]) ? Number ((data.insideMm[key] / factor).toFixed (6)) + ' ' + unit : '—'; }
+        this.inside.section.hidden = !data.insideMm;
         this.reason.textContent = data.fitted || /^Select one visible product,/.test (data.reason || '') ? '' : (data.reason || '');
         if (this.contents) {
             const c = data.contents, mm = value => Number ((value / factor).toFixed (unit === 'in' ? 3 : 1)) + ' ' + unit;
