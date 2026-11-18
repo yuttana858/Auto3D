@@ -32,8 +32,11 @@ export function CreateTimelineTracks (editor, parent)
         input.dataset.range = key;
     }
     const tracks = Element ('div', 'advance_animation_tracks', undefined, parent);
+    const state = editor.animationTrackState ||= { open : false, objects : new Set (), groups : { object : true, camera : true, action : true } };
+    state.groups ||= { object : true, camera : true, action : true };
     for (const [type, label] of [['object', 'Scene state'], ['camera', 'Camera positioning'], ['action', 'Actions']]) {
-        const row = Element ('div', 'advance_animation_track', undefined, tracks); Element ('strong', null, label, row);
+        const group = Element ('details', 'animation_scene_track', undefined, tracks); group.open = state.groups[type] !== false; Element ('summary', null, label, group); group.addEventListener ('toggle', () => { if (group.isConnected) { state.groups[type] = group.open; } });
+        const row = Element ('div', 'advance_animation_track', undefined, group); Element ('strong', null, label, row);
         const rail = Element ('div', 'advance_animation_rail', undefined, row);
         const interval = Element ('div', 'animation_interval', undefined, rail);
         interval.setAttribute ('aria-hidden', 'true');
@@ -70,6 +73,20 @@ export function CreateTimelineTracks (editor, parent)
                 editor.UpdatePlayheads (); editor.MarkDirty ();
             });
         }
+    }
+    // Keep one expandable track per object while retaining the existing scene and camera tracks.
+    const objects = Element ('details', 'animation_object_tracks', undefined, parent); objects.open = state.open;
+    Element ('summary', null, 'Object tracks (' + editor.document.objects.length + ')', objects);
+    objects.addEventListener ('toggle', () => { if (objects.isConnected) { state.open = objects.open; } });
+    for (const object of editor.document.objects) {
+        const group = Element ('details', 'animation_object_track', undefined, objects); group.open = state.objects.has (object.id);
+        Element ('summary', null, object.name + ' · ' + (object.keyframes?.length || 0) + ' keyframes', group);
+        group.addEventListener ('toggle', () => { if (!group.isConnected) { return; } if (group.open) { state.objects.add (object.id); } else { state.objects.delete (object.id); } });
+        const row = Element ('div', 'advance_animation_track', undefined, group); Element ('strong', null, object.name, row);
+        const rail = Element ('div', 'advance_animation_rail', undefined, row);
+        const playhead = Element ('input', 'animation_playhead', undefined, rail); playhead.type = 'range'; playhead.min = '0'; playhead.max = String (timeline.duration); playhead.step = '0.01'; playhead.value = String (timeline.time); playhead.setAttribute ('aria-label', 'Object ' + object.name + ' playhead');
+        playhead.addEventListener ('input', () => { timeline.Stop (); timeline.Seek (Number (playhead.value)); }); playhead.addEventListener ('change', () => editor.MarkDirty ());
+        for (const keyframe of object.keyframes || []) { const marker = Element ('button', 'animation_key_marker', '◆', rail); marker.style.left = 100 * keyframe.time / timeline.duration + '%'; marker.title = object.name + ' at ' + keyframe.time.toFixed (2) + ' s'; marker.setAttribute ('aria-label', marker.title); marker.addEventListener ('click', () => { timeline.Stop (); timeline.Seek (keyframe.time); }); }
     }
     UpdatePlayheads (editor);
 }

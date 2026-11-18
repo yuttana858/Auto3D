@@ -6359,6 +6359,55 @@
       "example": {}
     },
     {
+      "id": "animation.tracks.inspect",
+      "title": "Inspect animation tracks",
+      "category": "Animation",
+      "description": "List scene, camera, action and per-object track keyframes and expansion state.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "animation.tracks.expand",
+      "title": "Expand animation object tracks",
+      "category": "Animation",
+      "description": "Expand or collapse the object track list or one object track in the Advance animation panel.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "boolean"
+          },
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "track": {
+            "type": "string",
+            "enum": [
+              "scene",
+              "camera",
+              "actions",
+              "objects"
+            ]
+          }
+        },
+        "required": [
+          "open"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "open": true
+      }
+    },
+    {
       "id": "animation.action.open",
       "title": "Open Action keyframe options",
       "category": "Animation",
@@ -6998,6 +7047,37 @@
       "example": {
         "time": 0,
         "interpolation": "smooth"
+      }
+    },
+    {
+      "id": "animation.macro.record",
+      "title": "Run macro and record animation",
+      "category": "Animation",
+      "description": "Run a saved or supplied macro and record object transforms and camera views as sequential keyframes. Requires an empty stopped timeline and 1–100 existing objects. Unsupported commands, including creation, deletion, materials and procedural animation, are rejected before execution. Completed macro steps remain if a later step fails. Object/camera changes are interpolated over stepSeconds; the recorded timeline is one undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "definition": {
+            "type": "string",
+            "maxLength": 262144
+          },
+          "stepSeconds": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 30
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "name": "Demo",
+        "stepSeconds": 2
       }
     },
     {

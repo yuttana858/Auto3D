@@ -749,3 +749,7 @@ div.main_viewer
 .details_mesh_group[open] > .details_mesh_summary::before { transform: rotate(90deg); }
 .details_mesh_summary:hover { color: var(--ov_button_color); }
 .details_mesh_rows { padding-left: 11px; }
+
+.animation_object_tracks, .animation_object_track { padding: 4px 0; }
+.animation_scene_track > summary, .animation_object_tracks > summary, .animation_object_track > summary { cursor: pointer; }
+.animation_object_track { margin-left: 12px; }

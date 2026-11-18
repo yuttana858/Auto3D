@@ -82,7 +82,7 @@ export class CommandRegistry
     {
         return this.Queue (() => this.InvokeMacro (macro));
     }
-    async InvokeMacro (macro)
+    async InvokeMacro (macro, observer = null)
     {
         if (this.running) { return { ok : false, error : { code : 'NESTED_MACRO', message : 'A macro is already running. Nested macros are not supported.' }, completed : [] }; }
         const completed = []; const results = Object.create (null); const token = { cancelled : false }; this.running = token;
@@ -96,11 +96,12 @@ export class CommandRegistry
                 const hasReference = JSON.stringify (step.arguments || {}).includes ('"$ref"');
                 if (!hasReference) { Validate (step.arguments || {}, this.commands.get (step.command).inputSchema); }
             }
+            if (observer?.start) { await observer.start (); }
             for (const step of macro.steps) {
                 if (token.cancelled) { return { ok : false, cancelled : true, completed }; }
                 try {
                     const result = await this.Invoke (step.command, Resolve (step.arguments || {}, results));
-                    results[step.id] = result; completed.push ({ id : step.id, command : step.command, result });
+                    results[step.id] = result; completed.push ({ id : step.id, command : step.command, result }); if (observer?.step) { await observer.step (step, result, completed.length); }
                 } catch (error) { this.context?.website?.errorLogs?.Record ('error', 'macro', step.command + ': ' + error.message); return { ok : false, failedStep : step.id, error : { code : 'STEP_FAILED', message : error.message }, completed }; }
             }
             return { ok : true, completed };
