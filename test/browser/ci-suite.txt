@@ -82,6 +82,8 @@ workspace-commands
 workspace-editing
 workspace-optimization
 packaging-auto-pack
+packaging-auto-styles
+animation-video
 packaging-auto-pallet
 cad-conversion
 ai-image-dropzone

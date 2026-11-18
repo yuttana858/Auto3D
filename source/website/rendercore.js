@@ -29,6 +29,18 @@ export function RenderCamera (state, width, height, near, far)
     camera.position.fromArray (state.eye); camera.up.fromArray (state.up); camera.lookAt (new THREE.Vector3 (...state.center)); camera.updateMatrixWorld (true); return camera;
 }
 
+// Keep models/lights; never export editor selection, gizmos, axes or helpers. Returns [child, visible] pairs to restore.
+// Shared by image renders and video export.
+export function HideRenderHelpers (viewer, alpha = false)
+{
+    const root = viewer.mainModel?.mainModel?.GetRootObject?.(); const hidden = [];
+    for (const child of viewer.scene.children) {
+        if (child === root || child.isLight || child.isCamera || child === viewer.shadingModel.directionalLight.target) { continue; }
+        if (alpha || child.userData?.auto3dSceneEffect !== true && child !== viewer.defaultDome && child !== viewer.groundGrid) { hidden.push ([child, child.visible]); child.visible = false; }
+    }
+    return hidden;
+}
+
 export async function RenderPNG (website, job, { cancelled = () => false, progress = () => {}, preview = () => {}, background : interactive = false, tileSize = 1024 } = {})
 {
     const viewer = website.viewer; const renderer = viewer.renderer; const scene = viewer.scene;
@@ -39,12 +51,7 @@ export async function RenderPNG (website, job, { cancelled = () => false, progre
     const targetBefore = renderer.getRenderTarget (); const viewport = renderer.getViewport (new THREE.Vector4 ()); const scissor = renderer.getScissor (new THREE.Vector4 ()); const scissorTest = renderer.getScissorTest ();
     const clearColor = renderer.getClearColor (new THREE.Color ()).clone (); const clearAlpha = renderer.getClearAlpha (); const autoClear = renderer.autoClear;
     const background = scene.background; const shadowUpdate = renderer.shadowMap.autoUpdate; const lightPosition = viewer.shadingModel.directionalLight.position.clone ();
-    const root = viewer.mainModel?.mainModel?.GetRootObject?.(); const hidden = [];
-    // Keep models/lights; never export editor selection, gizmos, axes or helpers.
-    for (const child of scene.children) {
-        if (child === root || child.isLight || child.isCamera || child === viewer.shadingModel.directionalLight.target) { continue; }
-        if (job.alpha || child.userData?.auto3dSceneEffect !== true && child !== viewer.defaultDome && child !== viewer.groundGrid) { hidden.push ([child, child.visible]); child.visible = false; }
-    }
+    const hidden = HideRenderHelpers (viewer, job.alpha);
     const domePosition = viewer.defaultDome?.position.clone (); const domeScale = viewer.defaultDome?.scale.clone ();
     let target;
     try {

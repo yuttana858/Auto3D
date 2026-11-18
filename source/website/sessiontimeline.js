@@ -146,6 +146,8 @@ export class SessionTimeline
         this.frame = null;
         this.onTime = null;
         this.onPlaybackChanged = null;
+        // Additional views (the Animation panel) follow the playhead without replacing the Advance panel callbacks.
+        this.listeners = new Set ();
     }
 
     Load (data)
@@ -298,7 +300,9 @@ export class SessionTimeline
         };
     }
 
-    Seek (time, render = true)
+    // framing: apply automatic fold camera framing (playback does; manual scrubbing does not). Video export steps the
+    // timeline forward frame by frame with framing on and render off, so frames match what playback shows.
+    Seek (time, render = true, framing = render && this.playing)
     {
         this.time = Clamp (Number.isFinite (time) ? time : 0, 0, this.duration);
         for (const object of this.editor.document.objects) {
@@ -319,15 +323,17 @@ export class SessionTimeline
         // fold framing runs only during playback; explicit camera keyframes
         // above remain authoritative for authored camera animation.
         if (!this.playing) { this.editor.website.viewer?.navigation?.StopCameraMovement?.(); }
-        this.editor.packaging?.presentation?.Apply (this.time, render && this.playing);
+        this.editor.packaging?.presentation?.Apply (this.time, framing);
         if (render) {
             this.editor.UpdateSelectionBox ();
             this.editor.SyncInputs ();
             if (!this.playing) { this.editor.website.viewer.UpdateGroundGrid (); this.editor.website.sceneEffects?.Refresh (); }
             this.editor.website.viewer.Render ();
         }
-        this.onTime?.(this.time);
+        this.onTime?.(this.time); this.listeners.forEach (listener => listener ('time', this.time));
     }
+
+    Subscribe (listener) { this.listeners.add (listener); return () => this.listeners.delete (listener); }
 
     SetDuration (duration)
     {
@@ -345,7 +351,7 @@ export class SessionTimeline
         if (this.time < this.rangeStart || this.time >= this.rangeEnd) { this.Seek (this.rangeStart); }
         this.playing = true;
         this.previous = performance.now ();
-        this.onPlaybackChanged?.(true);
+        this.onPlaybackChanged?.(true); this.listeners.forEach (listener => listener ('playing', true));
         const tick = (now) => {
             this.frame = null;
             if (!this.playing) { return; }
@@ -367,7 +373,7 @@ export class SessionTimeline
         this.frame = null;
         const changed = this.playing;
         this.playing = false;
-        if (changed) { this.onPlaybackChanged?.(false); }
+        if (changed) { this.onPlaybackChanged?.(false); this.listeners.forEach (listener => listener ('playing', false)); }
     }
 
     Reset ()

@@ -12,11 +12,14 @@ export class AutoPackPanel
         this.host = host; this.pending = false;
         this.root = Element ('section', parent, undefined, 'packaging_auto_pack'); this.root.setAttribute ('aria-label', 'Auto Pack');
         Element ('h3', this.root, 'Auto Pack');
-        Element ('p', this.root, 'Fit an RSC around the selected product.', 'section_hint');
+        Element ('p', this.root, 'Fit a box from the Packaging generator around the selected product.', 'section_hint');
+        // Styles are the Packaging generator's catalog, so new generator styles appear here automatically.
+        const style = Element ('div', this.root, undefined, 'packaging_accessory_options');
+        this.style = this.Select (style, 'Box style', false); this.style.addEventListener ('change', () => { try { this.host.autoStyle?.(this.style.value); } catch (error) { this.status.textContent = error.message; } this.Refresh (); });
         this.objectName = Element ('strong', this.root);
         this.product = this.Size ('Selected object · bounding box');
-        this.inside = this.Size ('RSC inside size');
-        this.score = this.Size ('RSC score size');
+        this.inside = this.Size ('Inside size');
+        this.score = this.Size ('Score size');
         this.board = Element ('p', this.root, '', 'section_hint');
         Element ('p', this.root, 'Clearance: 0.001″ (0.0254 mm) on each face. The inside size adds clearance on both sides of each dimension and one board thickness along the longer side for the internal glue tab. It is generated like Generate with the inside basis: the selected board record and its allowance factors convert the inside size to score dimensions, and the carton keeps that CAD measurement layer.', 'section_hint');
         Element ('p', this.root, 'The blank starts below the product. A bottom flap stays underneath as the carton folds around it.', 'section_hint');
@@ -29,7 +32,11 @@ export class AutoPackPanel
         const board = Element ('div', contents, undefined, 'packaging_accessory_options');
         this.contentsBoard = this.Select (board, 'Contents flute'); this.contentsGrade = this.Select (board, 'Contents grade');
         this.contents = Element ('p', contents, '', 'section_hint'); this.contents.setAttribute ('aria-live', 'polite');
-        this.refresh = Element ('button', this.root, 'Refresh bounds'); this.refresh.type = 'button'; this.refresh.addEventListener ('click', () => { this.status.textContent = ''; this.Refresh (); });
+        // A scene with no units (STL, OBJ, many older or CAD exports) cannot be measured in mm; Refresh bounds assigns the
+        // chosen model units to it (one Undo step) and re-measures.
+        this.unitsRow = Element ('div', this.root, undefined, 'packaging_accessory_options'); this.units = this.Select (this.unitsRow, 'Model units');
+        this.Fill (this.units, [['mm', 'Millimetres (mm)'], ['cm', 'Centimetres (cm)'], ['m', 'Metres (m)'], ['in', 'Inches (in)'], ['ft', 'Feet (ft)']].map (([value, label]) => ({ value, label })), 'mm');
+        this.refresh = Element ('button', this.root, 'Refresh bounds'); this.refresh.type = 'button'; this.refresh.addEventListener ('click', () => this.RefreshBounds ());
         this.create = Element ('button', this.root, 'Auto Pack', 'packaging_auto_create'); this.create.type = 'button'; this.create.addEventListener ('click', () => this.Create ());
         this.playback = Element ('section', this.root, undefined, 'packaging_auto_playback'); this.playback.setAttribute ('aria-label', 'Auto Pack folding');
         this.playbackStatus = Element ('p', this.playback, '', 'section_hint'); this.playbackStatus.setAttribute ('role', 'status');
@@ -38,6 +45,8 @@ export class AutoPackPanel
         this.pause = Element ('button', buttons, 'Pause folding'); this.pause.type = 'button'; this.pause.addEventListener ('click', () => this.Control (this.host.playback?.().state === 'paused' ? 'resume' : 'pause'));
         this.cancel = Element ('button', buttons, 'Cancel folding'); this.cancel.type = 'button'; this.cancel.addEventListener ('click', () => this.Control ('cancel'));
         this.fold = Element ('button', this.root, 'Fold carton'); this.fold.type = 'button'; this.fold.addEventListener ('click', () => this.ToggleFold ());
+        // Open top: the packed carton's top flaps swing 120° open (and back), for loading or showing the product.
+        this.top = Element ('button', this.root, 'Open top'); this.top.type = 'button'; this.top.hidden = true; this.top.addEventListener ('click', () => this.ToggleTop ());
         this.reason = Element ('p', this.root, '', 'section_hint');
         this.status = Element ('p', this.root, '', 'section_hint'); this.status.setAttribute ('role', 'status'); this.status.setAttribute ('aria-live', 'polite');
         this.Refresh ();
@@ -48,9 +57,9 @@ export class AutoPackPanel
         const label = Element ('label', parent, undefined, 'packaging_accessory_check'); const input = Element ('input', label); input.type = 'checkbox'; input.setAttribute ('aria-label', title);
         label.appendChild (document.createTextNode (' ' + title)); input.addEventListener ('change', () => this.Refresh ()); return input;
     }
-    Select (parent, title)
+    Select (parent, title, refresh = true)
     {
-        const label = Element ('label', parent, title); const select = Element ('select', label); select.setAttribute ('aria-label', title); select.addEventListener ('change', () => this.Refresh ()); return select;
+        const label = Element ('label', parent, title); const select = Element ('select', label); select.setAttribute ('aria-label', title); if (refresh) { select.addEventListener ('change', () => this.Refresh ()); } return select;
     }
     Fill (select, items, fallback)
     {
@@ -82,6 +91,10 @@ export class AutoPackPanel
         try { data = this.host.autoInspect?.(this.ContentOptions ()) || { available : false, reason : 'Select a product in Auto3D to use Auto Pack.' }; }
         catch (error) { data = { available : false, reason : error.message }; }
         this.state = data; const factor = this.host.factor (), unit = Math.abs (factor - 25.4) < 1e-9 ? 'in' : 'mm';
+        const styles = this.host.autoStyles?.() || [];
+        this.Fill (this.style, styles.map (s => ({ value : s.code, label : s.code + ' · ' + s.acronym + ' · ' + s.name })), styles.find (s => s.selected)?.code || '0201');
+        if (styles.length) { this.style.value = styles.find (s => s.selected)?.code || this.style.value; }
+        this.unitsRow.hidden = !data.unitsUnknown; this.refresh.textContent = data.unitsUnknown ? 'Assign units and refresh bounds' : 'Refresh bounds';
         this.objectName.textContent = data.objectName || 'No product selected';
         for (const [row, size] of [[this.product, data.productMm], [this.inside, data.insideMm], [this.score, data.scoreMm]]) {
             for (const [key, field] of row.fields) { field.textContent = Number.isFinite (size?.[key]) ? Number ((size[key] / factor).toFixed (6)) + ' ' + unit : '—'; }
@@ -108,6 +121,14 @@ export class AutoPackPanel
         const canFold = Boolean (this.host.canAnimate?.() && this.host.toggleFold); this.fold.hidden = !canFold;
         this.fold.textContent = this.host.animation?.()?.action === 'unfold' ? 'Unfold carton' : 'Fold carton';
         this.fold.disabled = this.pending || this.host.blocked () || !canFold;
+        const top = this.host.autoTop?.() || null; this.top.hidden = !top || !this.host.toggleTop;
+        this.top.textContent = top?.open ? 'Close top' : 'Open top'; this.top.disabled = this.pending || this.host.blocked () || !top;
+    }
+    async ToggleTop ()
+    {
+        if (this.pending || this.top.disabled) { return; }
+        this.pending = true; this.RefreshPlayback ();
+        try { await this.host.toggleTop (); } catch (error) { this.status.textContent = error.message; } finally { this.pending = false; this.RefreshPlayback (); }
     }
     async ToggleFold ()
     {
@@ -118,6 +139,16 @@ export class AutoPackPanel
     async Control (action)
     {
         try { await this.host.control (action); } catch (error) { this.status.textContent = error.message; } finally { this.RefreshPlayback (); }
+    }
+    async RefreshBounds ()
+    {
+        if (this.pending) { return; }
+        this.status.textContent = '';
+        if (!this.host.autoRefresh) { this.Refresh (); return; }
+        this.pending = true;
+        try { const result = await this.host.autoRefresh (this.state?.unitsUnknown ? { units : this.units.value } : {}); this.status.textContent = result?.message || ''; }
+        catch (error) { this.status.textContent = error.message; }
+        finally { this.pending = false; this.Refresh (); }
     }
     async Create ()
     {

@@ -46,20 +46,32 @@ export function GuardAutoPackGeometryEdit (object)
 // CAD profile's measurement layer; earlier cartons keep their saved score fit.
 export function AutoPackPlanInput (data, parameters, profile)
 {
-    if (data.basis !== 'engineering-inside') { return { size : data.size, thickness : parameters.thickness, clearanceMm : data.clearanceMm }; }
+    // The style is the saved generator code (cartons before 0.84.0 are all 0201 RSCs).
+    const code = parameters.code || '0201';
+    if (data.basis !== 'engineering-inside') { return { size : data.size, thickness : parameters.thickness, clearanceMm : data.clearanceMm, code }; }
     if (!profile?.engineering) { throw new Error ('The Auto Pack carton lost its board record. Generate Auto Pack again.'); }
-    return { size : data.size, clearanceMm : data.clearanceMm, material : EngineeringMeasurements (profile).material };
+    return { size : data.size, clearanceMm : data.clearanceMm, material : EngineeringMeasurements (profile).material, code };
 }
 export function PackagingFoldRig (module, object, parameters, profile)
 {
     const data = AutoPackDefinition (object); if (!data) { return module.CreateFefcoFoldRig (parameters, profile); }
     const input = AutoPackPlanInput (data, parameters, profile), plan = module.CreateAutoPackPlan (input);
     if (Object.keys (plan.parameters).some (key => key !== 'closure' && parameters[key] !== plan.parameters[key])) { throw new Error ('The Auto Pack carton dimensions changed. Generate Auto Pack again.'); }
-    const rig = module.CreateAutoPackRig (input, profile); rig.hostAutoPack = true; return rig;
+    const rig = module.CreateAutoPackRig (input, profile); rig.hostAutoPack = true;
+    // A packed carton saved with closure 'open' has its top flaps standing open (Open top); a flat carton never does.
+    rig.autoPackOpenTop = object.userData?._auto3dPackagingState !== 'flat' && parameters.closure === 'open'; return rig;
 }
-export const PackagingFoldPose = (module, rig, progress) => rig.hostAutoPack ? module.AutoPackFoldPose (rig, progress) : module.FefcoFoldPose (rig, progress);
-export const InspectPackagingFold = (module, rig, progress) => rig.hostAutoPack ? module.InspectAutoPackFold (rig, progress) : module.InspectFefcoFold (rig, progress);
+// rig.topRoute: the playback progress drives only the top flaps of a packed carton (Open top / Close top).
+export const PackagingFoldPose = (module, rig, progress) => rig.hostAutoPack ? (rig.topRoute ? module.AutoPackFoldPose (rig, 1, progress) : module.AutoPackFoldPose (rig, progress)) : module.FefcoFoldPose (rig, progress);
+export const InspectPackagingFold = (module, rig, progress) => rig.hostAutoPack ? module.InspectAutoPackFold (rig, progress, rig.topRoute ? 'top' : 'fold') : module.InspectFefcoFold (rig, progress);
 export function PackagingFoldFrame (module, rig, parameters, profile, flat)
 {
-    return rig.hostAutoPack ? { ...module.AutoPackFoldFrame (rig, flat ? 0 : 1), parameters } : flat ? module.UnfoldFefco (parameters, profile) : module.CreateFefcoBox (parameters, profile);
+    return rig.hostAutoPack ? { ...module.AutoPackFoldFrame (rig, flat ? 0 : 1, !flat && parameters.closure === 'open' ? 1 : 0), parameters } : flat ? module.UnfoldFefco (parameters, profile) : module.CreateFefcoBox (parameters, profile);
+}
+// Open top is offered for a packed Auto Pack carton whose style has top flaps.
+export function AutoPackTopState (object)
+{
+    if (!AutoPackDefinition (object) || object.userData?._auto3dPackagingState === 'flat') { return null; }
+    let parameters; try { parameters = JSON.parse (object.userData._auto3dFefco); } catch { return null; }
+    return parameters.code === '0200' ? null : { open : parameters.closure === 'open' };
 }

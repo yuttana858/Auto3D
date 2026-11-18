@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { CreateAutoPackPlan, CreateAutoPackRig, AutoPackFoldPose, AutoPackFrame, InspectAutoPackFold, AutoPackFoldContacts, DisplayClearance, FefcoFoldPose } from '../src/index.js';
+import { CreateAutoPackPlan, CreateAutoPackRig, AutoPackFoldPose, AutoPackFrame, InspectAutoPackFold, AutoPackFoldContacts, DisplayClearance, FefcoFoldPose, AutoPackStyles, FefcoStyles, CreateFefcoFoldRig } from '../src/index.js';
 
 const near = (a, b) => assert.ok (Math.abs (a - b) < 1e-8, `${a} != ${b}`);
 const bounds = (rig, pose, kind, index) => {
@@ -86,15 +86,59 @@ describe ('Auto Pack stationary-product RSC', () => {
             const report = await InspectAutoPackFold (CreateAutoPackRig ({ size, thickness })); assert.equal (report.clear, true, JSON.stringify ({ size, report })); assert.equal (report.samples, 3601);
         }
     });
-    it ('renders the same audited panel vertices without cosmetic bow intruding into the small clearance', () => {
-        const rig = CreateAutoPackRig ({ size : [80, 150, 100], thickness : 3 });
+    it ('presents the Packaging generator carton (board appearance and rounded crease joins) while auditing exact panels', () => {
+        const rig = CreateAutoPackRig ({ size : [80, 150, 100], clearanceMm : .0254, material : { caliperMm : 3, insideFactors : [1, 1, 2], calibrated : false } }), generator = CreateFefcoFoldRig (rig.parameters, rig.profile);
+        assert.notEqual (rig.autoPackPresentation, 'exact panels');
+        // Cheap structural fingerprint (vertex count and coordinate sum) instead of deep-comparing large arrays.
+        const print = meshes => meshes.map (m => m.vertices.length + ':' + m.vertices.flat ().reduce ((s, v) => s + v, 0).toFixed (6)).join ('|');
+        assert.equal (print (rig.presentationMeshes), print (generator.presentationMeshes), 'same presentation meshes as Generate');
+        assert.notEqual (print (rig.presentationMeshes), print (rig.meshes), 'not the raw audited prisms');
         for (const p of [0, .1, .3, .5, .7, .9, 1]) {
-            const frame = AutoPackFrame (rig, p); assert.deepEqual (frame.visualMeshes, []);
-            frame.meshes.forEach ((mesh, i) => assert.deepEqual (frame.presentationMeshes[i].vertices, mesh.vertices));
-            assert.ok (frame.meshes.every (m => m.vertices.flat ().every (Number.isFinite)));
+            const frame = AutoPackFrame (rig, p); assert.ok (frame.visualMeshes.length > 0, 'crease joins at ' + p);
+            assert.ok (frame.meshes.every (m => m.vertices.flat ().every (Number.isFinite)) && frame.visualMeshes.every (m => m.vertices.flat ().every (Number.isFinite)));
         }
         const pose = AutoPackFoldPose (rig, 1); pose.matrices = pose.matrices.map (m => new THREE.Matrix4 ().makeTranslation (0, 1, 0).multiply (new THREE.Matrix4 ().fromArray (m)).toArray ());
         assert.equal (AutoPackFoldContacts (rig, pose).clear, false);
+    });
+    it ('fits every Packaging generator style around the product with a clear product audit', async function () {
+        this.timeout (120000);
+        assert.deepEqual (AutoPackStyles ().map (s => s.code), FefcoStyles.map (s => s.code));
+        for (const { code } of AutoPackStyles ()) {
+            const plan = CreateAutoPackPlan ({ size : [140, 90, 100], thickness : 3, code }), rig = CreateAutoPackRig ({ size : [140, 90, 100], clearanceMm : .0254, material : { caliperMm : 3, insideFactors : [1, 1, 2], calibrated : false }, code });
+            assert.notEqual (rig.autoPackPresentation, 'exact panels', code + ' uses the generator presentation'); assert.equal (rig.autoPackDisplayCheck.clear, true);
+            assert.equal (plan.parameters.code, code); assert.equal (rig.parameters.code, code);
+            assert.equal (plan.flapStack.top, code === '0200' ? 0 : plan.flapStack.base);
+            const report = await InspectAutoPackFold (rig); assert.equal (report.clear, true, code + ' ' + JSON.stringify (report).slice (0, 300)); assert.equal (report.code, code);
+            const frame = AutoPackFrame (rig, 1); assert.equal (frame.parameters.code, code); assert.ok (frame.visualMeshes.length > 0);
+        }
+        assert.throws (() => CreateAutoPackPlan ({ size : [140, 90, 100], thickness : 3, code : '0999' }), /catalog/);
+        const rsc = CreateAutoPackPlan ({ size : [140, 90, 100], thickness : 3 }), hsc = CreateAutoPackPlan ({ size : [140, 90, 100], thickness : 3, code : '0200' });
+        assert.ok (Math.abs (rsc.parameters.height - hsc.parameters.height - 2 * 3) < 1e-9, 'an HSC reserves no top flap stack');
+    });
+    it ('opens the top flaps 120 degrees on a clear route, and folds and unfolds an open-top carton', async function () {
+        this.timeout (240000);
+        const normal = (matrix) => new THREE.Vector3 (0, 0, 1).applyMatrix3 (new THREE.Matrix3 ().setFromMatrix4 (new THREE.Matrix4 ().fromArray (matrix))).normalize ();
+        for (const code of ['0201', '0202', '0203']) {
+            const rig = CreateAutoPackRig ({ size : [140, 90, 100], thickness : 3, code }), tops = rig.panels.map ((p, i) => [p, i]).filter (([p]) => p.kind === 'top');
+            assert.equal (tops.length, 4);
+            const top = await InspectAutoPackFold (rig, null, 'top'); assert.equal (top.clear, true, code + ' top route ' + JSON.stringify (top).slice (0, 300));
+            const closed = AutoPackFoldPose (rig, 1, 0), open = AutoPackFoldPose (rig, 1, 1); assert.equal (open.stage, 'open top'); assert.equal (closed.stage, 'packed');
+            const walls = new THREE.Box3 (); rig.panels.forEach ((p, i) => { if (p.kind === 'wall') { walls.union (bounds (rig, closed, 'wall', p.index)); } });
+            for (const [panel, i] of tops) {
+                near (normal (closed.matrices[i]).angleTo (normal (open.matrices[i])) * 180 / Math.PI, 120);
+                const flap = bounds (rig, open, 'top', panel.index);
+                assert.ok (flap.max.y > walls.max.y + 10, code + ' ' + panel.name + ' stands above the walls');
+                assert.ok (flap.min.x < walls.min.x - 1 || flap.max.x > walls.max.x + 1 || flap.min.z < walls.min.z - 1 || flap.max.z > walls.max.z + 1, code + ' ' + panel.name + ' leans outward');
+            }
+            const frame = AutoPackFrame (rig, 1, 1); assert.equal (frame.parameters.closure, 'open'); assert.equal (AutoPackFrame (rig, 1, 0).parameters.closure, 'closed');
+            // A saved open-top carton unfolds and folds along the open route: clear, open at 1 and flat at 0.
+            rig.autoPackOpenTop = true;
+            const route = await InspectAutoPackFold (rig); assert.equal (route.clear, true, code + ' open route ' + JSON.stringify (route).slice (0, 300));
+            assert.deepEqual (AutoPackFoldPose (rig, 1).matrices, open.matrices);
+            rig.autoPackOpenTop = false; const flat = AutoPackFoldPose (rig, 0).matrices; rig.autoPackOpenTop = true; assert.deepEqual (AutoPackFoldPose (rig, 0).matrices, flat);
+        }
+        const hsc = CreateAutoPackRig ({ size : [140, 90, 100], thickness : 3, code : '0200' }); assert.equal (AutoPackFoldPose (hsc, 1, 1).stage, 'packed');
+        assert.throws (() => AutoPackFoldPose (hsc, 1, 2), /Open top/);
     });
     it ('rejects invalid sizes, unsupported tiny/high-caliper boxes and edited dielines before mutation', () => {
         for (const size of [[], [1, 2], [10, 0, 20], [NaN, 20, 20], [20, Infinity, 20]]) { assert.throws (() => CreateAutoPackPlan ({ size })); }

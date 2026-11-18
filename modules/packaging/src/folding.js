@@ -52,11 +52,25 @@ export function CreateFefcoFoldRig (input, savedProfile = null)
     rig.visualMeshes = CreaseVisualMeshes (rig, { matrices : panels.map (() => new THREE.Matrix4 ().toArray ()) }); return rig;
 }
 
+// Flap stacking for a slotted style, shared by the generator fold and Auto Pack: inner (minor) flaps overlap when twice
+// their depth exceeds the length; outer flaps add one layer, or two when they overlap each other (0202/0203). The stack
+// is the same at the base and, when the style has top flaps, at the top.
+export function FefcoFlapLayers (parameters)
+{
+    const p = ValidateFefco (parameters), innerLayers = FlapDepth (p) * 2 > p.length ? 2 : 1, layers = innerLayers + (p.code === '0202' || p.code === '0203' ? 2 : 1);
+    return { innerLayers, layers, baseLayers : layers, topLayers : p.code === '0200' ? 0 : layers };
+}
+// Destination layer of a base or top flap within the stack (0 = against the contents).
+export function FefcoFlapLayer (panel, flapLayers)
+{
+    const minor = panel.index % 2 === 1; return minor ? (panel.index === 1 ? 0 : flapLayers.innerLayers - 1) : (panel.index === 0 ? flapLayers.innerLayers : flapLayers.layers - 1);
+}
+
 function FoldPose (rig, progress)
 {
     if (!Number.isFinite (progress) || progress < 0 || progress > 1) { throw new Error ('Fold progress must be between 0 and 1.'); }
-    const { length : l, width : w, height : h, thickness : t, code } = rig.parameters; const depth = FlapDepth (rig.parameters);
-    const innerLayers = depth * 2 > l ? 2 : 1; const layers = innerLayers + (code === '0202' || code === '0203' ? 2 : 1);
+    const { width : w, height : h, thickness : t, code } = rig.parameters; const flapLayers = FefcoFlapLayers (rig.parameters);
+    const { innerLayers, layers } = flapLayers; const l = rig.parameters.length;
     const raise = phase (progress, 0.02, 0.22);
     const root = translate ((-w / 2 - t) * raise, layers * t * raise, l / 2 * raise).multiply (new THREE.Matrix4 ().makeRotationY (Math.PI / 2 * raise)).multiply (new THREE.Matrix4 ().makeRotationX (Math.PI / 2 * raise));
     const walls = [root];
@@ -68,7 +82,7 @@ function FoldPose (rig, progress)
         // Reserve one caliper for the seam before wrapping the sleeve. This
         // score clearance approximates compression at the glue-tab crease.
         if (panel.kind === 'joint') { return hinge (root.clone ().multiply (translate (0, t * phase (progress, 0.02, 0.06), 0)), [0, 0, 0], new THREE.Matrix4 ().makeRotationZ (-Math.PI / 2 * phase (progress, 0.06, 0.16))).toArray (); }
-        const minor = panel.index % 2 === 1; const layer = minor ? (panel.index === 1 ? 0 : innerLayers - 1) : (panel.index === 0 ? innerLayers : layers - 1);
+        const layer = FefcoFlapLayer (panel, flapLayers);
         // Inner pair first, then outer pair. Lift to the destination stack BEFORE
         // turning so overlapping OSC/FOL flaps cannot sweep through a closed flap.
         const top = panel.kind === 'top'; const order = [1, 3, 0, 2].indexOf (panel.index); const span = top ? 0.06 : 0.05; const start = (top ? 0.76 : 0.48) + order * span;

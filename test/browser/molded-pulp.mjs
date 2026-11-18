@@ -19,11 +19,12 @@ try {
         catch { return route.fulfill ({ status : 404, body : 'Missing fixture asset' }); }
     });
     await page.goto ('https://auto3d.test/'); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
-    const call = async (id, args = {}) => { const response = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (response.ok, true, id + ': ' + JSON.stringify (response)); return response.result; };
+    // Forming refines the tray to the requested detail in place after it appears, so retry while the viewer is busy.
+    const call = async (id, args = {}) => { let response; for (let i = 0; i < 300; i++) { response = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); if (response.ok || !/busy/.test (response.error?.message || '')) { break; } await page.waitForTimeout (100); } assert.equal (response.ok, true, id + ': ' + JSON.stringify (response)); return response.result; };
     // Poll a command result from Node: waitForFunction would treat the returned Promise itself as truthy.
     const until = async (id, test, timeout = 60000) => { const end = Date.now () + timeout; for (;;) { const r = await page.evaluate (id => Auto3D.execute (id), id); if (r?.ok && test (r.result)) { return r.result; } if (Date.now () > end) { throw new Error ('Timed out waiting on ' + id + ': ' + JSON.stringify ({ stage : r?.result?.stage, result : r?.result?.result, generating : r?.result?.generating, reason : r?.result?.unavailableReason, ok : r?.ok, error : r?.error }).slice (0, 900) + ' status=' + await page.locator ('.mp_status').textContent ()); } await page.waitForTimeout (150); } };
     const group = page.getByRole ('group', { name : 'Generation modules', exact : true });
-    assert.deepEqual (await group.getByRole ('button').evaluateAll (nodes => nodes.map (node => node.getAttribute ('aria-label'))), ['AI Generative', 'Packaging design', 'Primary Products', 'Molded Pulp']);
+    assert.deepEqual (await group.getByRole ('button').evaluateAll (nodes => nodes.map (node => node.getAttribute ('aria-label'))), ['AI Generative', 'Packaging design', 'Primary Products', 'Molded Pulp', 'Animation and video']);
     assert.equal (requests.some (url => url.includes ('molded-pulp.module')), false, 'the module loads on demand');
 
     await call ('primary.configure', { family : 'can' }); const can = await call ('primary.generate');
@@ -89,7 +90,9 @@ try {
     const idle = await page.evaluate (() => new Promise (resolve => { let count = 0; const end = performance.now () + 1000; const tick = () => { count++; if (performance.now () < end) { requestAnimationFrame (tick); } else { resolve (count); } }; requestAnimationFrame (tick); }));
     console.log ('Frames per second while refining: ' + await frames + ', idle: ' + idle + ' (software GPU)');
     console.log ('Longest main-thread task during the fine tray: ' + Math.round (await page.evaluate (() => window.__longest)) + ' ms');
-    assert.ok (await frames >= Math.max (2, idle * 0.5), 'the viewer keeps rendering while the fine tray refines: ' + await frames + ' vs ' + idle + ' idle frames per second');
+    // Guards against a frozen main thread (about 0–2 fps), not a fixed share: the worker and the software GPU share the
+    // CI CPU, so a responsive viewer measures about half its idle rate there.
+    assert.ok (await frames >= Math.max (2, idle * 0.35), 'the viewer keeps rendering while the fine tray refines: ' + await frames + ' vs ' + idle + ' idle frames per second');
     assert.equal (fine.result.metrics.pocketCount, 6); assert.equal (fine.result.metrics.lugCount, 4); assert.ok (fine.result.metrics.cellMm <= 0.5);
     assert.ok (fine.result.trace.some (t => t.rule === 'RIB-BETWEEN') && fine.result.trace.every (t => /MP knowledge base/.test (t.basis)));
     await panel.locator ('.mp_why summary').click (); assert.ok (await panel.locator ('.mp_trace_item').count () >= 8);

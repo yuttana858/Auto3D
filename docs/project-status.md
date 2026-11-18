@@ -1,5 +1,26 @@
 # Auto3D development log and handoff
 
+## Animation panel and video export — Auto3D 0.86.0 (2026-11-18)
+
+Packaging 1.15.0 / Primary Products 0.15.0 / Molded Pulp 0.2.0 are preserved. Stacked on 0.85.0. Not deployed.
+
+- **Animation panel.** A new module panel with playback, sequence settings and keyframes.
+- **Video export.** Frame-accurate export of the timeline range to MP4 (H.264), or WebM when H.264 isn't available, using WebCodecs. It offers Viewport, 720p, 1080p and 4K sizes and 24–60 fps.
+- **Commands.** `animation.video.export`, `animation.video.inspect`, `animation.video.cancel` and `animation.video.download`.
+
+See docs/release-0860.md.
+
+## Auto Pack generator styles, Open top, Refresh bounds units — Auto3D 0.85.0 / Packaging 1.15.0 (2026-11-18)
+
+Primary Products 0.15.0 / Molded Pulp 0.2.0 are preserved. Based on main after #148 (0.84.1). Not deployed.
+
+- **Styles.** Auto Pack fits every Packaging generator style (0200, 0201, 0202, 0203, and any style added later) on the shared flap layering, with the 0.84.1 presentation.
+- **Open top.** Swings a packed carton's top flaps 120° open on an audited route.
+- **Refresh bounds.** Assigns units to unitless models in one Undo step.
+- **Commands.** `packaging.auto.styles`, `packaging.auto.style`, `packaging.auto.refresh_bounds` and `packaging.auto.top`.
+
+See docs/release-0850.md.
+
 ## Auto Pack edges match generated RSC boxes — Auto3D 0.84.1 / Packaging 1.14.1 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-18)
 
 Based on main after #147 (0.84.0). Not deployed.
