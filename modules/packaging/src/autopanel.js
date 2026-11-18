@@ -45,6 +45,8 @@ export class AutoPackPanel
         this.pause = Element ('button', buttons, 'Pause folding'); this.pause.type = 'button'; this.pause.addEventListener ('click', () => this.Control (this.host.playback?.().state === 'paused' ? 'resume' : 'pause'));
         this.cancel = Element ('button', buttons, 'Cancel folding'); this.cancel.type = 'button'; this.cancel.addEventListener ('click', () => this.Control ('cancel'));
         this.fold = Element ('button', this.root, 'Fold carton'); this.fold.type = 'button'; this.fold.addEventListener ('click', () => this.ToggleFold ());
+        // Open top: the packed carton's top flaps swing 120° open (and back), for loading or showing the product.
+        this.top = Element ('button', this.root, 'Open top'); this.top.type = 'button'; this.top.hidden = true; this.top.addEventListener ('click', () => this.ToggleTop ());
         this.reason = Element ('p', this.root, '', 'section_hint');
         this.status = Element ('p', this.root, '', 'section_hint'); this.status.setAttribute ('role', 'status'); this.status.setAttribute ('aria-live', 'polite');
         this.Refresh ();
@@ -119,6 +121,14 @@ export class AutoPackPanel
         const canFold = Boolean (this.host.canAnimate?.() && this.host.toggleFold); this.fold.hidden = !canFold;
         this.fold.textContent = this.host.animation?.()?.action === 'unfold' ? 'Unfold carton' : 'Fold carton';
         this.fold.disabled = this.pending || this.host.blocked () || !canFold;
+        const top = this.host.autoTop?.() || null; this.top.hidden = !top || !this.host.toggleTop;
+        this.top.textContent = top?.open ? 'Close top' : 'Open top'; this.top.disabled = this.pending || this.host.blocked () || !top;
+    }
+    async ToggleTop ()
+    {
+        if (this.pending || this.top.disabled) { return; }
+        this.pending = true; this.RefreshPlayback ();
+        try { await this.host.toggleTop (); } catch (error) { this.status.textContent = error.message; } finally { this.pending = false; this.RefreshPlayback (); }
     }
     async ToggleFold ()
     {

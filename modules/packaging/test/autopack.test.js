@@ -89,6 +89,31 @@ describe ('Auto Pack stationary-product RSC', () => {
         const rsc = CreateAutoPackPlan ({ size : [140, 90, 100], thickness : 3 }), hsc = CreateAutoPackPlan ({ size : [140, 90, 100], thickness : 3, code : '0200' });
         assert.ok (Math.abs (rsc.parameters.height - hsc.parameters.height - 2 * 3) < 1e-9, 'an HSC reserves no top flap stack');
     });
+    it ('opens the top flaps 120 degrees on a clear route, and folds and unfolds an open-top carton', async function () {
+        this.timeout (240000);
+        const normal = (matrix) => new THREE.Vector3 (0, 0, 1).applyMatrix3 (new THREE.Matrix3 ().setFromMatrix4 (new THREE.Matrix4 ().fromArray (matrix))).normalize ();
+        for (const code of ['0201', '0202', '0203']) {
+            const rig = CreateAutoPackRig ({ size : [140, 90, 100], thickness : 3, code }), tops = rig.panels.map ((p, i) => [p, i]).filter (([p]) => p.kind === 'top');
+            assert.equal (tops.length, 4);
+            const top = await InspectAutoPackFold (rig, null, 'top'); assert.equal (top.clear, true, code + ' top route ' + JSON.stringify (top).slice (0, 300));
+            const closed = AutoPackFoldPose (rig, 1, 0), open = AutoPackFoldPose (rig, 1, 1); assert.equal (open.stage, 'open top'); assert.equal (closed.stage, 'packed');
+            const walls = new THREE.Box3 (); rig.panels.forEach ((p, i) => { if (p.kind === 'wall') { walls.union (bounds (rig, closed, 'wall', p.index)); } });
+            for (const [panel, i] of tops) {
+                near (normal (closed.matrices[i]).angleTo (normal (open.matrices[i])) * 180 / Math.PI, 120);
+                const flap = bounds (rig, open, 'top', panel.index);
+                assert.ok (flap.max.y > walls.max.y + 10, code + ' ' + panel.name + ' stands above the walls');
+                assert.ok (flap.min.x < walls.min.x - 1 || flap.max.x > walls.max.x + 1 || flap.min.z < walls.min.z - 1 || flap.max.z > walls.max.z + 1, code + ' ' + panel.name + ' leans outward');
+            }
+            const frame = AutoPackFrame (rig, 1, 1); assert.equal (frame.parameters.closure, 'open'); assert.equal (AutoPackFrame (rig, 1, 0).parameters.closure, 'closed');
+            // A saved open-top carton unfolds and folds along the open route: clear, open at 1 and flat at 0.
+            rig.autoPackOpenTop = true;
+            const route = await InspectAutoPackFold (rig); assert.equal (route.clear, true, code + ' open route ' + JSON.stringify (route).slice (0, 300));
+            assert.deepEqual (AutoPackFoldPose (rig, 1).matrices, open.matrices);
+            rig.autoPackOpenTop = false; const flat = AutoPackFoldPose (rig, 0).matrices; rig.autoPackOpenTop = true; assert.deepEqual (AutoPackFoldPose (rig, 0).matrices, flat);
+        }
+        const hsc = CreateAutoPackRig ({ size : [140, 90, 100], thickness : 3, code : '0200' }); assert.equal (AutoPackFoldPose (hsc, 1, 1).stage, 'packed');
+        assert.throws (() => AutoPackFoldPose (hsc, 1, 2), /Open top/);
+    });
     it ('rejects invalid sizes, unsupported tiny/high-caliper boxes and edited dielines before mutation', () => {
         for (const size of [[], [1, 2], [10, 0, 20], [NaN, 20, 20], [20, Infinity, 20]]) { assert.throws (() => CreateAutoPackPlan ({ size })); }
         for (const input of [{ size : [10, 10, 10] }, { size : [20, 20, 20], thickness : 15 }, { size : [20, 20, 20], clearanceMm : 0 }, { size : [20, 20, 20], unexpected : true }]) { assert.throws (() => CreateAutoPackPlan (input)); }
