@@ -24,7 +24,7 @@ try {
     // Poll a command result from Node: waitForFunction would treat the returned Promise itself as truthy.
     const until = async (id, test, timeout = 60000) => { const end = Date.now () + timeout; for (;;) { const r = await page.evaluate (id => Auto3D.execute (id), id); if (r?.ok && test (r.result)) { return r.result; } if (Date.now () > end) { throw new Error ('Timed out waiting on ' + id + ': ' + JSON.stringify ({ stage : r?.result?.stage, result : r?.result?.result, generating : r?.result?.generating, reason : r?.result?.unavailableReason, ok : r?.ok, error : r?.error }).slice (0, 900) + ' status=' + await page.locator ('.mp_status').textContent ()); } await page.waitForTimeout (150); } };
     const group = page.getByRole ('group', { name : 'Generation modules', exact : true });
-    assert.deepEqual (await group.getByRole ('button').evaluateAll (nodes => nodes.map (node => node.getAttribute ('aria-label'))), ['AI Generative', 'Packaging design', 'Primary Products', 'Molded Pulp']);
+    assert.deepEqual (await group.getByRole ('button').evaluateAll (nodes => nodes.map (node => node.getAttribute ('aria-label'))), ['AI Generative', 'Packaging design', 'Primary Products', 'Molded Pulp', 'Animation and video']);
     assert.equal (requests.some (url => url.includes ('molded-pulp.module')), false, 'the module loads on demand');
 
     await call ('primary.configure', { family : 'can' }); const can = await call ('primary.generate');
