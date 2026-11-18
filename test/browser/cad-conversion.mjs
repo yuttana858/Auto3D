@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright-core';
 
 // Public synthetic box generated/reimported by Cloud 3D Studio 0.5.0; no customer CAD.
@@ -14,8 +15,8 @@ try {
     for (const width of [1440, 390]) {
         const page = await browser.newPage ({ viewport : { width, height : 1000 }, reducedMotion : 'reduce', acceptDownloads : true });
         page.setDefaultTimeout (45000);
-        const owner = '00000000-0000-4000-8000-000000000001', jobs = new Map (), errors = []; let uploads = 0, downloaded = 0;
-        page.on ('pageerror', error => errors.push (error.message));
+        const owner = '00000000-0000-4000-8000-000000000001', jobs = new Map (), uploaded = new Set (), errors = []; let uploads = 0, downloaded = 0, saved = 0;
+        page.on ('pageerror', error => errors.push (error.message)); page.on ('download', () => saved++);
         await page.route ('https://auto3d.test/**', async route => {
             const request = route.request (), url = new URL (request.url ()), pathname = url.pathname;
             if (pathname.startsWith ('/api/auth/')) { return route.fulfill ({ json : { user : { id : owner, email : 'synthetic@example.com' } } }); }
@@ -27,14 +28,14 @@ try {
                 if (parts[0] === 'capabilities') { return route.fulfill ({ json : { ready : true, version : '0.4.0', diagnosticProtocol : 1 } }); }
                 if (!parts.length && request.method () === 'GET') { return route.fulfill ({ json : { jobs : [...jobs.values ()] } }); }
                 if (!parts.length) {
-                    const body = request.postDataJSON (); assert.equal (body.sourceUnit, 'mm'); assert.equal (body.extension, 'x_t'); assert.ok (body.origin.windowId && body.origin.tabId);
+                    const body = request.postDataJSON (); assert.ok (['x_t', 'step'].includes (body.extension)); assert.equal (body.sourceUnit, body.extension === 'x_t' ? 'mm' : null); assert.ok (body.origin.windowId && body.origin.tabId);
                     const job = { id : randomUUID (), revision : 1, state : 'awaiting_upload', stage : 'awaiting_upload', source : { name : body.sourceName, bytes : body.sourceBytes, sha256 : body.sourceSha256, extension : body.extension, unit : body.sourceUnit }, origin : body.origin, artifacts : {}, summary : null, createdAt : new Date ().toISOString (), updatedAt : new Date ().toISOString () };
                     jobs.set (job.id, job); return route.fulfill ({ status : 201, json : { job } });
                 }
                 const job = jobs.get (parts[0]); assert.ok (job);
-                if (parts[1] === 'source') { uploads++; assert.equal (createHash ('sha256').update (request.postDataBuffer ()).digest ('hex'), job.source.sha256); return route.fulfill ({ json : { uploaded : true } }); }
+                if (parts[1] === 'source') { uploads++; uploaded.add (job.id); assert.equal (createHash ('sha256').update (request.postDataBuffer ()).digest ('hex'), job.source.sha256); return route.fulfill ({ json : { uploaded : true } }); }
                 if (parts[1] === 'submit') {
-                    assert.equal (uploads, 1); job.state = 'queued'; job.stage = 'queued'; job.revision++;
+                    assert.equal (uploaded.has (job.id), true); job.state = 'queued'; job.stage = 'queued'; job.revision++;
                     Object.assign (job, { state : 'running', stage : 'converting', progress : { phase : 'read_source', completed : null, total : null, unit : null } });
                     return route.fulfill ({ json : { job } });
                 }
@@ -54,15 +55,24 @@ try {
         await page.goto ('https://auto3d.test/website/index.html');
         await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked') && !document.querySelector ('#startup_splash'));
         const call = async (id, args = {}) => { const result = await page.evaluate (({ id, args }) => window.Auto3D.execute (id, args), { id, args }); assert.equal (result.ok, true, JSON.stringify (result)); return result.result; };
+        const waitAutomatic = async predicate => {
+            for (let attempt = 0; attempt < 180; attempt++) {
+                const result = await page.evaluate (() => window.Auto3D.execute ('conversion.inspect'));
+                if (result.ok && predicate (result.result.automatic)) { return; }
+                await delay (250);
+            }
+            assert.fail ('Automatic CAD workflow did not reach the expected state.');
+        };
         await page.locator ('#open_file').setInputFiles ([{ name : 'one.x_t', mimeType : 'application/octet-stream', buffer : Buffer.from ('public-one') }, { name : 'two.step', mimeType : 'application/octet-stream', buffer : Buffer.from ('public-two') }]);
         const dialog = page.getByRole ('dialog', { name : 'Convert CAD', exact : true });
         await dialog.getByText ('Multiple source files were selected. Choose one CAD file below; the other selected models have not been imported or uploaded.', { exact : true }).waitFor ();
         assert.equal ((await call ('conversion.inspect')).stagedFile, null); assert.equal (uploads, 0);
         await dialog.getByText ('CAD service ready · STEP/STL in mm · GLB in meters.', { exact : true }).waitFor ();
-        await dialog.getByLabel ('Source CAD file · up to 50 MiB', { exact : true }).setInputFiles ({ name : 'public-calibration.x_t', mimeType : 'application/octet-stream', buffer : Buffer.from ('public calibration placeholder') });
-        assert.equal (uploads, 0); assert.equal (await dialog.getByRole ('button', { name : 'Convert privately', exact : true }).isDisabled (), true);
+        await dialog.getByRole ('button', { name : 'Close Convert CAD', exact : true }).click ();
+        await page.locator ('#open_file').setInputFiles ({ name : 'public-calibration.XMT_TXT', mimeType : 'application/octet-stream', buffer : Buffer.from ('public calibration placeholder') });
+        assert.equal (uploads, 0); assert.equal (await dialog.getByRole ('button', { name : 'Convert and add to Auto3D', exact : true }).isDisabled (), true);
+        await dialog.getByText ('Detected Parasolid (.xmt_txt) · choose units to start automatically.', { exact : true }).waitFor ();
         await dialog.getByLabel ('Parasolid coordinate units', { exact : true }).selectOption ('mm');
-        await dialog.getByRole ('button', { name : 'Convert privately', exact : true }).click ();
         const phaseBar = dialog.getByRole ('progressbar', { name : 'Reading CAD format', exact : true }); await phaseBar.waitFor ();
         assert.equal (await phaseBar.getAttribute ('aria-valuenow'), null);
         await phaseBar.evaluate (node => { node.dataset.progressIdentity = 'retained'; });
@@ -74,20 +84,22 @@ try {
         active.progress.completed = 9;
         await page.waitForFunction (() => document.querySelector ('.cad_conversion_job [role="progressbar"]')?.getAttribute ('aria-valuenow') === '75');
         assert.equal (await measured.getAttribute ('data-progress-identity'), 'retained');
+        await dialog.getByRole ('button', { name : 'Close Convert CAD', exact : true }).click ();
         Object.assign (active, { state : 'ready', stage : 'ready', revision : 3, artifacts : { step : { bytes : 100, units : 'mm' }, glb : { bytes : glb.length, units : 'm' }, stl : { bytes : 100, units : 'mm' }, manifest : { bytes : 100, units : null } }, summary : { dimensionsMm : [40, 30, 20], topology : { solids : 1 }, producerVersion : '0.5.0', appearance }, updatedAt : new Date ().toISOString () });
-        await dialog.getByRole ('button', { name : 'Add to current session', exact : true }).waitFor ({ timeout : 15000 }).catch (async error => { console.log ({ width, uploads, jobs : [...jobs.values ()], ui : await dialog.innerText (), errors }); throw error; }); assert.equal (uploads, 1);
+        await waitAutomatic (flow => flow?.state === 'added');
+        assert.equal (uploads, 1); assert.equal (saved, 0, 'automatic import must not save a file');
+        await call ('conversion.open');
         assert.equal (await dialog.getByRole ('progressbar', { name : 'Ready · independently validated', exact : true }).getAttribute ('aria-valuenow'), '100');
-        assert.equal ((await call ('scene.inspect')).objects.length, 0, 'completed jobs must never import themselves');
+        const readyArtifacts = { ...active.artifacts };
         const appearanceResult = await call ('conversion.appearance', { jobId : active.id }); assert.deepEqual (appearanceResult.report, appearance);
         await dialog.getByText ('Appearance report', { exact : true }).click ();
         await dialog.getByText ('Source colors: 2 · GLB preserved · STEP preserved.', { exact : true }).waitFor ();
         await dialog.getByText ('STL contains geometry only; use GLB to retain supported appearance.', { exact : true }).waitFor ();
-        await dialog.getByRole ('button', { name : 'Add to current session', exact : true }).click ();
-        await dialog.getByText ('Added to the current session. Undo is available.', { exact : true }).waitFor ();
+        await dialog.getByText ('Added to this session automatically · Undo available.', { exact : true }).waitFor ();
         const scene = await call ('scene.inspect'); assert.equal (scene.objects.length, 1); assert.deepEqual (scene.objects[0].scale, [1, 1, 1]);
         assert.ok (scene.objects[0].userData.cadConversion.includes ('0.5.0')); assert.ok (!JSON.stringify (scene).includes ('Modal-Secret'));
         await mkdir ('work/cad-conversion', { recursive : true }); await page.screenshot ({ path : 'work/cad-conversion/' + width + '.png' });
-        const [download] = await Promise.all ([page.waitForEvent ('download'), dialog.getByRole ('button', { name : 'GLB · m', exact : true }).click ()]); assert.equal (download.suggestedFilename (), 'model.glb'); assert.equal (downloaded, 2);
+        const [download] = await Promise.all ([page.waitForEvent ('download'), dialog.getByRole ('button', { name : 'GLB · m', exact : true }).click ()]); assert.equal (download.suggestedFilename (), 'model.glb'); assert.equal (downloaded, 2); assert.equal (saved, 1);
         await dialog.getByRole ('button', { name : 'Close Convert CAD', exact : true }).click ();
         await call ('history.undo'); assert.equal ((await call ('scene.inspect')).objects.length, 0);
         await call ('history.redo'); assert.equal ((await call ('scene.inspect')).objects.length, 1);
@@ -109,7 +121,14 @@ try {
         assert.equal (await dialog.getByRole ('button', { name : 'Add to current session', exact : true }).count (), 0);
         assert.equal ((await call ('scene.inspect')).objects.length, 1, 'diagnostic report must not create a model');
         await page.screenshot ({ path : 'work/cad-conversion/diagnostics-' + width + '.png' });
+        await dialog.getByLabel ('Source CAD file · up to 50 MiB', { exact : true }).setInputFiles ({ name : 'public-step.step', mimeType : 'application/step', buffer : Buffer.from ('public STEP placeholder') });
+        await waitAutomatic (flow => flow?.jobId && flow.jobId !== active.id && flow.state === 'converting');
+        const step = [...jobs.values ()].find (job => job.id !== active.id);
+        assert.ok (step); assert.equal (step.source.extension, 'step'); assert.equal (step.source.unit, null);
+        Object.assign (step, { state : 'ready', stage : 'ready', artifacts : readyArtifacts, summary : { dimensionsMm : [40, 30, 20], topology : { solids : 1 }, producerVersion : '0.5.0', appearance } });
+        await waitAutomatic (flow => flow?.jobId === step.id && flow.state === 'added');
+        assert.equal ((await call ('scene.inspect')).objects.length, 2); assert.equal (uploads, 2); assert.equal (saved, 1);
         assert.deepEqual (errors, []); await page.close ();
     }
-    console.log ('CAD desktop/mobile passed: explicit private upload, required units, real calibration GLB import, account-bound transfer, downloads, one-step Undo/Redo and no automatic scene changes.');
+    console.log ('CAD desktop/mobile passed: detected Parasolid alias opens conversion, required units trigger upload, automatic colored GLB import survives closing the panel, STEP picker starts automatically, no manual save/Add, Undo/Redo and private diagnostics.');
 } finally { await browser.close (); }
