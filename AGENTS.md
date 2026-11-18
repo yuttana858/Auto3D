@@ -44,6 +44,8 @@ Molded Pulp 0.2.0 (Auto3D 0.83.0 / Packaging 1.14.0 / Primary Products 0.15.0, b
 
 # Agent-accessible features
 
+The server diagnostic candidate is Auto3D 0.84.0 / Packaging 1.14.0 / Primary Products 0.15.0 / Molded Pulp 0.2.0 with Cloud 3D Studio 0.4.0. `conversion.diagnose` reuses a failed owned upload on the private server; `conversion.diagnostics` reads only the strict geometry-free report. Raw failure diagnostics stay server-only. Never add source contents, arbitrary messages/logs or geometry to report fields. Diagnostic attempts do not reset conversion attempts, extend source retention or publish a model. See docs/release-0840.md.
+
 The conversion progress candidate is Auto3D 0.82.0 / Packaging 1.14.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 with Cloud 3D Studio 0.3.3. Percentages describe measured current-stage work; indeterminate native operations must remain indeterminate. Keep failure diagnostics geometry-free and server-only. Generic/worker failures may retry once, with two total attempts and quota/retention checks. See docs/release-0820.md.
 
 The unified agent approval release in PR #123 is Auto3D 0.68.0 / Packaging 1.10.7 / Primary Products 0.15.0 / Molded Pulp 0.1.0. One OAuth approval grants read, write and screenshots; Live Control has no separate screenshot preference. Server-issued window codes are visible in the header, Preferences and MCP connections; Copy code/New code use `agent.access.code.copy/refresh`, and agents pair with a user-supplied code through `auto3d.sessions.pair_code`. Existing restricted credentials require reconnection. Use `auto3d.capabilities.inspect` for effective grant permissions. See docs/release-0680.md.

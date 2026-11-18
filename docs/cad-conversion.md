@@ -1,4 +1,14 @@
-# Private CAD conversion — Auto3D 0.82.1
+# Private CAD conversion — Auto3D 0.84.0
+
+## Server diagnostics
+
+1. Upload explicitly through **Convert privately**. The source is already in private server storage; selecting a local file alone still does not upload it.
+2. When conversion fails, expand **Server diagnostic report** if the native worker supplied one automatically.
+3. Choose **Diagnose on server** to inspect the same failed upload again. No re-upload or CAD download to an agent is required. At most two diagnostic passes share the existing worker queue, with cancellation and the source's original expiry.
+4. Read the source/geometry/STEP checks and reader failure. These are reports, not conversion outputs: a validated diagnostic cannot add a model to the scene or claim mesh conversion succeeded.
+5. A connected agent can call `conversion.diagnostics` with the job ID to inspect the geometry-free report. `conversion.diagnose` queues the same bounded server operation and requires write access. Poll the read command for completion. It returns no CAD, raw logs, coordinates, private names or exception messages.
+
+The Modal worker reads the private upload into its temporary server filesystem and deletes temporary diagnostic files when the pass ends. Only allowlisted report fields leave that worker for the owned API. Source CAD is never transferred into the agent's diagnostic workspace. See [0.84.0 release notes](release-0840.md) for limits and validation.
 
 Cloud 3D Studio reuses the existing Modal workspace, Supabase identity/database and private `AUTO3D_LIBRARY_R2` bucket. Auto3D 0.82.1 and the native service are live; the full public-calibration pipeline passed. There is no new login system, paid workspace, GPU or permanent warm pool. CPU/build/idle usage still consumes the existing workspace's allowance; billing tiers and limits are unchanged.
 

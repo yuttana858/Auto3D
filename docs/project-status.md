@@ -1,5 +1,11 @@
 # Auto3D development log and handoff
 
+## Server CAD diagnostics — Auto3D 0.84.0 candidate (2026-11-17)
+
+Integrates main through #146 / 0.83.0; Packaging 1.14.0 / Primary Products 0.15.0 / Molded Pulp 0.2.0 are preserved. Adds automatic geometry-free failure reports, a bounded **Diagnose on server** pass using the original private upload, and `conversion.diagnose` / `conversion.diagnostics`. The same worker and account/queue/retention controls apply; diagnostic attempts are separate from conversion attempts. Reports cannot publish a model. Native companion is Cloud 3D Studio 0.4.0. See [release-0840.md](release-0840.md).
+
+Local: 1,009 app/module tests, 26 final focused CAD checks, 73 MCP tests, real workerd and isolated SQL checks pass. The full 88-check browser scope plus retries has 87 distinct passing checks, including desktop/mobile diagnostics. The Molded Pulp software-renderer refinement benchmark remains failing after a synchronization fix; its runtime is identical to 0.83.0. Keep the FPS assertion and profile that separate follow-up; later subcases are not verified. Native has 77 passing tests. Hosted and actual supplier-file diagnostic evidence remains pending.
+
 ## Durable CAD retry dispatch — Auto3D 0.82.1 (2026-11-17)
 
 Repairs the outbox gap found when retrying the original private X_T: queued retries now reset the old sent flag and attempt identity, and reject late acknowledgements. The corrective migration repairs only affected unclaimed queued rows, preserving two attempts, ownership, quotas and retention. Isolated PostgreSQL reproducer/recovery checks pass. PR #145 and production run 44187702251 (attempt 2) passed; Auto3D 0.82.1 is live. The retry reached OCCT topology construction and failed with `invalid_geometry`; source-file acceptance remains open. Cloud 3D Studio 0.3.5 also passed its native proof, actual scheduled-controller startup and full private user-API calibration with measured progress (44191600669); the separate controller check passed (44191600844). Its 71 tests pass, and temporary calibration accounts/jobs are removed. App/module versions and validation are in [release-0821.md](release-0821.md).

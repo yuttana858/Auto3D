@@ -4,6 +4,8 @@ export const CommandIds = Object.freeze ([
     'conversion.capabilities',
     'conversion.jobs',
     'conversion.job',
+    'conversion.diagnostics',
+    'conversion.diagnose',
     'conversion.submit',
     'conversion.cancel',
     'conversion.retry',

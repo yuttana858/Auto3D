@@ -34,6 +34,25 @@ const Echo = (broker, socket, respond = message => ({ result : { ok : true, comm
 };
 
 describe ('MCP live-control reliability', () => {
+    it ('lets a read grant inspect owned diagnostic reports without queuing compute', async () => {
+        const { broker, socket } = await Connected ();
+        await broker.registrations.Create (Registration ('diagnostic-reader', ['auto3d.read']));
+        await broker.Pair ({ accountId : owner, grantId : 'diagnostic-reader', connectionId : socket.data.connectionId, sessionId : 'tab-a', expiresAt : Date.now () + 3600000 });
+        const jobId = '00000000-0000-4000-8000-000000000001';
+        Echo (broker, socket, message => {
+            assert.equal (message.writeAuthorized, undefined);
+            return { result : { ok : true, command : message.command, result : { jobId, status : 'completed', report : null } } };
+        });
+        const service = new PilotService ({ AssertRegistration : input => broker.registrations.Assert (input), Dispatch : input => broker.Dispatch (input) }, catalog.commands);
+        const actor = { userId : owner, props : { registrationId : 'diagnostic-reader' }, scope : ['auto3d.read'], expiresAt : Date.now () / 1000 + 60 };
+        const tools = service.Tools (actor);
+        assert.ok (tools.some (tool => tool.id === 'conversion.jobs'));
+        assert.ok (tools.some (tool => tool.id === 'conversion.diagnostics' && !tool.mutates));
+        assert.ok (!tools.some (tool => tool.id === 'conversion.diagnose'));
+        assert.equal ((await service.Call (actor, 'conversion.diagnostics', { jobId })).status, 'completed');
+        await assert.rejects (broker.Dispatch ({ accountId : owner, grantId : 'diagnostic-reader', requestId : 'deny-compute', command : 'conversion.diagnose', arguments : { jobId } }), error => PublicError (error).code === 'permission_required');
+        await assert.rejects (service.Call (actor, 'conversion.diagnostics', { jobId, sourceUrl : 'https://elsewhere.invalid' }), error => PublicError (error).code === 'invalid_arguments');
+    });
     it ('keeps working after more than 1000 commands and removes legacy request records', async () => {
         let now = Date.now (); const { broker, socket, state } = await Connected ({ now : () => now });
         await broker.registrations.Create (Registration ());

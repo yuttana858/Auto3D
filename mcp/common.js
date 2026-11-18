@@ -1,6 +1,6 @@
 // AI messaging commands offered as direct tools to write grants, so agents find the user's prompt channel without browsing.
 export const MessagingTools = Object.freeze (['messenger.ai.inspect', 'messenger.ai.respond', 'messenger.ai.history']);
-export const ReadTools = Object.freeze (['scene.inspect', 'camera.current.inspect', 'packaging.measurements.inspect', 'render.queue.inspect', 'session.tabs.inspect', 'capture.image']);
+export const ReadTools = Object.freeze (['scene.inspect', 'camera.current.inspect', 'packaging.measurements.inspect', 'render.queue.inspect', 'session.tabs.inspect', 'capture.image', 'conversion.jobs', 'conversion.diagnostics']);
 export const ConnectionPolicy = 'full-access-v1';
 export const ConnectionScopes = Object.freeze (['auto3d.read', 'auto3d.write', 'auto3d.capture']);
 export const Scopes = Object.freeze ([...ConnectionScopes, 'offline_access']);
