@@ -96,7 +96,9 @@ try {
     const packedScene = await call ('scene.inspect'); assert.equal (packedScene.objects.length, beforeContents + 2 + 2 + 1);
     const packedCarton = packedScene.objects.find (item => item.userData?._auto3dAutoPack); assert.equal (JSON.parse (packedCarton.userData._auto3dAutoPack).productIds.length, 3 + 4);
     await call ('view.fit'); await page.screenshot ({ path : 'work/auto-pack-review/array-with-partitions-and-pads.png' });
-    await call ('history.undo'); await call ('history.undo'); await call ('history.undo'); assert.equal ((await call ('scene.inspect')).objects.length, beforeContents);
+    // A completed Auto Pack (contents, carton, fold) is one Undo step.
+    await call ('history.undo'); assert.equal ((await call ('scene.inspect')).objects.length, beforeContents);
+    await call ('history.redo'); assert.equal ((await call ('scene.inspect')).objects.length, beforeContents + 2 + 2 + 1); await call ('history.undo');
     assert.deepEqual (errors, []);
     console.log ('Auto Pack tabs, array group selection, packed partitions and pads, live bounds/units, exact fit clearance, cancel to flat, replay to closed, product preservation, Undo and mobile layout passed.');
 } finally { await browser.close (); }

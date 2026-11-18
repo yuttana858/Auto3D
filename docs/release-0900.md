@@ -98,4 +98,5 @@ All of these use the same `FacingTool` (`source/website/facingtool.js`) as the b
   - an Auto Pack integration test for the sequence, one Undo and replay
 - `npm --prefix modules/packaging test`: passing. `npm run test_mcp`: passing. Lint is clean.
 - Browser tests `autopack-sequence` and `assign-facing` are in the CI suite. `autopack-sequence` covers stage order, the lid open at 0.76 while packing, one Undo restoring the products, accessory drop-in and the easing preference.
+- Full local browser suite (93 tests): 92 passed on the first run; `packaging-auto-pack` still expected three Undo steps and now checks one Undo plus Redo, and passes.
 - In a real browser, a 3 × 2 product pack with four pads and partitions ran lift → erect → pads → partitions → products one at a time → top pad → close, with no page errors.
