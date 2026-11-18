@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Reliable macros and 24-hour agent pairing — Auto3D 0.89.0 (2026-11-18)
+
+Packaging 1.15.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0 are preserved. Based on main after #153 (0.88.0). Not deployed. Agent pairings last 24 hours, follow the window's active tab and survive reloads (these commits missed the #148 merge). Read-only Supabase tools are auto-approved in `.claude/settings.json`. Macro steps wait for playback, one Undo reverses a run, tab changes are allowed only as the last step, saved macros can be deleted and exported, and saving warns about account-specific IDs. See [release-0890.md](release-0890.md). Next: store macros in the account.
+
 ## Molded Pulp output: STEP and GLB on a NURBS B-rep — Auto3D 0.88.0 / Molded Pulp 0.3.0 (2026-11-18)
 
 Packaging 1.15.0 / Primary Products 0.15.0 are preserved. Based on main after #152 (0.87.1). Not deployed.

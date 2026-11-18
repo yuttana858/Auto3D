@@ -12,7 +12,7 @@ import { OpenModalConnection, ModalConnectionRequest, RemoveModalConnection } fr
 import { CadConversionsFor } from './cadconversion.js';
 import { CaptureApp } from './agentcapture.js';
 import { EditMacro } from './macrodesign.js';
-import { CommandRegistry } from './commandregistry.js';
+import { CommandRegistry, CheckMacro, MacroWarnings } from './commandregistry.js';
 import { UnitFactor, AppBuildInfo } from './preferences.js';
 import { Theme } from './settings.js';
 import { HexStringToRGBColor } from '../engine/model/color.js';
@@ -405,13 +405,19 @@ export function CreateAgentCommands (website)
         const keyframe = editor.timeline.CaptureCamera (); editor.MarkDirty (); editor.AnimationUI (); return keyframe;
     }, { time : 0, interpolation : 'smooth' });
     add ('macro.design.edit', 'Edit visual macro', 'Macros', 'Add, update, remove or reorder a visual macro step without executing it. Existing step IDs are preserved. Index is zero-based.', { definition : largeText, action : enumOf ('add', 'update', 'remove', 'move'), step : largeText, index : indexOf }, ['definition', 'action', 'step'], false, ({ definition, action, step, index }) => ({ macro : EditMacro (JSON.parse (definition), action, JSON.parse (step), index) }), { definition : '{"version":1,"steps":[]}', action : 'add', step : '{"command":"scene.inspect","arguments":{}}' });
-    add ('macro.cancel', 'Cancel running macro', 'Macros', 'Request cancellation of the running macro or typed command sequence. Stops before the next step; completed steps are not undone.', {}, [], false, () => registry.Cancel ());
-    add ('macro.list', 'List saved macros', 'Macros', 'Return macros stored in this browser.', {}, [], false, () => { const macros = JSON.parse (localStorage.getItem ('auto3d-macros-v1') || '[]'); if (!Array.isArray (macros)) { throw new Error ('Invalid macro storage.'); } return macros; });
-    add ('macro.save', 'Save macro', 'Macros', 'Save a named version 1 macro locally. Definition is a JSON string; matching names are replaced.', { name : text, definition : largeText }, ['name', 'definition'], false, ({ name, definition }) => {
-        const macro = JSON.parse (definition); if (!name.trim () || macro.version !== 1 || !Array.isArray (macro.steps) || !macro.steps.length || macro.steps.length > 100) { throw new Error ('Enter a name and a version 1 macro with 1–100 steps.'); }
-        const macros = JSON.parse (localStorage.getItem ('auto3d-macros-v1') || '[]'); if (!Array.isArray (macros)) { throw new Error ('Invalid macro storage.'); }
-        const next = macros.filter ((item) => item.name !== name.trim ()); next.push ({ name : name.trim (), macro }); localStorage.setItem ('auto3d-macros-v1', JSON.stringify (next)); return { name : name.trim (), steps : macro.steps.length };
+    add ('macro.cancel', 'Cancel running macro', 'Macros', 'Request cancellation of the running macro or typed command sequence. Stops before the next step, including while a step waits for its playback; completed steps stay applied and one history.undo reverses them.', {}, [], false, () => registry.Cancel ());
+    const savedMacros = () => { const macros = JSON.parse (localStorage.getItem ('auto3d-macros-v1') || '[]'); if (!Array.isArray (macros)) { throw new Error ('Invalid macro storage.'); } return macros; };
+    const savedMacro = name => { const item = savedMacros ().find (entry => entry.name.toLowerCase () === name.trim ().toLowerCase ()); if (!item) { throw new Error ('No saved macro named “' + name.trim () + '”.'); } return item; };
+    add ('macro.list', 'List saved macros', 'Macros', 'Return macros stored in this browser.', {}, [], false, () => savedMacros ());
+    add ('macro.save', 'Save macro', 'Macros', 'Save a named version 1 macro locally. Definition is a JSON string; matching names are replaced. The macro is checked before saving (unique step IDs, known commands, session tab changes only as the last step). warnings list arguments that name account- or scene-specific records another account cannot replay.', { name : text, definition : largeText }, ['name', 'definition'], false, ({ name, definition }) => {
+        const macro = JSON.parse (definition); if (!name.trim ()) { throw new Error ('Enter a macro name.'); }
+        CheckMacro (macro, registry.commands);
+        const next = savedMacros ().filter ((item) => item.name !== name.trim ()); next.push ({ name : name.trim (), macro }); localStorage.setItem ('auto3d-macros-v1', JSON.stringify (next)); return { name : name.trim (), steps : macro.steps.length, warnings : MacroWarnings (macro) };
     }, { name : 'Fit and inspect', definition : '{"version":1,"steps":[{"id":"fit","command":"view.fit","arguments":{}}]}' });
+    add ('macro.delete', 'Delete saved macro', 'Macros', 'Delete a macro saved in this browser by name (case-insensitive).', { name : text }, ['name'], false, ({ name }) => {
+        const item = savedMacro (name); localStorage.setItem ('auto3d-macros-v1', JSON.stringify (savedMacros ().filter (entry => entry !== item && entry.name !== item.name))); return { deleted : item.name, remaining : savedMacros ().length };
+    }, { name : 'Fit and inspect' });
+    add ('macro.export', 'Export saved macro', 'Macros', 'Return a saved macro as a portable JSON definition (for macro.save in another browser), with replay warnings.', { name : text }, ['name'], false, ({ name }) => { const item = savedMacro (name); return { name : item.name, definition : JSON.stringify (item.macro), steps : item.macro.steps.length, warnings : MacroWarnings (item.macro) }; }, { name : 'Fit and inspect' });
     add ('ui.materials', 'Open material editor', 'Panels', 'Open the material editor for the selected object.', {}, [], false, () => { if (!website.materialPanel.entries.length) { throw new Error ('Load and select a model first.'); } website.materialPanel.Open (); return { opened : true }; });
     const libraryId = { type : 'string', pattern : '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' };
     const libraryName = { type : 'string', minLength : 1, maxLength : 100 };

@@ -256,6 +256,8 @@ export const CommandIds = Object.freeze ([
     'macro.cancel',
     'macro.list',
     'macro.save',
+    'macro.delete',
+    'macro.export',
     'ui.materials',
     'app.version.inspect',
     'preferences.viewport.inspect',

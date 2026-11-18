@@ -7005,7 +7005,7 @@
       "id": "macro.cancel",
       "title": "Cancel running macro",
       "category": "Macros",
-      "description": "Request cancellation of the running macro or typed command sequence. Stops before the next step; completed steps are not undone.",
+      "description": "Request cancellation of the running macro or typed command sequence. Stops before the next step, including while a step waits for its playback; completed steps stay applied and one history.undo reverses them.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -7033,7 +7033,7 @@
       "id": "macro.save",
       "title": "Save macro",
       "category": "Macros",
-      "description": "Save a named version 1 macro locally. Definition is a JSON string; matching names are replaced.",
+      "description": "Save a named version 1 macro locally. Definition is a JSON string; matching names are replaced. The macro is checked before saving (unique step IDs, known commands, session tab changes only as the last step). warnings list arguments that name account- or scene-specific records another account cannot replay.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -7056,6 +7056,52 @@
       "example": {
         "name": "Fit and inspect",
         "definition": "{\"version\":1,\"steps\":[{\"id\":\"fit\",\"command\":\"view.fit\",\"arguments\":{}}]}"
+      }
+    },
+    {
+      "id": "macro.delete",
+      "title": "Delete saved macro",
+      "category": "Macros",
+      "description": "Delete a macro saved in this browser by name (case-insensitive).",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "name": "Fit and inspect"
+      }
+    },
+    {
+      "id": "macro.export",
+      "title": "Export saved macro",
+      "category": "Macros",
+      "description": "Return a saved macro as a portable JSON definition (for macro.save in another browser), with replay warnings.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "name": "Fit and inspect"
       }
     },
     {
