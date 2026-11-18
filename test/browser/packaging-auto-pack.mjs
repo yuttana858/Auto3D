@@ -96,7 +96,7 @@ try {
     const beforeContents = (await call ('scene.inspect')).objects.length;
     // Start observing before the click returns: software rendering can consume the animation while Playwright waits.
     await page.evaluate (() => { window.autoPackContentsPause = new Promise ((resolve, reject) => { const started = Date.now (); let seen = false; const check = async () => { const s = (await Auto3D.execute ('packaging.fefco.playback.inspect')).result; if (s.state === 'playing') { seen = true; } if (s.state === 'playing' && s.progress > .3) { await Auto3D.execute ('packaging.fefco.playback', { action : 'pause' }); resolve (); } else if (Date.now () - started > 180000 || (seen && s.state === 'completed')) { reject (new Error ('Fold did not pause mid-way: ' + s.state)); } else { setTimeout (check, 5); } }; check (); }); });
-    await auto.getByRole ('button', { name : 'Auto Pack', exact : true }).click ();
+    await call ('packaging.auto.generate', { duration : 30, partitions : true, pads : ['top', 'bottom'], boardId : 'nominal-e', grade : await auto.getByLabel ('Contents grade', { exact : true }).inputValue () });
     await page.evaluate (() => window.autoPackContentsPause);
     await page.screenshot ({ path : 'work/auto-pack-review/array-contents-mid-fold.png' });
     await call ('packaging.fefco.playback', { action : 'resume' }); await waitPlayback (['completed']);
