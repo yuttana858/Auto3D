@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { AccessCookie } from '../functions/_lib/auth.js';
+import { JobCapabilities } from '../functions/_lib/conversionjobs.js';
 import { ValidateModalSettings, ReadModalConnection, TestModalConnection, ModalProfile } from '../functions/_lib/modalconnection.js';
 import { onRequest } from '../functions/api/connections/modal.js';
 import { ModalConnectionRequest, RemoveModalConnection } from '../source/website/modalconnection.js';
@@ -95,6 +96,18 @@ describe ('Supabase Vault Modal credential bridge', () => {
         const response = await onRequest (context (environment, 'POST', {})); assert.equal (response.status, 200);
         const dto = await response.json (); assert.equal (dto.connected, true); assert.equal (dto.conversionReady, false); assert.ok (!JSON.stringify (dto).includes (settings ().tokenSecret));
         assert.equal (calls.filter (call => call.url.startsWith ('https://acme--')).length, 1);
+    });
+    it ('negotiates CAD appearance through the credential bridge and public capabilities without exposing arbitrary metadata', async () => {
+        const environment = { ...env (), AUTO3D_LIBRARY_R2 : {} }; await save (environment);
+        for (const appearanceApiVersion of [undefined, 0, 1, 2, '1', 'private-token']) {
+            upstream = () => Response.json ({ ...identity (), conversionReady : true, jobApiVersion : 1, diagnosticApiVersion : 1, appearanceApiVersion, secret : settings ().tokenSecret });
+            const capabilities = await JobCapabilities (environment);
+            assert.equal (capabilities.ready, true);
+            assert.equal (capabilities.diagnosticProtocol, 1);
+            assert.equal (capabilities.appearanceProtocol, appearanceApiVersion === 1 ? 1 : null);
+            assert.ok (!JSON.stringify (capabilities).includes (settings ().tokenSecret));
+            assert.ok (!JSON.stringify (capabilities).includes ('private-token'));
+        }
     });
     it ('distinguishes auth, missing endpoint, network, mismatched identity and malformed responses', async () => {
         const environment = env (); await save (environment);
