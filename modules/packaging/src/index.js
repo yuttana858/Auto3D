@@ -8,6 +8,8 @@ export * from './folding.js';
 export * from './solid.js';
 export * from './dimensions.js';
 export { FoldPlayback } from './foldplayback.js';
+export { MotionEasings, DefaultMotionEasing, EaseMotion, EaseSpan } from './easing.js';
+export { CreatePackSequence, SamplePackSequence, ProductDropSlots, PackErectProgress } from './packsequence.js';
 export { FefcoPanel } from './panel.js';
 export * from './surfacetextures.js';
 export * from './surfacerelief.js';

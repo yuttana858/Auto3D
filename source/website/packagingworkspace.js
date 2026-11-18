@@ -15,6 +15,7 @@ import { FefcoDimensions, ResolveFefcoDimensions } from '../../modules/packaging
 import { Sphere } from 'three';
 import { LoadPackagingModule, PackagingModel, FefcoSurfaces, ApplyFefcoFoldPose, BoardAppearanceMaterialChanges, PreparePackagingPresentations, ApplyPackagingPresentation } from './packagingadapter.js';
 import { FoldMotionProgress, FoldCameraFrame, CameraBottomInset, VisibleBounds } from './foldcamera.js';
+import { EaseMotion } from '../../modules/packaging/src/easing.js';
 import { ApplyCameraState } from './sessiontimeline.js';
 
 
@@ -219,7 +220,7 @@ export class PackagingWorkspace
             operation.player = new module.FoldPlayback (progress => {
                 autoPackGuard ();
                 if (editor.document !== target || editor.website.auth.user?.id !== account || editor.website.accountReady === false || editor.readOnly) { throw new Error ('The workspace or account changed during folding.'); }
-                const motion = FoldMotionProgress (progress, autoFit); const pose = PackagingFoldPose (module, rig, plan.from + (plan.to - plan.from) * motion); operation.stage = plan.action === 'unfold' ? ({ 'closing top' : 'opening top', 'closing base' : 'opening base', 'erecting walls' : 'unwrapping walls' }[pose.stage] || pose.stage) : plan.action === 'close top' && pose.stage === 'opening top' ? 'closing top' : pose.stage;
+                const motion = EaseMotion (FoldMotionProgress (progress, autoFit), editor.website.preferences?.motionEasing || 'smooth'); // Ramp in/out of the whole fold; each panel also eases within its phase. const pose = PackagingFoldPose (module, rig, plan.from + (plan.to - plan.from) * motion); operation.stage = plan.action === 'unfold' ? ({ 'closing top' : 'opening top', 'closing base' : 'opening base', 'erecting walls' : 'unwrapping walls' }[pose.stage] || pose.stage) : plan.action === 'close top' && pose.stage === 'opening top' ? 'closing top' : pose.stage;
                 if (preview.threeObject) {
                     ApplyFefcoFoldPose (preview.threeObject, rig, pose, unit);
                     if (operation.cameraAutoFit && cameraBefore) { const viewer = editor.website.viewer; const bounds = VisibleBounds (preview.threeObject); const sphere = bounds.getBoundingSphere (new Sphere ()); const size = viewer.GetImageSize (); viewer.SetCamera (FoldCameraFrame (cameraBefore, sphere, 0, progress, size.width / size.height, CameraBottomInset (viewer, editor.status), bounds)); }
