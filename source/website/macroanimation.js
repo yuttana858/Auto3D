@@ -11,6 +11,7 @@ export async function RecordMacroAnimation (editor, registry, macro, stepSeconds
     const document = editor.document, timeline = editor.timeline, owner = editor.website.auth?.user?.id;
     if (!owner || editor.website.accountReady === false || editor.readOnly || editor.busy) { throw new Error ('Use an editable signed-in session.'); }
     if (!document.objects.length || document.objects.length > 100) { throw new Error ('Record a session containing 1–100 objects.'); }
+    if (document.objects.some (item => item.player?.state?.playing)) { throw new Error ('Pause embedded animation before recording a macro.'); }
     if (timeline.playing || timeline.cameraKeyframes.length || timeline.actions.length || document.objects.some (item => item.keyframes?.length)) { throw new Error ('Start with an empty, stopped timeline so existing animation is not overwritten.'); }
     const objects = [...document.objects], before = timeline.Serialize (); let started = false;
     const valid = () => editor.website.auth?.user?.id === owner && editor.website.accountReady !== false && !editor.readOnly && editor.document === document && document.objects.length === objects.length && objects.every ((object, i) => document.objects[i] === object);
@@ -25,6 +26,6 @@ export async function RecordMacroAnimation (editor, registry, macro, stepSeconds
         const after = timeline.Serialize (), saved = objects.map (item => structuredClone (item.keyframes));
         const apply = forward => { if (editor.document !== document || !objects.every (item => document.objects.includes (item))) { throw new Error ('The recorded scene is no longer available.'); } for (let i = 0; i < objects.length; i++) { objects[i].keyframes = forward ? structuredClone (saved[i]) : []; } timeline.Load (forward ? after : before); timeline.Seek (timeline.time); editor.MarkDirty (); editor.AnimationUI (); };
         editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); editor.MarkDirty (); editor.AnimationUI ();
-        return { recorded : true, duration : end, steps : result.completed.length, objects : objects.length, completed : result.completed };
+        return { recorded : true, duration : end, steps : result.completed.length, objects : objects.length, completed : result.completed.map (({ id, command }) => ({ id, command })) };
     } catch (error) { if (started && valid ()) { clear (); } throw error; }
 }

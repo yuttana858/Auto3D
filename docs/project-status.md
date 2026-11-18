@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Macro animation recording and tracks — Auto3D 0.89.0 candidate
+
+Stacked on PR #156. Adds sequential native transform/camera keyframe recording for a restricted macro subset and collapsible scene, camera, action and per-object tracks. Unsupported commands are rejected before the macro runs; creation, deletion, materials, visibility and procedural animation need further work. See release-0890.md and agent-interface.md. Not deployed.
+
 ## Auto Pack compact help — Auto3D 0.88.1 / Packaging 1.15.1 candidate
 
 Auto Pack sizing and contents explanations are grouped in a collapsed How Auto Pack works disclosure. Pads and Partitions is a separate collapsed section retaining all existing settings. Agent commands open and close each section. Flute and board-record selection and the actual catalog thickness sit beside the box style; the panel shows Inside Dimensions without duplicate bounding-box or score-size cards. The folding progress bar is a manual fold-pose timeline after playback; pause/cancel buttons and repeated folding descriptions are removed from the Auto panel. Primary Products 0.15.0 and Molded Pulp 0.3.0 are unchanged. See release-0881.md. Not deployed.
