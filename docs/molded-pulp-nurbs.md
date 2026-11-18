@@ -164,11 +164,12 @@ What we learned while building it:
 #### Next steps
 
 1. ✔ Speed-up (identical output): contours scan a per-pocket window between floor and rim outlines; outline checks search the curve near each point's parameter; the 3D distance search reaches only as far as the tolerance needs. T1 standard: 1.3 s → 0.85 s. T3 fine: 5.4 s → 2.2 s.
-2. Floors and plateau as trimmed planes, plus the outer skirt wall (the outermost contour, ground high inside).
-3. Rim and floor fillets as the loft's end sections.
-4. Tool side by offsetting the outlines by the thickness in plan.
-5. Faces with inner loops in `brep.js`, sewing, and STEP output of the lofted shell. Then the OpenCASCADE gate.
-6. T2: split walls into bands at the join height, plus a saddle patch. Until then, the shell keeps the Phase 1 output and reports why.
+2. Outer skirt wall: `LoftPocketWalls (…, { skirtWall : true })` finds the outermost outline at every level and lofts it through the same code. Off by default because it does not meet tolerance yet. On T1 it needs the 256-control cap and still misses by 1.52 mm, taking 4.6 s. The skirt rises from the rectangular sheet edge, so its outlines have true 90° plan corners, which a uniform periodic cubic cannot follow. Next: corner-aware skirts, either drafted planar sides meeting at corner edges, or a plan corner radius from the DFM rules (real tools have one), with knots placed at the corners.
+3. Floors and plateau as trimmed planes.
+4. Rim and floor fillets as the loft's end sections.
+5. Tool side by offsetting the outlines by the thickness in plan.
+6. Faces with inner loops in `brep.js`, sewing, and STEP output of the lofted shell. Then the OpenCASCADE gate.
+7. T2: split walls into bands at the join height, plus a saddle patch. Until then, the shell keeps the Phase 1 output and reports why.
 
 ## Phase 3: Cloud 3D Studio
 
