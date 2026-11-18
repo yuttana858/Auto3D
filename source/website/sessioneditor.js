@@ -599,7 +599,7 @@ export class SessionEditor
             this.website.sidebar.detailsPanel.modelFormat = 'SESSION';
             this.website.UpdateMeshesVisibility ();
             this.website.sceneEffects?.ApplyObjectSettings (this.document.objects);
-            await this.packaging.presentation?.PrepareAll (); this.packaging.presentation?.Apply (this.timeline.time, false);
+            await this.packaging.presentation?.PrepareAll (); this.timeline.ApplyVisibility (); this.packaging.presentation?.Apply (this.timeline.time, false);
             this.RefreshUI (); this.Select (this.selected); this.website.sceneEffects?.Refresh (); this.website.viewModes?.Refresh (); this.website.viewer.Render ();
         } finally { this.busy = false; this.RefreshButtons (); this.website.materialPanel?.Update (); }
     }
@@ -696,7 +696,7 @@ export class SessionEditor
             this.selectionBox.visible = false;
             return;
         }
-        this.selectionBounds.makeEmpty (); (this.SelectedObjects ().length ? this.SelectedObjects () : [this.selected]).forEach ((object) => { if (object.threeObject && object.visible) { const include = () => this.selectionBounds.union (new THREE.Box3 ().setFromObject (object.threeObject)); if (this.packaging?.presentation) { this.packaging.presentation.WithOriginal (object, include); } else { include (); } } });
+        this.selectionBounds.makeEmpty (); (this.SelectedObjects ().length ? this.SelectedObjects () : [this.selected]).forEach ((object) => { if (object.threeObject?.visible) { const include = () => this.selectionBounds.union (new THREE.Box3 ().setFromObject (object.threeObject)); if (this.packaging?.presentation) { this.packaging.presentation.WithOriginal (object, include); } else { include (); } } });
         this.selectionBox.visible = !this.selectionBounds.isEmpty ();
         this.selectionBox.updateMatrixWorld (true);
     }
@@ -1106,6 +1106,7 @@ export class SessionEditor
         const entries = timeline.cameraKeyframes.map ((keyframe) => ({ type : 'camera', keyframe, object : null, label : 'Camera' }));
         for (const object of this.document.objects) {
             timeline.NormalizeObjectKeyframes (object).forEach ((keyframe) => entries.push ({ type : 'object', keyframe, object, label : object.name }));
+            (object.visibilityKeys || []).forEach (keyframe => entries.push ({ type : 'visibility', keyframe, object, label : object.name + (keyframe.visible ? ' · Show' : ' · Hide') }));
         }
         for (const action of timeline.actions) { const object = this.document.objects.find (object => object.id === action.objectId); if (object) { entries.push ({ type : 'action', keyframe : action, object, label : object.name + ' · ' + action.direction + ' fold action (' + action.duration + ' s)' }); } }
         entries.sort ((left, right) => left.keyframe.time - right.keyframe.time || left.type.localeCompare (right.type));
@@ -1117,12 +1118,12 @@ export class SessionEditor
                 const seek = Element ('button', 'timeline_keyframe_seek', entry.keyframe.time.toFixed (2) + 's · ' + entry.label, row);
                 seek.title = entry.type === 'camera'
                     ? 'Camera · ' + entry.keyframe.azimuth.toFixed (1) + '° az · ' + entry.keyframe.elevation.toFixed (1) + '° el · ' + DisplayLength (entry.keyframe.distance, this.document.model.GetUnit (), this.website.preferences.units) + ' distance'
-                    : entry.label + (entry.type === 'action' ? ' · procedural fold' : ' · ' + entry.keyframe.interpolation + ' tween');
+                    : entry.label + (entry.type === 'action' ? ' · procedural fold' : entry.type === 'visibility' ? ' · discrete visibility' : ' · ' + entry.keyframe.interpolation + ' tween');
                 seek.addEventListener ('click', () => { timeline.Seek (entry.keyframe.time); this.AnimationUI (); });
-                Element ('span', 'timeline_keyframe_mode', entry.type === 'action' ? 'Action' : entry.keyframe.interpolation, row);
+                Element ('span', 'timeline_keyframe_mode', entry.type === 'action' ? 'Action' : entry.type === 'visibility' ? 'Visibility' : entry.keyframe.interpolation, row);
                 if (!this.readOnly) {
                     const remove = Element ('button', 'timeline_keyframe_delete', '×', row); remove.title = 'Delete keyframe';
-                    remove.addEventListener ('click', () => { if (entry.type === 'action') { timeline.DeleteAction (entry.keyframe.id); } else { timeline.DeleteKeyframe (entry.type, entry.keyframe.id, entry.object); } this.MarkDirty (); this.AnimationUI (); });
+                    remove.addEventListener ('click', () => { if (entry.type === 'action') { timeline.DeleteAction (entry.keyframe.id); } else if (entry.type === 'visibility') { timeline.SetVisibilityKeys (entry.object, entry.object.visibilityKeys.filter (key => key.id !== entry.keyframe.id)); } else { timeline.DeleteKeyframe (entry.type, entry.keyframe.id, entry.object); } this.MarkDirty (); this.AnimationUI (); });
                 }
             }
         }
@@ -1367,7 +1368,7 @@ export class SessionEditor
     {
         if (this.readOnly || this.busy || !this.selected) { return; }
         const objects = this.SelectedObjects ().length ? this.SelectedObjects () : [this.selected]; const records = objects.map ((object) => ({ object, before : object.visible })); const after = !this.selected.visible;
-        const apply = (restore) => { records.forEach ((item) => { item.object.visible = restore ? item.before : after; item.object.threeObject.visible = item.object.visible; }); this.website.UpdateMeshesVisibility (); this.Select (this.selected, false, true); }; apply (false); this.history.Push ({ undo : () => apply (true), redo : () => apply (false) }); this.RefreshButtons ();
+        const apply = (restore) => { records.forEach ((item) => { item.object.visible = restore ? item.before : after; item.object.threeObject.visible = item.object.visible; }); this.website.UpdateMeshesVisibility (); this.timeline.ApplyVisibility (); this.Select (this.selected, false, true); }; apply (false); this.history.Push ({ undo : () => apply (true), redo : () => apply (false) }); this.RefreshButtons ();
     }
     // Sets the orbit pivot to the selection's center. `aim` also points the view at it (camera.orbit.focus_selected);
     // right-drag passes false, so eye and view center orbit together around the object and the framing is kept.

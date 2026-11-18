@@ -640,7 +640,7 @@ div.main_viewer
     border-top: 1px solid var(--ov_border_color);
 }
 
-.advance_animation_panel { position: fixed; bottom: 0; left: 0; right: 0; z-index: 15; box-sizing: border-box; height: min(330px, 45vh); overflow: auto; padding: 14px 24px; border-top: 1px solid var(--ov_border_color); background: var(--ov_background_color); color: var(--ov_foreground_color); font-size: 12px; }
+.advance_animation_panel { position: fixed; bottom: 0; left: 0; right: 0; z-index: 15; box-sizing: border-box; height: min(330px, 45vh); overflow: auto; padding: 14px 24px; border-top: 1px solid var(--ov_border_color); background: var(--ov_background_color); color: var(--ov_foreground_color); font-size: var(--workspace-menu-font-size, 13px); }
 .advance_animation_panel[hidden] { display: none; }
 .advance_animation_close { float: right; }
 .advance_animation_panel button, .advance_animation_panel input, .advance_animation_panel select { font: inherit; color: inherit; }
@@ -753,3 +753,11 @@ div.main_viewer
 .animation_object_tracks, .animation_object_track { padding: 4px 0; }
 .animation_scene_track > summary, .animation_object_tracks > summary, .animation_object_track > summary { cursor: pointer; }
 .animation_object_track { margin-left: 12px; }
+
+.animation_visibility_marker { top: 22px; color: #e7bd6d !important; }
+
+.animation_object_track .advance_animation_rail { height: 54px; }
+.animation_object_track .advance_animation_track { min-height: 62px; }
+.animation_object_track .animation_visibility_marker { top: 28px; min-width: 24px; min-height: 24px; }
+.animation_track_legend { font-size: var(--workspace-help-font-size, 12px); margin: 6px 0; opacity: .8; }
+.advance_animation_panel button:focus-visible, .advance_animation_panel summary:focus-visible { outline: 2px solid var(--ov_hover_color, #5aa9e6); outline-offset: 2px; }

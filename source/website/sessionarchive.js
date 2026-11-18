@@ -1,3 +1,4 @@
+import { ValidateVisibilityKeys } from './visibilitytrack.js';
 import { ValidateDimensions } from './dimensioncore.js';
 import { ValidateProductDefinition } from '../../modules/primary-products/src/definition.js';
 import { ValidatePulpDefinition } from '../../modules/molded-pulp/src/definition.js';
@@ -188,7 +189,7 @@ export function PackSession (document, view = {}, objects = document.objects, ki
     return {
         dimensions : ValidateDimensions (document.dimensions || []).filter (d => objects.some (o => o.id === d.objectId)), dimensionsVisible : document.dimensionsVisible !== false,
         format : 'SW Auto3D', version : SessionVersion, metadata : { savedAt : new Date ().toISOString () }, kind, name : document.name, view, packaging : kind === 'session' && document.packaging ? ValidatePackaging (document.packaging) : null,
-        objects : objects.map ((object) => ({ id : object.id, packagingProfile : object.packagingProfile ? ValidatePackaging (object.packagingProfile) : null, name : object.name, source : object.source, unit : object.unit, visible : object.visible, hiddenParts : object.hiddenParts || [], position : object.position, rotation : object.rotation, scale : object.scale, userData : object.userData || {}, castShadow : object.castShadow !== false, receiveShadow : object.receiveShadow !== false, keyframes : Array.isArray (object.keyframes) ? object.keyframes : [], playback : object.playback, animationAsset : object.animationAsset ? { main : object.animationAsset.main, files : object.animationAsset.files.map ((file) => ({ name : file.name, buffer : EncodeBuffer (file.buffer) })) } : null })),
+        objects : objects.map ((object) => ({ id : object.id, packagingProfile : object.packagingProfile ? ValidatePackaging (object.packagingProfile) : null, name : object.name, source : object.source, unit : object.unit, visible : object.visible, hiddenParts : object.hiddenParts || [], position : object.position, rotation : object.rotation, scale : object.scale, userData : object.userData || {}, castShadow : object.castShadow !== false, receiveShadow : object.receiveShadow !== false, keyframes : Array.isArray (object.keyframes) ? object.keyframes : [], visibilityKeys : ValidateVisibilityKeys (object.visibilityKeys || []), playback : object.playback, animationAsset : object.animationAsset ? { main : object.animationAsset.main, files : object.animationAsset.files.map ((file) => ({ name : file.name, buffer : EncodeBuffer (file.buffer) })) } : null })),
         model : { unit : model.unit, properties : model.propertyGroups, materials : model.materials.map (PackMaterial), meshes : model.meshes.map (PackMesh), nodes : model.root.childNodes.map (PackNode) }
     };
 }
@@ -244,6 +245,7 @@ export function ReadSession (data)
             rotation : [...item.rotation],
             scale : item.scale.map ((value) => Math.abs (value) < 1e-6 ? 1e-6 : value)
         })).sort ((a, b) => a.time - b.time) : [];
+        object.visibilityKeys = ValidateVisibilityKeys (data.visibilityKeys || []);
         if (data.userData && typeof data.userData === 'object' && !Array.isArray (data.userData)) {
             for (const [key, value] of Object.entries (data.userData).slice (0, 100)) {
                 const name = String (key).trim ().slice (0, 100);

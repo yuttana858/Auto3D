@@ -76,17 +76,18 @@ export function CreateTimelineTracks (editor, parent)
     }
     // Keep one expandable track per object while retaining the existing scene and camera tracks.
     const objects = Element ('details', 'animation_object_tracks', undefined, parent); objects.open = state.open;
-    Element ('summary', null, 'Object tracks (' + editor.document.objects.length + ')', objects);
+    Element ('summary', null, 'Object tracks (' + editor.document.objects.length + ')', objects); Element ('p', 'animation_track_legend', '◆ motion · ● show · ○ hide', objects);
     objects.addEventListener ('toggle', () => { if (objects.isConnected) { state.open = objects.open; } });
     for (const object of editor.document.objects) {
         const group = Element ('details', 'animation_object_track', undefined, objects); group.open = state.objects.has (object.id);
-        Element ('summary', null, object.name + ' · ' + (object.keyframes?.length || 0) + ' keyframes', group);
+        Element ('summary', null, object.name + ' · ' + (object.keyframes?.length || 0) + ' motion / ' + (object.visibilityKeys?.length || 0) + ' visibility', group);
         group.addEventListener ('toggle', () => { if (!group.isConnected) { return; } if (group.open) { state.objects.add (object.id); } else { state.objects.delete (object.id); } });
         const row = Element ('div', 'advance_animation_track', undefined, group); Element ('strong', null, object.name, row);
         const rail = Element ('div', 'advance_animation_rail', undefined, row);
         const playhead = Element ('input', 'animation_playhead', undefined, rail); playhead.type = 'range'; playhead.min = '0'; playhead.max = String (timeline.duration); playhead.step = '0.01'; playhead.value = String (timeline.time); playhead.setAttribute ('aria-label', 'Object ' + object.name + ' playhead');
         playhead.addEventListener ('input', () => { timeline.Stop (); timeline.Seek (Number (playhead.value)); }); playhead.addEventListener ('change', () => editor.MarkDirty ());
         for (const keyframe of object.keyframes || []) { const marker = Element ('button', 'animation_key_marker', '◆', rail); marker.style.left = 100 * keyframe.time / timeline.duration + '%'; marker.title = object.name + ' at ' + keyframe.time.toFixed (2) + ' s'; marker.setAttribute ('aria-label', marker.title); marker.addEventListener ('click', () => { timeline.Stop (); timeline.Seek (keyframe.time); }); }
+        for (const keyframe of object.visibilityKeys || []) { const marker = Element ('button', 'animation_key_marker animation_visibility_marker', keyframe.visible ? '●' : '○', rail); marker.style.left = 100 * keyframe.time / timeline.duration + '%'; marker.title = object.name + (keyframe.visible ? ' shown at ' : ' hidden at ') + keyframe.time.toFixed (2) + ' s'; marker.setAttribute ('aria-label', marker.title); marker.addEventListener ('click', () => { timeline.Stop (); timeline.Seek (keyframe.time); }); }
     }
     UpdatePlayheads (editor);
 }

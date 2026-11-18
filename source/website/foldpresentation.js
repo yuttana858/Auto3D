@@ -64,7 +64,7 @@ export class FoldPresentation
             const manual = this.manual.get (record.object.id); const hasSaved = record.object.userData?._auto3dFoldPreview !== undefined;
             if (manual !== undefined || sample || hasSaved) {
                 this.SetPose (record, manual ?? sample?.pose ?? BaseFoldPose (record.object));
-                if (sample && record.object.visible) { active.push (sample); currentBounds.union (VisibleBounds (record.preview)); }
+                if (sample && record.root.visible) { active.push (sample); currentBounds.union (VisibleBounds (record.preview)); }
             } else { record.preview.visible = false; record.children.forEach (([child, visible]) => { child.visible = visible; }); }
         }
         editor.website.viewModes?.Refresh ();

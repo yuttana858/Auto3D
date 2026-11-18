@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Object visibility and lifetime timeline — Auto3D 0.90.0 candidate
+
+Stacked on PR #157. Adds discrete, undoable visibility keyframes and lifetime ranges for existing scene objects, a compact Animation panel editor, macro visibility capture, session persistence and agent controls. UI/UX review was performed independently; selected-object context, local feedback, reset on selection change, and marker legends are included. This does not record object creation or permanent deletion. See release-0900.md. Not deployed.
+
 ## Macro animation recording and tracks — Auto3D 0.89.0 candidate
 
 Stacked on PR #156. Adds sequential native transform/camera keyframe recording for a restricted macro subset and collapsible scene, camera, action and per-object tracks. Unsupported commands are rejected before the macro runs; creation, deletion, materials, visibility and procedural animation need further work. See release-0890.md and agent-interface.md. Not deployed.

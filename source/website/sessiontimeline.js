@@ -1,4 +1,5 @@
 import { ValidateTimelineActions } from './timelineactions.js';
+import { ValidateVisibilityKeys, VisibilityAt } from './visibilitytrack.js';
 import * as THREE from 'three';
 
 function Clamp (value, min, max)
@@ -185,7 +186,7 @@ export class SessionTimeline
     {
         let maximum = this.cameraKeyframes.reduce ((value, item) => Math.max (value, item.time), 0);
         for (const object of this.editor.document.objects) {
-            for (const keyframe of object.keyframes || []) { maximum = Math.max (maximum, keyframe.time || 0); }
+            for (const keyframe of [...(object.keyframes || []), ...(object.visibilityKeys || [])]) { maximum = Math.max (maximum, keyframe.time || 0); }
         }
         maximum = Math.max (maximum, ...this.actions.filter (action => this.editor.document.objects.some (object => object.id === action.objectId)).map (action => action.time + action.duration));
         this.duration = Math.max (this.duration, maximum, 0.1);
@@ -200,6 +201,29 @@ export class SessionTimeline
         return object.keyframes;
     }
 
+    VisibilityAt (object, time = this.time) { return VisibilityAt (object, time); }
+    ApplyVisibility ()
+    {
+        for (const object of this.editor.document.objects) { if (object.threeObject) { object.threeObject.visible = VisibilityAt (object, this.time); } }
+    }
+    SetVisibilityKeys (object, keys)
+    {
+        const editor = this.editor; if (editor.readOnly || editor.busy || !editor.website.auth?.user || editor.website.accountReady === false || !editor.document.objects.includes (object)) { throw new Error ('Choose an editable signed-in object.'); }
+        const before = structuredClone (object.visibilityKeys || []), next = ValidateVisibilityKeys (keys); const oldDuration = this.duration, oldEnd = this.rangeEnd;
+        const apply = (values, forward) => { object.visibilityKeys = structuredClone (values); this.duration = oldDuration; this.rangeEnd = oldEnd; this.ExtendDurationForKeys (); if (forward && oldEnd === oldDuration) { this.rangeEnd = this.duration; } this.Seek (this.time); editor.MarkDirty (); editor.AnimationUI (); };
+        apply (next, true); editor.history.Push ({ undo : () => apply (before, false), redo : () => apply (next, true) }); return { objectId : object.id, visibilityKeys : structuredClone (next) };
+    }
+    SetVisibilityKey (object, time, visible)
+    {
+        if (!Number.isFinite (time) || time < 0 || time > 3600 || typeof visible !== 'boolean') { throw new Error ('Use a time from 0 to 3600 seconds and a visibility value.'); }
+        const keys = (object.visibilityKeys || []).filter (key => key.time !== time); keys.push ({ id : crypto.randomUUID (), time, visible }); return this.SetVisibilityKeys (object, keys);
+    }
+    SetLifetime (object, start, end)
+    {
+        if (!Number.isFinite (start) || start < 0 || start > 3600 || (end !== null && (!Number.isFinite (end) || end <= start || end > 3600))) { throw new Error ('Use a start from 0 to 3600 and an end after the start.'); }
+        const key = (time, visible) => ({ id : crypto.randomUUID (), time, visible });
+        return this.SetVisibilityKeys (object, [...(start > 0 ? [key (0, false)] : []), key (start, true), ...(end === null ? [] : [key (end, false)])]);
+    }
     async AddAction ({ objectId = this.editor.selected?.id, time = this.time, duration = 6, direction = 'toggle' } = {})
     {
         const editor = this.editor; if (editor.readOnly || editor.busy || !editor.website.auth?.user || editor.website.accountReady === false) { throw new Error ('Choose an editable signed-in timeline.'); }
@@ -319,6 +343,7 @@ export class SessionTimeline
         }
         const camera = this.CameraStateAt (this.time);
         if (camera) { ApplyCameraState (this.editor.website.viewer, camera); }
+        this.ApplyVisibility ();
         // Manual timeline seeking is used for close inspection. Automatic
         // fold framing runs only during playback; explicit camera keyframes
         // above remain authoritative for authored camera animation.
