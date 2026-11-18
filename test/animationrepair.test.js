@@ -103,11 +103,12 @@ describe ('Animation and interaction repairs', () => {
         timeline.time = 1; timeline.CaptureScene (); timeline.time = 3; object.position = [2, 0, 0]; timeline.CaptureScene (); timeline.SetRange (1, 4);
         timeline.cameraKeyframes = [{ id : 'camera', time : 2, interpolation : 'linear', eye : [3, 2, 1], center : [0, 0, 0], up : [0, 1, 0], fov : 45 }];
         object.visibilityKeys = [{ id : 'hide', time : 0, visible : false }, { id : 'show', time : 2, visible : true }];
+        timeline.embeddedClips = [{ id : 'clip', objectId : object.id, clip : 0, time : 1, duration : 2, speed : 1, loop : false, baseClip : 0, baseTime : 0 }];
         const saved = OpenSessionArchive (CreateRecoveryArchive (structuredClone (RecoverySnapshot (document, { timeline : timeline.Serialize () }))));
         assert.deepEqual (saved.document.objects[0].visibilityKeys.map (key => [key.time, key.visible]), [[0, false], [2, true]]); assert.equal (saved.document.objects[0].keyframes.length, 2); assert.equal (saved.view.timeline.rangeStart, 1); assert.equal (saved.view.timeline.rangeEnd, 4);
         assert.deepEqual (new Uint8Array (saved.document.objects[0].animationAsset.files[0].buffer), new Uint8Array (object.animationAsset.files[0].buffer));
         const reopened = new SessionTimeline ({ document : saved.document, website : { viewer : {} } }); reopened.Load (saved.view.timeline);
-        assert.equal (reopened.cameraKeyframes.length, 1); assert.deepEqual (reopened.ObjectStateAt (saved.document.objects[0], 2).position, [1, 0, 0]);
+        assert.equal (reopened.embeddedClips.length, 1); assert.equal (reopened.embeddedClips[0].objectId, saved.document.objects[0].id); assert.equal (reopened.cameraKeyframes.length, 1); assert.deepEqual (reopened.ObjectStateAt (saved.document.objects[0], 2).position, [1, 0, 0]);
         assert.throws (() => reopened.SetRange (3, 2), /range/);
         assert.doesNotThrow (() => reopened.SetRange (3.99, 4));
     });

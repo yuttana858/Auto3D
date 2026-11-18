@@ -1,4 +1,5 @@
 import { ValidateTimelineActions } from './timelineactions.js';
+import { ValidateTimelineClips, TimelineClipSample } from './timelineclips.js';
 import { ValidateVisibilityKeys, VisibilityAt } from './visibilitytrack.js';
 import * as THREE from 'three';
 
@@ -142,7 +143,7 @@ export class SessionTimeline
         this.loop = false;
         this.foldAutoFit = true;
         this.interpolation = 'smooth';
-        this.actions = []; this.cameraKeyframes = []; this.objectKeyCache = new WeakMap ();
+        this.actions = []; this.embeddedClips = []; this.cameraKeyframes = []; this.objectKeyCache = new WeakMap ();
         this.playing = false;
         this.frame = null;
         this.onTime = null;
@@ -158,7 +159,7 @@ export class SessionTimeline
         this.duration = Number.isFinite (source.duration) ? Clamp (source.duration, 0.1, 3600) : 5;
         this.time = Number.isFinite (source.time) ? Clamp (source.time, 0, this.duration) : 0;
         this.loop = source.loop === true;
-        this.foldAutoFit = source.foldAutoFit !== false; this.actions = ValidateTimelineActions (source.actions || []);
+        this.foldAutoFit = source.foldAutoFit !== false; this.actions = ValidateTimelineActions (source.actions || []); this.embeddedClips = ValidateTimelineClips (source.embeddedClips || []);
         this.interpolation = NormalizeInterpolation (source.interpolation);
         this.cameraKeyframes = Array.isArray (source.cameraKeyframes) ? source.cameraKeyframes.map (NormalizeCameraKeyframe).filter (Boolean).sort ((a, b) => a.time - b.time) : [];
         this.ExtendDurationForKeys ();
@@ -171,6 +172,7 @@ export class SessionTimeline
     {
         return {
             version : 3,
+            embeddedClips : this.embeddedClips.filter (action => this.editor.document.objects.some (object => object.id === action.objectId)).map (action => ({ ...action })),
             actions : this.actions.filter (action => this.editor.document.objects.some (object => object.id === action.objectId)).map (action => ({ ...action })),
             rangeStart : this.rangeStart, rangeEnd : this.rangeEnd,
             duration : this.duration,
@@ -189,6 +191,7 @@ export class SessionTimeline
             for (const keyframe of [...(object.keyframes || []), ...(object.visibilityKeys || [])]) { maximum = Math.max (maximum, keyframe.time || 0); }
         }
         maximum = Math.max (maximum, ...this.actions.filter (action => this.editor.document.objects.some (object => object.id === action.objectId)).map (action => action.time + action.duration));
+        maximum = Math.max (maximum, ...this.embeddedClips.filter (action => this.editor.document.objects.some (object => object.id === action.objectId)).map (action => action.time + action.duration));
         this.duration = Math.max (this.duration, maximum, 0.1);
         this.time = Clamp (this.time, 0, this.duration);
     }
@@ -223,6 +226,35 @@ export class SessionTimeline
         if (!Number.isFinite (start) || start < 0 || start > 3600 || (end !== null && (!Number.isFinite (end) || end <= start || end > 3600))) { throw new Error ('Use a start from 0 to 3600 and an end after the start.'); }
         const key = (time, visible) => ({ id : crypto.randomUUID (), time, visible });
         return this.SetVisibilityKeys (object, [...(start > 0 ? [key (0, false)] : []), key (start, true), ...(end === null ? [] : [key (end, false)])]);
+    }
+    ApplyEmbeddedClips ()
+    {
+        const groups = new Map (); for (const action of this.embeddedClips) { if (!groups.has (action.objectId)) { groups.set (action.objectId, []); } groups.get (action.objectId).push (action); }
+        for (const object of this.editor.document.objects) {
+            const player = object.player, actions = groups.get (object.id); if (!player || !actions) { continue; }
+            const sample = TimelineClipSample (actions, object.id, this.time, player.clips); if (!sample || !player.clips[sample.clip]) { continue; }
+            if (player.state.playing) { player.SetPlaying (false); }
+            if (player.state.clip !== sample.clip) { player.Choose (sample.clip, sample.time, false); }
+            if (sample.loop !== null) { player.action.setLoop (sample.loop ? THREE.LoopRepeat : THREE.LoopOnce, sample.loop ? Infinity : 1); player.action.clampWhenFinished = !sample.loop; } else { player.ApplyLoopMode (); }
+            player.Seek (sample.time, false);
+        }
+    }
+    AddEmbeddedClip ({ objectId = this.editor.selected?.id, clip, time = this.time, duration, speed = 1, loop = false } = {})
+    {
+        const editor = this.editor; if (editor.readOnly || editor.busy || this.playing || !editor.website.auth?.user || editor.website.accountReady === false) { throw new Error ('Pause playback and choose an editable signed-in timeline.'); }
+        const object = editor.document.objects.find (item => item.id === objectId), player = object?.player;
+        if (!player || !Number.isInteger (clip) || !player.clips[clip] || player.state.playing) { throw new Error ('Select an object with a paused embedded clip.'); }
+        const before = this.embeddedClips, first = before.find (item => item.objectId === objectId), action = { id : crypto.randomUUID (), objectId, clip, time, duration, speed, loop, baseClip : first?.baseClip ?? player.state.clip, baseTime : first?.baseTime ?? player.state.time };
+        const next = ValidateTimelineClips ([...before, action]); const oldDuration = this.duration, oldEnd = this.rangeEnd;
+        const apply = (items, forward) => { this.embeddedClips = items; this.duration = oldDuration; this.rangeEnd = oldEnd; this.ExtendDurationForKeys (); if (forward && oldEnd === oldDuration) { this.rangeEnd = this.duration; } if (!items.some (item => item.objectId === objectId)) { player.Choose (action.baseClip, action.baseTime, false); } this.Seek (this.time); editor.MarkDirty (); editor.AnimationUI (); };
+        apply (next, true); editor.history.Push ({ undo : () => apply (before, false), redo : () => apply (next, true) }); return { action : { ...action } };
+    }
+    DeleteEmbeddedClip (id)
+    {
+        const editor = this.editor; if (editor.readOnly || editor.busy || this.playing || !editor.website.auth?.user || editor.website.accountReady === false) { throw new Error ('Pause playback before editing the timeline.'); }
+        const before = this.embeddedClips, removed = before.find (item => item.id === id); if (!removed) { throw new Error ('Embedded clip action not found.'); } const next = before.filter (item => item.id !== id);
+        const apply = items => { this.embeddedClips = items; const player = editor.document.objects.find (item => item.id === removed.objectId)?.player; if (player && !items.some (item => item.objectId === removed.objectId)) { player.Choose (removed.baseClip, removed.baseTime, false); } this.Seek (this.time); editor.MarkDirty (); editor.AnimationUI (); };
+        apply (next); editor.history.Push ({ undo : () => apply (before), redo : () => apply (next) }); return { deleted : id };
     }
     async AddAction ({ objectId = this.editor.selected?.id, time = this.time, duration = 6, direction = 'toggle' } = {})
     {
@@ -343,6 +375,7 @@ export class SessionTimeline
         }
         const camera = this.CameraStateAt (this.time);
         if (camera) { ApplyCameraState (this.editor.website.viewer, camera); }
+        this.ApplyEmbeddedClips ();
         this.ApplyVisibility ();
         // Manual timeline seeking is used for close inspection. Automatic
         // fold framing runs only during playback; explicit camera keyframes

@@ -88,6 +88,16 @@ export class AnimationPanel
         this.clearVisibility = this.Button (lifetimeButtons, 'Clear visibility keys', () => { this.timeline.SetVisibilityKeys (this.editor.selected, []); this.visibilityStatus.textContent = 'Visibility keys cleared.'; }, null, this.visibilityStatus);
 
 
+        const embedded = Element ('details', 'animation_clip_section', undefined, keys); Element ('summary', null, 'Embedded clip', embedded);
+        this.clipTarget = Element ('p', 'animation_summary', '', embedded); Element ('p', 'animation_help', 'Pause the clip, then add it at the playhead. Speed changes playback; a non-looping clip holds its last frame.', embedded);
+        this.clipStatus = Element ('p', 'animation_summary', '', embedded); this.clipStatus.setAttribute ('role', 'status');
+        const clipGrid = Element ('div', 'animation_grid', undefined, embedded);
+        this.clipChoice = this.Select (clipGrid, 'Embedded clip', []); this.clipDuration = this.Number (clipGrid, 'Timeline duration (s)', .01, 3600, .01); this.clipSpeed = this.Number (clipGrid, 'Clip speed', .01, 10, .1); this.clipSpeed.value = '1';
+        const clipLoopLabel = Element ('label', 'animation_check', undefined, embedded); this.clipLoop = Element ('input', null, undefined, clipLoopLabel); this.clipLoop.type = 'checkbox'; clipLoopLabel.appendChild (document.createTextNode (' Loop clip'));
+        this.clipChoice.addEventListener ('change', () => { const clip = this.editor.selected?.player?.clips[Number (this.clipChoice.value)]; if (clip) { this.clipDuration.value = String (Number (clip.duration.toFixed (3))); } });
+        const clipButtons = Element ('div', 'animation_buttons', undefined, embedded);
+        this.clipAdd = this.Button (clipButtons, 'Add clip at playhead', () => { const object = this.editor.selected; if (!object?.player || !this.clipDuration.value.trim () || !this.clipSpeed.value.trim ()) { throw new Error ('Choose a paused clip, duration and speed.'); } this.timeline.AddEmbeddedClip ({ objectId : object.id, clip : Number (this.clipChoice.value), time : this.timeline.time, duration : Number (this.clipDuration.value), speed : Number (this.clipSpeed.value), loop : this.clipLoop.checked }); this.clipStatus.textContent = 'Clip added to timeline.'; }, null, this.clipStatus);
+
         const video = this.Section ('Export video', 'Records the range frame by frame, so no frame is dropped. The video stays in this browser until you download it.');
         const videoGrid = Element ('div', 'animation_grid', undefined, video);
         this.size = this.Select (videoGrid, 'Video size', Object.keys (VideoSizes).map (key => [key, SizeLabels[key]]));
@@ -118,6 +128,9 @@ export class AnimationPanel
         if (!this.Visible ()) { return; }
         const t = this.timeline, editor = this.editor, locked = this.Locked (), hasObjects = editor.document.objects.length > 0;
         if (this.visibilityObjectId !== (editor.selected?.id || null)) { this.visibilityObjectId = editor.selected?.id || null; this.lifeStart.value = '0'; this.lifeEnd.value = ''; this.visibilityStatus.textContent = ''; }
+        const clipPlayer = editor.selected?.player, clipId = editor.selected?.id || null;
+        if (clipId !== this.clipObjectId || clipPlayer !== this.clipPlayer) { this.clipObjectId = clipId; this.clipPlayer = clipPlayer; this.clipChoice.replaceChildren (); clipPlayer?.clips.forEach ((clip, index) => this.clipChoice.add (new Option (clip.name || 'Clip ' + (index + 1), String (index)))); if (clipPlayer) { this.clipChoice.value = String (clipPlayer.state.clip); this.clipDuration.value = String (Number (clipPlayer.clips[clipPlayer.state.clip].duration.toFixed (3))); } else { this.clipDuration.value = ''; } this.clipSpeed.value = '1'; this.clipLoop.checked = false; this.clipStatus.textContent = ''; }
+        this.clipTarget.textContent = !clipPlayer ? 'Select a model with an embedded clip.' : locked ? 'Selected: ' + editor.selected.name + ' · Editing unavailable.' : editor.busy ? 'Selected: ' + editor.selected.name + ' · Wait for the current operation.' : t.playing ? 'Selected: ' + editor.selected.name + ' · Pause the timeline to add a clip.' : clipPlayer.state.playing ? 'Selected: ' + editor.selected.name + ' · Pause the embedded clip first.' : 'Selected: ' + editor.selected.name; [this.clipChoice, this.clipDuration, this.clipSpeed, this.clipLoop, this.clipAdd].forEach (control => { control.disabled = locked || editor.busy || t.playing || !clipPlayer || clipPlayer.state.playing; });
         this.RefreshTime (); this.play.textContent = t.playing ? 'Pause' : 'Play';
         for (const [input, value] of [[this.duration, t.duration], [this.rangeStart, t.rangeStart], [this.rangeEnd, t.rangeEnd]]) { if (document.activeElement !== input) { input.value = String (Number (value.toFixed (3))); } }
         this.tween.value = t.interpolation; this.loop.checked = t.loop;
@@ -126,7 +139,7 @@ export class AnimationPanel
         this.play.disabled = this.reset.disabled = this.scrub.disabled = this.video.running;
         const visibilityKeys = editor.document.objects.reduce ((sum, item) => sum + (item.visibilityKeys?.length || 0), 0);
         const objectKeys = editor.document.objects.reduce ((sum, item) => sum + (item.keyframes?.length || 0), 0), animated = editor.document.objects.filter (item => item.keyframes?.length).length;
-        this.keySummary.textContent = t.cameraKeyframes.length + ' camera keyframe' + (t.cameraKeyframes.length === 1 ? '' : 's') + ' · ' + objectKeys + ' object keyframe' + (objectKeys === 1 ? '' : 's') + (animated ? ' on ' + animated + ' object' + (animated === 1 ? '' : 's') : '') + ' · ' + visibilityKeys + ' visibility keyframe' + (visibilityKeys === 1 ? '' : 's') + ' · ' + (t.actions?.length || 0) + ' fold action' + ((t.actions?.length || 0) === 1 ? '' : 's');
+        this.keySummary.textContent = t.cameraKeyframes.length + ' camera keyframe' + (t.cameraKeyframes.length === 1 ? '' : 's') + ' · ' + objectKeys + ' object keyframe' + (objectKeys === 1 ? '' : 's') + (animated ? ' on ' + animated + ' object' + (animated === 1 ? '' : 's') : '') + ' · ' + visibilityKeys + ' visibility keyframe' + (visibilityKeys === 1 ? '' : 's') + ' · ' + (t.embeddedClips?.length || 0) + ' clip action' + ((t.embeddedClips?.length || 0) === 1 ? '' : 's') + ' · ' + (t.actions?.length || 0) + ' fold action' + ((t.actions?.length || 0) === 1 ? '' : 's');
         this.size.value = this.options.size; this.fps.value = String (this.options.fps); this.format.value = this.options.format;
         this.RefreshVideo ();
     }

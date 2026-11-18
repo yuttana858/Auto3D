@@ -1,3 +1,4 @@
+import { ValidateTimelineClips } from './timelineclips.js';
 import { ValidateVisibilityKeys } from './visibilitytrack.js';
 import { ValidateDimensions } from './dimensioncore.js';
 import { ValidateProductDefinition } from '../../modules/primary-products/src/definition.js';
@@ -185,7 +186,7 @@ export function MigrateSessionData (data)
 export function PackSession (document, view = {}, objects = document.objects, kind = 'session')
 {
     const model = document.CompactModel (objects);
-    if (view.timeline?.actions) { view = { ...view, timeline : { ...view.timeline, actions : ValidateTimelineActions (view.timeline.actions).filter (action => objects.some (object => object.id === action.objectId)) } }; }
+    if (view.timeline) { view = { ...view, timeline : { ...view.timeline, actions : ValidateTimelineActions (view.timeline.actions || []).filter (action => objects.some (object => object.id === action.objectId)), embeddedClips : ValidateTimelineClips (view.timeline.embeddedClips || []).filter (action => objects.some (object => object.id === action.objectId)) } }; }
     return {
         dimensions : ValidateDimensions (document.dimensions || []).filter (d => objects.some (o => o.id === d.objectId)), dimensionsVisible : document.dimensionsVisible !== false,
         format : 'SW Auto3D', version : SessionVersion, metadata : { savedAt : new Date ().toISOString () }, kind, name : document.name, view, packaging : kind === 'session' && document.packaging ? ValidatePackaging (document.packaging) : null,
@@ -267,6 +268,7 @@ export function ReadSession (data)
         return object;
     });
     if (data.view?.timeline?.actions) { const actions = ValidateTimelineActions (data.view.timeline.actions); if (actions.some (action => !document.objects.some (object => object.id === action.objectId && object.userData._auto3dFefco))) { throw new Error ('Invalid action keyframe target.'); } }
+    if (data.view?.timeline?.embeddedClips) { const clips = ValidateTimelineClips (data.view.timeline.embeddedClips); if (clips.some (clip => !document.objects.some (object => object.id === clip.objectId && object.animationAsset))) { throw new Error ('Invalid embedded clip target.'); } }
     return { document, view : data.view || {}, kind : data.kind === 'model' ? 'model' : 'session' };
 }
 

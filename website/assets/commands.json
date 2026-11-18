@@ -6531,6 +6531,82 @@
       }
     },
     {
+      "id": "animation.clip.add",
+      "title": "Add embedded clip to timeline",
+      "category": "Animation",
+      "description": "Schedule a paused embedded clip for an existing model on the shared timeline. Start and duration are seconds; speed and loop control clip sampling. Overlaps on the same object are rejected. Preview and video export follow this same timeline. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "clip": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "time": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3600
+          },
+          "duration": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 3600
+          },
+          "speed": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 10
+          },
+          "loop": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "objectId",
+          "clip",
+          "duration"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "objectId": "object-1",
+        "clip": 0,
+        "time": 1,
+        "duration": 3,
+        "speed": 1,
+        "loop": false
+      }
+    },
+    {
+      "id": "animation.clip.delete",
+      "title": "Remove embedded clip from timeline",
+      "category": "Animation",
+      "description": "Remove one embedded clip timeline action by ID. Undo restores it.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "clip-action-id"
+      }
+    },
+    {
       "id": "animation.action.open",
       "title": "Open Action keyframe options",
       "category": "Animation",

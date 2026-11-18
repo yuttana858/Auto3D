@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Embedded clips on the shared timeline — Auto3D 0.91.0 candidate
+
+Stacked on PR #158. Schedules paused embedded clips on the shared timeline with start, duration, speed and looping; seeking, playback and video export sample the same timeline. Adds an Animation panel control, object-track clip spans, agent commands and archive persistence. Unmanaged clips retain their existing independent behavior. Array recording and macro-generated procedural actions remain future work. See release-0910.md. Not deployed.
+
 ## Object visibility and lifetime timeline — Auto3D 0.90.0 candidate
 
 Stacked on PR #157. Adds discrete, undoable visibility keyframes and lifetime ranges for existing scene objects, a compact Animation panel editor, macro visibility capture, session persistence and agent controls. UI/UX review was performed independently; selected-object context, local feedback, reset on selection change, and marker legends are included. This does not record object creation or permanent deletion. See release-0900.md. Not deployed.

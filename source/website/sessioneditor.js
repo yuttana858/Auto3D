@@ -599,7 +599,7 @@ export class SessionEditor
             this.website.sidebar.detailsPanel.modelFormat = 'SESSION';
             this.website.UpdateMeshesVisibility ();
             this.website.sceneEffects?.ApplyObjectSettings (this.document.objects);
-            await this.packaging.presentation?.PrepareAll (); this.timeline.ApplyVisibility (); this.packaging.presentation?.Apply (this.timeline.time, false);
+            await this.packaging.presentation?.PrepareAll (); this.timeline.ApplyEmbeddedClips (); this.timeline.ApplyVisibility (); this.packaging.presentation?.Apply (this.timeline.time, false);
             this.RefreshUI (); this.Select (this.selected); this.website.sceneEffects?.Refresh (); this.website.viewModes?.Refresh (); this.website.viewer.Render ();
         } finally { this.busy = false; this.RefreshButtons (); this.website.materialPanel?.Update (); }
     }
@@ -1109,6 +1109,7 @@ export class SessionEditor
             (object.visibilityKeys || []).forEach (keyframe => entries.push ({ type : 'visibility', keyframe, object, label : object.name + (keyframe.visible ? ' · Show' : ' · Hide') }));
         }
         for (const action of timeline.actions) { const object = this.document.objects.find (object => object.id === action.objectId); if (object) { entries.push ({ type : 'action', keyframe : action, object, label : object.name + ' · ' + action.direction + ' fold action (' + action.duration + ' s)' }); } }
+        for (const clip of timeline.embeddedClips) { const object = this.document.objects.find (item => item.id === clip.objectId); if (object) { entries.push ({ type : 'clip', keyframe : clip, object, label : object.name + ' · embedded clip ' + (clip.clip + 1) + ' (' + clip.duration + ' s)' }); } }
         entries.sort ((left, right) => left.keyframe.time - right.keyframe.time || left.type.localeCompare (right.type));
         if (!entries.length) {
             Element ('p', 'section_hint', 'Set the timeline time, position an object or the viewer camera, then save a keyframe. Smooth tweening is applied between keyframes by default.', keys);
@@ -1118,12 +1119,12 @@ export class SessionEditor
                 const seek = Element ('button', 'timeline_keyframe_seek', entry.keyframe.time.toFixed (2) + 's · ' + entry.label, row);
                 seek.title = entry.type === 'camera'
                     ? 'Camera · ' + entry.keyframe.azimuth.toFixed (1) + '° az · ' + entry.keyframe.elevation.toFixed (1) + '° el · ' + DisplayLength (entry.keyframe.distance, this.document.model.GetUnit (), this.website.preferences.units) + ' distance'
-                    : entry.label + (entry.type === 'action' ? ' · procedural fold' : entry.type === 'visibility' ? ' · discrete visibility' : ' · ' + entry.keyframe.interpolation + ' tween');
+                    : entry.label + (entry.type === 'action' ? ' · procedural fold' : entry.type === 'visibility' ? ' · discrete visibility' : entry.type === 'clip' ? ' · embedded clip' : ' · ' + entry.keyframe.interpolation + ' tween');
                 seek.addEventListener ('click', () => { timeline.Seek (entry.keyframe.time); this.AnimationUI (); });
-                Element ('span', 'timeline_keyframe_mode', entry.type === 'action' ? 'Action' : entry.type === 'visibility' ? 'Visibility' : entry.keyframe.interpolation, row);
+                Element ('span', 'timeline_keyframe_mode', entry.type === 'action' ? 'Action' : entry.type === 'visibility' ? 'Visibility' : entry.type === 'clip' ? 'Clip' : entry.keyframe.interpolation, row);
                 if (!this.readOnly) {
                     const remove = Element ('button', 'timeline_keyframe_delete', '×', row); remove.title = 'Delete keyframe';
-                    remove.addEventListener ('click', () => { if (entry.type === 'action') { timeline.DeleteAction (entry.keyframe.id); } else if (entry.type === 'visibility') { timeline.SetVisibilityKeys (entry.object, entry.object.visibilityKeys.filter (key => key.id !== entry.keyframe.id)); } else { timeline.DeleteKeyframe (entry.type, entry.keyframe.id, entry.object); } this.MarkDirty (); this.AnimationUI (); });
+                    remove.addEventListener ('click', () => { if (entry.type === 'action') { timeline.DeleteAction (entry.keyframe.id); } else if (entry.type === 'clip') { timeline.DeleteEmbeddedClip (entry.keyframe.id); } else if (entry.type === 'visibility') { timeline.SetVisibilityKeys (entry.object, entry.object.visibilityKeys.filter (key => key.id !== entry.keyframe.id)); } else { timeline.DeleteKeyframe (entry.type, entry.keyframe.id, entry.object); } this.MarkDirty (); this.AnimationUI (); });
                 }
             }
         }
@@ -1143,7 +1144,8 @@ export class SessionEditor
         const clipSettings = Element ('div', 'animation_settings', undefined, embedded);
         const speedLabel = Element ('label', null, 'Speed', clipSettings); const speed = Element ('select', null, undefined, speedLabel); speed.setAttribute ('aria-label', 'Animation speed'); [0.25, 0.5, 1, 1.5, 2].forEach ((value) => speed.add (new Option (value + '×', value))); speed.value = String (player.state.speed); speed.addEventListener ('change', () => { player.state.speed = Number (speed.value); this.MarkDirty (); });
         const clipLoopLabel = Element ('label', null, 'Loop', clipSettings); const clipLoop = Element ('input', null, undefined, clipLoopLabel); clipLoop.type = 'checkbox'; clipLoop.checked = player.state.loop !== false; clipLoop.setAttribute ('aria-label', 'Loop embedded animation'); clipLoop.addEventListener ('change', () => { player.SetLoop (clipLoop.checked); this.MarkDirty (); });
-        const clipScrub = Element ('input', null, undefined, embedded); clipScrub.type = 'range'; clipScrub.min = '0'; clipScrub.max = String (player.clips[player.state.clip].duration); clipScrub.step = '0.01'; clipScrub.value = String (player.state.time); clipScrub.setAttribute ('aria-label', 'Embedded animation timeline'); clipScrub.addEventListener ('input', () => { player.Seek (Number (clipScrub.value)); this.MarkDirty (); this.UpdateDetails (); }); player.onTime = (time) => { if (document.activeElement !== clipScrub) { clipScrub.value = String (time); } }; player.onPlaybackChanged = (playing) => { clipPlay.textContent = playing ? 'Pause' : 'Play'; this.MarkDirty (); };
+        const clipScrub = Element ('input', null, undefined, embedded); clipScrub.type = 'range'; clipScrub.min = '0'; clipScrub.max = String (player.clips[player.state.clip].duration); clipScrub.step = '0.01'; clipScrub.value = String (player.state.time); clipScrub.setAttribute ('aria-label', 'Embedded animation timeline'); clipScrub.addEventListener ('input', () => { player.Seek (Number (clipScrub.value)); this.MarkDirty (); this.UpdateDetails (); }); player.onTime = (time) => { if (document.activeElement !== clipScrub) { clipScrub.value = String (time); } }; player.onPlaybackChanged = (playing) => { clipPlay.textContent = playing ? 'Pause' : 'Play'; this.MarkDirty (); this.website.animationPanel?.Refresh (); };
+        if (timeline.embeddedClips.some (item => item.objectId === this.selected.id)) { [clips, clipPlay, clipReset, speed, clipLoop, clipScrub].forEach (control => { control.disabled = true; }); Element ('p', 'section_hint', 'Controlled by the timeline; remove the clip actions to use independent playback.', embedded); }
     }
 
     FitScene ()

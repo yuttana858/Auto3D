@@ -761,3 +761,9 @@ div.main_viewer
 .animation_object_track .animation_visibility_marker { top: 28px; min-width: 24px; min-height: 24px; }
 .animation_track_legend { font-size: var(--workspace-help-font-size, 12px); margin: 6px 0; opacity: .8; }
 .advance_animation_panel button:focus-visible, .advance_animation_panel summary:focus-visible { outline: 2px solid var(--ov_hover_color, #5aa9e6); outline-offset: 2px; }
+
+.animation_object_track .animation_clip_marker { top: 52px; color: #8dbf88 !important; min-width: 24px; min-height: 24px; }
+.animation_object_track .advance_animation_rail { height: 80px; }
+.animation_object_track .advance_animation_track { min-height: 88px; }
+
+.animation_clip_span { position: absolute; top: 60px; height: 7px; background: #8dbf88; border-radius: 4px; pointer-events: none; }
