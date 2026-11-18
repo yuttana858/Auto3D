@@ -50,7 +50,7 @@ try {
     await panel.getByRole ('button', { name : 'Form depth', exact : true }).click ();
     await until ('pulp.inspect', r => r.draft.formDepthMm === 35);
     await panel.getByRole ('button', { name : 'Form tray', exact : true }).click ();
-    await until ('pulp.inspect', r => r.result?.stage === 'tray' && !r.generating);
+    await until ('pulp.inspect', r => r.result?.stage === 'tray' && !r.generating && !r.refining && !r.livePending);
     const tray = (await call ('pulp.inspect')).result;
     assert.equal (tray.metrics.pocketCount, 6); assert.equal (tray.metrics.achievedDepthMm, 35); assert.equal ((await call ('scene.inspect')).objects.length, 7, 'the tray replaced the sheet in place');
     const box = await panel.boundingBox (), rail = await page.locator ('.scene_module_tools').boundingBox (); assert.ok (await panel.evaluate (node => node.scrollWidth <= node.clientWidth + 1), 'the minimal panel has no horizontal overflow'); assert.ok (box.width > 200 && rail);
@@ -88,8 +88,8 @@ try {
     const fine = await until ('pulp.inspect', r => r.result?.metrics?.detail === 'fine' && !r.refining && !r.generating, 120000);
     const idle = await page.evaluate (() => new Promise (resolve => { let count = 0; const end = performance.now () + 1000; const tick = () => { count++; if (performance.now () < end) { requestAnimationFrame (tick); } else { resolve (count); } }; requestAnimationFrame (tick); }));
     console.log ('Frames per second while refining: ' + await frames + ', idle: ' + idle + ' (software GPU)');
-    assert.ok (await frames >= Math.max (2, idle * 0.5), 'the viewer keeps rendering while the fine tray refines: ' + await frames + ' vs ' + idle + ' idle frames per second');
     console.log ('Longest main-thread task during the fine tray: ' + Math.round (await page.evaluate (() => window.__longest)) + ' ms');
+    assert.ok (await frames >= Math.max (2, idle * 0.5), 'the viewer keeps rendering while the fine tray refines: ' + await frames + ' vs ' + idle + ' idle frames per second');
     assert.equal (fine.result.metrics.pocketCount, 6); assert.equal (fine.result.metrics.lugCount, 4); assert.ok (fine.result.metrics.cellMm <= 0.5);
     assert.ok (fine.result.trace.some (t => t.rule === 'RIB-BETWEEN') && fine.result.trace.every (t => /MP knowledge base/.test (t.basis)));
     await panel.locator ('.mp_why summary').click (); assert.ok (await panel.locator ('.mp_trace_item').count () >= 8);
