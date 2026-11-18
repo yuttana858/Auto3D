@@ -590,6 +590,7 @@ export class SessionEditor
             this.document.objects.forEach ((object) => { object.threeObject.visible = object.visible; });
             await PreparePackagingPresentations (this.document.objects, this.document.model.materials, this.document.model.GetUnit ());
             if (beforeDisplay) { beforeDisplay (); }
+            this.motionOverride?.(); // A running sequence (Auto Pack) keeps its in-flight placement across rebuilds.
             this.website.navigator.Clear ();
             this.website.SetUIState (2);
             this.website.OnModelLoaded ({ model : this.document.model, mainFile : this.document.name, usedFiles : this.document.objects.map ((object) => object.source), missingFiles : [] }, root, fit);

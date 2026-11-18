@@ -51,7 +51,7 @@ describe ('Auto Pack scene integration', function () {
         const summary = auto.Inspect (); assert.equal (summary.available, false); assert.equal (summary.fitted, true); assert.equal (summary.objectId, product.id); near (summary.productMm.width, 60); near (summary.productMm.height, 80); near (summary.productMm.length, 24);
         assert.throws (() => SessionEditor.prototype.Archive.call (editor), /Finish or cancel folding/);
         const operation = editor.packaging.foldOperation; operation.player.now = () => operation.player.last + 2000; pending (); await operation.completion;
-        assert.equal (editor.packaging.FoldInspect ().state, 'completed'); assert.equal (editor.busy, false); assert.equal (editor.document.objects.length, 2); assert.equal (editor.history.undo.length, 2);
+        assert.equal (editor.packaging.FoldInspect ().state, 'completed'); assert.equal (editor.busy, false); assert.equal (editor.document.objects.length, 2); assert.equal (editor.history.undo.length, 1, 'the whole Auto Pack is one Undo step');
         assert.equal (JSON.stringify ([product.position, product.rotation, product.scale]), transform); assert.equal (editor.document.objects[0], product);
         const packed = editor.selected; assert.equal (packed.id, result.objectId); assert.equal (packed.userData._auto3dPackagingState, 'folded');
         const restored = ReadSession (PackSession (editor.document)).document.objects.find (o => o.id === packed.id); assert.equal (JSON.parse (restored.userData._auto3dAutoPack).productId, product.id);
@@ -62,7 +62,8 @@ describe ('Auto Pack scene integration', function () {
         assert.ok (['length', 'width', 'height'].every (id => inside[id].basis === 'inside'));
         near (inside.length.insideMm, 60 + .0508 + 3); near (inside.width.insideMm, 24 + .0508); near (inside.height.insideMm, 80 + .0508);
         assert.equal (engineering.material.caliperMm, JSON.parse (packed.userData._auto3dFefco).thickness);
-        await editor.history.Undo (); assert.equal (editor.selected.userData._auto3dPackagingState, 'flat'); await editor.history.Undo (); assert.deepEqual (editor.document.objects, [product]); assert.equal (editor.selected, product);
+        await editor.history.Undo (); assert.deepEqual (editor.document.objects, [product]); assert.equal (editor.selected, product);
+        await editor.history.Redo (); assert.equal (editor.document.objects.length, 2); assert.equal (editor.selected.userData._auto3dPackagingState, 'folded'); await editor.history.Undo (); assert.deepEqual (editor.document.objects, [product]);
         await editor.history.Redo (); await editor.history.Redo (); assert.equal (editor.selected.userData._auto3dPackagingState, 'folded'); assert.equal (editor.document.objects.length, 2);
     });
     it ('pause/cancel restores the generated flat carton and Undo removes only that carton', async () => {
@@ -113,6 +114,32 @@ describe ('Auto Pack scene integration', function () {
         copies[1].position[2] += 1; editor.document.ApplyTransform (copies[1]); await assert.rejects (() => editor.packaging.AnimateFold (), /product changed/);
         copies[1].position[2] -= 1; editor.document.ApplyTransform (copies[1]);
         editor.SelectedObjects = () => [...group, carton]; editor.selected = product; assert.match (auto.Inspect ().reason, /rather than their Auto Pack carton/);
+    });
+    it ('plays the assembly sequence: products rise in place, pieces lower in later, everything ends packed, one Undo restores', async () => {
+        const { auto, editor, product } = fixture ();
+        const copies = [1, 2].map (index => { const copy = editor.document.Instance (product); copy.position = [index * 50, 0, 0]; editor.document.ApplyTransform (copy); return copy; });
+        const products = [product, ...copies]; products.forEach (item => { item.userData = { _auto3dGroup : 'row', _auto3dGroupName : 'Array group', _auto3dGroupKind : 'array' }; });
+        editor.SelectedObjects = () => products; const original = products.map (item => [...item.position]);
+        // Stand-in meshes record where the sequence draws each object.
+        const mesh = () => ({ position : { x : 0, y : 0, z : 0, set (x, y, z) { Object.assign (this, { x, y, z }); }, fromArray (a) { this.set (...a); } }, visible : true, updateMatrixWorld () {} });
+        products.forEach (o => { o.threeObject = mesh (); });
+        const result = await auto.Generate ({ duration : 1, partitions : true, pads : ['bottom', 'top', 'front', 'back'] });
+        const sequence = auto.sequence, info = sequence.Inspect ();
+        assert.deepEqual (info.stages.map (s => s.name), ['lift', 'erect', 'bottom', 'sides', 'partitions', 'products', 'top', 'close']);
+        assert.deepEqual (info.order, [product.id, copies[0].id, copies[1].id]); assert.ok (info.entryMm > 83);
+        const pieces = result.contents.pieces.map (id => editor.document.objects.find (o => o.id === id)), drawn = o => [o.threeObject.position.x, o.threeObject.position.y, o.threeObject.position.z];
+        pieces.forEach (o => { o.threeObject ||= mesh (); }); /* only products and pieces; the carton keeps the fold's own preview */
+        sequence.Frame (0); assert.ok (pieces.every (o => o.threeObject.visible === false), 'pads and partitions start hidden');
+        products.forEach ((item, i) => { const at = drawn (item); original[i].forEach ((v, axis) => near (at[axis], v)); }); /* drawn where they were, before the partition spread */
+        const stage = name => info.stages.find (s => s.name === name);
+        sequence.Frame ((stage ('erect').start + stage ('erect').end) / 2); assert.ok (sequence.Inspect ().fold > 0 && sequence.Inspect ().fold < 0.76);
+        products.forEach (item => assert.ok (drawn (item)[1] > item.position[1] + 83, 'hovering above the open carton while it erects'));
+        sequence.Frame (stage ('close').start); assert.equal (sequence.Inspect ().fold, 0.76); products.forEach (item => near (drawn (item)[1], item.position[1]));
+        assert.ok (pieces.every (o => o.threeObject.visible));
+        const operation = editor.packaging.foldOperation; operation.player.now = () => operation.player.last + 2000; operation.player.Tick (); await operation.completion;
+        assert.equal (editor.packaging.FoldInspect ().state, 'completed', JSON.stringify (editor.packaging.lastFold)); assert.equal (editor.history.undo.length, 1, 'contents, carton and fold are one Undo step');
+        [...products, ...pieces].forEach (o => { const at = drawn (o); o.position.forEach ((v, axis) => near (at[axis], v)); assert.equal (o.threeObject.visible, true); });
+        await editor.history.Undo (); assert.deepEqual (editor.document.objects, products); products.forEach ((item, i) => assert.deepEqual (item.position, original[i]));
     });
     it ('packs an array with nested partitions and pads: opens gaps, nests strips, fits the carton around everything', async () => {
         const { auto, editor, product } = fixture ();
