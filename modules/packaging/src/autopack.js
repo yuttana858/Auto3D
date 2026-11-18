@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { CreateFefcoFoldRig, FefcoFoldPose } from './folding.js';
+import { CreateFefcoFoldRig, FefcoFoldPose, FefcoFlapLayers, FefcoFlapLayer, FefcoDisplayPose } from './folding.js';
 import { CreateAutoPackPlan } from './autopackplan.js';
-export { AutoPackClearanceMm, CreateAutoPackPlan } from './autopackplan.js';
+export { AutoPackClearanceMm, CreateAutoPackPlan, AutoPackStyles } from './autopackplan.js';
 import { PanelSolid, SolidIntersections } from './solid.js';
 import { TransformAppearanceMesh } from './boardappearance.js';
 
@@ -11,16 +11,16 @@ const phase = (progress, start, end) => { const t = Math.max (0, Math.min (1, (p
 
 export function CreateAutoPackRig (input, savedProfile = null)
 {
-    const plan = CreateAutoPackPlan ({ size : input.size, clearanceMm : input.clearanceMm, ...(input.material ? { material : input.material } : { thickness : input.thickness }) });
+    const plan = CreateAutoPackPlan ({ size : input.size, clearanceMm : input.clearanceMm, ...(input.code ? { code : input.code } : {}), ...(input.material ? { material : input.material } : { thickness : input.thickness }) });
+    // The carton is the Packaging generator's own rig for this style: same panels, presentation meshes (board
+    // appearance, panel bow, trimmed score bands) and crease visuals, so new generator styles carry over unchanged.
+    // The product-clearance audit uses the exact panel solids; bow and rounded crease joins are display only.
     const rig = CreateFefcoFoldRig (plan.parameters, savedProfile);
-    rig.autoPack = plan;
-    // Cosmetic bow and crease arcs can leave the audited prisms by more than
-    // the requested clearance. Keep exact panel geometry for this tight fit;
-    // existing material grain/texture maps remain available.
-    rig.presentationMeshes = rig.meshes; rig.visualMeshes = [];
+    rig.autoPack = plan; rig.flapLayers = FefcoFlapLayers (plan.parameters);
     const anchorIndex = rig.panels.findIndex (panel => panel.kind === 'base' && panel.index === 1);
     const final = FefcoFoldPose (rig, 1);
-    const alignment = new THREE.Matrix4 ().makeRotationY (plan.swapped ? Math.PI / 2 : 0).multiply (translate (0, -(2 * plan.thickness + plan.clearanceMm), plan.thickness / 2));
+    // The product rests on the base flap stack: drop the anchor by the stack plus clearance.
+    const alignment = new THREE.Matrix4 ().makeRotationY (plan.swapped ? Math.PI / 2 : 0).multiply (translate (0, -(rig.flapLayers.baseLayers * plan.thickness + plan.clearanceMm), plan.thickness / 2));
     rig.autoPackAnchor = alignment.multiply (new THREE.Matrix4 ().fromArray (final.matrices[anchorIndex])).toArray ();
     const [x, y, z] = plan.size;
     rig.autoPackProduct = PanelSolid ([[-x / 2, -z / 2], [x / 2, -z / 2], [x / 2, z / 2], [-x / 2, z / 2]], y);
@@ -39,7 +39,7 @@ function Pose (rig, progress)
         const wall = walls[panel.index];
         if (panel.kind === 'wall') { return wall; }
         if (panel.kind === 'joint') { return hinge (wall.clone ().multiply (translate (0, t * phase (progress, .02, .04), 0)), [0, 0, 0], new THREE.Matrix4 ().makeRotationZ (-Math.PI / 2 * phase (progress, .04, .15))); }
-        const top = panel.kind === 'top', anchor = !top && panel.index === 1, layer = panel.index % 2 === 1 ? 0 : 1;
+        const top = panel.kind === 'top', anchor = !top && panel.index === 1, layer = FefcoFlapLayer (panel, rig.flapLayers);
         const order = (top ? [1, 3, 0, 2] : [3, 0, 2]).indexOf (panel.index), start = (top ? .77 : .58) + order * .055;
         const turn = anchor ? phase (progress, 0, .2) : phase (progress, start + .01, start + .05);
         const lift = anchor ? 1 : phase (progress, start, start + .01);
@@ -61,7 +61,7 @@ export function AutoPackFoldPose (rig, progress)
 {
     const pose = Pose (rig, progress), contacts = AutoPackFoldContacts (rig, pose);
     if (!contacts.clear) { throw new Error ('Auto Pack blocked: ' + contacts.intersections[0].panels.join (' / ') + ' intersect at ' + (100 * progress).toFixed (2) + '%.'); }
-    return { ...pose, contacts, visualMeshes : [] };
+    return { ...pose, contacts, ...FefcoDisplayPose (rig, pose) };
 }
 
 // Audit is independent of display frame rate. Maximum hinge speed is 3375
@@ -72,10 +72,10 @@ export async function InspectAutoPackFold (rig, yieldProgress = null)
     const steps = 3600;
     for (let i = 0; i <= steps; i++) {
         const progress = i / steps, pose = Pose (rig, progress), contacts = AutoPackFoldContacts (rig, pose);
-        if (!contacts.clear) { return { code : '0201', samples : i + 1, progress, stage : pose.stage, ...contacts }; }
+        if (!contacts.clear) { return { code : rig.parameters.code, samples : i + 1, progress, stage : pose.stage, ...contacts }; }
         if (yieldProgress && i % 128 === 0) { await yieldProgress (progress); }
     }
-    return { code : '0201', clear : true, samples : steps + 1, angularStep : 1, units : 'mm', tolerance : .00001, intersections : [], productClearanceMm : rig.autoPack.clearanceMm };
+    return { code : rig.parameters.code, clear : true, samples : steps + 1, angularStep : 1, units : 'mm', tolerance : .00001, intersections : [], productClearanceMm : rig.autoPack.clearanceMm };
 }
 
 export function AutoPackFoldFrame (rig, progress)

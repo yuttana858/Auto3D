@@ -42,6 +42,8 @@ Auto3D 0.81.0 (Packaging 1.14.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0, b
 
 Molded Pulp 0.2.0 (Auto3D 0.83.0 / Packaging 1.14.0 / Primary Products 0.15.0, based on main after #145 (0.82.1)) adds a knowledge-base rule base for ribs and denest lugs (`modules/molded-pulp/src/rules.js`, traced decisions), live preview with one Undo step per burst, worker-based progressive detail (Draft/Standard/Fine/Ultra, `molded-pulp.worker.js`) and top-bottom/side clamshells. Keep heavy forming in the worker and new geometry on the adaptive shell mesher. See docs/release-0830.md.
 
+Auto3D 0.84.0 (Packaging 1.15.0 / Primary Products 0.15.0 / Molded Pulp 0.2.0, based on main after #146 (0.83.0)) builds Auto Pack cartons with the Packaging generator: board appearance and crease visuals (`FefcoDisplayPose`), flap layering (`FefcoFlapLayers`) and the style catalog (`AutoPackStyles` = `FefcoStyles`), so new generator styles reach Auto Pack automatically. Refresh bounds assigns units to unitless scenes (`packaging.auto.refresh_bounds { units }`). Keep Auto Pack on these shared generator paths. See docs/release-0840.md.
+
 # Agent-accessible features
 
 The conversion progress candidate is Auto3D 0.82.0 / Packaging 1.14.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 with Cloud 3D Studio 0.3.3. Percentages describe measured current-stage work; indeterminate native operations must remain indeterminate. Keep failure diagnostics geometry-free and server-only. Generic/worker failures may retry once, with two total attempts and quota/retention checks. See docs/release-0820.md.

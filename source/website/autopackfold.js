@@ -46,9 +46,11 @@ export function GuardAutoPackGeometryEdit (object)
 // CAD profile's measurement layer; earlier cartons keep their saved score fit.
 export function AutoPackPlanInput (data, parameters, profile)
 {
-    if (data.basis !== 'engineering-inside') { return { size : data.size, thickness : parameters.thickness, clearanceMm : data.clearanceMm }; }
+    // The style is the saved generator code (cartons before 0.84.0 are all 0201 RSCs).
+    const code = parameters.code || '0201';
+    if (data.basis !== 'engineering-inside') { return { size : data.size, thickness : parameters.thickness, clearanceMm : data.clearanceMm, code }; }
     if (!profile?.engineering) { throw new Error ('The Auto Pack carton lost its board record. Generate Auto Pack again.'); }
-    return { size : data.size, clearanceMm : data.clearanceMm, material : EngineeringMeasurements (profile).material };
+    return { size : data.size, clearanceMm : data.clearanceMm, material : EngineeringMeasurements (profile).material, code };
 }
 export function PackagingFoldRig (module, object, parameters, profile)
 {

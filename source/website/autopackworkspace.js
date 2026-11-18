@@ -1,4 +1,5 @@
-import { CreateAutoPackPlan } from '../../modules/packaging/src/autopackplan.js';
+import { CreateAutoPackPlan, AutoPackStyles } from '../../modules/packaging/src/autopackplan.js';
+import { Unit } from '../engine/model/unit.js';
 import { LoadPackagingModule, PackagingModel, PackagingUnitMM } from './packagingadapter.js';
 import { AutoPackDefinition, AutoPackPlanInput } from './autopackfold.js';
 import { CreateNestedPartitionPlan } from '../../modules/packaging/src/partitionnest.js';
@@ -31,7 +32,38 @@ const WorldScore = p => ({ width : p.swapped ? p.parameters.length : p.parameter
 // Measure canonical, transformed geometry in doubles; never round the fitting dimensions for display.
 export class AutoPackWorkspace
 {
-    constructor (packaging) { this.packaging = packaging; this.editor = packaging.editor; }
+    constructor (packaging) { this.packaging = packaging; this.editor = packaging.editor; this.code = '0201'; }
+    // Box styles come from the Packaging generator catalog, so a style added there is available to Auto Pack.
+    Styles () { return AutoPackStyles ().map (style => ({ ...style, selected : style.code === this.code })); }
+    SetStyle (code)
+    {
+        if (!AutoPackStyles ().some (style => style.code === code)) { throw new Error ('Choose a box style from the Packaging generator catalog.'); }
+        this.code = code; this.editor.website.packagingPanel?.Refresh?.(); return { code, styles : this.Styles () };
+    }
+    // Re-measure the selection from its current geometry. Files without unit information (STL, OBJ and many older or
+    // CAD exports) leave the scene's units unknown, which blocks every millimetre fit; units assigns the units the model
+    // was authored in to such a scene, as one Undo step, so Auto Pack (and the other generators) can measure it.
+    async RefreshBounds ({ units = null } = {})
+    {
+        const editor = this.editor, document = editor.document, names = { mm : Unit.Millimeter, cm : Unit.Centimeter, m : Unit.Meter, in : Unit.Inch, ft : Unit.Foot };
+        let assigned = null;
+        if (units !== null) {
+            if (!Object.hasOwn (names, units)) { throw new Error ('Choose model units: mm, cm, m, in or ft.'); }
+            this.packaging.Editable ();
+            const before = document.model.GetUnit ();
+            if (before !== Unit.Unknown && before !== names[units]) { throw new Error ('The scene already has units; Refresh bounds only assigns units to a scene that has none.'); }
+            if (before === Unit.Unknown) {
+                const objects = document.objects.filter (object => object.unit === undefined || object.unit === Unit.Unknown), apply = async unit => {
+                    if (editor.document !== document) { throw new Error ('These units belong to another session.'); }
+                    document.model.SetUnit (unit); objects.forEach (object => { object.unit = unit; }); await editor.Render?.(); editor.RefreshUI?.(); editor.website.packagingPanel?.Refresh?.();
+                };
+                await apply (names[units]); editor.history.Push ({ undo : () => apply (Unit.Unknown), redo : () => apply (names[units]) }); editor.MarkDirty?.();
+                assigned = units;
+            }
+        }
+        const result = this.Inspect ();
+        return { ...result, unitsAssigned : assigned, message : assigned ? 'Assigned ' + assigned + ' to the scene and re-measured the selection.' : result.available ? 'Re-measured the selection.' : result.reason };
+    }
     Measure (contents = null)
     {
         const editor = this.editor, object = editor.selected, document = editor.document;
@@ -45,12 +77,13 @@ export class AutoPackWorkspace
         if (objects.some (item => item.userData?._auto3dAutoPack !== undefined)) { throw new Error ('Select the products, rather than their Auto Pack carton.'); }
         if (objects.some (item => item.userData?._auto3dPallet !== undefined)) { throw new Error ('Deselect the pallet before using Auto Pack.'); }
         if (objects.some (item => item.animationAsset || item.keyframes?.length || item.hiddenParts?.length)) { throw new Error ('Auto Pack requires complete static models. Remove animation or hidden parts before fitting.'); }
-        const factor = PackagingUnitMM[document.model.GetUnit ()]; if (!factor) { throw new Error ('Set known scene units before using Auto Pack.'); }
+        const factor = PackagingUnitMM[document.model.GetUnit ()]; if (!factor) { throw new Error ('This scene has no units (common for STL, OBJ and older CAD exports). Choose the model units and press Refresh bounds.'); }
         const { min, max, size } = MeasureWorldBoundsMm (document, objects, factor, 'product');
-        // Same board record and allowance factors as Generate with the inside basis.
+        // Same board record and allowance factors as Generate with the inside basis. Every style uses the RSC (FEFCO
+        // reference) body allowances; the plan adds each style's extra flap layers to the height itself.
         const thickness = this.packaging.generationBoard?.caliperMm ?? this.packaging.FefcoInspect ().thickness;
         let plan, reason, material = null;
-        try { material = this.packaging.GenerationMaterial (ValidateFefco ({ ...DefaultFefco, code : '0201', thickness }), '0201'); plan = CreateAutoPackPlan ({ size, clearanceMm : .0254, material }); } catch (error) { reason = error.message; }
+        try { material = this.packaging.GenerationMaterial (ValidateFefco ({ ...DefaultFefco, code : this.code, thickness }), '0201'); plan = CreateAutoPackPlan ({ size, clearanceMm : .0254, material, code : this.code }); } catch (error) { reason = error.message; }
         const group = objects.length > 1 ? (object.userData?._auto3dGroupName || objects.length + ' products') : null;
         return { object, objects, name : group ? group + ' · ' + objects.length + ' products' : object.name, document, factor, bounds : { min, max }, size, plan, material, reason, origin : [(min[0] + max[0]) / 2, min[1], (min[2] + max[2]) / 2] };
     }
@@ -61,7 +94,7 @@ export class AutoPackWorkspace
         const span = [0, 1, 2].map (a => plan.envelope.max[a] - plan.envelope.min[a]);
         const local = [span[0], span[1] + has ('bottom') + has ('top'), span[2] + has ('front') + has ('back')], size = [0, 0, 0];
         size[plan.lengthAxis] = local[0]; size[1] = local[1]; size[plan.widthAxis] = local[2];
-        const fit = CreateAutoPackPlan ({ size, clearanceMm : .0254, material : m.material });
+        const fit = CreateAutoPackPlan ({ size, clearanceMm : .0254, material : m.material, code : this.code });
         return { board : plan.material.name, thicknessMm : t, pads : plan.pads.map (p => ({ position : p.position, lengthMm : p.length, acrossMm : p.across })),
             partitions : plan.partitions ? { layout : plan.partitions.layout, strips : plan.partitions.strips, requiredGapMm : plan.partitions.requiredGapMm, growthMm : plan.partitions.growthMm, moves : plan.partitions.moves.length, collapsedMm : plan.partitions.layers[0].set.collapsedMm } : null,
             packedMm : { width : size[0], length : size[2], height : size[1] }, insideMm : { ...fit.insideMm }, scoreMm : WorldScore (fit) };
@@ -78,9 +111,9 @@ export class AutoPackWorkspace
             const m = this.Measure (), p = m.plan;
             let contents = null;
             if (contentOptions) { try { const options = this.ContentsOptions (contentOptions); if (options.partitions || options.pads.length) { contents = this.ContentsPreview (options); } } catch (error) { contents = { reason : error.message }; } }
-            if (!p) { return { available : false, reason : m.reason, objectId : m.object.id, objectIds : m.objects.map (item => item.id), objectName : m.name, units : 'mm', productMm : { width : m.size[0], length : m.size[2], height : m.size[1] }, contents }; }
-            return { available : true, objectId : m.object.id, objectIds : m.objects.map (item => item.id), objectName : m.name, units : 'mm', productMm : { width : m.size[0], length : m.size[2], height : m.size[1] }, insideMm : { ...p.insideMm }, usableInsideMm : { ...p.usableInsideMm }, glueTabAllowanceMm : p.glueTabAllowanceMm, basis : p.basis, scoreMm : WorldScore (p), allowanceMm : { ...p.allowanceMm }, clearanceMm : .0254, thicknessMm : p.parameters.thickness, boardName : m.material?.name || this.packaging.generationBoard?.name || 'Current packaging caliper', contents };
-        } catch (error) { return { available : false, reason : error.message }; }
+            if (!p) { return { available : false, reason : m.reason, code : this.code, unitsUnknown : false, objectId : m.object.id, objectIds : m.objects.map (item => item.id), objectName : m.name, units : 'mm', productMm : { width : m.size[0], length : m.size[2], height : m.size[1] }, contents }; }
+            return { available : true, code : this.code, unitsUnknown : false, objectId : m.object.id, objectIds : m.objects.map (item => item.id), objectName : m.name, units : 'mm', productMm : { width : m.size[0], length : m.size[2], height : m.size[1] }, insideMm : { ...p.insideMm }, usableInsideMm : { ...p.usableInsideMm }, glueTabAllowanceMm : p.glueTabAllowanceMm, basis : p.basis, scoreMm : WorldScore (p), allowanceMm : { ...p.allowanceMm }, clearanceMm : .0254, thicknessMm : p.parameters.thickness, boardName : m.material?.name || this.packaging.generationBoard?.name || 'Current packaging caliper', contents };
+        } catch (error) { return { available : false, reason : error.message, code : this.code, unitsUnknown : this.editor.document.model.GetUnit () === Unit.Unknown }; }
     }
     // What Auto Pack will put in the carton with the products: nested partitions between them and pads around them.
     ContentsOptions ({ pads = [], partitions = false, boardId, grade } = {})
@@ -174,11 +207,11 @@ export class AutoPackWorkspace
             const module = await LoadPackagingModule (); unchanged ();
             // The carton is a generated FEFCO 0201 with the standard CAD profile and measurement layer.
             const profile = this.packaging.GenerationProfile (m.plan.parameters, { material : m.material, basis : 'inside' });
-            const rig = module.CreateAutoPackRig ({ size : m.size, clearanceMm : .0254, material : m.material }, profile);
+            const rig = module.CreateAutoPackRig ({ size : m.size, clearanceMm : .0254, material : m.material, code : this.code }, profile);
             const report = await module.InspectAutoPackFold (rig, async progress => { unchanged (); editor.Status?.('Auto Pack · checking clearance · ' + Math.round (progress * 100) + '%'); await new Promise (resolve => setTimeout (resolve, 0)); });
             unchanged (); if (!report.clear) { throw new Error ('This product and board cannot be packed without intersections. Choose a thinner board or another product.'); }
             const data = module.AutoPackFrame (rig, 0), model = PackagingModel (data, target.model.GetUnit ());
-            object = target.AddImported (model, 'Auto Pack · ' + m.name); object.source = 'Auto Pack · FEFCO 0201'; object.packagingProfile = data.profile;
+            object = target.AddImported (model, 'Auto Pack · ' + m.name); object.source = 'Auto Pack · FEFCO ' + data.parameters.code; object.packagingProfile = data.profile;
             object.position = m.origin.map (v => v / m.factor); object.rotation = [0, 0, 0]; object.scale = [1, 1, 1];
             object.userData = { _auto3dFefco : JSON.stringify (data.parameters), _auto3dPackagingState : 'flat', _auto3dAutoPack : JSON.stringify ({ version : 1, size : m.size, clearanceMm : .0254, productId : previous.id, productIds : products.map (item => item.id), productBounds : m.bounds, origin : m.origin, basis : 'engineering-inside' }) };
             target.ApplyTransform (object); target.packaging = data.profile; editor.selected = object; await editor.Render (true); editor.busy = true;
