@@ -12,16 +12,14 @@ export function ShowAdvanceAnimation (editor, visible)
     editor.website.layouter.Resize ();
 }
 
-export function CreateTimelineTracks (editor, parent)
+export function CreateTimelineTracks (editor, parent, slots = {})
 {
     const timeline = editor.timeline;
-    const cameraLabel = Element ('label', 'fold_camera_option', undefined, parent);
-    const autoFit = Element ('input', null, undefined, cameraLabel); autoFit.type = 'checkbox'; autoFit.checked = timeline.foldAutoFit !== false; autoFit.disabled = editor.readOnly || editor.busy;
-    autoFit.setAttribute ('aria-label', 'Auto-fit folding camera'); cameraLabel.appendChild (document.createTextNode ('Auto-fit fold / unfold · Camera keyframes take priority'));
-    autoFit.addEventListener ('change', () => editor.Run (() => editor.packaging.SetFoldCameraAutoFit (autoFit.checked)));
-    const ranges = Element ('div', 'timeline_ranges', undefined, parent);
-    for (const [key, label] of [['rangeStart', 'Beginning'], ['rangeEnd', 'End']]) {
-        const field = Element ('label', null, label + ' (s)', ranges); const input = Element ('input', null, undefined, field);
+    // In and Out fields sit in the toolbar's Timing group, Auto-fit in its Camera group, when the toolbar provides them.
+    const ranges = slots.ranges || Element ('div', 'timeline_ranges', undefined, parent);
+    for (const [key, label, short] of [['rangeStart', 'Beginning', 'In'], ['rangeEnd', 'End', 'Out']]) {
+        const field = Element ('label', 'timeline_field', undefined, ranges); Element ('span', null, short, field); const input = Element ('input', null, undefined, field);
+        field.title = label + ' of the played range (s)';
         input.type = 'number'; input.min = '0'; input.max = String (timeline.duration); input.step = '0.01'; input.value = String (timeline[key]); input.disabled = editor.readOnly;
         input.setAttribute ('aria-label', label + ' of animation');
         input.addEventListener ('change', () => {
@@ -31,6 +29,12 @@ export function CreateTimelineTracks (editor, parent)
         });
         input.dataset.range = key;
     }
+    const cameraLabel = Element ('label', 'timeline_field timeline_check fold_camera_option', undefined, slots.camera || parent);
+    const autoFit = Element ('input', null, undefined, cameraLabel); autoFit.type = 'checkbox'; autoFit.checked = timeline.foldAutoFit !== false; autoFit.disabled = editor.readOnly || editor.busy;
+    autoFit.setAttribute ('aria-label', 'Auto-fit folding camera'); Element ('span', null, 'Auto-fit fold', cameraLabel);
+    cameraLabel.title = 'Frame the box while it folds or unfolds. Camera keyframes take priority.';
+    autoFit.addEventListener ('change', () => editor.Run (() => editor.packaging.SetFoldCameraAutoFit (autoFit.checked)));
+    if (slots.camera) { slots.camera.prepend (cameraLabel); }
     const tracks = Element ('div', 'advance_animation_tracks', undefined, parent);
     for (const [type, label] of [['object', 'Scene state'], ['camera', 'Camera positioning'], ['action', 'Actions']]) {
         const row = Element ('div', 'advance_animation_track', undefined, tracks); Element ('strong', null, label, row);

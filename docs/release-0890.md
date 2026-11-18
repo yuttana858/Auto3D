@@ -1,6 +1,6 @@
 # Auto3D 0.89.0 / Packaging 1.15.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0
 
-Reliable macros, 24-hour agent pairing, and read-only database auto-approval. Based on main after #153 (0.88.0). No module changes.
+Reliable macros, 24-hour agent pairing, read-only database auto-approval, and a one-line Advance animation toolbar. Based on main after #153 (0.88.0). No module changes.
 
 The pairing and database commits were pushed to #148 after its head was read for merge, so #148 merged only the 0.84.1 Auto Pack fix. They are included here, and the pairing notes that were written for 0.85.0 are below.
 
@@ -28,9 +28,20 @@ Before this change a pairing was lost after 1 hour idle, when the user switched 
 
 `.claude/settings.json` auto-approves the read-only Supabase MCP tools (list and get projects, tables, migrations, extensions, branches and edge functions; advisors; logs; docs search; type generation; reading notebooks) for every Claude Code session on this repository. SQL execution, migrations, edge function deploys and secrets, branch changes, project create/pause/restore and notebook writes are listed under `ask` and keep asking each time.
 
+## One-line Advance animation toolbar
+
+The Advance animation panel used five rows for its controls (title and camera readout, Duration/Tween/Loop, three full-width keyframe buttons, Play/Reset, Auto-fit, then In/Out fields), with 7 px labels, white range inputs and a Close button floating outside the box. They are now one toolbar line (`.timeline_toolbar`, `role="toolbar"`):
+
+**▶ / ❚❚ · ↺ · time** │ **Length · In · Out · Tween · Loop** │ **+ Scene · + Camera · + Fold** │ **Auto-fit fold · camera readout · Camera…** │ **×**
+
+- Same handlers as before; every control keeps its accessible name (`Play`/`Pause`, `Reset`, `Keyframe scene state`, `Keyframe camera`, `Action`, `Camera settings`, `Close Advance animation`, `Timeline duration in seconds`, `Beginning/End of animation`, `Keyframe interpolation`, `Auto-fit folding camera`), so commands, agents and tests are unaffected. Longer explanations moved to tooltips.
+- `CreateTimelineTracks (editor, parent, { ranges, camera })` puts the In/Out fields and Auto-fit into the toolbar groups; without slots it keeps its own rows.
+- The panel is 300 px tall (was 330) with no inner border. On narrow screens the toolbar scrolls sideways and the Close button stays pinned in view.
+
 ## Validation
 
 - Unit tests, including the new `test/macro-run.test.js` (playback wait, cancel while waiting, one Undo after success and after failure, tab-step rule, save/export/delete with warnings). Three tests that counted one Undo per macro step now expect the grouped step.
 - MCP tests (73): a tab switch moves the pairing to the new active tab; routing, replay and revocation are still refused; a pairing survives an hour idle and ends at 24 hours.
 - Browser `mcp-access`: Live Control reports a 24-hour expiry, a reload reconnects with the same window identity, and Disconnect clears it.
+- Browser `animation`: the toolbar is one line (≤ 40 px), Close is in view, and every control is found by its accessible name. `animation-video`, `workspace-editing`, `module-panels` and `packaging-module` pass.
 - Browser `command-design`: a macro creates a 0201, toggles the fold, then runs `view.fit` and `packaging.fefco.playback.inspect` (state `completed`). One Undo leaves an empty scene. A macro with a tab change before the last step is refused.

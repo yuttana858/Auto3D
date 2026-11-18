@@ -36,6 +36,11 @@ const playhead=page.getByLabel('Scene state playhead');await playhead.fill('1.5'
 const marker=page.getByLabel('Beginning marker on Scene state');await marker.focus();await page.keyboard.press('ArrowRight');assert.ok((await call('animation.timeline.inspect')).rangeStart>0.5);
 await page.getByLabel('End of animation',{exact:true}).fill('3.5');await page.getByLabel('End of animation',{exact:true}).dispatchEvent('change');
 await page.screenshot({path:'/tmp/auto3d-advance-animation.png'});
+// Every Advance animation control sits on one toolbar line, with Close in view.
+const toolbar=await page.evaluate(()=>{const bar=document.querySelector('#advance_animation_panel .timeline_toolbar');const close=bar.querySelector('.advance_animation_close').getBoundingClientRect();const tops=[...bar.querySelectorAll('button,input,select')].map(e=>Math.round(e.getBoundingClientRect().top+e.getBoundingClientRect().height/2));return{height:bar.getBoundingClientRect().height,rows:new Set(tops).size,closeVisible:close.right<=innerWidth&&close.width>0,names:[...bar.querySelectorAll('button')].map(b=>b.getAttribute('aria-label'))};});
+assert.ok(toolbar.height<=40,JSON.stringify(toolbar));assert.ok(toolbar.rows<=2,JSON.stringify(toolbar));assert.equal(toolbar.closeVisible,true);
+for(const name of ['Play','Reset','Keyframe scene state','Keyframe camera','Action','Camera settings','Close Advance animation'])assert.ok(toolbar.names.includes(name),name);
+for(const label of ['Timeline duration in seconds','Beginning of animation','End of animation','Keyframe interpolation','Auto-fit folding camera'])assert.equal(await page.getByLabel(label,{exact:true}).count(),1,label);
 await call('animation.timeline.playback',{action:'play'});await page.waitForTimeout(250);await call('animation.timeline.playback',{action:'pause'});
 await call('object.transform',{objectId,position:[1,0,0]});
 let checkpoint = null;
