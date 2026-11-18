@@ -3,7 +3,7 @@ import { IsIntentionallyReleasedWebGLContext } from './webglcleanup.js';
 export function RedactLogText (value)
 {
     const sanitized = String (value ?? '').replace (/\bBearer\s+[^\s,;]+/gi, 'Bearer [redacted]');
-    return sanitized.replace (/data:[^\s]+/gi, '[data omitted]').replace (/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?/g, '[token omitted]').replace(/\b(?:sb_secret_|sb_publishable_)[A-Za-z0-9_-]+/g, '[key omitted]').replace (/((?:password|passwd|authorization|cookie|api[_ -]?key|access[_ -]?token|refresh[_ -]?token|secret)["']?\s*[=:]\s*)(?:"[^"]*"|'[^']*'|[^\s,;}]+)/gi, '$1[redacted]').replace (/\bBearer\s+[^\s,;]+/gi, 'Bearer [redacted]').replace (/https?:\/\/[^\s)]+/g, (url) => SafeLogPath (url)).slice (0, 1800);
+    return sanitized.replace (/data:[^\s]+/gi, '[data omitted]').replace (/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?/g, '[token omitted]').replace (/\b(?:ak|as|wk|ws)-[A-Za-z0-9_-]{8,}/g, '[Modal token omitted]').replace(/\b(?:sb_secret_|sb_publishable_)[A-Za-z0-9_-]+/g, '[key omitted]').replace (/((?:password|passwd|authorization|cookie|api[_ -]?key|access[_ -]?token|refresh[_ -]?token|secret)["']?\s*[=:]\s*)(?:"[^"]*"|'[^']*'|[^\s,;}]+)/gi, '$1[redacted]').replace (/\bBearer\s+[^\s,;]+/gi, 'Bearer [redacted]').replace (/https?:\/\/[^\s)]+/g, (url) => SafeLogPath (url)).slice (0, 1800);
 }
 export function SafeLogPath (url)
 {

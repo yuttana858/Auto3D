@@ -59,6 +59,7 @@ export function DropToFloorDelta (box, upVector)
 const Icons = {
     'primary-products' : '<path d="M6 2h5v4l2 4v12H4V10l2-4ZM4 14h9M17 7q4-2 7 0v14q-4 2-7 0ZM17 9q4 2 7 0"/>',
     'molded-pulp' : '<path d="M2 16h4l2-6h3l2 6h2l2-6h3l2 6h2M2 19h22"/>',
+    animation : '<rect x="2" y="5" width="16" height="14" rx="2"/><path d="m18 10 6-3v10l-6-3M7 9.5v5l4.5-2.5Z"/>',
     packaging : '<path d="M3 4h18v16H3Z M8 4v16 M16 4v16 M3 10h18"/>',
     dimension : '<path d="M4 3v18M20 3v18M4 12h16M8 8l-4 4 4 4m8-8 4 4-4 4"/>',
     select : '<path d="m6 3 13 10-7 1-3 7Z"/>', move : '<path d="M12 2v20M2 12h20m-13-7 3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3m14-6 3 3-3 3"/>',
@@ -96,8 +97,8 @@ export class SessionEditor
         this.controls = new TransformControls (viewer.camera, viewer.renderer.domElement); this.controls.setSize (0.8); this.helper = this.controls.getHelper (); viewer.scene.add (this.helper);
         viewer.renderer.domElement.addEventListener ('pointerdown', event => { this.shiftDragRequested = event.shiftKey && this.mode === 'translate'; }, true);
         viewer.navigation.onOrbitStart = () => this.OrbitSelected (false);
-        // Main viewer: right-drag orbits around the selected model's center (left/right, with up/down tilt) without first
-        // re-aiming the camera, so the current framing is kept while the view swings around the object.
+        // Main viewer: right-drag is a level turntable orbit around the selected model's center (left/right around the scene up
+        // axis, up/down over the top) with no camera roll or tilt, and without re-aiming, so the current framing is kept.
         viewer.navigation.rightDragPansHorizontally = false;
         let panControlsEnabled = null;
         viewer.navigation.onPanModifier = active => {
@@ -239,7 +240,7 @@ export class SessionEditor
     ModelTools ()
     {
         const toggle = (id, open) => () => this.website.modulePanels ? this.website.modulePanels.Toggle (id, open) : open ();
-        return [['ai', 'AI Generative', toggle ('ai', () => this.website.aiWorkspace?.Open ())], ['packaging', 'Packaging design', toggle ('packaging', () => this.website.packagingPanel?.Open ())], ['primary-products', 'Primary Products', toggle ('primary-products', () => this.website.primaryProductsPanel?.Open ())], ['molded-pulp', 'Molded Pulp', toggle ('molded-pulp', () => this.website.moldedPulpPanel?.Open ())], ['select', 'Select (V)', () => this.SetMode ('select')], ['move', 'Move (W)', () => this.SetMode ('translate')], ['rotate', 'Rotate (E)', () => this.SetMode ('rotate')], ['scale', 'Scale (R)', () => this.SetMode ('scale')], ['dimension', 'Dimensions · drag an edge', () => this.website.dimensions.SetActive (!this.website.dimensions.active)], ['duplicate', 'Duplicate object (Ctrl+D)', () => this.Duplicate ()], ['array', 'Array selected object', () => this.ArrayDialog ()], ['floor', 'Drop selected object to floor', () => this.DropToFloor ()], ['visible', 'Hide or show object (H)', () => this.ToggleVisibility ()], ['remove', 'Delete object', () => this.Delete ()], ['focus', 'Focus object (F)', () => this.Focus ()], ['fit', 'Fit all objects to screen', () => this.FitScene ()], ['update', 'Update selected model', () => this.UpdateModel ()], ['undo', 'Undo object edit (Ctrl+Z)', () => this.Undo ()], ['redo', 'Redo object edit (Ctrl+Shift+Z)', () => this.Redo ()], ['add', 'Add model', () => this.AddModel ()], ['save', 'Save or open session (Ctrl+S)', () => this.library.SaveDialog (true)], ['export', 'Export', () => this.Export ()], ['library', 'Model library', () => this.library.Open ()], ['commands', 'Command bar', () => this.commandBar.SetVisible (!this.commandBar.visible)]];
+        return [['ai', 'AI Generative', toggle ('ai', () => this.website.aiWorkspace?.Open ())], ['packaging', 'Packaging design', toggle ('packaging', () => this.website.packagingPanel?.Open ())], ['primary-products', 'Primary Products', toggle ('primary-products', () => this.website.primaryProductsPanel?.Open ())], ['molded-pulp', 'Molded Pulp', toggle ('molded-pulp', () => this.website.moldedPulpPanel?.Open ())], ['animation', 'Animation and video', toggle ('animation', () => this.website.animationPanel?.Open ())], ['select', 'Select (V)', () => this.SetMode ('select')], ['move', 'Move (W)', () => this.SetMode ('translate')], ['rotate', 'Rotate (E)', () => this.SetMode ('rotate')], ['scale', 'Scale (R)', () => this.SetMode ('scale')], ['dimension', 'Dimensions · drag an edge', () => this.website.dimensions.SetActive (!this.website.dimensions.active)], ['duplicate', 'Duplicate object (Ctrl+D)', () => this.Duplicate ()], ['array', 'Array selected object', () => this.ArrayDialog ()], ['floor', 'Drop selected object to floor', () => this.DropToFloor ()], ['visible', 'Hide or show object (H)', () => this.ToggleVisibility ()], ['remove', 'Delete object', () => this.Delete ()], ['focus', 'Focus object (F)', () => this.Focus ()], ['fit', 'Fit all objects to screen', () => this.FitScene ()], ['update', 'Update selected model', () => this.UpdateModel ()], ['undo', 'Undo object edit (Ctrl+Z)', () => this.Undo ()], ['redo', 'Redo object edit (Ctrl+Shift+Z)', () => this.Redo ()], ['add', 'Add model', () => this.AddModel ()], ['save', 'Save or open session (Ctrl+S)', () => this.library.SaveDialog (true)], ['export', 'Export', () => this.Export ()], ['library', 'Model library', () => this.library.Open ()], ['commands', 'Command bar', () => this.commandBar.SetVisible (!this.commandBar.visible)]];
     }
 
     ToolDisabled (key)
@@ -261,7 +262,7 @@ export class SessionEditor
         const historyTools = Element ('div', 'session_history_tools', undefined, document.getElementById ('toolbar')); historyTools.setAttribute ('role', 'group'); historyTools.setAttribute ('aria-label', 'Edit history'); document.getElementById ('toolbar').prepend (historyTools);
         const tools = this.ModelTools ().filter (([key]) => !stripHidden.has (key));
         for (const [key, label, action] of tools) {
-            const button = Element ('button', 'scene_tool', undefined, ['ai', 'packaging', 'primary-products', 'molded-pulp'].includes (key) ? moduleTools : ['undo', 'redo'].includes (key) ? historyTools : this.strip); button.title = label; button.setAttribute ('aria-label', label); button.innerHTML = '<svg viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">' + Icons[key] + '</svg>';
+            const button = Element ('button', 'scene_tool', undefined, ['ai', 'packaging', 'primary-products', 'molded-pulp', 'animation'].includes (key) ? moduleTools : ['undo', 'redo'].includes (key) ? historyTools : this.strip); button.title = label; button.setAttribute ('aria-label', label); button.innerHTML = '<svg viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">' + Icons[key] + '</svg>';
             button.addEventListener ('click', async () => { if (['undo', 'redo'].includes (key)) { button.setAttribute ('aria-busy', 'true'); button.disabled = true; try { await this.Run (action); } finally { button.removeAttribute ('aria-busy'); this.RefreshButtons (); } } else { await this.Run (action); } }); this.buttons.set (key, button);
         }
         this.transformPanel = Element ('div', 'scene_transform_panel', undefined, this.website.parameters.viewerDiv); this.transformPanel.hidden = true;
@@ -726,13 +727,16 @@ export class SessionEditor
     {
         this.SyncInputs ();
         this.UpdateDetails ();
+        // Auto Pack and Auto pallet show sizes and the height limit in display units.
+        { const workspace = this.website?.packagingPanel?.workspace, tab = workspace?.InspectTab ().tab; if (tab === 'auto') { workspace.autoPanel.Refresh (); } else if (tab === 'accessories') { workspace.accessoriesPanel.Refresh (); } }
     }
     RefreshButtons ()
     {
         this.website?.dimensions?.Draw (this.website.viewer.camera);
-        this.website?.primaryProductsPanel?.RefreshAvailability (); this.website?.moldedPulpPanel?.RefreshAvailability ();
+        this.website?.primaryProductsPanel?.RefreshAvailability (); this.website?.moldedPulpPanel?.RefreshAvailability (); this.website?.animationPanel?.Refresh ();
         this.processing?.Sync (this.busy && !this.packaging?.foldOperation && !this.packaging?.dimensionUpdating && this.arrayOperation?.stage !== 'revealing' && !this.website?.rendering?.running); this.commandBar?.SetBusy (this.busy);
         this.website?.packagingPanel?.fefcoPanel?.SetDisabled ();
+        { const workspace = this.website?.packagingPanel?.workspace, tab = workspace?.InspectTab ().tab; if (tab === 'auto') { workspace.autoPanel.Refresh (); } else if (tab === 'accessories') { workspace.accessoriesPanel.Refresh (); } }
         for (const [key, button] of this.buttons) {
             button.disabled = this.ToolDisabled (key) || button.hasAttribute?.('aria-busy') === true;
             if (key === 'dimension') { button.setAttribute ('aria-pressed', String (this.website.dimensions?.active === true)); }
@@ -801,6 +805,7 @@ export class SessionEditor
             if (label === 'Vertices:' || label === 'Triangles:') { row.querySelector ('.ov_property_table_value').textContent = (label === 'Triangles:' ? counts.triangles : counts.vertices).toLocaleString (); }
             if (label === 'Triangles:') { const tool = Element ('div', 'scene_polygon_tool'); const button = Element ('button', null, 'Optimize polygons…', tool); button.disabled = this.readOnly; button.onclick = () => this.OpenPolygonTool (); row.after (tool); }
         }
+        panel.RefreshMeshSummary?.();
         const base = this.GetObjectBaseSize (object);
         const units = this.website.preferences.units;
         const unitLabel = UnitFactor (object.unit, units) === null ? 'model units' : DisplayUnitLabel (units);
@@ -1049,6 +1054,8 @@ export class SessionEditor
 
     AnimationUI ()
     {
+        // The Animation module panel follows every timeline edit made here or by commands.
+        queueMicrotask (() => this.website.animationPanel?.Refresh ());
         this.animationPanel.replaceChildren ();
         const timeline = this.timeline;
         timeline.ExtendDurationForKeys ();

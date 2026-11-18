@@ -6,8 +6,9 @@ import { Theme, Settings, CameraSettings } from './settings.js';
 import { WorkspaceDialog } from './modellibrary.js';
 import { Unit } from '../engine/model/unit.js';
 import { OpenCommandPanel } from './commandpanel.js';
+import { OpenModalConnection } from './modalconnection.js';
 
-export const AppVersion = '0.71.0';
+export const AppVersion = '0.89.0';
 
 export function AppBuildInfo ()
 {
@@ -102,6 +103,9 @@ export class Preferences
         const adminLink = document.createElement ('a'); adminLink.href = '?console=' + AccountConsole; adminLink.textContent = 'Account administration — requests and approvals';
         adminLink.addEventListener ('click', async (event) => { event.preventDefault (); try { await this.website.accountAdmin.Open (); dialog.close (); } catch (error) { adminLink.textContent = error.message; } });
         adminArea.appendChild (adminLink);
+        const modalLink = document.createElement ('button'); modalLink.type = 'button'; modalLink.textContent = 'Manage Modal connections';
+        modalLink.addEventListener ('click', async () => { try { await OpenModalConnection (this.website); dialog.close (); } catch (error) { modalLink.textContent = error.message; } });
+        adminArea.appendChild (modalLink);
         this.website.accountAdmin?.Refresh ().then ((data) => { if (data.isAdmin && dialog.isConnected) { adminArea.hidden = false; } }).catch ((error) => { if (dialog.isConnected && this.website.auth?.user) { const message = document.createElement ('p'); message.setAttribute ('role', 'status'); message.textContent = error.message; adminArea.appendChild (message); adminArea.hidden = false; } });
         const display = section ('Display');
         const displayControls = document.createElement ('div'); displayControls.className = 'preferences_display_controls';
@@ -139,7 +143,7 @@ export class Preferences
         const syncStatus = document.createElement ('p'); syncStatus.setAttribute ('role', 'status'); syncStatus.textContent = 'Theme and units are saved automatically to your account.'; this.syncStatus = syncStatus;
         display.appendChild (syncStatus);
         const about = document.createElement ('p'); about.className = 'preferences_about';
-        about.textContent = 'SW Auto3D v' + AppVersion + ' · Build ' + AppBuildInfo ().build + ' — A browser workspace for inspecting, arranging and reviewing 3D models, materials, lighting and reusable layouts. Dimensions use the units declared by the source model; unspecified units remain model units.';
+        about.textContent = 'Auto3D v' + AppVersion + ' · Build ' + AppBuildInfo ().build + ' — A browser workspace for inspecting, arranging and reviewing 3D models, materials, lighting and reusable layouts. Dimensions use the units declared by the source model; unspecified units remain model units.';
         const tools = section ('Tools');
         const toolActions = document.createElement ('div'); toolActions.className = 'preferences_actions';
         const commands = document.createElement ('button'); commands.textContent = 'Commands and macros'; commands.className = 'workspace_primary'; commands.addEventListener ('click', () => { dialog.close (); OpenCommandPanel (this.website); });

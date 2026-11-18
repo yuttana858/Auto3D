@@ -4,120 +4,75 @@
 //   • the product's own bottom surface where that surface is at or below the form depth (pockets and floors),
 //   • the form depth everywhere else (the plateau between and around pockets),
 //   • 0 along the sheet perimeter, so the outer wall drafts down to a foot that stands on the base plane.
-// Product clearance widens pockets laterally (grey-scale erosion with a disc). The draft angle limits every slope to
-// cot(draft) by a two-pass distance transform, which always opens pockets wider at the top — a straight-pull, demoldable
-// shape. The outer (tool-side) surface is the inner surface offset by the pulp thickness along the surface normal
-// (erosion with a ball), so steep walls keep their full thickness instead of thinning like a vertical offset would.
-const Chamfer8Error = 1.0824; // worst-case overestimate of Euclidean distance by an 8-neighbour chamfer transform
+// Product clearance widens pockets laterally (octagonal erosion, field.js). The draft angle limits every slope to
+// cot(draft) by fast marching, which always opens pockets wider at the top — a straight-pull, demoldable shape. The outer
+// (tool-side) surface is the inner surface offset by the pulp thickness along the surface normal (ball erosion), so steep
+// walls keep their full thickness instead of thinning like a vertical offset would.
+import { MinFilterOctagon, SlopeLimit, OffsetDown } from './field.js';
 
-function DiscOffsets (radius, dx, dz)
+export function InitialSurface (field, grid, depth)
 {
-    const result = [], ri = Math.floor (radius / dx), rj = Math.floor (radius / dz);
-    for (let j = -rj; j <= rj; j++) { for (let i = -ri; i <= ri; i++) { const d = Math.hypot (i * dx, j * dz); if (d <= radius + 1e-9) { result.push ([i, j, d]); } } }
-    return result;
-}
-
-function MinFilter (values, grid, radius)
-{
-    if (radius <= 0) { return values; }
-    const { nx, nz, dx, dz } = grid, offsets = DiscOffsets (radius, dx, dz), out = new Float64Array (values.length);
-    for (let j = 0; j < nz; j++) {
-        for (let i = 0; i < nx; i++) {
-            let m = values[j * nx + i];
-            for (const [oi, oj] of offsets) { const a = i + oi, b = j + oj; if (a >= 0 && b >= 0 && a < nx && b < nz) { const v = values[b * nx + a]; if (v < m) { m = v; } } }
-            out[j * nx + i] = m;
-        }
-    }
-    return out;
-}
-
-// Enforce H(p) <= H(q) + |p - q| * slope for all p, q (forward + backward 8-neighbour passes).
-function LimitSlope (values, grid, slope)
-{
-    if (!Number.isFinite (slope)) { return values; }
-    const { nx, nz, dx, dz } = grid, out = Float64Array.from (values), s = slope / Chamfer8Error;
-    const hx = dx * s, hz = dz * s, hd = Math.hypot (dx, dz) * s;
-    const forward = [[-1, 0, hx], [-1, -1, hd], [0, -1, hz], [1, -1, hd]], backward = [[1, 0, hx], [1, 1, hd], [0, 1, hz], [-1, 1, hd]];
-    for (let pass = 0; pass < 2; pass++) {
-        for (let j = 0; j < nz; j++) {
-            for (let i = 0; i < nx; i++) {
-                const k = j * nx + i; let m = out[k];
-                for (const [oi, oj, h] of forward) { const a = i + oi, b = j + oj; if (a >= 0 && b >= 0 && a < nx && b < nz) { const v = out[b * nx + a] + h; if (v < m) { m = v; } } }
-                out[k] = m;
-            }
-        }
-        for (let j = nz - 1; j >= 0; j--) {
-            for (let i = nx - 1; i >= 0; i--) {
-                const k = j * nx + i; let m = out[k];
-                for (const [oi, oj, h] of backward) { const a = i + oi, b = j + oj; if (a >= 0 && b >= 0 && a < nx && b < nz) { const v = out[b * nx + a] + h; if (v < m) { m = v; } } }
-                out[k] = m;
-            }
-        }
-    }
-    return out;
-}
-
-// Normal offset of a heightfield by the thickness: L(p) = min over |q - p| <= t of H(q) - sqrt(t² - |q - p|²).
-function OffsetDown (top, grid, thickness)
-{
-    const { nx, nz, dx, dz } = grid, offsets = DiscOffsets (thickness, dx, dz).map (([i, j, d]) => [i, j, Math.sqrt (Math.max (0, thickness * thickness - d * d))]), out = new Float64Array (top.length);
-    for (let j = 0; j < nz; j++) {
-        for (let i = 0; i < nx; i++) {
-            let m = top[j * nx + i] - thickness;
-            for (const [oi, oj, h] of offsets) { const a = i + oi, b = j + oj; if (a >= 0 && b >= 0 && a < nx && b < nz) { const v = top[b * nx + a] - h; if (v < m) { m = v; } } }
-            out[j * nx + i] = m;
-        }
-    }
-    return out;
-}
-
-export function FormSurfaces (field, grid, draft)
-{
-    const { nx, nz } = grid, depth = draft.formDepthMm, initial = new Float64Array (nx * nz);
+    const { nx, nz } = grid, initial = new Float32Array (nx * nz);
     for (let k = 0; k < initial.length; k++) { const b = field[k]; initial[k] = Number.isFinite (b) && b <= depth ? Math.max (0, b) : depth; }
     for (let i = 0; i < nx; i++) { initial[i] = 0; initial[(nz - 1) * nx + i] = 0; }
     for (let j = 0; j < nz; j++) { initial[j * nx] = 0; initial[j * nx + nx - 1] = 0; }
-    const cleared = MinFilter (initial, grid, draft.clearanceMm);
-    const slope = draft.draftDeg > 0 ? 1 / Math.tan (draft.draftDeg * Math.PI / 180) : Infinity;
-    const top = LimitSlope (cleared, grid, slope).map (v => Math.min (depth, Math.max (0, v)));
+    return initial;
+}
+
+export function DraftSlope (draftDeg) { return draftDeg > 0 ? 1 / Math.tan (draftDeg * Math.PI / 180) : Infinity; }
+
+// Inner surface only (features are applied before the offset, see plan.js).
+export function FormTop (field, grid, draft, depth = draft.formDepthMm)
+{
+    const cleared = MinFilterOctagon (InitialSurface (field, grid, depth), grid, draft.clearanceMm), slope = DraftSlope (draft.draftDeg);
+    const top = SlopeLimit (cleared, grid, slope);
+    for (let k = 0; k < top.length; k++) { top[k] = Math.min (depth, Math.max (0, top[k])); }
+    return { top, slope };
+}
+
+export function FormSurfaces (field, grid, draft, depth = draft.formDepthMm)
+{
+    const { top, slope } = FormTop (field, grid, draft, depth);
     return { top, bottom : OffsetDown (top, grid, draft.thicknessMm), slope };
 }
 
 // Flat sheet: the same shell representation with a constant top at 0 and bottom at −thickness.
 export function SheetSurfaces (grid, draft)
 {
-    const n = grid.nx * grid.nz; return { top : new Float64Array (n), bottom : new Float64Array (n).fill (-draft.thicknessMm) };
+    const n = grid.nx * grid.nz; return { top : new Float32Array (n), bottom : new Float32Array (n).fill (-draft.thicknessMm) };
 }
 
-// Connected pocket regions (H below the plateau) that do not touch the sheet perimeter, plus the narrowest plateau rib
-// separating two pockets, found with a labelled multi-source distance propagation.
+// Connected pocket regions (H below the plateau) that do not touch the sheet perimeter, with their bounding boxes in mm,
+// plus the narrowest plateau rib separating two pockets (labelled multi-source distance propagation).
 export function PocketMetrics (top, grid, depth)
 {
-    const { nx, nz, dx, dz } = grid, n = nx * nz, label = new Int32Array (n).fill (-1), low = k => top[k] < depth - 1e-6;
-    let pockets = 0; const sizes = [];
+    const { nx, nz, dx, dz, x0, z0 } = grid, n = nx * nz, label = new Int32Array (n).fill (-1), low = k => top[k] < depth - 1e-4;
+    const pockets = [], stack = new Int32Array (n);
     for (let start = 0; start < n; start++) {
         if (!low (start) || label[start] !== -1) { continue; }
-        const stack = [start], cells = []; label[start] = -2;
-        while (stack.length) {
-            const k = stack.pop (); cells.push (k); const i = k % nx, j = (k - i) / nx;
-            for (const [a, b] of [[i - 1, j], [i + 1, j], [i, j - 1], [i, j + 1]]) { if (a >= 0 && b >= 0 && a < nx && b < nz) { const q = b * nx + a; if (label[q] === -1 && low (q)) { label[q] = -2; stack.push (q); } } }
+        let size = 0, head = 0, perimeter = false, i0 = nx, i1 = 0, j0 = nz, j1 = 0; stack[size++] = start; label[start] = -2; const cells = [];
+        while (head < size) {
+            const k = stack[head++]; cells.push (k); const i = k % nx, j = (k - i) / nx;
+            if (i === 0 || j === 0 || i === nx - 1 || j === nz - 1) { perimeter = true; }
+            if (i < i0) { i0 = i; } if (i > i1) { i1 = i; } if (j < j0) { j0 = j; } if (j > j1) { j1 = j; }
+            if (i > 0) { const q = k - 1; if (label[q] === -1 && low (q)) { label[q] = -2; stack[size++] = q; } }
+            if (i < nx - 1) { const q = k + 1; if (label[q] === -1 && low (q)) { label[q] = -2; stack[size++] = q; } }
+            if (j > 0) { const q = k - nx; if (label[q] === -1 && low (q)) { label[q] = -2; stack[size++] = q; } }
+            if (j < nz - 1) { const q = k + nx; if (label[q] === -1 && low (q)) { label[q] = -2; stack[size++] = q; } }
         }
-        const perimeter = cells.some (k => { const i = k % nx, j = (k - i) / nx; return i === 0 || j === 0 || i === nx - 1 || j === nz - 1; });
-        const id = perimeter ? -3 : pockets++; for (const k of cells) { label[k] = id; }
-        if (!perimeter) { sizes.push (cells.length * dx * dz); }
+        const id = perimeter ? -3 : pockets.length; for (const k of cells) { label[k] = id; }
+        if (!perimeter) { pockets.push ({ x0 : x0 + i0 * dx, x1 : x0 + i1 * dx, z0 : z0 + j0 * dz, z1 : z0 + j1 * dz, areaMm2 : Math.round (cells.length * dx * dz) }); }
     }
-    // Voronoi-style propagation over plateau nodes: where fronts from two different pockets meet, their summed distance
-    // is the plateau rib width between those pockets.
-    const dist = new Float64Array (n).fill (Infinity), owner = new Int32Array (n).fill (-1); let queue = [];
+    const dist = new Float32Array (n).fill (Infinity), owner = new Int32Array (n).fill (-1); let queue = [];
     for (let k = 0; k < n; k++) { if (label[k] >= 0) { dist[k] = 0; owner[k] = label[k]; queue.push (k); } }
     let minRib = Infinity;
-    const steps = [[1, 0, dx], [-1, 0, dx], [0, 1, dz], [0, -1, dz]];
     while (queue.length) {
         const next = [];
         for (const k of queue) {
             const i = k % nx, j = (k - i) / nx;
-            for (const [oi, oj, h] of steps) {
-                const a = i + oi, b = j + oj; if (a < 0 || b < 0 || a >= nx || b >= nz) { continue; }
+            for (let s = 0; s < 4; s++) {
+                const a = s === 0 ? i + 1 : s === 1 ? i - 1 : i, b = s === 2 ? j + 1 : s === 3 ? j - 1 : j, h = s < 2 ? dx : dz;
+                if (a < 0 || b < 0 || a >= nx || b >= nz) { continue; }
                 const q = b * nx + a; if (label[q] === -3) { continue; }
                 if (owner[q] >= 0 && owner[q] !== owner[k]) { minRib = Math.min (minRib, dist[k] + dist[q] + h); continue; }
                 if (dist[k] + h < dist[q]) { dist[q] = dist[k] + h; owner[q] = owner[k]; next.push (q); }
@@ -125,21 +80,23 @@ export function PocketMetrics (top, grid, depth)
         }
         queue = next;
     }
-    return { pocketCount : pockets, pocketAreasMm2 : sizes.map (a => Math.round (a)), minRibMm : Number.isFinite (minRib) ? Math.max (0, minRib - Math.max (dx, dz)) : null };
+    return { pocketCount : pockets.length, pockets, pocketAreasMm2 : pockets.map (p => p.areaMm2), minRibMm : Number.isFinite (minRib) ? Math.max (0, minRib - Math.max (dx, dz)) : null };
 }
 
-// Separate product footprints (4-connected nodes where a product surface was sensed), for comparing with pockets.
 // Separate product footprints (4-connected nodes where a product surface was sensed) and the narrowest footprint
 // extent among them, for comparing with pockets and for the per-product depth-to-width check.
 export function FootprintIslands (field, grid)
 {
-    const { nx, nz, dx, dz } = grid, seen = new Uint8Array (nx * nz); let count = 0, narrowest = Infinity;
+    const { nx, nz, dx, dz } = grid, seen = new Uint8Array (nx * nz), stack = new Int32Array (nx * nz); let count = 0, narrowest = Infinity;
     for (let start = 0; start < seen.length; start++) {
         if (seen[start] || !Number.isFinite (field[start])) { continue; }
-        count++; const stack = [start]; seen[start] = 1; let i0 = Infinity, i1 = -Infinity, j0 = Infinity, j1 = -Infinity;
-        while (stack.length) {
-            const k = stack.pop (), i = k % nx, j = (k - i) / nx; i0 = Math.min (i0, i); i1 = Math.max (i1, i); j0 = Math.min (j0, j); j1 = Math.max (j1, j);
-            for (const [a, b] of [[i - 1, j], [i + 1, j], [i, j - 1], [i, j + 1]]) { if (a >= 0 && b >= 0 && a < nx && b < nz) { const q = b * nx + a; if (!seen[q] && Number.isFinite (field[q])) { seen[q] = 1; stack.push (q); } } }
+        count++; let size = 0, i0 = Infinity, i1 = -Infinity, j0 = Infinity, j1 = -Infinity; stack[size++] = start; seen[start] = 1;
+        while (size) {
+            const k = stack[--size], i = k % nx, j = (k - i) / nx; i0 = Math.min (i0, i); i1 = Math.max (i1, i); j0 = Math.min (j0, j); j1 = Math.max (j1, j);
+            if (i > 0 && !seen[k - 1] && Number.isFinite (field[k - 1])) { seen[k - 1] = 1; stack[size++] = k - 1; }
+            if (i < nx - 1 && !seen[k + 1] && Number.isFinite (field[k + 1])) { seen[k + 1] = 1; stack[size++] = k + 1; }
+            if (j > 0 && !seen[k - nx] && Number.isFinite (field[k - nx])) { seen[k - nx] = 1; stack[size++] = k - nx; }
+            if (j < nz - 1 && !seen[k + nx] && Number.isFinite (field[k + nx])) { seen[k + nx] = 1; stack[size++] = k + nx; }
         }
         narrowest = Math.min (narrowest, (i1 - i0) * dx, (j1 - j0) * dz);
     }

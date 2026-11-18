@@ -186,7 +186,7 @@
 
     .mini_shared_view div.title svg.logo_image
     {
-        width: 132px;
+        width: 86px;
         height: 32px;
     }
 
@@ -747,3 +747,12 @@ div.main_viewer
 
 /* The command bar is restored with its existing preference when the product editor closes. */
 .primary_profile_open .scene_command_bar { display: none; }
+
+/* Details: Format / Vertices / Lines / Triangles collapse into a Mesh dropdown. */
+.details_mesh_group { margin: 0 0 4px; }
+.details_mesh_summary { display: flex; align-items: center; gap: 6px; padding: 4px 0; cursor: pointer; list-style: none; color: var(--ov_foreground_color); font-size: var(--workspace-meta-font-size, 12px); user-select: none; }
+.details_mesh_summary::-webkit-details-marker { display: none; }
+.details_mesh_summary::before { content: ''; width: 0; height: 0; border-left: 5px solid currentColor; border-top: 4px solid transparent; border-bottom: 4px solid transparent; transition: transform .15s; }
+.details_mesh_group[open] > .details_mesh_summary::before { transform: rotate(90deg); }
+.details_mesh_summary:hover { color: var(--ov_button_color); }
+.details_mesh_rows { padding-left: 11px; }

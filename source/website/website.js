@@ -1,9 +1,13 @@
+import { Messenger } from './messenger.js';
 import { DimensionTool } from './dimensiontool.js';
 import { RenderQueue } from './renderqueue.js';
 import { ViewModes } from './viewmodes.js';
 import { RenderingPanel } from './renderingpanel.js';
 import { CameraPanel } from './camerapanel.js';
 import { ModelExtensions, SupportedFormatsText } from './importformats.js';
+import { CadConversionsFor } from './cadconversion.js';
+import { CadFileType } from './cadfiletype.js';
+import { CadMessages } from './cadconversioncontract.js';
 import { GetFileExtension, TransformFileHostUrls } from '../engine/io/fileutils.js';
 import { InputFilesFromFileObjects, InputFilesFromUrls } from '../engine/import/importerfiles.js';
 import { ImportErrorCode, ImportSettings } from '../engine/import/importer.js';
@@ -42,6 +46,7 @@ import { Preferences } from './preferences.js';
 import { ModulePanels } from './modulepanels.js';
 import { PrimaryProductsPanel } from './primaryproductspanel.js';
 import { MoldedPulpPanel } from './moldedpulppanel.js';
+import { AnimationPanel } from './animationpanel.js';
 import { PackagingPanel } from './packagingpanel.js';
 import { AIWorkspace } from './aiworkspace.js';
 import { SceneEffects } from '../engine/viewer/sceneeffects.js';
@@ -163,7 +168,10 @@ class WebsiteLayouter
         const drawer = document.getElementById ('material_drawer');
         const animationDrawer = document.getElementById ('advance_animation_panel');
         const drawerHeight = (drawer && drawer.classList.contains ('open') ? drawer.offsetHeight : 0) + (animationDrawer && !animationDrawer.hidden ? animationDrawer.offsetHeight : 0);
-        let contentHeight = Math.max (120, windowHeight - headerHeight - drawerHeight);
+        // The brand strip sits under the workspace; bottom drawers open above it.
+        const footer = document.getElementById ('app_footer'), footerHeight = footer && getComputedStyle (footer).display !== 'none' ? footer.offsetHeight : 0;
+        document.documentElement.style.setProperty ('--app_footer_height', footerHeight + 'px');
+        let contentHeight = Math.max (120, windowHeight - headerHeight - footerHeight - drawerHeight);
 
         const panelHeaderHeight = document.getElementById ('upload_panel_toggle').offsetHeight;
         this.parameters.mainDiv.style.height = contentHeight + 'px';
@@ -228,6 +236,7 @@ export class Website
         this.InitNavigator ();
         this.InitWorkspace ();
         this.InitFullscreen ();
+        this.messenger = new Messenger (this);
 
         this.viewer.SetMouseClickHandler (this.OnModelClicked.bind (this));
         this.viewer.SetMouseMoveHandler (this.OnModelMouseMoved.bind (this));
@@ -260,7 +269,7 @@ export class Website
         this.cameraPanel = new CameraPanel (this);
         this.viewModes = new ViewModes (this); this.rendering = new RenderQueue (this); this.renderingPanel = new RenderingPanel (this);
         this.preferences = new Preferences (this);
-        this.aiWorkspace = new AIWorkspace (this); this.packagingPanel = new PackagingPanel (this); this.primaryProductsPanel = new PrimaryProductsPanel (this); this.moldedPulpPanel = new MoldedPulpPanel (this);
+        this.aiWorkspace = new AIWorkspace (this); this.packagingPanel = new PackagingPanel (this); this.primaryProductsPanel = new PrimaryProductsPanel (this); this.moldedPulpPanel = new MoldedPulpPanel (this); this.animationPanel = new AnimationPanel (this);
         for (const [id, setting] of [['horizon_gradient', 'horizonGradient'], ['ground_grid', 'showGroundGrid']]) {
             const checkbox = document.getElementById (id);
             checkbox.addEventListener ('change', () => {
@@ -279,6 +288,9 @@ export class Website
         const formats = document.getElementById ('supported_formats');
         if (formats) { formats.textContent = SupportedFormatsText; }
         document.getElementById ('workspace_upload').addEventListener ('click', () => this.OpenFileBrowserDialog ());
+        const cadButton = document.createElement ('button'); cadButton.className = 'workspace_upload_button'; cadButton.textContent = 'Convert CAD'; cadButton.id = 'workspace_convert_cad'; cadButton.type = 'button';
+        cadButton.addEventListener ('click', () => CadConversionsFor (this).Open ().catch (error => this.sessionEditor.Status (error.message)));
+        document.getElementById ('workspace_upload').after (cadButton);
         this.modulePanels.Render ();
         this.sidebar.detailsPanel.SetCollapsed (false); // Model spec is the default right panel, so its preview and specs start expanded.
         this.sidebar.detailsPanel.contentDiv.textContent = 'Load a model to view geometry, dimensions, materials and properties.';
@@ -515,6 +527,14 @@ export class Website
         const selected = Array.from (files);
         const session = selected.find ((file) => file.name.toLowerCase ().endsWith ('.auto3d'));
         if (session) { await this.sessionEditor.Run (() => this.sessionEditor.OpenArchiveFile (session)); return; }
+        const parasolid = selected.find (file => CadFileType (file.name)?.format === 'parasolid');
+        if (parasolid) {
+            const conversion = CadConversionsFor (this);
+            const replacing = !!this.sessionEditor.replaceTarget; this.sessionEditor.replaceTarget = null;
+            if (conversion.AutomaticActive ()) { await conversion.Open (null, CadMessages.import_busy); return; }
+            if (selected.length > 1) { conversion.ClearFile (); await conversion.Open (null, 'Multiple source files were selected. Choose one CAD file below; the other selected models have not been imported or uploaded.'); }
+            else { try { await conversion.Open (parasolid, replacing ? 'The converted model will be added as a new scene object automatically.' : ''); } catch (error) { this.sessionEditor.Status (error.message); } } return;
+        }
 
         const candidates = selected.filter ((file) => MultiModelExtensions.has (GetFileExtension (file.name).toLowerCase ()));
         if (!this.sessionEditor.replaceTarget && candidates.length > 1) {
@@ -630,6 +650,7 @@ export class Website
         this.settings.themeId = newThemeId;
         this.settings.AlignBackgroundWithTheme ();
         this.themeHandler.SwitchTheme (this.settings.themeId);
+        document.documentElement.dataset.theme = this.settings.themeId === Theme.Dark ? 'dark' : 'light';
         if (resetColors) {
             let defaultSettings = new Settings (this.settings.themeId);
             if (this.settings.backgroundPreset !== 'custom') { this.settings.backgroundColor = defaultSettings.backgroundColor; }

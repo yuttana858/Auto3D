@@ -1,8 +1,14 @@
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { MoldedPulpVersion, DefaultPulpDraft, UpdatePulpDraft, PulpTypes, PulpTypeList } from '../src/state.js';
-import { SenseBounds, SheetRect, FormGrid, BottomHeightfield } from '../src/surface.js';
-import { PlanSheet, PlanTray } from '../src/plan.js';
+import { SenseBounds, SheetRect, BottomHeightfield } from '../src/surface.js';
+import { DetailGrid } from '../src/field.js';
+import { PlanSheet, PlanTray, FormShell } from '../src/plan.js';
+import { SlopeLimit, MinFilterOctagon } from '../src/field.js';
+import { AdaptiveShellMesh } from '../src/rtin.js';
+import { PlanFeatures, PulpRuleList } from '../src/rules.js';
+import { HandlePulpJob } from '../src/worker.js';
+import { PulpDetail } from '../src/state.js';
 import { PulpDefinition, ValidatePulpDefinition } from '../src/definition.js';
 
 // Closed cylinder (a can) standing on y = base, centred at (cx, cz). Returns packed world-mm triangles.
@@ -95,7 +101,7 @@ describe ('Molded Pulp surface sensing and sheet', () => {
     });
     it ('rasterizes the lowest product surface, including a curved underside', () => {
         const triangles = Dome (), bounds = SenseBounds (triangles), rect = SheetRect (bounds, { extraLengthMm : 20, extraWidthMm : 20 });
-        const grid = FormGrid (rect, { resolutionMm : 2, thicknessMm : 2 }), field = BottomHeightfield (triangles, grid, rect.baseY);
+        const grid = DetailGrid (rect, { resolutionMm : 2, thicknessMm : 2 }), field = BottomHeightfield (triangles, grid, rect.baseY);
         const at = (x, z) => field[Math.round ((z - grid.z0) / grid.dz) * grid.nx + Math.round ((x - grid.x0) / grid.dx)];
         assert.ok (Math.abs (at (0, 0)) < 0.2); assert.ok (Math.abs (at (30, 0) - 5) < 0.6); assert.equal (at (-69, -69), Infinity);
     });
@@ -105,57 +111,142 @@ describe ('Molded Pulp surface sensing and sheet', () => {
     });
 });
 
+const at = (shell, values, x, z) => { const g = shell.grid; return values[Math.round ((z - g.z0) / g.dz) * g.nx + Math.round ((x - g.x0) / g.dx)]; };
+
 describe ('Molded Pulp tray forming', function () {
-    this.timeout (30000);
-    const draft = UpdatePulpDraft (DefaultPulpDraft ('type2'), { formDepthMm : 30, extraLengthMm : 40, extraWidthMm : 40, resolutionMm : 1 });
-    const plan = PlanTray (SixPack (), draft), top = plan.components[0];
+    this.timeout (60000);
+    const draft = UpdatePulpDraft (DefaultPulpDraft ('type2'), { formDepthMm : 30, extraLengthMm : 40, extraWidthMm : 40, resolutionMm : 1, ribs : 'off', lugs : 'off' });
+    const shell = FormShell (SixPack (), draft, { keepSurfaces : true }), plan = PlanTray (SixPack (), draft), component = plan.components[0];
     it ('forms one pocket per can, pulled up to the form depth', () => {
         assert.equal (plan.metrics.pocketCount, 6); assert.equal (plan.metrics.productIslands, 6); assert.equal (plan.metrics.achievedDepthMm, 30); assert.equal (plan.metrics.overallHeightMm, 33);
-        const ys = top.positions.filter ((v, i) => i % 3 === 1); assert.ok (Math.abs (Math.max (...ys) - 30) < 1e-4); assert.ok (Math.abs (Math.min (...ys) + 3) < 1e-4);
+        const ys = component.positions.filter ((v, i) => i % 3 === 1); assert.ok (Math.abs (Math.max (...ys) - 30) < 1e-4); assert.ok (Math.abs (Math.min (...ys) + 3) < 1e-3);
     });
     it ('keeps the pocket floor on the product base and opens pockets with draft', () => {
-        const { positions } = top, origin = plan.origin, n = plan.metrics.gridNodes; let floor = 0, maxSlope = 0;
-        const grid = FormGrid (plan.rect, draft), heights = new Float64Array (n);
-        for (let k = 0; k < n; k++) { heights[k] = positions[k * 3 + 1]; }
-        const at = (x, z) => heights[Math.round ((z - grid.z0) / grid.dz) * grid.nx + Math.round ((x - grid.x0) / grid.dx)];
-        floor = at (0, 0); assert.ok (Math.abs (floor) < 1e-6, 'can centre rests on the pocket floor');
-        assert.ok (at (33 + 0.6, 0) < 0.6, 'clearance keeps the pocket wider than the can');
-        for (let j = 1; j < grid.nz - 1; j++) { for (let i = 1; i < grid.nx - 1; i++) { const k = j * grid.nx + i; maxSlope = Math.max (maxSlope, Math.abs (heights[k + 1] - heights[k]) / grid.dx, Math.abs (heights[k + grid.nx] - heights[k]) / grid.dz); } }
-        assert.ok (maxSlope <= 1 / Math.tan (draft.draftDeg * Math.PI / 180) + 1e-6, 'no wall is steeper than the draft allows');
-        assert.ok (Math.abs (origin[1]) < 1e-9);
+        const top = shell.surfaces.top, g = shell.grid;
+        assert.ok (Math.abs (at (shell, top, 0, 0)) < 1e-6, 'can centre rests on the pocket floor'); assert.ok (at (shell, top, 33 + 0.6, 0) < 0.6, 'clearance keeps the pocket wider than the can');
+        let maxSlope = 0; for (let j = 1; j < g.nz - 1; j++) { for (let i = 1; i < g.nx - 1; i++) { const k = j * g.nx + i; maxSlope = Math.max (maxSlope, Math.abs (top[k + 1] - top[k]) / g.dx, Math.abs (top[k + g.nx] - top[k]) / g.dz); } }
+        assert.ok (maxSlope <= 1 / Math.tan (draft.draftDeg * Math.PI / 180) * 1.02, 'no wall is steeper than the draft allows: ' + maxSlope);
     });
-    it ('produces a closed, outward-facing shell whose volume matches the estimate', () => {
-        const check = MeshChecks (top); assert.equal (check.open, 0); assert.ok (check.volume > 0);
-        assert.ok (Math.abs (check.volume / 1000 - plan.metrics.volumeCm3) / plan.metrics.volumeCm3 < 0.02);
-        assert.ok (plan.metrics.estimatedMassG > 0);
+    it ('produces a closed, outward-facing adaptive shell whose volume matches the estimate', () => {
+        const check = MeshChecks (component); assert.equal (check.open, 0); assert.ok (check.volume > 0);
+        assert.ok (Math.abs (check.volume / 1000 - plan.metrics.volumeCm3) / plan.metrics.volumeCm3 < 0.03, check.volume / 1000 + ' vs ' + plan.metrics.volumeCm3);
+        assert.ok (plan.metrics.triangles < plan.metrics.fullGridTriangles / 3, 'flat plateau and floors are simplified: ' + plan.metrics.triangles + ' of ' + plan.metrics.fullGridTriangles);
     });
     it ('keeps full wall thickness on steep walls (normal offset, not vertical)', () => {
-        const thick = PlanTray (SixPack (), UpdatePulpDraft (draft, { draftDeg : 3, thicknessMm : 3 })), grid = FormGrid (thick.rect, thick.draft), p = thick.components[0].positions, n = grid.nx * grid.nz;
-        let thinnest = Infinity, steep = 0; const w = 6;
-        for (let j = w; j < grid.nz - w; j += 3) {
-            for (let i = w; i < grid.nx - w; i += 3) {
-                const k = j * grid.nx + i, x = p[k * 3], y = p[k * 3 + 1], z = p[k * 3 + 2]; let best = Infinity;
-                if (Math.abs (p[(k + 1) * 3 + 1] - y) > grid.dx * 2) { steep++; }
-                for (let b = -w; b <= w; b++) { for (let a = -w; a <= w; a++) { const q = n + k + b * grid.nx + a, d = Math.hypot (p[q * 3] - x, p[q * 3 + 1] - y, p[q * 3 + 2] - z); if (d < best) { best = d; } } }
+        const { top, bottom } = shell.surfaces, g = shell.grid; let thinnest = Infinity, steep = 0;
+        for (let j = 6; j < g.nz - 6; j += 3) {
+            for (let i = 6; i < g.nx - 6; i += 3) {
+                const k = j * g.nx + i; if (Math.abs (top[k + 1] - top[k]) > g.dx * 2) { steep++; }
+                let best = Infinity; for (let b = -6; b <= 6; b++) { for (let a = -6; a <= 6; a++) { const q = k + b * g.nx + a; best = Math.min (best, Math.hypot (a * g.dx, bottom[q] - top[k], b * g.dz)); } }
                 thinnest = Math.min (thinnest, best);
             }
         }
-        assert.ok (steep > 20, 'the sample includes steep pocket walls');
-        assert.ok (thinnest > 3 * 0.8, 'nearest outer-surface node stays near the nominal 3 mm thickness: ' + thinnest);
+        assert.ok (steep > 20); assert.ok (thinnest > 3 * 0.8, 'outer surface stays near the nominal 3 mm: ' + thinnest);
     });
     it ('flags DFM issues from the knowledge-base rules', () => {
         const ids = plan => plan.checks.map (c => c.id);
         assert.ok (!ids (plan).includes ('MP-R1'), '20 mm gaps leave ribs wider than 8 mm');
-        const tight = PlanTray (SixPack (10), draft); assert.ok (ids (tight).includes ('MP-R1'), '10 mm gaps leave ribs under 8 mm');
-        const merged = PlanTray (SixPack (2), draft); assert.ok (ids (merged).includes ('MP-R2'), 'touching pockets are reported'); assert.equal (merged.metrics.productIslands, 6);
-        const shallow = PlanTray (SixPack (), UpdatePulpDraft (draft, { extraLengthMm : 2, extraWidthMm : 2 })); assert.ok (ids (shallow).includes ('MP-M1'));
+        assert.ok (ids (PlanTray (SixPack (10), draft)).includes ('MP-R1'));
+        const merged = PlanTray (SixPack (2), draft); assert.ok (ids (merged).includes ('MP-R2')); assert.equal (merged.metrics.productIslands, 6);
+        assert.ok (ids (PlanTray (SixPack (), UpdatePulpDraft (draft, { extraLengthMm : 2, extraWidthMm : 2 }))).includes ('MP-M1'));
         const deep = PlanTray (SixPack (), UpdatePulpDraft (draft, { formDepthMm : 100, extraLengthMm : 60, extraWidthMm : 60 })); assert.ok (ids (deep).includes ('MP-H1')); assert.ok (ids (deep).includes ('MP-H2'));
-        const thin = PlanTray (SixPack (), UpdatePulpDraft (draft, { thicknessMm : 0.8 })); assert.ok (ids (thin).includes ('MP-T1'));
-        const nodraft = PlanTray (SixPack (), UpdatePulpDraft (draft, { draftDeg : 0 })); assert.ok (ids (nodraft).includes ('MP-D0'));
+        assert.ok (ids (PlanTray (SixPack (), UpdatePulpDraft (draft, { thicknessMm : 0.8 }))).includes ('MP-T1'));
+        assert.ok (ids (PlanTray (SixPack (), UpdatePulpDraft (draft, { draftDeg : 0 }))).includes ('MP-D0'));
     });
-    it ('conforms to a curved underside and stays bounded in size', () => {
-        const toilet = PlanTray (Dome (), UpdatePulpDraft (DefaultPulpDraft ('type1'), { formDepthMm : 25, extraLengthMm : 60, extraWidthMm : 60 }));
-        assert.equal (toilet.metrics.pocketCount, 1); assert.equal (toilet.metrics.achievedDepthMm, 25); assert.ok (toilet.metrics.gridNodes <= 360000);
-        assert.equal (MeshChecks (toilet.components[0]).open, 0);
+    it ('conforms to a curved underside', () => {
+        const toilet = PlanTray (Dome (), UpdatePulpDraft (DefaultPulpDraft ('type1'), { formDepthMm : 25, extraLengthMm : 60, extraWidthMm : 60, ribs : 'off', lugs : 'off' }));
+        assert.equal (toilet.metrics.pocketCount, 1); assert.equal (toilet.metrics.achievedDepthMm, 25); assert.equal (MeshChecks (toilet.components[0]).open, 0);
+    });
+});
+
+describe ('Molded Pulp numerical core', function () {
+    this.timeout (60000);
+    it ('limits slope isotropically (fast marching, not an octagonal chamfer)', () => {
+        const n = 201, grid = { nx : n, nz : n, dx : 0.5, dz : 0.5 }, values = new Float32Array (n * n).fill (100); values[100 * n + 100] = 0;
+        const out = SlopeLimit (values, grid, 2);
+        for (const angle of [0, 22.5, 45, 67.5]) { const r = 40, a = angle * Math.PI / 180, i = Math.round (100 + Math.cos (a) * r / 0.5), j = Math.round (100 + Math.sin (a) * r / 0.5), d = Math.hypot ((i - 100) * 0.5, (j - 100) * 0.5); assert.ok (Math.abs (out[j * n + i] / (2 * d) - 1) < 0.04, angle + '°: ' + out[j * n + i] / (2 * d)); }
+    });
+    it ('approximates a disc with the linear-time octagon clearance filter', () => {
+        const n = 101, grid = { nx : n, nz : n, dx : 1, dz : 1 }, values = new Float32Array (n * n).fill (10); values[50 * n + 50] = 0;
+        const out = MinFilterOctagon (values, grid, 10);
+        assert.equal (out[50 * n + 59], 0); assert.equal (out[59 * n + 50], 0); assert.equal (out[50 * n + 62], 10); assert.equal (out[58 * n + 58], 10, 'outside the octagon corner (11.3 mm)'); assert.equal (out[56 * n + 56], 0);
+    });
+    it ('meshes adaptively within tolerance and stays watertight', () => {
+        const n = 129, grid = { nx : n, nz : n, dx : 1, dz : 1, x0 : 0, z0 : 0 }, top = new Float32Array (n * n), bottom = new Float32Array (n * n);
+        for (let j = 0; j < n; j++) { for (let i = 0; i < n; i++) { const k = j * n + i, r = Math.hypot (i - 64, j - 64); top[k] = i === 0 || j === 0 || i === n - 1 || j === n - 1 ? 0 : Math.min (20, Math.max (0, r - 20)); bottom[k] = top[k] - 2; } }
+        const mesh = AdaptiveShellMesh (grid, { top, bottom }, [64, 0, 64], 'test', 0.05), check = MeshChecks (mesh);
+        assert.equal (check.open, 0); assert.ok (check.volume > 0); assert.ok (mesh.triangleCount < mesh.gridTriangles / 2);
+    });
+    it ('sizes grids by detail tier and keeps ultra bounded', () => {
+        const rect = SheetRect (SenseBounds (SixPack ()), DefaultPulpDraft ());
+        const sides = Object.keys (PulpDetail).map (d => DetailGrid (rect, { ...DefaultPulpDraft (), detail : d }, d).n);
+        assert.deepEqual (sides, [257, 513, 1025, 2049].map ((max, i) => Math.min (max, sides[i]))); assert.ok (sides[3] <= 2049 && sides[0] < sides[2]);
+        assert.ok (DetailGrid (rect, DefaultPulpDraft (), 'fine').cell <= 0.5);
+    });
+});
+
+describe ('Molded Pulp feature rule base', function () {
+    this.timeout (60000);
+    const base = UpdatePulpDraft (DefaultPulpDraft ('type2'), { formDepthMm : 30, extraLengthMm : 80, extraWidthMm : 80 });
+    it ('publishes every rule with its knowledge-base basis', () => {
+        const rules = PulpRuleList (); assert.ok (rules.length >= 8); for (const r of rules) { assert.match (r.basis, /MP knowledge base/); assert.ok (['parameter', 'placement', 'check'].includes (r.kind)); }
+    });
+    it ('places ribs only where the land between pockets allows 8 mm each side, and four symmetric lugs', () => {
+        const wide = PlanTray (SixPack (60), base).features, narrow = PlanTray (SixPack (20), base).features;
+        assert.ok (wide.ribs.some (r => r.rule === 'RIB-BETWEEN'), 'wide gaps get ribs'); assert.ok (!narrow.ribs.some (r => r.rule === 'RIB-BETWEEN'), '20 mm gaps are too narrow');
+        assert.match (narrow.trace.find (t => t.rule === 'RIB-BETWEEN').decision, /no rib/);
+        assert.deepEqual (wide.lugs.map (l => l.side).sort (), ['+X', '+Z', '−X', '−Z'].sort ()); assert.ok (wide.lugs.every (l => l.nodes > 0));
+        const rib = wide.rib; assert.ok (rib.floorWidthMm >= 3 * base.thicknessMm && rib.depthMm >= 3 && rib.depthMm <= 15);
+        assert.ok (wide.nesting.pitchMm > 0 && wide.trace.length === PulpRuleList ().length);
+    });
+    it ('cuts hollow ribs into the plateau and thickens the wall at lugs, keeping the shell closed', () => {
+        const draft = UpdatePulpDraft (base, { resolutionMm : 1 }), plan = FormShell (SixPack (60), draft, { keepSurfaces : true }), rib = plan.features.ribs.find (r => r.rule === 'RIB-BETWEEN');
+        const mx = (rib.x0 + rib.x1) / 2, mz = (rib.z0 + rib.z1) / 2, top = plan.surfaces.top, bottom = plan.surfaces.bottom;
+        assert.ok (Math.abs (at (plan, top, mx, mz) - (plan.metrics.achievedDepthMm - rib.depthMm)) < 0.6, 'rib floor at plateau − depth');
+        assert.ok (at (plan, top, mx, mz) - at (plan, bottom, mx, mz) < draft.thicknessMm + 0.6, 'the rib is a hollow fold, not solid');
+        const lug = plan.features.lugs[0]; assert.ok (lug.nodes > 0);
+        assert.equal (MeshChecks (plan.component).open, 0); assert.ok (plan.metrics.ribCount >= 1 && plan.metrics.lugCount === 4);
+    });
+    it ('honours overrides and turns features off', () => {
+        const off = PlanTray (SixPack (60), UpdatePulpDraft (base, { ribs : 'off', lugs : 'off' })).features; assert.equal (off.ribs.length + off.lugs.length, 0);
+        const custom = PlanTray (SixPack (60), UpdatePulpDraft (base, { ribDepthMm : 5, ribWidthMm : 9 })).features; assert.equal (custom.rib.depthMm, 5); assert.equal (custom.rib.floorWidthMm, 9);
+        assert.ok (PlanFeatures ({ draft : UpdatePulpDraft (base, { draftDeg : 2 }), depthMm : 30, slope : 28, rect : { x0 : 0, x1 : 200, z0 : 0, z1 : 150, lengthMm : 200, widthMm : 150 }, pockets : [], skirtRunMm : 1 }).warnings.some (w => w.id === 'MP-N1'));
+    });
+});
+
+describe ('Molded Pulp clamshells, detail and worker', function () {
+    this.timeout (120000);
+    const base = UpdatePulpDraft (DefaultPulpDraft ('type3dry'), { extraLengthMm : 40, extraWidthMm : 40, resolutionMm : 1.5, ribs : 'off' });
+    it ('encapsulates top and bottom with flanges meeting at the parting plane and a hinge', () => {
+        const plan = PlanTray (SixPack (), UpdatePulpDraft (base, { clamshell : 'top-bottom', partingFraction : 0.5 }));
+        assert.deepEqual (plan.components.map (c => c.id), ['pulp-shell-a', 'pulp-hinge', 'pulp-shell-b']);
+        const ys = id => plan.components.find (c => c.id === id).positions.filter ((v, i) => i % 3 === 1);
+        assert.ok (Math.abs (Math.max (...ys ('pulp-shell-a')) - 61) < 0.05, 'base flange at the parting plane'); assert.ok (Math.abs (Math.min (...ys ('pulp-shell-b')) - 61) < 0.05, 'lid flange at the parting plane');
+        assert.ok (Math.max (...ys ('pulp-shell-b')) > 122, 'lid covers the can tops');
+        for (const c of plan.components) { const check = MeshChecks (c); assert.equal (check.open, 0, c.id); assert.ok (check.volume > 0, c.id + ' faces outward'); }
+        assert.equal (plan.metrics.shells.length, 2); assert.equal (plan.metrics.pocketCount, 12);
+        const hinge = plan.components.find (c => c.id === 'pulp-hinge'), hx = hinge.positions.filter ((v, i) => i % 3 === 0);
+        assert.ok (Math.max (...hx) - Math.min (...hx) > 270, 'the hinge runs along the long (X) flange edge');
+    });
+    it ('splits side to side across X', () => {
+        const plan = PlanTray (SixPack (), UpdatePulpDraft (base, { clamshell : 'side-x', hinge : false }));
+        assert.deepEqual (plan.components.map (c => c.id), ['pulp-shell-a', 'pulp-shell-b']);
+        const xs = id => plan.components.find (c => c.id === id).positions.filter ((v, i) => i % 3 === 0), mid = (plan.bounds.min[0] + plan.bounds.max[0]) / 2 - plan.origin[0];
+        assert.ok (Math.abs (Math.max (...xs ('pulp-shell-a')) - mid) < 0.05); assert.ok (Math.abs (Math.min (...xs ('pulp-shell-b')) - mid) < 0.05);
+        for (const c of plan.components) { assert.equal (MeshChecks (c).open, 0, c.id); }
+    });
+    it ('places a sheet per shell for clamshell sheets', () => {
+        const sheet = PlanSheet (SixPack (), UpdatePulpDraft (base, { clamshell : 'top-bottom' })); assert.equal (sheet.components.length, 2);
+        const ys = sheet.components[1].positions.filter ((v, i) => i % 3 === 1); assert.ok (Math.min (...ys) >= 122 - 1e-4, 'lid sheet sits on the product tops');
+    });
+    it ('forms at fine detail within budget and transfers results from the worker handler', () => {
+        const started = Date.now (), { message, transfer } = HandlePulpJob ({ id : 7, stage : 'tray', triangles : SixPack (), draft : UpdatePulpDraft (base, { resolutionMm : null, detail : 'fine' }), detail : 'fine' });
+        assert.equal (message.id, 7); assert.equal (message.plan.metrics.pocketCount, 6); assert.ok (message.plan.metrics.cellMm <= 0.5); assert.equal (transfer.length, 4 + 6, 'mesh buffers plus the NURBS faces (points and knots of top and bottom)'); assert.ok (transfer.includes (message.plan.nurbs.shells[0].top.points.buffer));
+        assert.ok (Date.now () - started < 30000, 'fine detail stays interactive in a worker: ' + (Date.now () - started) + ' ms');
+    });
+    it ('still validates drafts saved by 0.1.0', () => {
+        const legacy = { pulpType : 'type2', thicknessMm : 3, extraLengthMm : 20, extraWidthMm : 20, formDepthMm : 30, clearanceMm : 1, draftDeg : 4, resolutionMm : null, color : '#a79c89' };
+        const definition = ValidatePulpDefinition ({ schemaVersion : 1, module : 'molded-pulp', moduleVersion : '0.1.0', stage : 'tray', productIds : ['a'], draft : legacy });
+        assert.equal (definition.draft.detail, 'standard'); assert.equal (definition.draft.clamshell, 'none'); assert.equal (definition.moduleVersion, '0.1.0');
     });
 });

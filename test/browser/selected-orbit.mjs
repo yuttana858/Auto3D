@@ -12,6 +12,9 @@ try {
     const call = async (id, args = {}) => { const r = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (r.ok, true, JSON.stringify (r)); return r.result; };
     const labels = await page.locator ('.scene_tools button').evaluateAll (nodes => nodes.map (node => node.getAttribute ('aria-label'))); for (const text of ['Hide or show', 'Delete object', 'Model library', 'Save or open', 'Export', 'Add model']) { assert.equal (labels.some (label => label.startsWith (text)), false); }
     assert.equal (await page.locator ('.header_library_button').count () > 0, true);
+    // Brand strip: SWIS mark and "SW Innovation Systems" bottom right; the workspace ends where the strip begins.
+    const strip = await page.evaluate (() => ({ text : document.querySelector ('.app_brand').innerText, main : document.getElementById ('main').getBoundingClientRect ().bottom, footer : document.getElementById ('app_footer').getBoundingClientRect (), logo : document.querySelector ('.logo_image use').getAttribute ('href') }));
+    assert.equal (strip.text, 'SW Innovation Systems'); assert.ok (Math.abs (strip.main - strip.footer.top) < 1 && strip.footer.height > 0 && strip.footer.bottom === 1000, JSON.stringify (strip)); assert.match (strip.logo, /auto3d-logo\.svg/);
     await call ('packaging.fefco.preset', { code : '0201', length : 100, width : 80, height : 60 }); await call ('object.transform', { position : [60, 20, 0] });
     // The preset's animated fit may still be moving the camera; wait until two reads agree.
     let settled = null; for (let retry = 0; retry < 100; retry++) { const next = await call ('camera.current.inspect'); if (settled && JSON.stringify (settled) === JSON.stringify (next)) { break; } settled = next; await page.waitForTimeout (100); }
@@ -19,12 +22,12 @@ try {
     // Focus keeps the camera position and aims the orbit center at the selection.
     const focused = await call ('camera.current.inspect'); assert.deepEqual (focused.eye, before.eye); assert.deepEqual (focused.center, focus.pivot); assert.equal (focused.fov, before.fov);
     const canvas = page.locator ('#main_viewer canvas').first (); const area = await canvas.boundingBox (); const point = { x : area.x + area.width * .6, y : area.y + area.height * .45 };
-    await page.mouse.move (point.x, point.y); await page.mouse.down ({ button : 'right' }); await page.mouse.move (point.x + 35, point.y, { steps : 8 }); await page.mouse.up ({ button : 'right' }); const horizontal = await call ('camera.current.inspect'); assert.notDeepEqual (horizontal.eye, focused.eye); assert.deepEqual (horizontal.up, focused.up);
+    await page.mouse.move (point.x, point.y); await page.mouse.down ({ button : 'right' }); await page.mouse.move (point.x + 35, point.y, { steps : 8 }); await page.mouse.up ({ button : 'right' }); const horizontal = await call ('camera.current.inspect'); assert.notDeepEqual (horizontal.eye, focused.eye); /* Right-drag is a level turntable: the camera never rolls or tilts, its up stays the scene up axis. */ const level = up => Math.abs (up[0]) < 1e-9 && Math.abs (up[1] - 1) < 1e-9 && Math.abs (up[2]) < 1e-9; assert.ok (level (horizontal.up), JSON.stringify (horizontal.up));
     await page.mouse.move (point.x, point.y); await page.mouse.down ({ button : 'right' }); await page.mouse.move (point.x + 65, point.y + 25, { steps : 8 }); await page.mouse.up ({ button : 'right' });
     const after = await call ('camera.current.inspect'); const span = camera => Math.hypot (...camera.eye.map ((v, i) => v - camera.center[i]));
     /* Main viewer: right-drag orbits around the selected model; the view center stays on it and the viewing distance is unchanged. */
     const near = (a, b) => a.every ((v, i) => Math.abs (v - b[i]) < 1e-6);
-    assert.ok (near (after.center, focus.pivot), JSON.stringify ([after.center, focus.pivot])); assert.notDeepEqual (focused.eye, after.eye); assert.ok (Math.abs (span (focused) - span (after)) < 1e-3); assert.equal (before.fov, after.fov); assert.equal (await page.locator ('.auto3d_context_menu').count (), 0);
+    assert.ok (near (after.center, focus.pivot), JSON.stringify ([after.center, focus.pivot])); assert.notDeepEqual (focused.eye, after.eye); assert.ok (Math.abs (span (focused) - span (after)) < 1e-3); assert.ok (level (after.up), JSON.stringify (after.up)); assert.equal (before.fov, after.fov); assert.equal (await page.locator ('.auto3d_context_menu').count (), 0);
     /* Pan away with the middle button, then right-drag: it orbits around the selected model without re-aiming, so the framing (offset of the view center from the model) is kept. */
     await page.mouse.move (point.x, point.y); await page.mouse.down ({ button : 'middle' }); await page.mouse.move (point.x - 120, point.y + 40, { steps : 8 }); await page.mouse.up ({ button : 'middle' });
     const panned = await call ('camera.current.inspect'); assert.ok (!near (panned.center, focus.pivot), 'middle-drag moved the view center away');
@@ -32,7 +35,7 @@ try {
     const orbited = await call ('camera.current.inspect'), distance = (a, b) => Math.hypot (...a.map ((v, i) => v - b[i]));
     assert.ok (!near (orbited.center, focus.pivot), 'right-drag must not snap the view onto the model'); assert.notDeepEqual (orbited.eye, panned.eye);
     assert.ok (Math.abs (distance (orbited.eye, focus.pivot) - distance (panned.eye, focus.pivot)) < 1e-3, 'eye orbits the model at a constant distance');
-    assert.ok (Math.abs (distance (orbited.center, focus.pivot) - distance (panned.center, focus.pivot)) < 1e-3, 'view center keeps its offset from the model'); assert.ok (Math.abs (span (orbited) - span (panned)) < 1e-3);
+    assert.ok (Math.abs (distance (orbited.center, focus.pivot) - distance (panned.center, focus.pivot)) < 1e-3, 'view center keeps its offset from the model'); assert.ok (Math.abs (span (orbited) - span (panned)) < 1e-3); assert.ok (level (orbited.up), JSON.stringify (orbited.up));
     const scene = await call ('scene.inspect'); assert.equal (scene.objects.length, 1); assert.deepEqual (scene.objects[0].position, [60, 20, 0]);
     await call ('ui.array'); const dialog = page.getByRole ('dialog', { name : 'Array selected model', exact : true }); await dialog.waitFor ();
     await page.waitForFunction (() => parseFloat (getComputedStyle (document.querySelector ('.array_dialog h2')).fontSize) > 18);

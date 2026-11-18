@@ -1,0 +1,19 @@
+/* Animation module panel (host feature: timeline playback, keyframes and video export). */
+.animation_module_panel { flex: 1; margin-left: 40px; width: calc(100% - 40px); box-sizing: border-box; padding: 14px 12px; overflow: auto; color: var(--ov_foreground_color); background: var(--ov_background_color); font-size: var(--workspace-menu-font-size, 13px); }
+.animation_module_panel h3 { margin: 0 0 6px; font-size: var(--workspace-title-font-size, 14px); font-weight: 600; }
+.animation_section { padding: 12px 0; border-top: 1px solid var(--ov_border_color); }
+.animation_help, .animation_summary { margin: 0 0 8px; font-size: var(--workspace-help-font-size, 12px); line-height: 1.45; opacity: .8; }
+.animation_status:empty { display: none; }
+.animation_status { margin: 8px 0 0; font-size: var(--workspace-help-font-size, 12px); color: var(--ov_error_color, #e06c6c); }
+.animation_buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 8px; }
+.animation_buttons button, .animation_secondary { padding: 6px 10px; border: 1px solid var(--ov_border_color); border-radius: 4px; color: inherit; background: transparent; cursor: pointer; font: inherit; }
+.animation_buttons button:hover:not(:disabled), .animation_secondary:hover:not(:disabled) { border-color: var(--ov_hover_color, #5aa9e6); }
+.animation_buttons button:disabled { opacity: .45; cursor: default; }
+.animation_buttons .animation_primary { border-color: transparent; color: #fff; background: var(--ov_button_color, #3393bd); }
+.animation_time { margin-left: auto; font-variant-numeric: tabular-nums; opacity: .85; }
+.animation_scrub, .animation_progress { width: 100%; }
+.animation_grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.animation_field { display: flex; flex-direction: column; gap: 3px; min-width: 0; font-size: var(--workspace-meta-font-size, 12px); }
+.animation_field input, .animation_field select { min-width: 0; padding: 5px 6px; border: 1px solid var(--ov_border_color); border-radius: 4px; color: inherit; background: var(--ov_background_color); font: inherit; }
+.animation_check { display: flex; align-items: center; gap: 4px; font-size: var(--workspace-meta-font-size, 12px); }
+@media (max-width: 520px) { .animation_grid { grid-template-columns: 1fr; } }

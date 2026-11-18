@@ -28,7 +28,7 @@ try {
     const params = new URLSearchParams ({ client_id : clientId, redirect_uri : callback, response_type : 'code', resource : origin + '/mcp', scope : 'auto3d.read offline_access', state : 'browser-fixture-state', code_challenge : challenge, code_challenge_method : 'S256' });
     await page.goto (origin + '/oauth/authorize?' + params);
     assert.equal (await page.getByLabel ('App window code').count (), 0);
-    assert.equal (await page.locator ('.agent-brand').innerText (), 'SW Auto3D');
+    assert.equal (await page.locator ('.agent-brand').innerText (), 'Auto3D');
     assert.equal (await page.locator ('.agent-card').evaluate (el => getComputedStyle (el).borderRadius), '12px');
     // One approval includes every tool and screenshots, even for a read-only client request.
     assert.equal (await page.getByRole ('checkbox').count (), 0);

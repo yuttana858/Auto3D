@@ -1,0 +1,14 @@
+# Quick browser checks run on every ready PR. Every name here must also be in ci-suite.txt.
+# The full ci-suite.txt runs on request: the "full-ci" PR label, or a manual "Run workflow" with suite=full.
+# Keep this list short (about 10 minutes on a hosted runner); choose tests that cover the main areas.
+auth
+landing-signin
+workspace-commands
+workspace-editing
+module-panels
+command-bar
+messenger-ai-history
+ai-creations
+packaging-module
+mcp-consent
+cad-conversion

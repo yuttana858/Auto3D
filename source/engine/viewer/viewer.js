@@ -538,6 +538,7 @@ export class Viewer
     {
         let oldCamera = this.navigation.GetCamera ();
         let newCamera = this.upVector.SetDirection (upDirection, oldCamera);
+        this.SyncNavigationWorldUp ();
         this.UpdateGroundGrid ();
         let animationSteps = animate ? this.settings.animationSteps : 0;
         this.navigation.MoveCamera (newCamera, animationSteps);
@@ -548,6 +549,7 @@ export class Viewer
     {
         let oldCamera = this.navigation.GetCamera ();
         let newCamera = this.upVector.Flip (oldCamera);
+        this.SyncNavigationWorldUp ();
         this.UpdateGroundGrid ();
         this.navigation.MoveCamera (newCamera, 0);
         this.Render ();
@@ -731,6 +733,16 @@ export class Viewer
         });
 
         this.upVector = new UpVector ();
+        this.SyncNavigationWorldUp ();
+    }
+
+    // Right-drag orbit is a level turntable around the scene's up axis; keep navigation in step with it.
+    SyncNavigationWorldUp ()
+    {
+        if (!this.navigation || !this.upVector) { return; }
+        const up = this.upVector.direction === Direction.X ? [1, 0, 0] : this.upVector.direction === Direction.Z ? [0, 0, 1] : [0, 1, 0];
+        const sign = this.upVector.isFlipped ? -1 : 1;
+        this.navigation.worldUp = new Coord3D (up[0] * sign, up[1] * sign, up[2] * sign);
     }
 
     InitShading  ()

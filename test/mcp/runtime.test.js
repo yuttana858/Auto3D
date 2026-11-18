@@ -48,7 +48,7 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         assert.ok (!html.includes ('name="appWindowCode"')); assert.ok (!html.includes ('name="harness"')); assert.ok (!html.includes ('name="name"'));
         assert.match (html, /read and edit your selected workspace, use every Auto3D tool, and capture viewport or workspace screenshots/);
         assert.ok (!html.includes ('type="checkbox"'));
-        assert.ok (!html.includes ('approve-manual')); assert.match (html, /SW Auto3D/); assert.match (html, /mcp-consent\.css/);
+        assert.ok (!html.includes ('approve-manual')); assert.match (html, /<span>Auto3D<\/span>/); assert.doesNotMatch (html, /SW Auto3D/); assert.match (html, /mcp-consent\.css/);
         const form = new URLSearchParams ({ handle : html.match (/name="handle" value="([^"]+)"/)[1], binding : html.match (/name="binding" value="([^"]+)"/)[1], permissions : html.match (/name="permissions" value="([^"]+)"/)[1], name : 'My review agent', harness : 'chatgpt', appWindowCode, decision : 'approve' });
         if (!appWindowCode) { form.delete ('name'); form.delete ('harness'); }
         const cookies = [cookieFor (id), ...response.headers.getSetCookie ().map (value => value.split (';')[0])].join ('; ');
@@ -170,6 +170,12 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
         socket.send (JSON.stringify ({ type : 'result', requestId : commandRequest.requestId, sessionId : commandRequest.sessionId, result : { ok : true, command : commandRequest.command, result : [] } }));
         const commandResponse = await commandPending;
         assert.equal (commandResponse.status, 200); assert.deepEqual (JSON.parse ((await commandResponse.json ()).result.content[0].text), []);
+        // Direct AI messaging tool: dispatched to the paired window like any write command.
+        const replyArgs = { message : 'Done.', replyTo : 1 }, replyPending = rpc (token.access_token, 'tools/call', { name : 'messenger.ai.respond', arguments : replyArgs });
+        const replyRequest = await message (socket); assert.equal (replyRequest.command, 'messenger.ai.respond'); assert.deepEqual (replyRequest.arguments, replyArgs); assert.equal (replyRequest.writeAuthorized, true);
+        socket.send (JSON.stringify ({ type : 'result', requestId : replyRequest.requestId, sessionId : replyRequest.sessionId, result : { ok : true, command : 'messenger.ai.respond', result : { id : 2, shown : true } } }));
+        assert.deepEqual (JSON.parse ((await (await replyPending).json ()).result.content[0].text), { id : 2, shown : true });
+        const badReply = await (await rpc (token.access_token, 'tools/call', { name : 'messenger.ai.respond', arguments : { message : '' } })).json (); assert.equal (badReply.result.isError, true);
         const boxArgs = { code : '0201', length : 304.8, width : 304.8, height : 304.8 };
         const boxPending = rpc (token.access_token, 'tools/call', { name : 'auto3d.commands.invoke', arguments : { command : 'packaging.fefco.generate', arguments : boxArgs } });
         const boxRequest = await message (socket); assert.equal (boxRequest.command, 'packaging.fefco.generate'); assert.deepEqual (boxRequest.arguments, boxArgs); assert.equal (boxRequest.writeAuthorized, true);
@@ -259,13 +265,18 @@ describe ((live ? 'Live administrator MCP' : 'MCP pilot') + ' on the Workers run
     it ('exposes the generated full command catalog only with write consent', async () => {
         const reader = await restrictedToken (), readerList = await (await rpc (reader.access_token, 'tools/list')).json ();
         assert.ok (!readerList.result.tools.some (tool => tool.name.startsWith ('auto3d.commands.')));
+        assert.ok (!readerList.result.tools.some (tool => tool.name.startsWith ('messenger.ai.')), 'AI messaging tools need write consent');
         const writer = await grant (userA, 'auto3d.read auto3d.write auto3d.capture offline_access'), response = await rpc (writer.access_token, 'tools/list');
         assert.equal (response.status, 200);
         const tools = (await response.json ()).result.tools;
-        assert.ok (tools.length < 25);
+        // A compact top-level list: families, catalog tools and a few direct tools, not the full command catalog.
+        assert.ok (tools.length < 30, String (tools.length));
+        for (const name of ['messenger.ai.inspect', 'messenger.ai.respond', 'messenger.ai.history']) { assert.ok (tools.some (tool => tool.name === name), name + ' is a direct AI messaging tool'); }
         for (const name of ['auto3d.design', 'auto3d.commands', 'auto3d.capture', 'auto3d.modules', 'auto3d.sessions', 'auto3d.settings']) { assert.ok (tools.some (tool => tool.name === name)); }
         const design = await rpc (writer.access_token, 'tools/call', { name : 'auto3d.design', arguments : {} });
         const designGroups = JSON.parse ((await design.json ()).result.content[0].text); assert.ok (designGroups.categories.some (category => category.category === 'Objects')); assert.equal (designGroups.commands, undefined);
+        const messenger = await rpc (writer.access_token, 'tools/call', { name : 'auto3d.commands', arguments : { category : 'Messenger' } });
+        const messengerPage = JSON.parse ((await messenger.json ()).result.content[0].text); assert.ok (messengerPage.commands.some (command => command.id === 'messenger.ai.history')); assert.ok (messengerPage.commands.some (command => command.id === 'messenger.audio.capabilities')); assert.ok (messengerPage.commands.some (command => command.id === 'messenger.message.draft'));
         assert.ok (tools.some (tool => tool.name === 'auto3d.commands.categories'));
         assert.ok (tools.some (tool => tool.name === 'auto3d.commands.list'));
         assert.ok (tools.some (tool => tool.name === 'auto3d.commands.invoke' && tool.annotations.readOnlyHint === false && tool.annotations.destructiveHint));

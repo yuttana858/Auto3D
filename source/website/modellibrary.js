@@ -356,6 +356,8 @@ export class ModelLibrary
         const kind = document.createElement ('select'); kind.setAttribute ('aria-label', 'Save contents');
         kind.add (new Option ('Entire session', 'session'));
         if (!custom && !download && this.editor.selected) { kind.add (new Option ('Selected model', 'model')); }
+        const ai = this.editor.website.aiWorkspace;
+        if (!custom && ai && (ai.assets.size || ai.recent.some (item => item.status === 'SUCCEEDED' && item.modelUrl))) { kind.add (new Option ('AI project', 'ai')); }
         kindLabel.appendChild (kind);
 
         const destinationLabel = document.createElement ('label'); destinationLabel.textContent = 'Destination';
@@ -378,8 +380,9 @@ export class ModelLibrary
                     ? 'Corporate publishing remains disabled while identity transitions. Save to Device library or a file.'
                     : destination.value === 'account' ? 'Private to your account · Available on your other devices · Up to 32 MB per save.' : 'Choose any category/project folder. Nested folders use paths such as Project A/Concepts.';
             submit.textContent = destination.value === 'file' ? 'Save session file' : destination.value === 'shared' ? 'Publishing unavailable' : 'Save to library';
-            submit.disabled = (!custom && !this.editor.document.objects.length && !this.editor.document.packaging?.paths?.length) || destination.value === 'shared';
+            submit.disabled = (!custom && kind.value !== 'ai' && !this.editor.document.objects.length && !this.editor.document.packaging?.paths?.length) || destination.value === 'shared';
         };
+        kind.addEventListener ('change', updateHint);
         destination.addEventListener ('change', async () => { saveStorage = destination.value === 'device' ? this.deviceStorage : this.accountStorage; updateHint (); if (destination.value === 'file' || destination.value === 'shared') { return; } try { folders = await saveStorage.Folders (); populateFolders (); updateHint (); } catch (error) { status.textContent = error.message + ' You can save to File on disk instead.'; submit.disabled = true; } }); updateHint ();
 
         const open = document.createElement ('button'); open.type = 'button'; open.textContent = 'Open session file';
@@ -401,7 +404,7 @@ export class ModelLibrary
                 }
                 const owner = this.editor.website.auth.user?.id;
                 const objects = kind.value === 'model' ? [this.editor.selected] : this.editor.document.objects;
-                const prepared = custom ? await custom.prepare (name.value.trim ()) : null;
+                const prepared = custom ? await custom.prepare (name.value.trim ()) : kind.value === 'ai' ? await ai.PrepareProject (name.value.trim ()) : null;
                 const saved = prepared ? prepared.archive : await this.editor.ArchiveAsync (objects, kind.value, name.value.trim ());
                 if (!owner || this.editor.website.auth.user?.id !== owner) { throw new Error ('Account changed. Sign in before saving.'); }
                 if (destination.value === 'file') {
@@ -436,7 +439,7 @@ export class ModelLibrary
                     stage = destination.value === 'account' ? 'uploading to account Library' : 'saving to device Library';
                     status.textContent = destination.value === 'account' ? 'Uploading to your account Library…' : 'Saving to device Library…';
                     await saveStorage.Save ({
-                        id : crypto.randomUUID (), name : name.value.trim (), category : folder, kind : kind.value,
+                        id : crypto.randomUUID (), name : name.value.trim (), category : folder, kind : kind.value === 'ai' ? 'session' : kind.value,
                         updatedAt : new Date ().toISOString (), thumbnail, objects : prepared ? prepared.objects : objects.length,
                         archive : new Blob ([saved], { type : 'application/octet-stream' })
                     });
@@ -683,10 +686,12 @@ export class ModelLibrary
                         if (!folder) { return; }
                         await this.storage.MoveMany ([item.id], folder); await load ();
                     });
-                    const remove = document.createElement ('button'); remove.textContent = 'Delete';
+                    const remove = document.createElement ('button'); remove.textContent = 'Delete'; remove.setAttribute ('aria-label', 'Delete ' + item.name);
                     remove.addEventListener ('click', async () => {
                         if (!window.confirm ('Delete “' + item.name + '” from this library?')) { return; }
-                        await this.storage.Remove (item.id); selectedIds.delete (item.id); await load ();
+                        const storage = this.storage; remove.disabled = true;
+                        try { await storage.Remove (item.id); selectedIds.delete (item.id); if (storage === this.storage) { await load (); } }
+                        catch (error) { if (storage === this.storage && dialog.isConnected) { status.textContent = 'Could not delete “' + item.name + '”: ' + error.message; remove.disabled = false; } }
                     });
                     actions.append (move, remove);
                 }

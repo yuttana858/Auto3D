@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "profile": "production",
+  "purpose": "deployment",
+  "revision": "4fb8192c-8208-4fd4-94f9-0434dcc497cd",
+  "settings": {
+    "workspace": "replace-with-your-workspace-slug",
+    "environment": "main",
+    "app": "cloud-3d-studio",
+    "endpoint": "",
+    "tokenId": "ak-PASTE_THE_TOKEN_ID_HERE",
+    "tokenSecret": "as-PASTE_THE_MATCHING_SECRET_HERE"
+  }
+}

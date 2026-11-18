@@ -52,11 +52,25 @@ export function CreateFefcoFoldRig (input, savedProfile = null)
     rig.visualMeshes = CreaseVisualMeshes (rig, { matrices : panels.map (() => new THREE.Matrix4 ().toArray ()) }); return rig;
 }
 
+// Flap stacking for a slotted style, shared by the generator fold and Auto Pack: inner (minor) flaps overlap when twice
+// their depth exceeds the length; outer flaps add one layer, or two when they overlap each other (0202/0203). The stack
+// is the same at the base and, when the style has top flaps, at the top.
+export function FefcoFlapLayers (parameters)
+{
+    const p = ValidateFefco (parameters), innerLayers = FlapDepth (p) * 2 > p.length ? 2 : 1, layers = innerLayers + (p.code === '0202' || p.code === '0203' ? 2 : 1);
+    return { innerLayers, layers, baseLayers : layers, topLayers : p.code === '0200' ? 0 : layers };
+}
+// Destination layer of a base or top flap within the stack (0 = against the contents).
+export function FefcoFlapLayer (panel, flapLayers)
+{
+    const minor = panel.index % 2 === 1; return minor ? (panel.index === 1 ? 0 : flapLayers.innerLayers - 1) : (panel.index === 0 ? flapLayers.innerLayers : flapLayers.layers - 1);
+}
+
 function FoldPose (rig, progress)
 {
     if (!Number.isFinite (progress) || progress < 0 || progress > 1) { throw new Error ('Fold progress must be between 0 and 1.'); }
-    const { length : l, width : w, height : h, thickness : t, code } = rig.parameters; const depth = FlapDepth (rig.parameters);
-    const innerLayers = depth * 2 > l ? 2 : 1; const layers = innerLayers + (code === '0202' || code === '0203' ? 2 : 1);
+    const { width : w, height : h, thickness : t, code } = rig.parameters; const flapLayers = FefcoFlapLayers (rig.parameters);
+    const { innerLayers, layers } = flapLayers; const l = rig.parameters.length;
     const raise = phase (progress, 0.02, 0.22);
     const root = translate ((-w / 2 - t) * raise, layers * t * raise, l / 2 * raise).multiply (new THREE.Matrix4 ().makeRotationY (Math.PI / 2 * raise)).multiply (new THREE.Matrix4 ().makeRotationX (Math.PI / 2 * raise));
     const walls = [root];
@@ -68,7 +82,7 @@ function FoldPose (rig, progress)
         // Reserve one caliper for the seam before wrapping the sleeve. This
         // score clearance approximates compression at the glue-tab crease.
         if (panel.kind === 'joint') { return hinge (root.clone ().multiply (translate (0, t * phase (progress, 0.02, 0.06), 0)), [0, 0, 0], new THREE.Matrix4 ().makeRotationZ (-Math.PI / 2 * phase (progress, 0.06, 0.16))).toArray (); }
-        const minor = panel.index % 2 === 1; const layer = minor ? (panel.index === 1 ? 0 : innerLayers - 1) : (panel.index === 0 ? innerLayers : layers - 1);
+        const layer = FefcoFlapLayer (panel, flapLayers);
         // Inner pair first, then outer pair. Lift to the destination stack BEFORE
         // turning so overlapping OSC/FOL flaps cannot sweep through a closed flap.
         const top = panel.kind === 'top'; const order = [1, 3, 0, 2].indexOf (panel.index); const span = top ? 0.06 : 0.05; const start = (top ? 0.76 : 0.48) + order * span;
@@ -98,6 +112,13 @@ export function FefcoFoldPose (rig, progress)
 {
     const pose = FoldPose (rig, progress); const contacts = FefcoFoldContacts (rig, pose);
     if (!contacts.clear) { const pair = contacts.intersections[0]; throw new Error ('Fold blocked: ' + pair.panels.join (' / ') + ' intersect at ' + (progress * 100).toFixed (2) + '%.'); }
+    return { ...FoldDisplayPose (rig, pose), contacts };
+}
+
+// Display pose shared by every fold route (standard FEFCO and Auto Pack): the trimmed, bowed board
+// panels plus crease bends that join them, from the collision pose's matrices.
+export function FoldDisplayPose (rig, pose)
+{
     // Collision solids retain the clearance needed by the folding audit. For
     // display, move only the glue tab back to its shared score so its tighter
     // visual arc joins both trimmed panels without a perpendicular step.
@@ -106,7 +127,7 @@ export function FefcoFoldPose (rig, progress)
         const wall = rig.panels.findIndex (panel => panel.kind === 'wall' && panel.index === 0), joint = rig.panels.findIndex (panel => panel.kind === 'joint');
         if (wall >= 0 && joint >= 0) { const root = new THREE.Matrix4 ().fromArray (pose.matrices[wall]), tab = new THREE.Matrix4 ().fromArray (pose.matrices[joint]); const normal = new THREE.Vector3 (0, 1, 0).transformDirection (root); const origin = new THREE.Vector3 ().setFromMatrixPosition (root), tabOrigin = new THREE.Vector3 ().setFromMatrixPosition (tab); const shift = tabOrigin.sub (origin).dot (normal); const offset = normal.multiplyScalar (-shift); tab.premultiply (translate (offset.x, offset.y, offset.z)); displayMatrices[joint] = tab.toArray (); }
     }
-    const displayPose = { ...pose, displayMatrices }; return { ...displayPose, contacts, visualMeshes : CreaseVisualMeshes (rig, displayPose) };
+    const displayPose = { ...pose, displayMatrices }; return { ...displayPose, visualMeshes : CreaseVisualMeshes (rig, displayPose) };
 }
 
 // Audit independently of display frame rate, before replacing the original.

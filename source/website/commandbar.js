@@ -23,6 +23,8 @@ export class CommandBar
         this.browse = document.createElement ('button'); this.browse.type = 'button'; this.browse.textContent = 'Commands & macros'; this.browse.addEventListener ('click', () => OpenCommandPanel (website)); form.appendChild (this.browse);
         this.history = []; this.historyIndex = 0; this.RestoreVisibility ();
         this.log = []; this.nextId = 1; this.ownStatus = null;
+        let owner = website.auth?.user?.id || null;
+        website.auth?.Subscribe (user => { const next = user?.id || null; if (next !== owner) { this.log = []; this.history = []; this.historyIndex = 0; this.input.value = ''; this.status.textContent = 'Add a model to begin'; owner = next; } });
         // Every status line change (app progress, errors, agent replies) is kept for agents to read.
         // Observer callbacks run after ShowStatus returns, so its own text is skipped by value.
         new MutationObserver (() => { const text = this.status.textContent; if (text === this.ownStatus) { this.ownStatus = null; return; } this.ownStatus = null; delete this.status.dataset.tone; this.Record ('app', 'status', text); }).observe (this.status, { childList : true, characterData : true, subtree : true });
@@ -35,26 +37,37 @@ export class CommandBar
             this.input.value = this.history[this.historyIndex] || ''; resize ();
         });
         form.addEventListener ('submit', async event => {
-            event.preventDefault (); if (this.running || website.sessionEditor.busy) { return; }
+            event.preventDefault ();
             const text = this.input.value.trim (); if (!text) { this.input.focus (); return; }
-            const remember = () => { this.history.push (text); this.history = this.history.slice (-50); this.historyIndex = this.history.length; this.input.value = ''; resize (); };
-            const addressed = AgentPrefix.test (text);
-            if (addressed) { const message = text.replace (AgentPrefix, '').trim (); if (message) { this.SendToAgent (message); remember (); } this.input.focus (); return; }
-            this.running = true; this.SetBusy (true); this.status.textContent = 'Running command…';
-            try {
-                const result = await website.commands.Execute ('commands.text', { text });
-                if (!result.ok || !result.result.ok) { throw new Error (result.error?.message || result.result.error?.message || 'Command could not complete.'); }
-                remember ();
-                const completed = result.result.completed; const last = completed.at (-1);
-                this.Record ('user', 'command', text, true);
-                this.status.textContent = last?.command === 'object.array' ? 'Array created · ' + last.result.total + ' objects' : 'Completed · ' + completed.length + (completed.length === 1 ? ' command' : ' commands');
-            } catch (error) {
-                // Text that is not a command is a message for a connected agent.
-                if (/^Unknown command/.test (error.message) && this.AgentConnected ()) { this.SendToAgent (text); remember (); }
-                else { this.Record ('user', 'command', text, false); this.status.textContent = error.message; }
-            }
-            finally { this.running = false; this.SetBusy (website.sessionEditor.busy); this.input.focus (); }
+            const result = await this.Submit (text);
+            if (result.accepted) { this.history.push (text); this.history = this.history.slice (-50); this.historyIndex = this.history.length; this.input.value = ''; resize (); }
+            this.input.focus ();
         });
+    }
+    // Shared by this box and the Messenger AI tab: run text as a command, or send it to a connected agent.
+    // Both are recorded in the log, which Messenger saves as AI history.
+    // keepForAgent (Messenger AI tab): non-command text is kept for the next agent even when none is connected.
+    async Submit (text, { keepForAgent = false } = {})
+    {
+        text = String (text ?? '').trim ();
+        if (!text || text.length > TextLimit) { return { accepted : false, kind : 'invalid', error : 'Enter 1–2,000 characters.' }; }
+        if (this.running || this.website.sessionEditor.busy) { return { accepted : false, kind : 'busy', error : 'Another command is running.' }; }
+        if (AgentPrefix.test (text)) { const message = text.replace (AgentPrefix, '').trim (); if (!message) { return { accepted : false, kind : 'invalid', error : 'Enter a message for the agent.' }; } return { accepted : true, kind : 'message', id : this.SendToAgent (message).id }; }
+        this.running = true; this.SetBusy (true); this.status.textContent = 'Running command…';
+        try {
+            const result = await this.website.commands.Execute ('commands.text', { text });
+            if (!result.ok || !result.result.ok) { throw new Error (result.error?.message || result.result.error?.message || 'Command could not complete.'); }
+            const completed = result.result.completed; const last = completed.at (-1);
+            const entry = this.Record ('user', 'command', text, true);
+            this.status.textContent = last?.command === 'object.array' ? 'Array created · ' + last.result.total + ' objects' : 'Completed · ' + completed.length + (completed.length === 1 ? ' command' : ' commands');
+            return { accepted : true, kind : 'command', ok : true, id : entry.id };
+        } catch (error) {
+            // Text that is not a command is a message for a connected agent.
+            if (/^Unknown command/.test (error.message) && (keepForAgent || this.AgentConnected ())) { return { accepted : true, kind : 'message', id : this.SendToAgent (text).id }; }
+            const entry = this.Record ('user', 'command', text, false); this.status.textContent = error.message;
+            return { accepted : false, kind : 'command', ok : false, id : entry.id, error : error.message };
+        }
+        finally { this.running = false; this.SetBusy (this.website.sessionEditor.busy); }
     }
     AgentConnected () { return this.website.agentAccess?.socket?.readyState === 1; }
     Record (from, kind, text, ok = true)
@@ -63,6 +76,7 @@ export class CommandBar
         if (kind === 'status' && (!value || last?.kind === 'status' && last.text === value)) { return null; }
         const entry = { id : this.nextId++, at : Date.now (), from, kind, text : value, ok };
         this.log.push (entry); if (this.log.length > LogLimit) { this.log.splice (0, this.log.length - LogLimit); }
+        this.root.dispatchEvent (new CustomEvent ('auto3d-command-entry', { detail : entry }));
         return entry;
     }
     SendToAgent (text)

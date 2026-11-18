@@ -110,7 +110,7 @@ div.main_viewer { flex: 1; min-width: 0; position: relative; overflow: hidden; }
 div.main_viewer canvas { margin: 0; border: 0; }
 .viewer_empty { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; pointer-events: none; color: var(--sw_axis_text, var(--ov_foreground_color)); --ov_logo_text_color: var(--sw_axis_text, var(--ov_foreground_color)); background: var(--sw_viewer_background, var(--ov_background_color)); }
 .viewer_empty[hidden] { display: none; }
-.viewer_empty svg { width: 240px; max-width: 100%; height: 60px; }
+.viewer_empty svg { width: 162px; max-width: 100%; height: 60px; }
 .viewer_empty h2 { margin: 22px 0 8px; font-size: 19.33px; font-weight: normal; }
 .viewer_empty p { max-width: 260px; color: var(--ov_light_icon_color); line-height: 1.6; font-size: 11.33px; }
 div.intro { margin: 12px; padding: 14px 10px; border-width: 1px; border-radius: 5px; box-sizing: border-box; }
@@ -176,3 +176,12 @@ div.main_viewer.hdri_background_visible .viewer_empty { background: transparent;
 /* Keep the materials drawer beside the model materials sidebar while editing a product. */
 .primary_profile_open .material_drawer { left: var(--primary-drawer-left, 0px); }
 @media (max-width: 720px) { .primary_profile_open .material_drawer { left: 0; } }
+/* Brand strip under the workspace; bottom drawers open above it. */
+.app_footer { position: fixed; z-index: 12; left: 0; right: 0; bottom: 0; height: 24px; box-sizing: border-box; display: flex; align-items: center; justify-content: flex-end; padding: 0 12px; background: var(--ov_toolbar_background_color); border-top: 1px solid var(--ov_border_color); color: var(--ov_foreground_color); }
+.app_brand { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: .02em; opacity: .9; white-space: nowrap; }
+.app_brand img { display: block; width: auto; height: 14px; }
+.app_brand .app_brand_dark, :root[data-theme="dark"] .app_brand .app_brand_light { display: none; }
+:root[data-theme="dark"] .app_brand .app_brand_dark { display: block; }
+.auth_locked .app_footer { visibility: hidden; pointer-events: none; }
+.mini_shared_view .app_footer { display: none; }
+.material_drawer, .advance_animation_panel { bottom: var(--app_footer_height, 0px); }

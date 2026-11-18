@@ -1,6 +1,8 @@
 account-storage
 accounts
 admin-controls
+modal-connection
+ai-creations
 ai-credentials
 ai-extended
 ai-progress
@@ -41,10 +43,13 @@ login-updates
 material-surface
 mcp-access
 mcp-consent
+messenger-ai-history
+messenger-people
 mini-presentation
 model-spec
 module-panels
 molded-pulp
+molded-pulp-export
 multiwall-glue
 packaging-cleanup
 packaging-effects
@@ -78,3 +83,10 @@ viewport-quality
 workspace-commands
 workspace-editing
 workspace-optimization
+packaging-auto-pack
+packaging-auto-styles
+animation-video
+packaging-auto-pallet
+cad-conversion
+ai-image-dropzone
+packaging-accessories

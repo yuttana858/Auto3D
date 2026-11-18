@@ -1,5 +1,5 @@
 import { Validate } from '../source/website/commandregistry.js';
-import { AgentError, ConnectionPolicy, ConnectionScopes, ErrorCode, Identifier, MissingScopeError, ReadTools } from './common.js';
+import { AgentError, ConnectionPolicy, ConnectionScopes, ErrorCode, Identifier, MissingScopeError, MessagingTools, ReadTools } from './common.js';
 
 const CapabilitiesTool = Object.freeze ({ id : 'auto3d.capabilities.inspect', title : 'Inspect agent permissions', description : 'Read effective read, write and screenshot permissions without a connected window. Reports whether this connection needs the unified approval again to enable every tool.', mutates : false, inputSchema : { type : 'object', properties : {}, additionalProperties : false } });
 
@@ -13,10 +13,10 @@ const CatalogTools = Object.freeze ([
 // source of truth, so newly registered commands appear without a hard-coded count.
 const Families = Object.freeze ({
     design : { title : 'Design', categories : ['Scene', 'Objects', 'Materials', 'Lighting', 'View', 'Camera', 'Rendering', 'Animation', 'History'] },
-    commands : { title : 'Commands & Macros', categories : ['Commands', 'Macros'] },
+    commands : { title : 'Commands & Macros', categories : ['Commands', 'Macros', 'Messenger'] },
     capture : { title : 'Screen capture', categories : ['Capture'] },
     modules : { title : 'Modules', categories : ['Packaging', 'Primary Products', 'Molded Pulp', 'AI', 'Panels', 'Knowledge'] },
-    sessions : { title : 'Sessions & Library', categories : ['Sessions', 'Library'] },
+    sessions : { title : 'Sessions, Library & Conversion', categories : ['Sessions', 'Library', 'Conversion'] },
     settings : { title : 'Settings & Administration', categories : ['Account', 'Administration', 'Preferences', 'Diagnostics'] }
 });
 const FamilySchema = { type : 'object', properties : { category : { type : 'string', maxLength : 80 }, search : { type : 'string', maxLength : 120 }, offset : { type : 'integer', minimum : 0, maximum : 10000 }, limit : { type : 'integer', minimum : 1, maximum : 25 } }, additionalProperties : false };
@@ -54,7 +54,8 @@ export class PilotService
     Tools (actor)
     {
         const basic = this.tools.filter (tool => ReadTools.includes (tool.id) && (tool.id !== 'capture.image' || actor.scope.includes ('auto3d.capture')));
-        return [CapabilitiesTool, ...(actor.scope.includes ('auto3d.write') ? [...basic, ...FamilyTools, ...HeadlessTools, ...CatalogTools] : [...basic, ...FamilyToolsFor (false), ...HeadlessTools.slice (0, 2), HeadlessTools[3]])];
+        const messaging = this.tools.filter (tool => MessagingTools.includes (tool.id));
+        return [CapabilitiesTool, ...(actor.scope.includes ('auto3d.write') ? [...basic, ...messaging, ...FamilyTools, ...HeadlessTools, ...CatalogTools] : [...basic, ...FamilyToolsFor (false), ...HeadlessTools.slice (0, 2), HeadlessTools[3]])];
     }
     Categories ()
     {

@@ -25,3 +25,10 @@ export { PackagingPanel } from './workspacepanel.js';
 
 export * from './boarddatabase.js';
 export { OpenBoardDatabaseEditor } from './boarddatabasepanel.js';
+
+export * from './autopack.js';
+export * from './palletplan.js';
+export { CreatePallet } from './pallet.js';
+export * from './accessories.js';
+export { AccessoriesPanel } from './accessoriespanel.js';
+export * from './partitionnest.js';

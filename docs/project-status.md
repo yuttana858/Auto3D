@@ -1,8 +1,141 @@
 # Auto3D development log and handoff
 
-## Assign facing — Auto3D 0.71.0 / Primary Products 0.15.0 / Packaging 1.10.7 (2026-11-13)
+## Automatic CAD import — Auto3D 0.89.0 live (2026-11-18)
 
-Model spec phase 2. Assign facing shows the selected model's footprint as a glowing blue ground rectangle with Front and Up arrows. Clicking a face makes it the Front (Shift+click or Up mode makes it Up); the model turns by the smallest rotation, sets on the floor, saves `userData._auto3dFacing` and adds one Undo step. ⟲/⟳ 90° turns, Done/Escape. Agents use `object.facing.*`. Next: optional placement visual on import, and AI/Molded Pulp/Primary Products sections. See [release-0710.md](release-0710.md).
+Packaging 1.15.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0 remain unchanged. Integrates main `12dea98` / 0.88.0 and its Molded Pulp NURBS output release (#153). Parasolid open/drop detects the format and opens conversion; choosing a source (plus actual Parasolid units) starts conversion and automatically adds its GLB to the originating scene with Undo. STEP opens locally as before. The bounded watcher continues with the dialog closed and pauses on account/document/tab/read-only changes. Native Cloud 3D Studio remains 0.5.0 with the existing private processing/retention contract. PR #154; local 1,049 app/module tests, 73 MCP tests, workerd/build/audit checks and all 91 distinct browser checks passed across the full run and four unchanged isolated reruns. Initial failures remain recorded in [validation/cad-auto-0890.md](validation/cad-auto-0890.md). CI 44380198211 and production deployment 44381827086 (attempt 1) passed. Runtime commit `6bdb3c321cfcf9f97bf29739fdd521969e44cba6`; the served version/bundle, landing/login, credential boundary and live MCP checks all passed. See [release-0890.md](release-0890.md) for final validation/publication evidence and [commercial SDK research](cad-commercial-sdk.md) for future reader choices.
+
+## Molded Pulp output: STEP and GLB on a NURBS B-rep — Auto3D 0.88.0 / Molded Pulp 0.3.0 (2026-11-18)
+
+Packaging 1.15.0 / Primary Products 0.15.0 are preserved. Based on main after #152 (0.87.1). Not deployed.
+
+- **Review vs output.** The formed field stays the internal review model; output is a NURBS B-rep built on it.
+- **Exports.** **Export STEP** (closed solid per shell, AP214, mm) and **Export GLB** (pulp material, m), in the panel and through `pulp.export`.
+- **NURBS core.** The B-spline core, B-rep topology and STEP writer live in `modules/molded-pulp/src/nurbs/`.
+- **Validation.** OpenCASCADE reads the STEP as valid solids (6-can tray: 0 open edges, volume within 0.1%).
+- **Next step.** Phase 2 (smooth cubic lofts), with its test cases and pass criteria, in docs/molded-pulp-nurbs.md.
+
+See docs/release-0880.md.
+
+## Appearance capability bridge — Auto3D 0.87.1 live (2026-11-18)
+
+Passes the exact supported appearance API flag through the sanitized Modal bridge so the public conversion API can advertise it. Live 0.87.0 conversion/diagnostic checks found 16 source colors in the retained STEP; the stricter appearance-aware public gate caught this metadata omission. See [release-0871.md](release-0871.md). PR #152 / deployed commit `b6865eb67b971b358a798506c733817891c36279`; CI 44347073226 and deployment 44348738348 (attempt 2) passed. The appearance-aware private pipeline 44345807731 (attempt 2) passed actual public GLB color/alpha, hashes/units, account isolation and diagnostic checks. No customer CAD was downloaded to the agent workspace.
+
+## CAD appearance — Auto3D 0.87.0 candidate (2026-11-18)
+
+Packaging 1.15.0 / Primary Products 0.15.0 / Molded Pulp 0.2.0 are preserved. Based on main 94918fe / 0.86.0. Adds a strict appearance report and read-only `conversion.appearance`, plus the service-only source inventory companion for Cloud 3D Studio 0.5.0. STEP colors/alpha are retained; bitmap images/UVs are reported unavailable to the current reader. See [release-0870.md](release-0870.md). Local tests/builds and all 90 distinct browser checks passed across the 89/90 full run and unchanged dimensions rerun; see release notes for exact evidence. Hosted migration, native 0.5.0 deployment and Auto3D 0.87.0 deployment passed (PR #151 / run 44345035739). The appearance-aware gate prompted the 0.87.1 bridge correction.
+
+## Animation panel and video export — Auto3D 0.86.0 (2026-11-18)
+
+Packaging 1.15.0 / Primary Products 0.15.0 / Molded Pulp 0.2.0 are preserved. Stacked on 0.85.0. Not deployed.
+
+- **Animation panel.** A new module panel with playback, sequence settings and keyframes.
+- **Video export.** Frame-accurate export of the timeline range to MP4 (H.264), or WebM when H.264 isn't available, using WebCodecs. It offers Viewport, 720p, 1080p and 4K sizes and 24–60 fps.
+- **Commands.** `animation.video.export`, `animation.video.inspect`, `animation.video.cancel` and `animation.video.download`.
+
+See docs/release-0860.md.
+
+## Auto Pack generator styles, Open top, Refresh bounds units — Auto3D 0.85.0 / Packaging 1.15.0 (2026-11-18)
+
+Primary Products 0.15.0 / Molded Pulp 0.2.0 are preserved. Based on main after #148 (0.84.1). Not deployed.
+
+- **Styles.** Auto Pack fits every Packaging generator style (0200, 0201, 0202, 0203, and any style added later) on the shared flap layering, with the 0.84.1 presentation.
+- **Open top.** Swings a packed carton's top flaps 120° open on an audited route.
+- **Refresh bounds.** Assigns units to unitless models in one Undo step.
+- **Commands.** `packaging.auto.styles`, `packaging.auto.style`, `packaging.auto.refresh_bounds` and `packaging.auto.top`.
+
+See docs/release-0850.md.
+
+## Auto Pack edges match generated RSC boxes — Auto3D 0.84.1 / Packaging 1.14.1 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-18)
+
+Based on main after #147 (0.84.0). Not deployed.
+
+- **Auto Pack presentation.** Auto Pack cartons drew raw collision panels: square edges, exposed flute, no crease bends. They now use the standard presentation through the shared `FoldDisplayPose`, guarded by a display clearance check. Panel bow is turned off in the saved appearance if it would bulge into the product, and exact panels remain the fallback for score-fit cartons. See [release-0841.md](release-0841.md).
+
+## Server CAD diagnostics — Auto3D 0.84.0 live (2026-11-17)
+
+Integrates main through #146 / 0.83.0; Packaging 1.14.0 / Primary Products 0.15.0 / Molded Pulp 0.2.0 are preserved. Adds automatic geometry-free failure reports, a bounded **Diagnose on server** pass using the original private upload, and `conversion.diagnose` / `conversion.diagnostics`. The same worker and account/queue/retention controls apply; diagnostic attempts are separate from conversion attempts. Reports cannot publish a model. Native companion is Cloud 3D Studio 0.4.0. See [release-0840.md](release-0840.md).
+
+Local: 1,009 app/module tests, 26 final focused CAD checks, 73 MCP tests, real workerd and isolated SQL checks pass. The full 88-check browser scope plus retries has 87 distinct passing checks, including desktop/mobile diagnostics. The Molded Pulp software-renderer refinement benchmark remains failing after a synchronization fix; its runtime is identical to 0.83.0. Keep the FPS assertion and profile that separate follow-up; later subcases are not verified. Native has 77 passing tests. PR #147, hosted CI 44212580363 and production deployment 44213677044 passed for app commit `d5d222f`. Cloud 3D Studio #19 / `ed68d5a` passed deployment 44214197321, actual controller startup, full calibration and automatic/manual diagnostic privacy gates. Temporary accounts/jobs were independently confirmed removed. The original private upload was diagnosed successfully through the scheduled worker: reading passed; construction failed at the reader's parametric face validity check (`occt.construction_failed`, `ValueError`); later checks did not run. Conversion attempts remain two and one separate diagnostic completed. No customer CAD entered the agent workspace and no model was published. Source conversion acceptance and the face-construction compatibility repair remain open; see the safe report evidence in release-0840.md.
+
+## Durable CAD retry dispatch — Auto3D 0.82.1 (2026-11-17)
+
+Repairs the outbox gap found when retrying the original private X_T: queued retries now reset the old sent flag and attempt identity, and reject late acknowledgements. The corrective migration repairs only affected unclaimed queued rows, preserving two attempts, ownership, quotas and retention. Isolated PostgreSQL reproducer/recovery checks pass. PR #145 and production run 44187702251 (attempt 2) passed; Auto3D 0.82.1 is live. The retry reached OCCT topology construction and failed with `invalid_geometry`; source-file acceptance remains open. Cloud 3D Studio 0.3.5 also passed its native proof, actual scheduled-controller startup and full private user-API calibration with measured progress (44191600669); the separate controller check passed (44191600844). Its 71 tests pass, and temporary calibration accounts/jobs are removed. App/module versions and validation are in [release-0821.md](release-0821.md).
+
+## CAD progress and failure diagnosis — Auto3D 0.82.0 live (2026-11-17)
+
+Packaging 1.14.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 are preserved. Adds animated current-stage progress, measured percentages where work counts exist, elapsed time, stable polling and reduced motion. Cloud 3D Studio 0.3.3 reports native phases and actionable failures without exposing private CAD or exception text. Older generic failures gain one quota-checked retry, still capped at two total attempts and the original retention. PR #144, hosted CI and deployment passed. All 991 application tests and 72 MCP tests passed; the preceding full browser run completed 87/87, and final integrated CAD/Accessories/Auto Pack flows passed separately. Native progress was verified through the real private user API. The actual source failed during OCCT construction; see [release-0820.md](release-0820.md).
+
+## Packaging Accessories: pads and partitions — Auto3D 0.81.0 / Packaging 1.14.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-17)
+
+Based on main after #141 (0.80.0). Not deployed.
+
+- **Accessories tab.** Pads and partitions for the selected carton, sized from its engineering inside dimensions:
+  - **Pads:** top, bottom, front and back, with flute and grade from the board catalog. By default the carton inside grows by the pad thicknesses so the product space stays the same; **Do not affect box ID** keeps the carton size instead.
+  - **Partitions:** interlocking slotted cells.
+  - Every piece is a CAD board profile grouped with the carton. See [release-0810.md](release-0810.md).
+- **Auto Pack with nested partitions and pads.** The algorithm reads the product layout (columns × rows × layers), opens gaps that are too narrow for the board, nests one interlocking slotted set per layer between the products, wraps the pads around them, and fits the carton around everything. The contents stay in place while the carton folds.
+
+## Auto Pack on the packaging engineering system — Auto3D 0.80.0 / Packaging 1.13.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-17)
+
+Based on main after #142 (0.79.0). Not deployed.
+
+- **Auto Pack follows the generator.** It now sizes the RSC like Generate with the inside basis: inside targets (product + clearance + glue-tab reserve) go through `ScoreForTarget` with the generation board's allowance factors. The carton's CAD profile carries the standard measurement layer, built by the shared `GenerationProfile`. Before, Auto Pack used its own score formula and attached no engineering record, so the dimension tools reported an inside size smaller than the product. Older cartons keep their fit. See [release-0800.md](release-0800.md).
+
+## Private CAD conversion — Auto3D 0.79.0 live (2026-11-17)
+
+PR #142 merged after main #138/#139/#140; Packaging 1.12.0, Primary Products 0.15.0 and Molded Pulp 0.1.0 are preserved. Adds private owned Parasolid/STEP conversion, streamed/checksummed R2 files, leases/cancellation/cleanup, strict `conversion.*` commands and explicit unit-safe session import. Hosted CI 44145555167 and production rollout 44147440033 passed for app commit `1bdd6a9`. Cloud 3D Studio 0.3.2 is live: run 44150179064 passed native calibration, protected gateway verification, direct Vault runtime provisioning and the actual user-API private conversion with two-account isolation and all artifact hashes/units. Background reconciliation is enabled and canary cleanup independently confirmed. The production Pages profile and existing bindings are verified. Supplier Parasolid acceptance remains pending the private reference file. See [release-0790.md](release-0790.md), [cad-conversion.md](cad-conversion.md) and [exact credential/profile steps](modal-credentials.md).
+
+## Image to 3D drop zone and Auto Pack for arrays — Auto3D 0.78.0 / Packaging 1.12.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-17)
+
+Based on main after #138 (0.77.0). Not deployed.
+
+- **Auto Pack for arrays.** A selected group or array is packed as one product: the RSC fits the combined bounds and the carton records every member (`productIds`) for the replay guards. Before, Auto Pack required exactly one selected object, so selecting an array disabled it.
+- **Image to 3D drop zone.** The AI viewer becomes a drop zone (click, drag and drop, Ctrl+V paste) in Image to 3D and Multi-image to 3D until a reference is chosen. Finished generations from this window open in the viewer automatically. New command: `ai.reference.add_image`. See [release-0780.md](release-0780.md).
+
+## Modal bridge integration — Auto3D 0.77.0 candidate (2026-11-17)
+
+PR #138 incorporates current main and the Auto pallet work from #139, preserving the connected prompt, branding and Auto Pack release. Packaging 1.12.0, Primary Products 0.15.0 and Molded Pulp 0.1.0 remain intact. The credential bridge has its own [0.77.0 release notes](release-0770.md); the existing 0.75.0 and 0.76.0 release histories are retained. The hosted CAD service and conversion connector continue in this integration candidate. No production app deployment is claimed.
+
+## Auto pallet — Auto3D 0.76.0 / Packaging 1.12.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-17)
+
+Based on main after #136 (0.75.0). Not deployed.
+
+- **Auto pallet.** The Packaging Auto tab gains an Auto pallet section and button. It column-stacks the selected box on a 40 × 48 × 5 in pallet (blue, brown or black) under a maximum overall height (default 55 in), using a guillotine dynamic-programming layer search that mixes orientations when that fits more. The demo 0201 box gives 20 × 8 = 160 boxes, 54.13 in overall. New commands: `packaging.pallet.plan`, `packaging.pallet.inspect` and `packaging.pallet.generate`. See [release-0760.md](release-0760.md).
+
+## Connected AI prompt, SWIS branding and Auto Pack — Auto3D 0.75.0 / Packaging 1.11.0 / Primary Products 0.15.0 / Molded Pulp 0.1.0 (2026-11-16)
+
+PR #136, based on main after #134 (0.74.0). Stacks #135 (Auto Pack) and #137 (Parasolid converter docs) so they share one CI run and one merge. Not deployed.
+
+- **Connected AI prompt.** The Messenger AI tab and the command bar are one prompt: commands run from either box, other text goes to a connected agent, and Messenger saves commands (✓/✗), messages and agent replies as AI history. `messenger.ai.inspect`, `messenger.ai.respond` and `messenger.ai.history` are direct MCP tools for write grants. See [release-0750.md](release-0750.md).
+- **Branding.** The visible name is Auto3D (no "SW"). The SWIS mark with "SW Innovation Systems" is under sign-in on the landing page and in a new grey strip at the bottom right of the main app. Saved-session and Library identifiers are unchanged. See [release-0750.md](release-0750.md).
+
+## Integrated release: level orbit, AI/Library usability, Messenger daily history — Auto3D 0.74.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0 (2026-11-16)
+
+PR #134 stacks the three open drafts so they share one CI run and one merge (#128 and #132 were folded in). Merged 2026-11-16.
+
+- **Level right-drag orbit.** Main-viewer right-drag is a level turntable orbit: left/right turns around the scene up axis, up/down raises or lowers the view (stopping 1° short of the poles), and the camera never rolls or tilts. With a model selected, it still orbits the model's center while keeping the framing. Held X/Y/Z axis rotation, pan, zoom and touch are unchanged; Free orbit now affects touch only. See [release-0740.md](release-0740.md).
+- **AI import and Library usability (from #128, prepared as 0.73.0).** Shared hover cue for enabled buttons, an accessible busy indicator through AI model import (in the shared Add path), and visible error feedback for personal/device Library deletion. The duplicate AI project save button is removed; the standard Save dialog offers AI project when completed models are available. Published shared Library remains read-only. See [release-0730.md](release-0730.md).
+- **Messenger daily history (from #132, prepared as 0.71.1).** A History button for AI and direct/group messages, grouped by the viewer's local date with paginated older messages (`ui.messenger.history`). It uses the existing membership-protected message store; nothing is moved, deleted or duplicated, and leaving a conversation still removes access. See [release-0711.md](release-0711.md).
+- **Auto Pack (from #135).** Packaging Auto tab fits a finite-caliper RSC to the selected static model world bounds with 0.001 inch per-face clearance and an explicit glue-tab reserve. A bottom-flap anchored route folds around the stationary product, with collision auditing, playback controls, Undo and persisted fold metadata. See [release-0750.md](release-0750.md). Candidate, not deployed.
+  Implementation `6f9686c`: 910 full-suite tests passed before the final account/session completion guard; 35 focused integration tests passed after that guard and its regression. Also passed 72 MCP tests, lint, website/Pages/standalone Packaging builds, and the production-bundle Auto Pack browser flow (desktop/mobile, transformed bounds, units, creation, cancel, replay, saved summary and Undo). Hosted CI pending; retain draft to conserve Actions quota. Based on main through #133; versions 0.73.0 and 0.74.0 are reserved by separate open workstreams.
+- **Lighter CI gate.** Ready PRs run validation plus a 10-test browser smoke suite in one job. The full browser suite runs only with the `full-ci` label or a manual run. `tools/run_browser_suite.mjs` is the shared CI/local runner and writes a commit-tied report. See [actions-cost-control.md](actions-cost-control.md).
+- **Local Parasolid converter (from #137).** Docs and an offline converter download; see [parasolid-local-converter.md](parasolid-local-converter.md).
+
+## Add several AI models at once, Mesh dropdown in Details — Auto3D 0.72.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0 (2026-11-16)
+
+Checked creations can be added together (**Add selected**, or **New session** for one new tab). Images are skipped, and one viewer message tracks the batch. In Details, Format, Vertices, Lines and Triangles collapse into a **Mesh** dropdown with a triangle-count summary. See [release-0720.md](release-0720.md).
+
+## AI creations: delete, multi-select, Add/New, thumbnail size — Auto3D 0.71.0 / Primary Products 0.15.0 / Packaging 1.10.7 / Molded Pulp 0.1.0 (2026-11-14)
+
+Latest creations gains per-card delete (confirmed; removed at Meshy, own tasks only with the shared key), multi-select with Delete selected, hover **Add** / **New** on 3D models, an animated download and add message over the main viewer, and a thumbnail size slider in the extended view. The header is about half its previous height. Generate reference views was verified against live Meshy. See [release-0710.md](release-0710.md).
+
+## Messenger multi-user and durable AI history — Auto3D 0.70.3 candidate
+
+Adds server-only membership-scoped direct/group conversations, exact-email lookup with throttling, paginated agent-readable AI history, and browser STT/TTS capability reporting. The production schema and this follow-up have not been deployed. Members may leave; adding or removing others is not yet implemented. Agent origin is client-reported, and prompt-injection detection is not guaranteed. See [messenger-plan.md](messenger-plan.md).
+
+## Messenger recovery — local development
+
+Recovers the floating Messenger UI from #119 onto current main and connects its AI tab to the existing session-only command-bar agent channel. Agent replies appear in Messenger and can be read aloud; the command-bar log is cleared on account change. Direct/group messaging, persistent history, agent conversation permissions and prompt-injection defenses are not complete. Do not describe the implementation as a completed Messenger or deploy it as such. See [messenger-plan.md](messenger-plan.md).
 
 ## Model spec default right panel — Auto3D 0.70.0 / Primary Products 0.15.0 / Packaging 1.10.7 (2026-11-13)
 
@@ -607,4 +740,8 @@ Validation: 464 unit tests, lint and website/Pages build; Chromium covers clean 
 Read `AGENTS.md`, this log and the architecture overview first. Treat the live deployment commit and tests as evidence; do not infer release success from a merged PR or the old version label. Keep the current batch in one release PR. Preserve unrelated local files and development screenshots under work/. Publish only reviewed changes on the current main tree.
 
 Use shared application services and strict registry commands for new user actions; synchronize the catalog. Respect login, account isolation and read-only sessions. Never put credentials in documents, browser code, screenshots or logs. Do not replay SQL from `database/history/pr16/`. Update this log after each release with version, commit, deployment result, meaningful tests and remaining issues.
+
+# Messenger voice foundation (local work in progress)
+
+The floating Messenger foundation includes a user-initiated browser dictation button, privacy disclosure, opt-in browser speech playback hook and `ui.messenger.voice` command. Dictation adds editable draft text only. The local AI tab reads connected-agent replies from the command-bar channel; persistent conversation storage is not implemented. Browser speech support and audio processing vary; see [Messenger plan](messenger-plan.md).
 
