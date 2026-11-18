@@ -235,7 +235,7 @@ export class MoldedPulpWorkspace
         const shells = plan.loft || [], walls = shells.reduce ((n, s) => n + s.walls.length, 0), ok = shells.every (s => s.ok);
         const worst = Math.max (0, ...shells.map (s => s.maxDistanceMm || 0)), tolerance = shells[0]?.toleranceMm;
         const message = ok ? `Smooth walls: ${walls} wall${walls === 1 ? '' : 's'}, ${shells.reduce ((n, s) => n + s.controls, 0)} control points, within ${worst.toFixed (2)} mm of the review surface (limit ${tolerance?.toFixed (2)} mm).`
-            : 'Smooth walls not ready: ' + shells.filter (s => !s.ok).map (s => s.reason).join (' ') + (shells.some (s => s.walls.some (w => w.kind === 'skirt' && !w.withinTolerance)) ? ' The outer skirt has sharp plan corners; turn it off or wait for corner-aware skirts.' : '');
+            : 'Smooth walls not ready: ' + shells.filter (s => !s.ok).map (s => s.reason).join (' ') + (shells.some (s => s.walls.some (w => w.kind === 'skirt' && !w.withinTolerance)) ? ' The outer skirt is outside the tolerance; you can turn it off.' : '');
         return { ok, skirtWall : draft.skirtWall, shells, message };
     }
     // Output for tooling and customers: STEP (closed B-rep per shell, mm, from the NURBS output) or GLB (the formed shell

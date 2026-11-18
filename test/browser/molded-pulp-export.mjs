@@ -51,7 +51,7 @@ try {
     await page.waitForFunction (() => /Smooth walls/.test (document.querySelector ('.mp_status')?.textContent || ''), null, { timeout : 120000 });
     assert.match (await panel.locator ('.mp_status').textContent (), /Smooth walls: 6 walls, \d+ control points, within [\d.]+ mm of the review surface/);
     await skirt.check (); assert.equal ((await call ('pulp.inspect')).draft.skirtWall, true);
-    const withSkirt = await call ('pulp.loft.check'); assert.equal (withSkirt.skirtWall, true); assert.ok (withSkirt.shells[0].walls.some (w => w.kind === 'skirt'), 'skirt reported when on');
+    const withSkirt = await call ('pulp.loft.check'); assert.equal (withSkirt.skirtWall, true); assert.equal (withSkirt.shells[0].walls.filter (w => w.kind === 'skirt').length, 4, 'four skirt sides between the sheet corners'); assert.equal (withSkirt.ok, true, withSkirt.message);
     assert.equal ((await call ('scene.inspect')).objects.length, objectsBefore, 'the check does not change the scene');
     console.log ('Smooth walls (skirt off): ' + await panel.locator ('.mp_status').textContent ()); console.log ('Smooth walls (skirt on): ' + JSON.stringify (withSkirt.shells[0].walls.map (w => w.id + ' ' + w.outlineControls + 'x' + w.heightControls + ' ' + w.maxDistanceMm.toFixed (2) + (w.withinTolerance ? '' : ' (outside)'))) + ' ok=' + withSkirt.ok);
     await skirt.uncheck (); assert.equal ((await call ('pulp.loft.check')).shells[0].walls.some (w => w.kind === 'skirt'), false);

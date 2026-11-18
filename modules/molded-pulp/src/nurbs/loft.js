@@ -6,6 +6,7 @@ import { Degree, ClampedKnots, Greville, AxisBasis, FitAxis, FindSpan, BasisFuns
 import { IsoContours, Centroid, PolygonArea, OutlineWindow } from './contours.js';
 import { SeamOrder, FitPeriodic, PeriodicPoint, OutlineDeviation } from './periodic.js';
 import { SurfaceDistance } from './measure.js';
+import { OpenKnots, OpenPoint, OpenParams, FitOpen, OpenDeviation, OutlineCorners } from './open.js';
 
 function Inside (points, x, z)
 {
@@ -68,15 +69,17 @@ export function LoftPocketWalls (grid, H, { depthMm, outlineToleranceMm = Math.m
     // Search only as far as the tolerance needs: anything farther fails the check either way.
     const distance = SurfaceDistance (grid, H, Math.min (2.5, 3 * wallToleranceMm + 2 * Math.max (grid.dx, grid.dz))), walls = [];
     // One cubic wall surface through a stack of outlines (one per level, all with a shared seam).
-    const loft = (outlines, seed, id, kind) => {
+    // open: the outlines are sides between two corners (clamped cubics with pinned ends) instead of closed loops.
+    const loft = (outlines, seed, id, kind, open = false) => {
         // Outline controls: the smallest m (growing ×1.5) that fits every level within the outline tolerance.
-        let m = 12, fits;
+        let m = open ? 4 : 12, fits;
         for (;;) {
-            fits = outlines.map (o => FitPeriodic (o.points, o.params, m));
-            const worst = Math.max (...outlines.map ((o, k) => OutlineDeviation (o.points, fits[k], 4, o.params)));
+            fits = outlines.map (o => open ? FitOpen (o.points, o.params, m) : FitPeriodic (o.points, o.params, m));
+            const worst = Math.max (...outlines.map ((o, k) => open ? OpenDeviation (o.points, fits[k], o.params, 4) : OutlineDeviation (o.points, fits[k], 4, o.params)));
             if (worst <= outlineToleranceMm || m >= maxOutlineControls) { break; }
             m = Math.min (maxOutlineControls, Math.ceil (m * 1.5));
         }
+        const knotsU = open ? OpenKnots (m) : PeriodicKnots (m);
         // Height controls: the smallest n (doubling from 4) whose wall stays within the 3D distance tolerance.
         const values = new Float64Array (count * m * 2);
         for (let k = 0; k < count; k++) { for (let i = 0; i < m; i++) { values[(k * m + i) * 2] = fits[k][i][0]; values[(k * m + i) * 2 + 1] = fits[k][i][1]; } }
@@ -86,17 +89,17 @@ export function LoftPocketWalls (grid, H, { depthMm, outlineToleranceMm = Math.m
             const controls = FitAxis (values, m * 2, AxisBasis (knotsV, levels)), gv = Greville (knotsV);
             const ringAt = h => { const s = FindSpan (knotsV, h), N = BasisFuns (knotsV, s, h), ring = []; for (let i = 0; i < m; i++) { let x = 0, z = 0; for (let r = 0; r <= Degree; r++) { const b = s - Degree + r; x += N[r] * controls[(b * m + i) * 2]; z += N[r] * controls[(b * m + i) * 2 + 1]; } ring.push ([x, z]); } return ring; };
             let max = 0; const rows = 2 * (count - 1);
-            for (let r = 0; r <= rows; r++) { const h = lo + (hi - lo) * r / rows, ring = ringAt (h); for (let q = 0; q < 2 * m; q++) { const [x, z] = PeriodicPoint (ring, q / (2 * m)); max = Math.max (max, distance (x, h, z)); } }
+            for (let r = 0; r <= rows; r++) { const h = lo + (hi - lo) * r / rows, ring = ringAt (h); for (let q = 0; q <= 2 * m - (open ? 0 : 1); q++) { const [x, z] = open ? OpenPoint (ring, knotsU, q / (2 * m)) : PeriodicPoint (ring, q / (2 * m)); max = Math.max (max, distance (x, h, z)); } }
             wall = { knotsV, controls, gv, max };
             if (max <= wallToleranceMm || n >= count) { break; }
             n = Math.min (count, n * 2);
         }
         // Surface: U periodic (m + 3 wrapped controls), V clamped in height; point (x, y = Greville height, z).
-        const countU = m + Degree, points = new Float64Array (countU * n * 3);
+        const countU = open ? m : m + Degree, points = new Float64Array (countU * n * 3);
         for (let b = 0; b < n; b++) { for (let a = 0; a < countU; a++) { const i = a % m, k = (b * countU + a) * 3; points[k] = wall.controls[(b * m + i) * 2]; points[k + 1] = wall.gv[b]; points[k + 2] = wall.controls[(b * m + i) * 2 + 1]; } }
         return {
             id, kind, seed, areaMm2 : Math.abs (PolygonArea (outlines[0].points)),
-            surface : { degreeU : Degree, degreeV : Degree, periodicU : true, knotsU : PeriodicKnots (m), knotsV : wall.knotsV, countU, countV : n, points },
+            surface : { degreeU : Degree, degreeV : Degree, periodicU : !open, knotsU, knotsV : wall.knotsV, countU, countV : n, points },
             outlineControls : m, heightControls : n, maxDistanceMm : wall.max, withinTolerance : wall.max <= wallToleranceMm
         };
     };
@@ -109,7 +112,22 @@ export function LoftPocketWalls (grid, H, { depthMm, outlineToleranceMm = Math.m
         if (!largest) { skirt.length = 0; break; }
         skirt.push (SeamOrder (largest.points, centre));
     }
-    if (skirt.length === count) { walls.push (loft (skirt, centre, 'Outer skirt', 'skirt')); }
+    if (skirt.length === count) {
+        // A sheet edge has sharp plan corners that one smooth closed curve cannot follow: split every level at the same
+        // corners and loft each side between them. Neighbouring sides share the corner points, so they meet in a common
+        // corner edge. Without stable corners (a rounded outline) the skirt is one closed loft.
+        const corners = skirt.map (o => OutlineCorners (o.points));
+        if (corners[0].length >= 3 && corners.every (c => c.length === corners[0].length)) {
+            for (let side = 0; side < corners[0].length; side++) {
+                const sides = skirt.map ((o, k) => {
+                    const c = corners[k], from = c[side], to = c[(side + 1) % c.length], points = [];
+                    for (let i = from; ; i = (i + 1) % o.points.length) { points.push (o.points[i]); if (i === to) { break; } }
+                    return { points, params : OpenParams (points) };
+                });
+                walls.push (loft (sides, centre, 'Outer skirt side ' + (side + 1), 'skirt', true));
+            }
+        } else { walls.push (loft (skirt, centre, 'Outer skirt', 'skirt')); }
+    }
     const controls = walls.reduce ((s, w) => s + w.surface.countU * w.surface.countV, 0), maxDistanceMm = Math.max (0, ...walls.map (w => w.maxDistanceMm));
     if (!pockets.length) { return { ok : false, reason : 'No pockets were found below the plateau.', walls, merges, levels : count, range : [lo, hi], controls : 0, maxDistanceMm : 0, outlineToleranceMm, wallToleranceMm }; }
     return { ok : walls.every (w => w.withinTolerance) && (!skirtWall || walls.some (w => w.kind === 'skirt')), reason : walls.every (w => w.withinTolerance) ? (skirtWall && !walls.some (w => w.kind === 'skirt') ? 'No closed outer skirt outline at every level.' : null) : 'A wall is outside the tolerance.', walls, merges, levels : count, range : [lo, hi], controls, maxDistanceMm, outlineToleranceMm, wallToleranceMm };

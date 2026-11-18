@@ -11,6 +11,7 @@ import { IsoContours, PolygonArea } from '../src/nurbs/contours.js';
 import { SeamOrder, FitPeriodic, PeriodicPoint, OutlineDeviation } from '../src/nurbs/periodic.js';
 import { SurfaceDistance } from '../src/nurbs/measure.js';
 import { LoftPocketWalls } from '../src/nurbs/loft.js';
+import { FitOpen, OpenPoint, OpenKnots, OpenParams, OutlineCorners } from '../src/nurbs/open.js';
 
 function Cylinder (cx, cz, radius, height, out, segments = 48)
 {
@@ -141,6 +142,15 @@ describe ('Molded Pulp Phase 2: lofted pocket walls', function () {
     });
 });
 
+describe ('Molded Pulp open sides and outline corners', () => {
+    it ('pins open side fits to their end points and finds the corners of a rectangle', () => {
+        const side = Array.from ({ length : 41 }, (_, i) => [i, Math.sin (i / 40 * Math.PI) * 3]), fit = FitOpen (side, OpenParams (side), 8);
+        assert.deepEqual (fit[0], side[0]); assert.deepEqual (fit[7], side[40]); assert.deepEqual (OpenPoint (fit, OpenKnots (8), 1), side[40]);
+        const rect = []; for (let i = 0; i < 40; i++) { rect.push ([i, 0]); } for (let i = 0; i < 20; i++) { rect.push ([40, i]); } for (let i = 40; i > 0; i--) { rect.push ([i, 20]); } for (let i = 20; i > 0; i--) { rect.push ([0, i]); }
+        assert.deepEqual (OutlineCorners (rect).map (i => rect[i]), [[0, 0], [40, 0], [40, 20], [0, 20]]);
+    });
+});
+
 describe ('Molded Pulp smooth wall check and the outer skirt option', function () {
     this.timeout (180000);
     it ('keeps the skirt option off by default and validates it', async () => {
@@ -156,8 +166,9 @@ describe ('Molded Pulp smooth wall check and the outer skirt option', function (
         assert.equal (off.ok, true, off.reason); assert.equal (off.walls.length, 6); assert.ok (off.walls.every (w => w.kind === 'pocket'));
         assert.equal (PlanTray (SixPack (86, 48), base).loft, undefined, 'no check unless asked');
         const on = PlanTray (SixPack (86, 48), { ...base, skirtWall : true }, { loftCheck : true }).loft[0];
-        const skirt = on.walls.find (w => w.kind === 'skirt'); assert.ok (skirt, 'skirt wall included');
-        // Rectangular sheets give the skirt sharp plan corners: reported, not hidden.
-        if (!skirt.withinTolerance) { assert.equal (on.ok, false); assert.match (on.reason, /outside the tolerance/); }
+        // The rectangular sheet gives the skirt four sharp plan corners: it is lofted as four sides that meet at them.
+        const sides = on.walls.filter (w => w.kind === 'skirt');
+        assert.deepEqual (sides.map (w => w.id), ['Outer skirt side 1', 'Outer skirt side 2', 'Outer skirt side 3', 'Outer skirt side 4']);
+        assert.equal (on.ok, true, on.reason); assert.ok (sides.every (w => w.withinTolerance && w.maxDistanceMm <= 0.3125), JSON.stringify (sides));
     });
 });

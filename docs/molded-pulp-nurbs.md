@@ -178,7 +178,18 @@ On real Primary Products cans (3 × 2, 20 mm gap, Type 2, 35 mm, standard):
 #### Next steps
 
 1. ✔ Speed-up (identical output): contours scan a per-pocket window between floor and rim outlines; outline checks search the curve near each point's parameter; the 3D distance search reaches only as far as the tolerance needs. T1 standard: 1.3 s → 0.85 s. T3 fine: 5.4 s → 2.2 s.
-2. Outer skirt wall: `LoftPocketWalls (…, { skirtWall : true })` finds the outermost outline at every level and lofts it through the same code. Off by default because it does not meet tolerance yet. On T1 it needs the 256-control cap and still misses by 1.52 mm, taking 4.6 s. The skirt rises from the rectangular sheet edge, so its outlines have true 90° plan corners, which a uniform periodic cubic cannot follow. Next: corner-aware skirts, either drafted planar sides meeting at corner edges, or a plan corner radius from the DFM rules (real tools have one), with knots placed at the corners.
+2. ✔ Outer skirt wall, corner-aware (option `skirtWall`, off by default).
+   - **Why the first version failed:** the skirt rises from the rectangular sheet edge, so its outlines have true 90° plan corners. One smooth closed curve cannot follow them: it needed the 256-control cap and still missed by 1.52 mm.
+   - **The fix:** `OutlineCorners` finds the corners (turning angle over ±3 mm of arc). They are stable at every level: four corners at 84–89° on T1. Each level is split into sides between corners. Each side is an open clamped cubic with its ends pinned to the corners, so neighbouring sides meet in a shared corner edge, and each side is lofted through the levels.
+   - **Results:**
+
+     | Case | Skirt sides | Whole tray |
+     | --- | --- | --- |
+     | T1 standard | 4 sides, within 0.08–0.13 mm | ok, 696 controls |
+     | T1 fine | 4 sides, within 0.04 mm | ok, 1,160 controls |
+     | Real Primary Products cans | 4 sides, 48–72 × 4 controls, within 0.15–0.18 mm | ok |
+
+   - **To do:** straight sides still use 32–72 outline controls because the fit follows the review grid's ripple. A side tolerance tied to straightness, or a line or arc check, should bring a straight side down to about 4 controls.
 3. Floors and plateau as trimmed planes.
 4. Rim and floor fillets as the loft's end sections.
 5. Tool side by offsetting the outlines by the thickness in plan.
