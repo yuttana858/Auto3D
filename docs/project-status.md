@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Automatic CAD import — Auto3D 0.89.0 candidate (2026-11-18)
+
+Packaging 1.15.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0 remain unchanged. Integrates main `12dea98` / 0.88.0 and its Molded Pulp NURBS output release (#153). Parasolid open/drop detects the format and opens conversion; choosing a source (plus actual Parasolid units) starts conversion and automatically adds its GLB to the originating scene with Undo. STEP opens locally as before. The bounded watcher continues with the dialog closed and pauses on account/document/tab/read-only changes. Native Cloud 3D Studio remains 0.5.0 with the existing private processing/retention contract. See [release-0890.md](release-0890.md) for final validation/publication evidence and [commercial SDK research](cad-commercial-sdk.md) for future reader choices.
+
 ## Molded Pulp output: STEP and GLB on a NURBS B-rep — Auto3D 0.88.0 / Molded Pulp 0.3.0 (2026-11-18)
 
 Packaging 1.15.0 / Primary Products 0.15.0 are preserved. Based on main after #152 (0.87.1). Not deployed.

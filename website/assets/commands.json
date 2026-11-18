@@ -5,7 +5,7 @@
       "id": "conversion.open",
       "title": "Open CAD converter",
       "category": "Conversion",
-      "description": "Open the interactive private CAD conversion dialog. Selecting a source does not upload it. Supports a subset of Parasolid and single-file STEP.",
+      "description": "Open the interactive private CAD conversion dialog. Choosing a file starts conversion and automatically adds the GLB to the originating session. Parasolid requires actual coordinate units first. Supports a subset of Parasolid and single-file STEP.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -159,9 +159,9 @@
     },
     {
       "id": "conversion.submit",
-      "title": "Convert staged CAD privately",
+      "title": "Convert and import staged CAD",
       "category": "Conversion",
-      "description": "Explicitly upload the file selected in Convert CAD to private cloud processing. Parasolid requires actual source units. STEP uses embedded units. The result is never automatically inserted into a session.",
+      "description": "Start private conversion of the selected file. Parasolid requires actual source units; STEP uses embedded units. Automatically add the GLB to the originating account/session when ready, with one Undo step. Returns queued status; poll conversion.inspect for automatic state/result. Set autoImport false to retain a manual Add workflow. Account/session changes pause automatic insertion.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -189,6 +189,9 @@
               "standard",
               "fine"
             ]
+          },
+          "autoImport": {
+            "type": "boolean"
           }
         },
         "required": [],
@@ -196,7 +199,8 @@
       },
       "example": {
         "sourceUnit": "mm",
-        "quality": "standard"
+        "quality": "standard",
+        "autoImport": true
       }
     },
     {
@@ -228,7 +232,7 @@
       "id": "conversion.retry",
       "title": "Retry CAD conversion",
       "category": "Conversion",
-      "description": "Retry a transiently failed owned job within its deadline and two-attempt limit.",
+      "description": "Retry a transiently failed owned job within its deadline and two-attempt limit, then automatically add the ready GLB to the originating session. Poll conversion.inspect for automatic state/result.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -373,7 +377,7 @@
       "id": "conversion.sample",
       "title": "Convert public calibration box",
       "category": "Conversion",
-      "description": "Explicitly run the private cloud pipeline on the bundled public 40 × 30 × 20 mm STEP calibration box. Consumes a normal conversion slot; contains no customer CAD.",
+      "description": "Run the private cloud pipeline on the bundled public 40 × 30 × 20 mm STEP calibration box and automatically add its GLB to this session. Consumes a normal conversion slot; contains no customer CAD.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
