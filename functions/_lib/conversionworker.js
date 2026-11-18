@@ -1,6 +1,7 @@
 import { JsonBody } from './accountstorage.js';
 import { CadExact, CadFailureCode, CadProgress } from '../../source/website/cadconversioncontract.js';
 import { CadDiagnosticReport } from '../../source/website/cadconversiondiagnostics.js';
+import { CadAppearanceReport } from '../../source/website/cadconversionappearance.js';
 import { JobDatabase, JobOwnerActive, JobBucket, GetJob, ChangeJob, PublicJob, SourceKey, ArtifactKey, Sha256, SafeEqual, UploadJobObject, CadArtifacts, CadLimits, CadUuid, CadHash, CadError } from './conversionjobs.js';
 
 export async function WorkerJob (env, request, id, attempt)
@@ -40,7 +41,11 @@ export async function ValidateJobResult (env, job)
     }
     const topology = {};
     for (const kind of ['solids', 'shells', 'faces', 'edges', 'vertices']) { const count = manifest.cad?.topology?.[kind]; if (!Number.isSafeInteger (count) || count < 0 || count > 100000000) { throw CadError ('validation_failed'); } topology[kind] = count; }
-    return { artifacts : objects, summary : { dimensionsMm : dimensions, topology, producerVersion : manifest.producer_version, stepReimportPassed : true, meshReimportPassed : true, progressReported : !!job.summary?.progress } };
+    const appearance = Object.hasOwn (manifest, 'appearance') ? CadAppearanceReport (manifest.appearance) : null;
+    if (appearance && appearance.sourceFormat !== (['step', 'stp'].includes (job.source_extension) ? 'step' : 'parasolid')) { throw CadError ('validation_failed'); }
+    const [major, minor] = manifest.producer_version.split ('.').map (Number);
+    if ((major > 0 || minor >= 5) && !appearance) { throw CadError ('validation_failed'); }
+    return { artifacts : objects, summary : { dimensionsMm : dimensions, topology, producerVersion : manifest.producer_version, stepReimportPassed : true, meshReimportPassed : true, progressReported : !!job.summary?.progress, ...(appearance ? { appearance } : {}) } };
 }
 export async function WorkerOperation (env, request, parts)
 {
@@ -70,7 +75,7 @@ export async function WorkerOperation (env, request, parts)
         if (job.purpose === 'diagnostic' && request.headers.get ('X-Auto3D-Diagnostic-Protocol') !== '1') { return { accepted : false }; }
         CadExact (body, []); const result = await ChangeJob (env, job, 'claim');
         if (!result.claimed) { return { accepted : false }; }
-        return { accepted : true, progressProtocol : 1, diagnosticProtocol : 1, purpose : job.purpose || 'conversion', source : { extension : job.source_extension, bytes : job.source_bytes, sha256 : job.source_sha256, unit : job.source_unit }, quality : job.quality };
+        return { accepted : true, progressProtocol : 1, diagnosticProtocol : 1, appearanceProtocol : 1, purpose : job.purpose || 'conversion', source : { extension : job.source_extension, bytes : job.source_bytes, sha256 : job.source_sha256, unit : job.source_unit }, quality : job.quality };
     }
     if (operation === 'progress') {
         CadExact (body, Object.hasOwn (body, 'progress') ? ['stage', 'progress'] : ['stage']);
@@ -80,8 +85,10 @@ export async function WorkerOperation (env, request, parts)
     }
     if (operation === 'complete') {
         if (job.purpose === 'diagnostic') {
-            CadExact (body, ['report']); const report = CadDiagnosticReport (body.report);
-            const result = await ChangeJob (env, job, 'complete', { report }); return { state : result.job.state };
+            CadExact (body, ['report', ...(Object.hasOwn (body, 'appearance') ? ['appearance'] : [])]); const report = CadDiagnosticReport (body.report);
+            const appearance = Object.hasOwn (body, 'appearance') ? CadAppearanceReport (body.appearance, true) : null;
+            if (appearance && appearance.sourceFormat !== (['step', 'stp'].includes (job.source_extension) ? 'step' : 'parasolid')) { throw CadError ('invalid_request'); }
+            const result = await ChangeJob (env, job, 'complete', { report, ...(appearance ? { appearance } : {}) }); return { state : result.job.state };
         }
         CadExact (body, []); const evidence = await ValidateJobResult (env, job);
         const result = await ChangeJob (env, job, 'complete', evidence); return { state : result.job.state };

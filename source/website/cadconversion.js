@@ -3,6 +3,7 @@ import { AgentError } from '../../mcp/common.js';
 import { CadLimits, CadArtifacts, CadMessages, CadUuid, CadRequest, CadProgressView, CadPhases } from './cadconversioncontract.js';
 import { ParseConvertedGlb, AddConvertedModel } from './cadconversionimport.js';
 import { CadDiagnosticReport, CadDiagnosticAdvice, CadDiagnosticChecks } from './cadconversiondiagnostics.js';
+import { CadAppearanceReport, CadAppearanceLines } from './cadconversionappearance.js';
 
 function ClientError (code)
 {
@@ -130,6 +131,13 @@ export class CadConversions
         if (!Object.hasOwn (CadArtifacts, kind)) { throw ClientError ('invalid_request'); }
         return this.Request (this.JobPath (id) + '/artifacts/' + kind, 'GET', undefined, true);
     }
+    async Appearance (id)
+    {
+        const job = await this.Get (id), sourceOnly = !job.summary?.appearance;
+        const value = job.summary?.appearance || job.diagnostics?.appearance;
+        return { jobId : job.id, status : value ? 'completed' : 'not_available', sourceOnly,
+            report : value ? CadAppearanceReport (value, sourceOnly) : null };
+    }
     async Download (id, kind)
     {
         const buffer = await this.Artifact (id, kind), url = URL.createObjectURL (new Blob ([buffer], { type : CadArtifacts[kind].type }));
@@ -205,9 +213,10 @@ export class CadConversions
                 let record = rows.get (job.id);
                 if (!record) {
                     const row = Element ('article', null, jobs); row.className = 'cad_conversion_job'; row.dataset.jobId = job.id;
-                    const title = Element ('strong', '', row), progress = ProgressElement (row), elapsed = Element ('span', '', row), message = Element ('p', '', row), summary = Element ('p', '', row), diagnostic = Element ('details', null, row), controls = Element ('div', null, row);
+                    const title = Element ('strong', '', row), progress = ProgressElement (row), elapsed = Element ('span', '', row), message = Element ('p', '', row), summary = Element ('p', '', row), appearance = Element ('details', null, row), diagnostic = Element ('details', null, row), controls = Element ('div', null, row);
+                    appearance.hidden = true;
                     diagnostic.className = 'cad_conversion_diagnostic'; diagnostic.hidden = true;
-                    elapsed.className = 'cad_conversion_elapsed'; controls.className = 'mode_buttons'; record = { row, title, progress, elapsed, message, summary, diagnostic, controls }; rows.set (job.id, record);
+                    elapsed.className = 'cad_conversion_elapsed'; controls.className = 'mode_buttons'; record = { row, title, progress, elapsed, message, summary, appearance, diagnostic, controls }; rows.set (job.id, record);
                 }
                 const { row, controls } = record; if (anchor.nextSibling !== row) { anchor.after (row); } anchor = row; row.dataset.state = job.state;
                 record.title.textContent = job.source.name;
@@ -215,6 +224,18 @@ export class CadConversions
                 record.started = Date.parse (job.createdAt); record.finished = liveStates.has (job.state) ? null : Date.parse (job.updatedAt);
                 record.message.hidden = !job.errorCode || job.purpose === 'diagnostic'; record.message.textContent = job.errorCode ? (CadMessages[job.errorCode] || CadMessages.conversion_failed) + (CadPhases[job.progress?.phase] ? ' Stopped during: ' + CadPhases[job.progress.phase].toLowerCase () + '.' : '') : '';
                 record.summary.hidden = !job.summary; record.summary.textContent = job.summary ? 'X × Y × Z: ' + job.summary.dimensionsMm.map (n => Number (n.toFixed (3))).join (' × ') + ' mm · ' + job.summary.topology.solids + ' solids · independently validated' : '';
+                const appearance = job.summary?.appearance || job.diagnostics?.appearance;
+                const appearanceKey = JSON.stringify (appearance);
+                if (record.appearanceKey !== appearanceKey) {
+                    record.appearanceKey = appearanceKey; record.appearance.replaceChildren (); record.appearance.hidden = !appearance;
+                    if (appearance) {
+                        try {
+                            const lines = CadAppearanceLines (appearance, !job.summary?.appearance);
+                            Element ('summary', 'Appearance report', record.appearance);
+                            for (const line of lines) { Element ('p', line, record.appearance); }
+                        } catch { record.appearance.hidden = true; }
+                    }
+                }
                 const reportKey = JSON.stringify ([job.diagnostics?.report, job.diagnostics?.errorCode]);
                 if (record.reportKey !== reportKey) {
                     record.reportKey = reportKey; record.diagnostic.replaceChildren (); record.diagnostic.hidden = !job.diagnostics?.report && !job.diagnostics?.errorCode;
