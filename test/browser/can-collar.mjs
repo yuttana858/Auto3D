@@ -30,9 +30,15 @@ try {
     assert.ok (Math.abs (inspect.rim.canDiameterMm - 66) < 0.5 && Math.abs (inspect.rim.canHeightMm - 122) < 0.5, JSON.stringify (inspect.rim));
     assert.ok (inspect.rim.undercutMm > 0.2 && inspect.rim.radiusMm < 33, JSON.stringify (inspect.rim));
     assert.ok (inspect.rim.bottomMm > 118 && inspect.rim.bottomMm < 122, JSON.stringify (inspect.rim));
-    assert.equal (inspect.collar.cans, 6); assert.ok (Math.abs (inspect.collar.holeRadiusMm - (inspect.rim.radiusMm - 1.5)) < 1e-6);
-    assert.equal (inspect.collar.automaticTuck, true); assert.ok (inspect.collar.neckClearanceMm >= .0254 - 1e-7);
-    assert.ok (inspect.collar.reliefRadiusMm > inspect.rim.radiusMm && inspect.collar.webMm >= 1.5 - 1e-6);
+    // 12 oz cans get the universal design automatically: the same hole for every pack.
+    assert.equal (inspect.collar.cans, 6); assert.equal (inspect.collar.standard.id, '12oz-202'); assert.equal (inspect.collar.tabs, 16);
+    assert.equal (inspect.collar.holeRadiusMm, 27.5); assert.equal (inspect.collar.reliefRadiusMm, 32); assert.equal (inspect.collar.standard.tabHeightMm, 4.5);
+    assert.ok (inspect.collar.neckClearanceMm >= .0254 - 1e-7 && inspect.collar.webMm >= 1.5 - 1e-6); assert.equal (inspect.collar.profile, '12 oz can collar · 6 cans');
+    assert.equal ((await call ('packaging.accessories.collar.inspect', { design : '12oz-202', tabs : 30, reliefMm : 9 })).collar.tabs, 16, 'the universal design ignores tab and relief options');
+    assert.equal ((await call ('packaging.accessories.collar.inspect', { tabs : 20 })).collar.standard, null, 'explicit tabs ask Automatic for a custom fit');
+    // Custom fit follows the sensed rims instead.
+    const custom = (await call ('packaging.accessories.collar.inspect', { design : 'custom' })).collar;
+    assert.equal (custom.standard, null); assert.ok (Math.abs (custom.holeRadiusMm - (inspect.rim.radiusMm - 1.5)) < 1e-6); assert.equal (custom.automaticTuck, true);
     await fails ('packaging.accessories.collar', { boardId : 'tissue' });
     await fails ('packaging.accessories.collar', { tuckMm : 40 });
 
@@ -40,7 +46,7 @@ try {
     await call ('packaging.tab', { tab : 'accessories' });
     const panel = page.getByRole ('region', { name : 'Can collar', exact : true }); await panel.waitFor ();
     assert.equal (await panel.getByLabel ('Tuck under rim (mm, blank fits neck)', { exact : true }).inputValue (), '');
-    await page.waitForFunction (() => /6 cans · rim Ø/.test (document.querySelector ('[aria-label="Can collar"]')?.textContent || ''));
+    await page.waitForFunction (() => /6 cans · 12 oz can · 211 body, 202 end universal design · 16 tabs/.test (document.querySelector ('[aria-label="Can collar"]')?.textContent || ''));
     await panel.getByLabel ('Collar board', { exact : true }).selectOption ('sbs-24pt');
     const before = (await call ('scene.inspect')).objects.length;
     await panel.getByRole ('button', { name : 'Add can collar', exact : true }).click ();
@@ -58,7 +64,24 @@ try {
     // The collar profile: rounded outline plus a tabbed relief hole per can.
     await call ('object.select', { objectId : collar.id, single : true }); await call ('packaging.open_selected');
     const profile = await call ('packaging.inspect'); assert.equal (profile.paths.length, 7); assert.equal (profile.thickness, 0.61);
+    // Print: paperboard collars have a white top; demo artwork in CAD updates the collar model in one Undo step.
+    assert.deepEqual ((await call ('packaging.print.inspect')).print, { version : 1, ground : 'white' });
+    assert.equal ((await call ('packaging.print.inspect')).rendersOnModel, true);
+    const materials = async () => (await call ('material.list')).map (m => m.name);
+    assert.ok ((await materials ()).includes ('White top'));
+    const demo = await call ('packaging.print.demo', {}); assert.equal (demo.applied.updated, true); assert.equal (demo.print.artwork.name, 'Demo · sparkling');
+    assert.ok (Math.abs (demo.print.artwork.widthMm - demo.dielineMm.maxX) < 1e-6, 'demo artwork covers the dieline');
+    assert.ok ((await materials ()).includes ('Print · Demo · sparkling'));
+    assert.equal (await page.locator ('[data-print-artwork]').count (), 1, 'the CAD drawing shows the artwork under the dieline');
     await page.screenshot ({ path : 'work/can-collar/collar-cad.png' });
+    const placed = await call ('packaging.print.place', { xMm : 10, widthMm : 150 }); assert.equal (placed.changed, true); assert.equal (placed.print.artwork.xMm, 10); assert.equal (placed.print.artwork.widthMm, 150);
+    await call ('history.undo'); assert.deepEqual ((await call ('packaging.print.inspect')).print.artwork, demo.print.artwork);
+    await fails ('packaging.print.ground', { ground : 'gold' });
+    await call ('packaging.print.ground', { ground : 'natural' }); assert.equal ((await call ('packaging.print.inspect')).print.ground, 'natural');
+    await call ('history.undo'); assert.equal ((await call ('packaging.print.inspect')).print.ground, 'white');
+    // The universal 12 oz hole is also a CAD shape tool.
+    const standardHole = await call ('packaging.path.standard_hole', { center : [0, 0], units : 'mm' }); assert.equal (standardHole.tabs, 16);
+    await call ('history.undo');
     // A second collar for the same cans is refused.
     await page.keyboard.press ('Escape'); await call ('object.select', { objectId : can.objectId });
     await fails ('packaging.accessories.collar', {}, /already have a collar/);
@@ -72,5 +95,5 @@ try {
     await fails ('packaging.path.relief_hole', { center : [140, 60], holeRadius : 30, reliefRadius : 30.1, units : 'mm' }, /0.2 mm/);
     await fails ('packaging.path.round_corners', { ids : [rect.pathId], radius : -1, units : 'mm' });
     assert.deepEqual (errors, []);
-    console.log ('Can collar: six-pack rim sensing, tabbed relief holes, rounded corners, group, Undo/Redo, duplicate refusal and CAD shape tools passed.');
+    console.log ('Can collar: six-pack rim sensing, 12 oz universal design, custom fit, white top, demo artwork on the model, print Undo, group, Undo/Redo, duplicate refusal and CAD shape tools passed.');
 } finally { await browser.close (); }

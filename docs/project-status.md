@@ -1,5 +1,15 @@
 # Auto3D development log and handoff
 
+## Universal 12 oz collar, white top, board artwork and import unit fix — Auto3D 0.95.0 / Packaging 1.18.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0 (2026-11-19)
+
+Candidate on `claude/dazzling-faraday-rhti3h`, not deployed.
+- Collars for 12 oz cans use one universal design (`12oz-202`: 16 tabs 4.5 mm tall, tips Ø 55, reliefs Ø 64, 1 mm slits), chosen automatically when the rims fit.
+- Paperboard collars have a white top.
+- Flat boards take artwork in the CAD Print section, and it updates the 3D board in one Undo step.
+- Fix: a GLB added to a scene in another unit keeps its real size (it used to look invisible in millimetre product scenes).
+
+See docs/release-0950.md.
+
 ## Integrated animation and can-collar release — Auto3D 0.94.0 candidate
 
 Packaging 1.17.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0. Consolidates #158 visibility/lifetime tracks, #159 embedded clip scheduling, #160 array timeline reveals, #162 macro step timing, and #166 can collars/CAD shape tools into #162, preserving main through #164 (`cfd03f6`) and its shared account macro library. Resolves code, version and release-note conflicts without dropping either workstream. See [release-0940.md](release-0940.md). Combined validation and merge status are recorded in PR #162.

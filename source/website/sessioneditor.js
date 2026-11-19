@@ -558,10 +558,17 @@ export class SessionEditor
         const extension = result.mainFile.split ('.').pop ().toLowerCase ();
         if (extension === 'glb' || extension === 'gltf') { result.model.SetUnit (Unit.Meter); result.model.materials.forEach ((material, index) => { material.gltfMaterialIndex = index; }); }
         const target = this.replaceTarget; this.replaceTarget = null;
+        // A scene keeps one unit (its first model's). A model in another known unit (a GLB in metres into a
+        // millimetre scene of generated products, for example) is scaled to keep its real size.
+        const sceneUnit = this.document.objects.length ? this.document.model.GetUnit () : null;
         const object = this.document.AddImported (result.model, result.mainFile, result.upVector);
+        const sourceFactor = UnitFactor (object.unit, 'metric'), sceneFactor = sceneUnit === null ? null : UnitFactor (sceneUnit, 'metric');
+        const unitRatio = sourceFactor && sceneFactor ? sourceFactor / sceneFactor : 1;
+        if (unitRatio !== 1) { object.unit = sceneUnit; object.scale = object.scale.map (value => value * unitRatio); this.document.ApplyTransform (object); }
         if (extension === 'glb' || extension === 'gltf') { object.animationAsset = { main : result.mainFile, files }; }
         if (target && this.document.objects.includes (target)) {
             Object.assign (object, TransformState (target), { id : target.id, name : target.name, visible : target.visible, userData : { ...(target.userData || {}) }, castShadow : target.castShadow !== false, receiveShadow : target.receiveShadow !== false }); this.document.ApplyTransform (object);
+            if (unitRatio !== 1) { object.scale = object.scale.map (value => value * unitRatio); this.document.ApplyTransform (object); }
             const index = this.document.objects.indexOf (target); this.document.Remove (target);
             this.history.Push ({ undo : async () => { this.document.Remove (object); this.document.Restore (target, index); this.selected = target; await this.Render (); }, redo : async () => { this.document.Remove (target); this.document.Restore (object, index); this.selected = object; await this.Render (); } });
         } else {

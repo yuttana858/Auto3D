@@ -46,6 +46,7 @@ export class AccessoriesPanel
         const collar = Element ('section', this.root, undefined, 'packaging_accessory_group'); collar.setAttribute ('aria-label', 'Can collar'); Element ('h4', collar, 'Can collar');
         Element ('p', collar, 'Select a group or array of upright cans (for a six-pack, array one can 3 × 2). Each can gets a round hole split into tabs by relief slits; the tabs tuck under the can rim and the slits let them flex over it. Corners are rounded; sizes come from the rims sensed on the selected cans.', 'section_hint');
         const fields = Element ('div', collar, undefined, 'packaging_accessory_options');
+        this.collarDesign = this.Select (fields, 'Collar design');
         this.collarBoard = this.Select (fields, 'Collar board');
         const number = (title, value, min, max, step = 'any') => { const label = Element ('label', fields, title); const input = Element ('input', label); input.type = 'number'; input.min = String (min); input.max = String (max); input.step = step; input.value = value; input.setAttribute ('aria-label', title); input.addEventListener ('change', () => this.Refresh ()); return input; };
         this.collarTuck = number ('Tuck under rim (mm, blank fits neck)', '', 0.3, 10, '0.1'); this.collarTuck.placeholder = 'Auto · up to 1.5';
@@ -55,13 +56,22 @@ export class AccessoriesPanel
         this.collarTabs = number ('Tabs per can (0 automatic)', '0', 0, 48, '1');
         this.collarSize = Element ('p', collar, '', 'section_hint');
         this.addCollar = Element ('button', collar, 'Add can collar', 'packaging_auto_create'); this.addCollar.type = 'button'; this.addCollar.addEventListener ('click', () => this.CreateCollar ());
+        this.collarArtwork = Element ('button', collar, 'Edit collar artwork in CAD', 'packaging_auto_create'); this.collarArtwork.type = 'button'; this.collarArtwork.addEventListener ('click', () => this.EditCollarArtwork ());
         this.collarStatus = Element ('p', collar, '', 'section_hint'); this.collarStatus.setAttribute ('role', 'status'); this.collarStatus.setAttribute ('aria-live', 'polite');
+    }
+    async EditCollarArtwork ()
+    {
+        try { const result = await (this.host.run ? this.host.run (() => this.host.editCollarArtwork ()) : this.host.editCollarArtwork ()); if (result?.message) { this.collarStatus.textContent = result.message; } }
+        catch (error) { this.collarStatus.textContent = error.message; }
     }
     CollarOptions ()
     {
         const value = input => input.value === '' ? undefined : input.valueAsNumber, options = {};
         if (this.collarBoard.value) { options.boardId = this.collarBoard.value; }
-        for (const [key, input] of [['tuckMm', this.collarTuck], ['reliefMm', this.collarRelief], ['marginMm', this.collarMargin], ['cornerRadiusMm', this.collarCorner], ['tabs', this.collarTabs]]) { const v = value (input); if (Number.isFinite (v)) { options[key] = v; } }
+        if (this.collarDesign.value) { options.design = this.collarDesign.value; }
+        // A universal design fixes the hole (tuck, reliefs and tabs); only board, margin and corners apply.
+        const fixed = options.design && options.design !== 'custom' && (options.design !== 'auto' || this.collarState?.collar?.standard);
+        for (const [key, input] of [['tuckMm', this.collarTuck], ['reliefMm', this.collarRelief], ['marginMm', this.collarMargin], ['cornerRadiusMm', this.collarCorner], ['tabs', this.collarTabs]]) { if (fixed && ['tuckMm', 'reliefMm', 'tabs'].includes (key)) { continue; } const v = value (input); if (Number.isFinite (v)) { options[key] = v; } }
         return options;
     }
     RefreshCollar ()
@@ -70,11 +80,14 @@ export class AccessoriesPanel
         let data;
         try { data = this.host.collarInspect?.(this.CollarOptions ()) || { available : false, reason : 'Can collars are not available here.' }; }
         catch (error) { data = { available : false, reason : error.message }; }
+        if (data.designs) { this.Fill (this.collarDesign, [{ value : 'auto', label : 'Automatic (universal when it fits)' }, ...data.designs.map (d => ({ value : d.id, label : d.name + ' · universal' })), { value : 'custom', label : 'Custom fit to these cans' }], 'auto'); }
         if (data.boards) { this.Fill (this.collarBoard, data.boards.map (b => ({ value : b.id, label : b.name + ' · ' + b.caliperMm + ' mm' })), data.defaults?.boardId || data.boards[0]?.id || ''); }
         this.collarState = data;
         const mm = v => Number (v.toFixed (1)) + ' mm', c = data.collar;
-        this.collarSize.textContent = c ? data.cans + ' cans · rim Ø ' + mm (2 * data.rim.radiusMm) + ' · collar ' + mm (c.sizeMm.length) + ' × ' + mm (c.sizeMm.width) + ' · ' + c.tabs + ' tabs per can, tips Ø ' + mm (2 * c.holeRadiusMm) + ', reliefs to Ø ' + mm (2 * c.reliefRadiusMm) + ' · corners ' + mm (c.cornerRadiusMm) + ' · effective tuck ' + Number (c.tuckMm.toFixed (3)) + ' mm' + (c.automaticTuck ? ' (auto fit)' : '') : data.reason || '';
+        const universal = c?.standard; for (const input of [this.collarTuck, this.collarRelief, this.collarTabs]) { input.disabled = Boolean (universal); }
+        this.collarSize.textContent = c && universal ? data.cans + ' cans · ' + universal.name + ' universal design · ' + universal.tabs + ' tabs, ' + mm (universal.tabWidthMm) + ' wide × ' + mm (universal.tabHeightMm) + ' tall · tips Ø ' + mm (universal.tipDiameterMm) + ', reliefs Ø ' + mm (universal.reliefDiameterMm) + ', slits ' + mm (universal.notchWidthMm) + ' · collar ' + mm (c.sizeMm.length) + ' × ' + mm (c.sizeMm.width) + ' · ' + (data.boards?.find (b => b.id === this.collarBoard.value)?.ground === 'white' ? 'white top' : 'natural top') : c ? (c.standardRefused ? 'Custom fit (' + c.standardRefused + ') · ' : '') + data.cans + ' cans · rim Ø ' + mm (2 * data.rim.radiusMm) + ' · collar ' + mm (c.sizeMm.length) + ' × ' + mm (c.sizeMm.width) + ' · ' + c.tabs + ' tabs per can, tips Ø ' + mm (2 * c.holeRadiusMm) + ', reliefs to Ø ' + mm (2 * c.reliefRadiusMm) + ' · corners ' + mm (c.cornerRadiusMm) + ' · effective tuck ' + Number (c.tuckMm.toFixed (3)) + ' mm' + (c.automaticTuck ? ' (auto fit)' : '') : data.reason || '';
         this.addCollar.disabled = this.pending || this.host.blocked () || !data.available || !this.host.addCollar;
+        this.collarArtwork.disabled = this.pending || this.host.blocked () || !this.host.editCollarArtwork;
     }
     async CreateCollar ()
     {

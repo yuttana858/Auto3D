@@ -9,13 +9,34 @@ import { DefaultEngineering } from './engineering.js';
 //
 // World convention (Auto3D board pieces): profile X = world X, profile Y = world −Z, caliper up (+Y).
 
+// Collar boards. Paperboard collars print on a white top (coated) face; molded fiber stays natural.
 export const CollarBoards = Object.freeze ([
-    { id : 'sbs-24pt', name : 'SBS paperboard · 24 pt', caliperMm : 0.61 },
-    { id : 'cuk-24pt', name : 'CUK paperboard · 24 pt', caliperMm : 0.61 },
-    { id : 'cuk-28pt', name : 'CUK paperboard · 28 pt', caliperMm : 0.71 },
-    { id : 'kraft-32pt', name : 'Kraft board · 32 pt', caliperMm : 0.81 },
-    { id : 'molded-fiber', name : 'Molded fiber · 1.2 mm', caliperMm : 1.2 }
+    { id : 'sbs-24pt', name : 'SBS paperboard · 24 pt', caliperMm : 0.61, ground : 'white' },
+    { id : 'cuk-24pt', name : 'CUK white top · 24 pt', caliperMm : 0.61, ground : 'white' },
+    { id : 'cuk-28pt', name : 'CUK white top · 28 pt', caliperMm : 0.71, ground : 'white' },
+    { id : 'kraft-32pt', name : 'Kraft white top · 32 pt', caliperMm : 0.81, ground : 'white' },
+    { id : 'molded-fiber', name : 'Molded fiber · 1.2 mm', caliperMm : 1.2, ground : 'natural' }
 ]);
+// Universal collar designs: for a can size every collar uses the same hole (tab count, tab width and
+// height, tip and relief diameters), so one CAD hole design serves every pack layout of that can.
+// 12 oz: 211 body (Ø 66 mm) with a 202 end (seam Ø about 57.9 mm). Tab tips Ø 55 mm reach about 1.45 mm
+// under the seam and clear the neck below it; 16 tabs 4.5 mm tall end at Ø 64 mm, leaving a 2 mm web
+// between touching cans; V slits are 1 mm wide at the tip.
+export const CollarStandards = Object.freeze ([
+    Object.freeze ({ id : '12oz-202', name : '12 oz can · 211 body, 202 end', canDiameterMm : 66, rimDiameterMm : [56.9, 58.9], tipDiameterMm : 55, reliefDiameterMm : 64, tabs : 16, notchWidthMm : 1, tipPoints : 3, pitchMm : 66 })
+]);
+export function CollarStandard (id)
+{
+    const standard = CollarStandards.find (s => s.id === id); if (!standard) { throw new Error ('Choose a collar standard: ' + CollarStandards.map (s => s.id).join (', ') + '.'); }
+    const tipWidthMm = Math.PI * standard.tipDiameterMm / standard.tabs - standard.notchWidthMm;
+    return { ...standard, tabHeightMm : (standard.reliefDiameterMm - standard.tipDiameterMm) / 2, tabWidthMm : tipWidthMm };
+}
+// The standard's hole as a CAD cut outline centred on center (profile mm): the same points every collar uses.
+export function StandardReliefHole (id, center)
+{
+    const s = CollarStandard (id);
+    return ReliefHoleOutline ({ center, holeRadius : s.tipDiameterMm / 2, reliefRadius : s.reliefDiameterMm / 2, tabs : s.tabs, notchWidthMm : s.notchWidthMm, tipPoints : s.tipPoints, rotation : Math.PI / s.tabs });
+}
 export const DefaultCollarOptions = Object.freeze ({ boardId : 'cuk-24pt', tuckMm : 1.5, reliefMm : 3, marginMm : 5, cornerRadiusMm : null, tabs : 0, notchWidthMm : 1.2, webMm : 1.5 });
 export const MaxCollarCans = 24;
 export const CollarNeckClearanceMm = 0.0254;
@@ -83,7 +104,7 @@ function HoleInnerRadius (points, center)
 }
 
 // Collar profile for cans at world centres (x, z mm), all with the same rim radius.
-export function CreateCanCollarPlan ({ cans, rimRadiusMm, neckRadiusMm = null, thickness, tuckMm = null, reliefMm = DefaultCollarOptions.reliefMm, marginMm = DefaultCollarOptions.marginMm, cornerRadiusMm = null, tabs = 0, notchWidthMm = DefaultCollarOptions.notchWidthMm, webMm = DefaultCollarOptions.webMm, name = 'Can collar', grade = 'Custom' } = {})
+export function CreateCanCollarPlan ({ cans, rimRadiusMm, neckRadiusMm = null, thickness, tuckMm = null, reliefMm = DefaultCollarOptions.reliefMm, marginMm = DefaultCollarOptions.marginMm, cornerRadiusMm = null, tabs = 0, notchWidthMm = DefaultCollarOptions.notchWidthMm, webMm = DefaultCollarOptions.webMm, name = 'Can collar', grade = 'Custom', standard = null, print = null } = {})
 {
     if (!Array.isArray (cans) || cans.length < 1 || cans.length > MaxCollarCans) { throw new Error ('A can collar holds 1–' + MaxCollarCans + ' cans.'); }
     cans.forEach ((can, i) => { if (!Array.isArray (can) || can.length !== 2 || !can.every (Number.isFinite)) { throw new Error ('Can ' + (i + 1) + ' needs an [x, z] centre in mm.'); } });
@@ -92,11 +113,19 @@ export function CreateCanCollarPlan ({ cans, rimRadiusMm, neckRadiusMm = null, t
     range (tuckMm, 'Tuck', 0.3, Math.min (10, rim * 0.4)); range (reliefMm, 'Relief beyond the rim', 0.5, 20); range (marginMm, 'Edge margin', 1, 50); range (notchWidthMm, 'Relief slit width', 0.3, 5); range (webMm, 'Board web between holes', 0.5, 20);
     if (neckRadiusMm !== null) { range (neckRadiusMm, 'Neck radius', 0.001, rim); }
     let holeRadius = rim - tuckMm;
+    // A universal design fixes the hole: tabs, slit width, tip and relief diameters do not follow options.
+    const design = standard === null ? null : CollarStandard (standard);
+    if (design) {
+        const [low, high] = design.rimDiameterMm;
+        if (2 * rim < low || 2 * rim > high) { throw new Error ('These cans do not fit the ' + design.name + ' collar: rim Ø ' + (2 * rim).toFixed (1) + ' mm (the design needs ' + low + '–' + high + ' mm). Choose Custom fit.'); }
+        holeRadius = design.tipDiameterMm / 2; tuckMm = rim - holeRadius; tabs = design.tabs; notchWidthMm = design.notchWidthMm;
+    }
     // Reliefs reach past the rim, but always leave a web of board between neighbouring holes.
     let nearest = Infinity;
     for (let i = 0; i < cans.length; i++) { for (let j = i + 1; j < cans.length; j++) { nearest = Math.min (nearest, Math.hypot (cans[i][0] - cans[j][0], cans[i][1] - cans[j][1])); } }
     if (nearest < 2 * rim + webMm) { throw new Error ('The cans are too close: their rims need ' + (2 * rim + webMm).toFixed (1) + ' mm between centres (now ' + nearest.toFixed (1) + ' mm).'); }
-    const reliefRadius = Math.min (rim + reliefMm, (nearest - webMm) / 2);
+    const reliefRadius = design ? design.reliefDiameterMm / 2 : Math.min (rim + reliefMm, (nearest - webMm) / 2);
+    if (design && nearest < 2 * reliefRadius + webMm - 1e-9) { throw new Error ('Space the cans at least ' + (2 * reliefRadius + webMm).toFixed (1) + ' mm apart (centre to centre) for the ' + design.name + ' collar.'); }
     if (reliefRadius < rim + 0.3) { throw new Error ('There is no room for relief slits between these cans. Space them further apart.'); }
     const tabCount = tabs || Math.max (8, Math.min (24, Math.round (2 * Math.PI * holeRadius / 11)));
     if (!Number.isInteger (tabCount) || tabCount < 4 || tabCount > 48) { throw new Error ('Use 4–48 tabs around each can (0 chooses automatically).'); }
@@ -107,9 +136,10 @@ export function CreateCanCollarPlan ({ cans, rimRadiusMm, neckRadiusMm = null, t
     const radius = Math.min (corner, (max[0] - min[0]) / 2, (max[1] - min[1]) / 2);
     const outline = RoundedRectangle (min, max, radius, { maxChordMm : 2.5 });
     // Spend the 2000-point design budget evenly across the holes: fewer points along each tab tip for big packs.
-    const perHole = (PointBudget - outline.length) / cans.length, tipPoints = Math.max (0, Math.min (3, Math.floor (perHole / tabCount) - 3));
+    const perHole = (PointBudget - outline.length) / cans.length, tipPoints = design ? design.tipPoints : Math.max (0, Math.min (3, Math.floor (perHole / tabCount) - 3));
+    if (design && tabCount * (3 + tipPoints) > perHole) { throw new Error ('The ' + design.name + ' collar holds up to ' + Math.floor ((PointBudget - outline.length) / (tabCount * (3 + tipPoints))) + ' cans.'); }
     if (tabCount * 3 > perHole) { throw new Error ('Too many tabs for ' + cans.length + ' cans. Use fewer tabs.'); }
-    if (neckRadiusMm !== null && automaticTuck) {
+    if (neckRadiusMm !== null && automaticTuck && !design) {
         // Tab tips are straight chords. Their inscribed radius, not just their vertex radius, must clear the neck.
         holeRadius = Math.max (holeRadius, (neckRadiusMm + CollarNeckClearanceMm) / Math.cos (Math.PI / tabCount / (tipPoints + 1)));
         tuckMm = rim - holeRadius;
@@ -118,7 +148,7 @@ export function CreateCanCollarPlan ({ cans, rimRadiusMm, neckRadiusMm = null, t
     const shift = p => [p[0] - min[0], p[1] - min[1]];
     const holes = cans.map ((can, i) => ({ id : 'can-' + (i + 1), type : 'cut', closed : true, points : ReliefHoleOutline ({ center : [can[0], -can[1]], holeRadius, reliefRadius, tabs : tabCount, notchWidthMm, tipPoints, rotation : Math.PI / tabCount }).map (shift) }));
     const innerRadius = HoleInnerRadius (holes[0].points, shift ([cans[0][0], -cans[0][1]]));
-    if (neckRadiusMm !== null && innerRadius < neckRadiusMm + CollarNeckClearanceMm - 1e-7) { throw new Error ('This tuck intersects the can neck through the collar thickness. Reduce tuck or leave it blank for automatic fit.'); }
+    if (neckRadiusMm !== null && innerRadius < neckRadiusMm + CollarNeckClearanceMm - 1e-7) { throw new Error (design ? 'The ' + design.name + ' tabs would cut into this can neck. Choose Custom fit.' : 'This tuck intersects the can neck through the collar thickness. Reduce tuck or leave it blank for automatic fit.'); }
     const paths = [{ id : 'outline', type : 'cut', closed : true, points : outline.map (shift) }, ...holes];
     PackagingContours ({ version : 1, name, grade, thickness : t, paths }); // Throws if any hole crosses the outline or another hole.
     // Measurement layer: overall length and width across the outline, and the first hole's tab tip and relief
@@ -133,7 +163,7 @@ export function CreateCanCollarPlan ({ cans, rimRadiusMm, neckRadiusMm = null, t
     const engineering = DefaultEngineering ({ version : 1, name, grade, thickness : t, paths : [] });
     engineering.materials[0] = { ...engineering.materials[0], name : grade === 'Custom' ? engineering.materials[0].name : grade };
     engineering.dimensions = references.map (ref => ({ ...ref, mode : 'auto', basis : 'score', targetMm : null, toleranceMm : null }));
-    const profile = ValidatePackaging ({ version : 1, name, grade, thickness : t, paths, engineering });
+    const profile = ValidatePackaging ({ version : 1, name, grade, thickness : t, paths, engineering, ...(print ? { print } : {}) });
     const lengthMm = max[0] - min[0], widthMm = max[1] - min[1];
-    return { version : 1, units : 'mm', kind : 'can-collar', cans : cans.length, thicknessMm : t, rimRadiusMm : rim, holeRadiusMm : holeRadius, reliefRadiusMm : reliefRadius, tuckMm, requestedTuckMm, automaticTuck, neckRadiusMm, neckClearanceMm : neckRadiusMm === null ? null : innerRadius - neckRadiusMm, tabs : tabCount, notchWidthMm, cornerRadiusMm : radius, marginMm, webMm : Math.min (...cans.flatMap ((a, i) => cans.slice (i + 1).map (b => Math.hypot (a[0] - b[0], a[1] - b[1]) - 2 * reliefRadius)), Infinity), sizeMm : { length : lengthMm, width : widthMm }, worldMinMm : [min[0], -max[1]], points : profile.paths.reduce ((sum, p) => sum + p.points.length, 0), profile };
+    return { version : 1, units : 'mm', kind : 'can-collar', standard : design ? { id : design.id, name : design.name, tipDiameterMm : design.tipDiameterMm, reliefDiameterMm : design.reliefDiameterMm, tabs : design.tabs, tabHeightMm : design.tabHeightMm, tabWidthMm : design.tabWidthMm, notchWidthMm : design.notchWidthMm } : null, cans : cans.length, thicknessMm : t, rimRadiusMm : rim, holeRadiusMm : holeRadius, reliefRadiusMm : reliefRadius, tuckMm, requestedTuckMm, automaticTuck, neckRadiusMm, neckClearanceMm : neckRadiusMm === null ? null : innerRadius - neckRadiusMm, tabs : tabCount, notchWidthMm, cornerRadiusMm : radius, marginMm, webMm : Math.min (...cans.flatMap ((a, i) => cans.slice (i + 1).map (b => Math.hypot (a[0] - b[0], a[1] - b[1]) - 2 * reliefRadius)), Infinity), sizeMm : { length : lengthMm, width : widthMm }, worldMinMm : [min[0], -max[1]], points : profile.paths.reduce ((sum, p) => sum + p.points.length, 0), profile };
 }

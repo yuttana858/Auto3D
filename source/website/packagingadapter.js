@@ -9,6 +9,7 @@ import { RGBColor } from '../engine/model/color.js';
 import { Unit } from '../engine/model/unit.js';
 import { CloneSurface } from './scenedocument.js';
 import { Matrix4, BufferGeometry, Float32BufferAttribute } from 'three';
+import { PrintTextureFor } from './boardprint.js';
 
 export const PackagingUnitMM = { [Unit.Millimeter] : 1, [Unit.Centimeter] : 10, [Unit.Meter] : 1000, [Unit.Inch] : 25.4, [Unit.Foot] : 304.8 };
 function PackagingTexture (definition)
@@ -42,6 +43,15 @@ export function PackagingModel (data, unit = Unit.Millimeter, surfaces = {})
     const factor = PackagingUnitMM[unit]; if (!factor) { throw new Error ('Set known scene units before adding packaging geometry.'); }
     const model = new Model (); model.SetUnit (unit);
     for (const definition of data.materials) {
+        // Printed artwork: the image comes from the print resources (or the board's existing print material),
+        // never from a reused surface, so new artwork replaces the old one.
+        if (definition.role === 'print') {
+            const material = new PhysicalMaterial (); material.name = definition.name; material.color = new RGBColor (...definition.color); material.boardSurfaceRole = 'print';
+            for (const key of ['roughness', 'metalness']) { if (definition[key] !== undefined) { material[key] = definition[key]; } }
+            const texture = PrintTextureFor (definition.printResource, definition.printMime, surfaces.print?.diffuseMap);
+            if (texture) { material.diffuseMap = PackagingTexture (texture); }
+            model.AddMaterial (material); continue;
+        }
         if (surfaces[definition.role]) {
             const material = CloneSurface (surfaces[definition.role]); material.boardSurfaceRole = definition.role;
             if (material.boardFluteLinked) { for (const key of ['normalMap', 'bumpMap']) { if (definition[key]) { material[key] = PackagingTexture (definition[key]); } } }
@@ -94,7 +104,7 @@ export function FefcoSurfaces (model)
     const indices = area.map ((value, index) => ({ value, index })).sort ((a, b) => b.value - a.value).filter (item => item.value > 0);
     if (!indices.length) { throw new Error ('The selected box has no board material.'); }
     const tagged = Object.fromEntries (model.materials.filter (material => material.boardSurfaceRole).map (material => [material.boardSurfaceRole, material]));
-    return { liner : tagged.liner || model.materials[indices[0].index], edge : tagged.edge || model.materials[(indices[1] || indices[0]).index], ...(tagged.inner ? { inner : tagged.inner } : {}), ...(tagged.closed ? { closed : tagged.closed } : {}) };
+    return { liner : tagged.liner || model.materials[indices[0].index], edge : tagged.edge || model.materials[(indices[1] || indices[0]).index], ...(tagged.inner ? { inner : tagged.inner } : {}), ...(tagged.closed ? { closed : tagged.closed } : {}), ...(tagged.print ? { print : tagged.print } : {}) };
 }
 
 // Replace GPU buffers only. Engine meshes remain the canonical source for CAD,

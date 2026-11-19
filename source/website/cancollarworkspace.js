@@ -1,5 +1,5 @@
 import { DropIn } from './dropin.js';
-import { SenseCanRim, CanRadiusInSlab, CreateCanCollarPlan, CollarBoards, DefaultCollarOptions, MaxCollarCans, CollarNeckClearanceMm } from '../../modules/packaging/src/cancollar.js';
+import { SenseCanRim, CanRadiusInSlab, CreateCanCollarPlan, CollarBoards, CollarStandards, DefaultCollarOptions, MaxCollarCans, CollarNeckClearanceMm } from '../../modules/packaging/src/cancollar.js';
 import { LoadPackagingModule, PackagingUnitMM } from './packagingadapter.js';
 import { AddBoardPiece, AccessoryData } from './accessoriesworkspace.js';
 
@@ -14,13 +14,14 @@ export class CanCollarWorkspace
     constructor (packaging) { this.packaging = packaging; this.editor = packaging.editor; }
     Options (input = {})
     {
-        const allowed = ['boardId', 'tuckMm', 'reliefMm', 'marginMm', 'cornerRadiusMm', 'tabs', 'notchWidthMm'];
+        const allowed = ['design', 'boardId', 'tuckMm', 'reliefMm', 'marginMm', 'cornerRadiusMm', 'tabs', 'notchWidthMm'];
         const unknown = Object.keys (input || {}).find (key => !allowed.includes (key)); if (unknown) { throw new Error ('Unknown can collar option: ' + unknown + '.'); }
-        const options = { ...DefaultCollarOptions, ...input };
+        const options = { ...DefaultCollarOptions, design : 'auto', ...input };
+        if (!['auto', 'custom', ...CollarStandards.map (d => d.id)].includes (options.design)) { throw new Error ('Choose a collar design: auto, custom or ' + CollarStandards.map (d => d.id).join (', ') + '.'); }
         const board = CollarBoards.find (b => b.id === options.boardId); if (!board) { throw new Error ('Choose a collar board: ' + CollarBoards.map (b => b.id).join (', ') + '.'); }
         if (options.cornerRadiusMm !== null && (typeof options.cornerRadiusMm !== 'number' || !Number.isFinite (options.cornerRadiusMm) || options.cornerRadiusMm < 0)) { throw new Error ('Corner radius must be 0 mm or more (omit it to follow the corner cans).'); }
         if (!Number.isInteger (options.tabs) || options.tabs < 0 || options.tabs > 48) { throw new Error ('Tabs must be 0 (automatic) or 4–48.'); }
-        return { ...options, board, automaticTuck : !Object.hasOwn (input, 'tuckMm') };
+        return { ...options, board, automaticTuck : !Object.hasOwn (input, 'tuckMm'), explicitFit : ['tuckMm', 'reliefMm', 'tabs', 'notchWidthMm'].some (key => Object.hasOwn (input, key) && input[key] !== DefaultCollarOptions[key]) };
     }
     // The selected cans, each with its sensed rim in world mm.
     Cans ()
@@ -55,20 +56,47 @@ export class CanCollarWorkspace
         if (Math.max (...bottoms) - Math.min (...bottoms) > 1) { throw new Error ('The cans stand at different heights. Set them on the same floor first.'); }
         return { document, factor, cans, rimRadiusMm : Math.max (...rims), rimBottomMm : Math.min (...bottoms) };
     }
+    // Universal design for these cans: a named standard, or for 'auto' the standard whose rim range fits.
+    Design (c, options)
+    {
+        if (options.design === 'custom') { return null; }
+        if (options.design !== 'auto') { return options.design; }
+        // Explicit tuck, relief or tab values ask for a custom fit.
+        if (options.explicitFit) { return null; }
+        return CollarStandards.find (d => 2 * c.rimRadiusMm >= d.rimDiameterMm[0] && 2 * c.rimRadiusMm <= d.rimDiameterMm[1])?.id || null;
+    }
     Plan (c, options)
     {
-        const name = 'Can collar · ' + c.cans.length + (c.cans.length === 1 ? ' can' : ' cans');
+        const standard = this.Design (c, options), design = CollarStandards.find (d => d.id === standard);
+        const name = (design ? design.name.split (' · ')[0] + ' collar' : 'Can collar') + ' · ' + c.cans.length + (c.cans.length === 1 ? ' can' : ' cans');
         const topMm = c.rimBottomMm - CollarNeckClearanceMm;
         const neckRadiusMm = Math.max (...c.cans.map (can => CanRadiusInSlab (can.triangles, can.rim.center, topMm - options.board.caliperMm, topMm)));
-        return { ...CreateCanCollarPlan ({ cans : c.cans.map (can => can.rim.center), rimRadiusMm : c.rimRadiusMm, neckRadiusMm, thickness : options.board.caliperMm, tuckMm : options.automaticTuck ? null : options.tuckMm, reliefMm : options.reliefMm, marginMm : options.marginMm, cornerRadiusMm : options.cornerRadiusMm, tabs : options.tabs, notchWidthMm : options.notchWidthMm, name, grade : options.board.name }), topMm };
+        const plan = (id, title) => CreateCanCollarPlan ({ cans : c.cans.map (can => can.rim.center), rimRadiusMm : c.rimRadiusMm, neckRadiusMm, thickness : options.board.caliperMm, tuckMm : options.automaticTuck ? null : options.tuckMm, reliefMm : options.reliefMm, marginMm : options.marginMm, cornerRadiusMm : options.cornerRadiusMm, tabs : options.tabs, notchWidthMm : options.notchWidthMm, name : title, grade : options.board.name, standard : id, print : { version : 1, ground : options.board.ground } });
+        // Automatic: the universal design when it fits these cans, otherwise a custom fit (with the reason).
+        if (standard && options.design === 'auto') {
+            try { return { ...plan (standard, name), topMm }; }
+            catch (error) { return { ...plan (null, 'Can collar · ' + c.cans.length + (c.cans.length === 1 ? ' can' : ' cans')), topMm, standardRefused : error.message }; }
+        }
+        return { ...plan (standard, name), topMm };
+    }
+    // Opens the CAD designer on the collar of the selected cans (or the selected collar), at its Print section.
+    EditArtwork ()
+    {
+        const editor = this.editor, document = editor.document, selected = editor.SelectedObjects ? editor.SelectedObjects () : [editor.selected];
+        const ids = new Set (selected.filter (Boolean).map (object => object.id));
+        const collar = selected.find (object => AccessoryData (object)?.kind === 'collar') || document.objects.find (object => AccessoryData (object)?.kind === 'collar' && AccessoryData (object).canIds?.some (id => ids.has (id)));
+        if (!collar) { throw new Error ('Select a can pack with a collar (or the collar) to edit its artwork.'); }
+        editor.Select ? editor.Select (collar, false, false, true) : (editor.selected = collar);
+        const result = this.packaging.OpenSelected ();
+        return { ...result, objectId : collar.id, message : 'Collar opened in CAD: use Print to set the board top and artwork.' };
     }
     Inspect (input = {})
     {
-        const boards = CollarBoards.map (b => ({ ...b }));
+        const boards = CollarBoards.map (b => ({ ...b })), designs = CollarStandards.map (d => ({ id : d.id, name : d.name, tabs : d.tabs, tipDiameterMm : d.tipDiameterMm, reliefDiameterMm : d.reliefDiameterMm, notchWidthMm : d.notchWidthMm, rimDiameterMm : [...d.rimDiameterMm] }));
         let options, c;
         try { options = this.Options (input); c = this.Cans (); }
-        catch (error) { return { available : false, reason : error.message, boards, defaults : { ...DefaultCollarOptions } }; }
-        const rim = c.cans[0].rim, result = { available : true, units : 'mm', boards, defaults : { ...DefaultCollarOptions }, cans : c.cans.length, canIds : c.cans.map (can => can.object.id), rim : { radiusMm : c.rimRadiusMm, bottomMm : c.rimBottomMm, heightMm : rim.rimHeightMm, neckRadiusMm : rim.neckRadiusMm, undercutMm : rim.undercutMm, canDiameterMm : rim.diameterMm, canHeightMm : rim.heightMm } };
+        catch (error) { return { available : false, reason : error.message, boards, designs, defaults : { ...DefaultCollarOptions, design : 'auto' } }; }
+        const rim = c.cans[0].rim, result = { available : true, units : 'mm', boards, designs, defaults : { ...DefaultCollarOptions, design : 'auto' }, cans : c.cans.length, canIds : c.cans.map (can => can.object.id), rim : { radiusMm : c.rimRadiusMm, bottomMm : c.rimBottomMm, heightMm : rim.rimHeightMm, neckRadiusMm : rim.neckRadiusMm, undercutMm : rim.undercutMm, canDiameterMm : rim.diameterMm, canHeightMm : rim.heightMm } };
         try { const { profile, ...plan } = this.Plan (c, options); result.collar = { ...plan, board : options.board.name, profile : profile.name }; }
         catch (error) { result.available = false; result.reason = error.message; }
         return result;
@@ -92,7 +120,7 @@ export class CanCollarWorkspace
             // Keep a small axial gap below the rim; the full board slab and tab chords clear each neck.
             const min = [plan.worldMinMm[0], plan.topMm - plan.thicknessMm, plan.worldMinMm[1]];
             collar = AddBoardPiece (module, target, plan.profile, material, { upright : false, runsAlongX : true, min }, c.factor, plan.profile.name, 'Accessory · can collar');
-            collar.userData = { ...group, [AccessoryKey] : JSON.stringify ({ version : 1, kind : 'collar', canIds : cans.map (can => can.id), boardId : options.board.id, boardName : options.board.name, thicknessMm : plan.thicknessMm, rimRadiusMm : plan.rimRadiusMm, holeRadiusMm : plan.holeRadiusMm, reliefRadiusMm : plan.reliefRadiusMm, tuckMm : plan.tuckMm, tabs : plan.tabs }) };
+            collar.userData = { ...group, [AccessoryKey] : JSON.stringify ({ version : 1, kind : 'collar', canIds : cans.map (can => can.id), design : plan.standard?.id || 'custom', boardId : options.board.id, boardName : options.board.name, thicknessMm : plan.thicknessMm, rimRadiusMm : plan.rimRadiusMm, holeRadiusMm : plan.holeRadiusMm, reliefRadiusMm : plan.reliefRadiusMm, tuckMm : plan.tuckMm, tabs : plan.tabs }) };
             cans.forEach (can => { can.userData = { ...can.userData, ...group }; });
             unchanged ();
             // Hidden through the rebuild, then lowered onto the cans like the other accessories.

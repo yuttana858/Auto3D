@@ -18,6 +18,9 @@ import { LoadPackagingModule, PackagingModel, FefcoSurfaces, ApplyFefcoFoldPose,
 import { FoldMotionProgress, FoldCameraFrame, CameraBottomInset, VisibleBounds } from './foldcamera.js';
 import { EaseMotion } from '../../modules/packaging/src/easing.js';
 import { FilletPolygon, CircleOutline, ReliefHoleOutline } from '../../modules/packaging/src/cadshapes.js';
+import { ValidatePrint, FitArtwork } from '../../modules/packaging/src/print.js';
+import { StandardReliefHole, CollarStandard } from '../../modules/packaging/src/cancollar.js';
+import { PrintResources, ImportPrintImage, DemoPrintArtwork, PrintImageURL, RegisterPrintResources } from './boardprint.js';
 import { ApplyCameraState } from './sessiontimeline.js';
 
 
@@ -29,7 +32,7 @@ export class PackagingWorkspace
 {
     constructor (editor) { this.editor = editor; this.autoPack = new AutoPackWorkspace (this); this.autoPallet = new AutoPalletWorkspace (this); this.accessories = new AccessoriesWorkspace (this); this.canCollar = new CanCollarWorkspace (this); this.presentation = new FoldPresentation (editor); this.dialog = null; this.refreshing = false; this.draft = []; this.active = null; this.selectedPaths = new Set (); this.cadTool = 'select'; this.cadFace = 'inside'; this.creaseProcess = { kind : 'crease' }; this.linkedObjectId = null; this.draftType = 'cut'; this.gridSnapMM = 5; this.displayFactor = 1; this.view = { x : -20, y : -220, width : 340, height : 240 }; }
     Design () { return this.editor.document.packaging || NewPackagingDesign (); }
-    PanelHost () { return { autoInspect : options => this.autoPack.Inspect (options || null), autoPack : options => this.autoPack.Generate (options || {}), autoStyles : () => this.autoPack.Styles (), autoStyle : code => this.autoPack.SetStyle (code), autoRefresh : options => this.autoPack.RefreshBounds (options || {}), autoTop : () => AutoPackTopState (this.editor.selected), toggleTop : () => this.ToggleTop (), palletInspect : options => this.autoPallet.Inspect (options), accessoriesInspect : options => this.accessories.Inspect (options), accessoryBoards : () => this.accessories.Boards (), addPads : options => this.accessories.AddPads (options), addPartitions : options => this.accessories.AddPartitions (options), collarInspect : options => this.canCollar.Inspect (options || {}), addCollar : options => this.canCollar.Add (options || {}), autoPallet : options => this.autoPallet.Generate (options), boards : () => this.BoardInspect (), generationBoard : () => this.generationBoard?.id || null, generationBasis : () => this.generationBasis || 'inside', setGenerationBasis : basis => this.SetGenerationBasis (basis), convertGenerationBasis : changes => this.ConvertGenerationBasis (changes), selectBoard : (id, target) => this.SelectBoard (id, target), boardEditor : () => this.OpenBoardDatabase (), appearance : () => this.AppearanceInspect (), updateAppearance : changes => this.UpdateAppearance (changes), dimensions : () => this.DimensionsInspect (), updateBoardDirection : degrees => this.UpdateBoardDirection (degrees), dimensionMode : basis => this.DimensionMode (basis), updateDimensions : changes => this.UpdateDimensions (changes), dimensionsBlocked : () => this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false || this.editor.busy && !this.dimensionUpdating, inspect : () => this.FefcoInspect (), configure : changes => this.ConfigureFefco (changes), generate : changes => this.GenerateFefco (changes), preset : (code, changes) => this.GeneratePreset (code, changes), designer : () => this.OpenSelected (), measurements : () => { this.OpenSelected (); return this.OpenMeasurements (); }, unfold : () => this.UnfoldSelected (), scrub : (progress, commit) => this.SetFoldScrub (progress, commit), scrubInspect : () => this.FoldScrubInspect (), animate : () => this.AnimateFold (), toggleFold : () => this.ToggleFold (), playbackBlocked : () => this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false, animation : () => this.AnimationInspect (), playback : () => this.FoldInspect (), control : action => this.FoldControl (action), canAnimate : () => Boolean (this.editor.selected?.userData?._auto3dFefco), factor : () => this.Factor (), run : action => this.editor.Run (action), blocked : () => this.editor.busy || this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false, canUnfold : () => this.CanUnfold () }; }
+    PanelHost () { return { autoInspect : options => this.autoPack.Inspect (options || null), autoPack : options => this.autoPack.Generate (options || {}), autoStyles : () => this.autoPack.Styles (), autoStyle : code => this.autoPack.SetStyle (code), autoRefresh : options => this.autoPack.RefreshBounds (options || {}), autoTop : () => AutoPackTopState (this.editor.selected), toggleTop : () => this.ToggleTop (), palletInspect : options => this.autoPallet.Inspect (options), accessoriesInspect : options => this.accessories.Inspect (options), accessoryBoards : () => this.accessories.Boards (), addPads : options => this.accessories.AddPads (options), addPartitions : options => this.accessories.AddPartitions (options), collarInspect : options => this.canCollar.Inspect (options || {}), addCollar : options => this.canCollar.Add (options || {}), editCollarArtwork : () => this.canCollar.EditArtwork (), autoPallet : options => this.autoPallet.Generate (options), boards : () => this.BoardInspect (), generationBoard : () => this.generationBoard?.id || null, generationBasis : () => this.generationBasis || 'inside', setGenerationBasis : basis => this.SetGenerationBasis (basis), convertGenerationBasis : changes => this.ConvertGenerationBasis (changes), selectBoard : (id, target) => this.SelectBoard (id, target), boardEditor : () => this.OpenBoardDatabase (), appearance : () => this.AppearanceInspect (), updateAppearance : changes => this.UpdateAppearance (changes), dimensions : () => this.DimensionsInspect (), updateBoardDirection : degrees => this.UpdateBoardDirection (degrees), dimensionMode : basis => this.DimensionMode (basis), updateDimensions : changes => this.UpdateDimensions (changes), dimensionsBlocked : () => this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false || this.editor.busy && !this.dimensionUpdating, inspect : () => this.FefcoInspect (), configure : changes => this.ConfigureFefco (changes), generate : changes => this.GenerateFefco (changes), preset : (code, changes) => this.GeneratePreset (code, changes), designer : () => this.OpenSelected (), measurements : () => { this.OpenSelected (); return this.OpenMeasurements (); }, unfold : () => this.UnfoldSelected (), scrub : (progress, commit) => this.SetFoldScrub (progress, commit), scrubInspect : () => this.FoldScrubInspect (), animate : () => this.AnimateFold (), toggleFold : () => this.ToggleFold (), playbackBlocked : () => this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false, animation : () => this.AnimationInspect (), playback : () => this.FoldInspect (), control : action => this.FoldControl (action), canAnimate : () => Boolean (this.editor.selected?.userData?._auto3dFefco), factor : () => this.Factor (), run : action => this.editor.Run (action), blocked : () => this.editor.busy || this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false, canUnfold : () => this.CanUnfold () }; }
     AppearanceInspect ()
     {
         const object = this.editor.selected; const profile = object?.packagingProfile;
@@ -520,6 +523,69 @@ export class PackagingWorkspace
         const points = ReliefHoleOutline ({ center : center.map (v => v * factor), holeRadius : holeRadius * factor, reliefRadius : reliefRadius * factor, tabs, notchWidthMm : notchWidth * factor, rotation : Math.PI / tabs });
         const result = this.AddPath (points, 'cut', true, 'mm'); this.Message ('Relief hole added · ' + tabs + ' tabs'); return { ...result, tabs, holeRadiusMm : holeRadius * factor, reliefRadiusMm : reliefRadius * factor };
     }
+    // The universal 12 oz collar hole (or another collar standard) as a cut outline at center. One Undo step.
+    AddStandardHole ({ center, standard = '12oz-202', units = 'display' } = {})
+    {
+        const factor = units === 'mm' ? 1 : this.Factor (), s = CollarStandard (standard);
+        const result = this.AddPath (StandardReliefHole (standard, center.map (v => v * factor)), 'cut', true, 'mm'); this.Message (s.name + ' collar hole added'); return { ...result, standard : s.id, tabs : s.tabs, tipDiameterMm : s.tipDiameterMm, reliefDiameterMm : s.reliefDiameterMm };
+    }
+    // Print: white or natural top and artwork on the dieline. Changes apply to the linked flat board at once,
+    // as one Undo step with the drawing change.
+    PrintInspect ()
+    {
+        const design = ValidatePackaging (this.Design ()), bounds = design.paths.length ? PackagingBounds (design) : null, linked = this.PrintTarget ();
+        const artwork = design.print?.artwork || null;
+        return { print : design.print || null, units : 'mm', dielineMm : bounds, artworkLoaded : artwork ? PrintResources.has (artwork.resourceId) : null, linkedObjectId : linked?.id || null, rendersOnModel : Boolean (linked), note : linked || !this.linkedObjectId ? undefined : 'Print shows on flat boards (collars, pads and custom dielines); folded boxes keep it in the profile.' };
+    }
+    PrintTarget ()
+    {
+        const object = this.editor.document.objects.find (item => item.id === this.linkedObjectId);
+        return object?.packagingProfile && !object.userData?._auto3dFefco ? object : null;
+    }
+    async PrintChange (change, message)
+    {
+        this.Editable (); if (this.draft.length) { throw new Error ('Finish or cancel the current path first.'); }
+        const design = ValidatePackaging (this.Design ()); if (!design.paths.length) { throw new Error ('Draw or load a dieline before adding print.'); }
+        const print = change (design.print ? structuredClone (design.print) : { version : 1, ground : 'natural' }, design), next = { ...design };
+        if (print && (print.ground !== 'natural' || print.artwork)) { next.print = ValidatePrint (print); } else { delete next.print; }
+        if (JSON.stringify (next) === JSON.stringify (design)) { return { ...this.PrintInspect (), changed : false }; }
+        const editor = this.editor, start = editor.history.undo.length, target = this.PrintTarget ();
+        this.Change (next); let applied = null;
+        if (target) {
+            try { applied = await this.ApplyCAD ('auto', target.id); }
+            catch (error) { await editor.history.Undo?.(); throw error; }
+            editor.history.Group (start);
+        }
+        this.Draw?.(); this.Message (message + (applied?.updated ? ' · model updated' : '')); return { ...this.PrintInspect (), changed : true, applied };
+    }
+    SetPrintGround (ground) { return this.PrintChange (print => ({ ...print, ground }), ground === 'white' ? 'White top' : 'Natural board top'); }
+    // Places a registered image on the dieline: fit cover (default), contain or stretch over the dieline bounds.
+    SetArtwork (resource, fit = 'cover')
+    {
+        return this.PrintChange ((print, design) => ({ ...print, artwork : { resourceId : resource.resourceId, mime : resource.mime, name : resource.name, widthPx : resource.widthPx, heightPx : resource.heightPx, ...FitArtwork (resource, PackagingBounds (design), fit) } }), 'Artwork placed · ' + resource.name);
+    }
+    PlaceArtwork ({ fit = null, xMm, yMm, widthMm, heightMm } = {})
+    {
+        return this.PrintChange ((print, design) => {
+            if (!print.artwork) { throw new Error ('Add artwork before placing it.'); }
+            const place = fit ? FitArtwork (print.artwork, PackagingBounds (design), fit) : { xMm : xMm ?? print.artwork.xMm, yMm : yMm ?? print.artwork.yMm, widthMm : widthMm ?? print.artwork.widthMm, heightMm : heightMm ?? print.artwork.heightMm };
+            return { ...print, artwork : { ...print.artwork, ...place } };
+        }, 'Artwork moved');
+    }
+    ClearArtwork () { return this.PrintChange (print => { const next = { ...print }; delete next.artwork; return next; }, 'Artwork removed'); }
+    async ImportArtwork (buffer, name, fit = 'cover') { this.Editable (); return this.SetArtwork (await ImportPrintImage (buffer, name), fit); }
+    async DemoArtwork ({ title, subtitle, fit = 'cover' } = {})
+    {
+        this.Editable (); const design = ValidatePackaging (this.Design ()); if (!design.paths.length) { throw new Error ('Draw or load a dieline before adding print.'); }
+        const b = PackagingBounds (design); return this.SetArtwork (await DemoPrintArtwork ({ widthMm : b.maxX - b.minX, heightMm : b.maxY - b.minY, ...(title ? { title } : {}), ...(subtitle ? { subtitle } : {}) }), fit);
+    }
+    OpenArtworkFile ()
+    {
+        this.Editable ();
+        if (!this.artworkInput) { this.artworkInput = Object.assign (document.createElement ('input'), { type : 'file', accept : 'image/png,image/jpeg,image/webp', hidden : true }); this.artworkInput.addEventListener ('change', () => { const file = this.artworkInput.files?.[0]; this.artworkInput.value = ''; if (file) { this.Run (async () => this.ImportArtwork (await file.arrayBuffer (), file.name)); } }); }
+        if (!this.artworkInput.isConnected) { (this.dialog || document.body).appendChild (this.artworkInput); }
+        this.artworkInput.click (); return { opened : true, interactive : true };
+    }
     EditPath (id, changes, units = 'display')
     {
         const design = ValidatePackaging (this.Design ()); const path = design.paths.find ((item) => item.id === id); if (!path) { throw new Error ('Choose an existing path.'); }
@@ -558,13 +624,14 @@ export class PackagingWorkspace
     {
         const profile = this.editor.selected?.packagingProfile; if (!profile) { throw new Error ('Select a board created from a packaging profile.'); }
         const saved = this.editor.selected.userData?._auto3dFefco; const fefco = saved ? ValidateFefco (JSON.parse (saved)) : null;
+        RegisterPrintResources (this.editor.document.CompactModel ([this.editor.selected], true));
         this.linkedObjectId = this.editor.selected.id; this.selectedPaths.clear (); this.active = null; this.draft = []; const result = this.Change (profile); if (fefco) { this.fefco = fefco; this.Refresh (); } return result;
     }
     OpenSelected ()
     {
         this.Editable (); const object = this.editor.selected;
         if (!object?.packagingProfile) { throw new Error ('Select a generated packaging box or dieline.'); }
-        const profile = ValidatePackaging (object.packagingProfile); this.linkedObjectId = object.id;
+        const profile = ValidatePackaging (object.packagingProfile); this.linkedObjectId = object.id; RegisterPrintResources (this.editor.document.CompactModel ([object], true));
         if (JSON.stringify (this.Design ()) !== JSON.stringify (profile)) { this.LoadSelected (); }
         const result = this.Open (); this.Fit (); return { ...result, objectId : object.id, profilePaths : profile.paths.length };
     }
@@ -656,7 +723,7 @@ export class PackagingWorkspace
         const index = target.objects.indexOf (source);
         try {
             const module = await LoadPackagingModule ();
-            const data = parameters ? (flat ? module.UnfoldFefco (parameters, next) : module.CreateFefcoBox (parameters, next)) : module.CreateBoard (next, { textured : true, guides : true }); data.profile = next;
+            const data = parameters ? (flat ? module.UnfoldFefco (parameters, next) : module.CreateFefcoBox (parameters, next)) : module.CreateBoard (next, { textured : true, guides : !source.userData?._auto3dAccessory }); data.profile = next;
             if (editor.readOnly || editor.website.accountReady === false || editor.document !== target || editor.website.auth.user?.id !== account || !target.objects.includes (source) || JSON.stringify (this.Design ()) !== JSON.stringify (before)) { throw new Error ('The workspace or account changed during Apply.'); }
             const model = PackagingModel (data, target.model.GetUnit (), FefcoSurfaces (target.CompactModel ([source], true)));
             replacement = target.AddImported (model, source.name);
@@ -725,6 +792,22 @@ export class PackagingWorkspace
         action ('Round selected corners', () => this.RoundCorners ({ radius : this.shapeRadius.valueAsNumber }), shapeActions);
         action ('Add circle', () => this.AddCircle ({ center : [this.x.valueAsNumber, this.y.valueAsNumber], radius : this.shapeRadius.valueAsNumber, type : this.draftType }), shapeActions);
         action ('Add relief hole', () => this.AddReliefHole ({ center : [this.x.valueAsNumber, this.y.valueAsNumber], holeRadius : this.shapeRadius.valueAsNumber, reliefRadius : this.reliefRadius.valueAsNumber, tabs : this.reliefTabs.valueAsNumber, notchWidth : 1.2 / this.Factor () }), shapeActions);
+        action ('Add 12 oz collar hole', () => this.AddStandardHole ({ center : [this.x.valueAsNumber, this.y.valueAsNumber], standard : '12oz-202' }), shapeActions);
+        const printSection = Element ('details', tools, undefined, 'packaging_print_tools'); printSection.open = true; Element ('summary', printSection, 'Print: board top and artwork');
+        Element ('p', printSection, 'The printed top of the board. Artwork is cropped by the cut lines and updates the linked board in 3D (collars, pads and custom dielines).', 'section_hint');
+        const groundLabel = Element ('label', printSection, 'Board top'); this.printGround = Element ('select', groundLabel); this.printGround.setAttribute ('aria-label', 'Board top');
+        this.printGround.add (new Option ('Natural kraft', 'natural')); this.printGround.add (new Option ('White top', 'white'));
+        this.printGround.addEventListener ('change', () => this.Run (() => this.SetPrintGround (this.printGround.value)));
+        const printActions = Element ('div', printSection, undefined, 'packaging_actions');
+        action ('Load artwork…', () => this.OpenArtworkFile (), printActions); action ('Demo artwork', () => this.DemoArtwork (), printActions);
+        action ('Fit to dieline', () => this.PlaceArtwork ({ fit : 'cover' }), printActions); action ('Remove artwork', () => this.ClearArtwork (), printActions);
+        const placement = Element ('div', printSection, undefined, 'packaging_vertices'); this.artworkFields = {};
+        for (const [key, title] of [['xMm', 'Artwork X'], ['yMm', 'Artwork Y'], ['widthMm', 'Artwork width'], ['heightMm', 'Artwork height']]) {
+            const label = Element ('label', placement, title); const input = Element ('input', label); input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', title);
+            input.addEventListener ('change', () => this.Run (() => { const value = input.valueAsNumber * this.Factor (); if (Number.isFinite (value)) { return this.PlaceArtwork ({ [key] : value }); } }));
+            this.artworkFields[key] = input;
+        }
+        this.artworkLine = Element ('p', printSection, '', 'section_hint');
         const finish = Element ('div', tools, undefined, 'packaging_actions'); action ('Finish open path', () => this.Finish (false), finish); action ('Close outline', () => this.Finish (true), finish);
         action ('Remove last point', () => this.RemoveDraftPoint ()); action ('Cancel current path', () => this.CancelDraft ());
         this.snap = field ('Grid snap'); this.snap.type = 'number'; this.snap.step = 'any'; this.snap.min = '0'; this.snap.value = String (this.gridSnapMM / this.Factor ());
@@ -776,7 +859,12 @@ export class PackagingWorkspace
     RenderControls ()
     {
         const factor = this.Factor (); if (factor !== this.displayFactor) { for (const input of [this.x, this.y]) { if (Number.isFinite (input.valueAsNumber)) { input.value = String (Number ((input.valueAsNumber * this.displayFactor / factor).toFixed (6))); } } this.displayFactor = factor; } this.snap.value = String (Number ((this.gridSnapMM / factor).toFixed (6)));
-        const design = this.Design (); this.name.value = design.name; this.thickness.value = String (Number ((design.thickness / this.Factor ()).toFixed (6))); this.grade.value = Object.hasOwn (BoardCalipers, design.grade) ? design.grade : 'Custom';
+        const design = this.Design (); this.name.value = design.name;
+        if (this.printGround) {
+            const print = design.print, artwork = print?.artwork; this.printGround.value = print?.ground || 'natural';
+            for (const [key, input] of Object.entries (this.artworkFields)) { input.disabled = !artwork; if (document.activeElement !== input) { input.value = artwork ? String (Number ((artwork[key] / this.Factor ()).toFixed (4))) : ''; } }
+            this.artworkLine.textContent = artwork ? artwork.name + ' · ' + artwork.widthPx + ' × ' + artwork.heightPx + ' px' + (PrintResources.has (artwork.resourceId) ? '' : ' · image not loaded in this window') : 'No artwork';
+        } this.thickness.value = String (Number ((design.thickness / this.Factor ()).toFixed (6))); this.grade.value = Object.hasOwn (BoardCalipers, design.grade) ? design.grade : 'Custom';
         this.units.textContent = 'X/Y and thickness in ' + DisplayUnitLabel (this.editor.website.preferences.units) + ' · scroll to zoom · Enter to finish · Shift+Enter to close';
         for (const id of this.selectedPaths) { if (!design.paths.some (path => path.id === id)) { this.selectedPaths.delete (id); } } if (!design.paths.some ((path) => path.id === this.active)) { this.active = null; }
         if (this.processFields) { const fields = this.processFields; fields.type.value = this.creaseProcess.kind; fields.cut.value = String (this.creaseProcess.cutMm ?? 3); fields.tie.value = String (this.creaseProcess.tieMm ?? 1); fields.cut.closest ('.packaging_perforation_fields').hidden = !fields.type.value.includes ('perforation'); }
@@ -796,10 +884,22 @@ export class PackagingWorkspace
         const pattern = make ('pattern', { id : 'packaging_grid', width : grid, height : grid, patternUnits : 'userSpaceOnUse' }, make ('defs', {})); make ('path', { d : 'M' + grid + ' 0H0V' + grid, fill : 'none', stroke : 'var(--ov_border_color)', 'stroke-width' : this.view.width / 1200 }, pattern);
         make ('rect', { x : this.view.x, y : this.view.y, width : this.view.width, height : this.view.height, fill : 'url(#packaging_grid)' });
         make ('path', { d : 'M' + this.view.x + ' 0h' + this.view.width + 'M0 ' + this.view.y + 'v' + this.view.height, stroke : '#888', 'stroke-width' : this.view.width / 700 });
+        // Printed top: the board area (cut outlines, holes excluded) in its ground colour, and the artwork clipped to it.
+        const outlines = design.paths.filter (path => path.type === 'cut' && path.closed).map (path => path.points.map ((point, index) => (index ? 'L' : 'M') + faceX (point[0]) + ' ' + -point[1]).join (' ') + 'Z').join (' ');
+        if (outlines && design.print) {
+            make ('path', { d : outlines, 'fill-rule' : 'evenodd', fill : design.print.ground === 'white' ? '#fbfaf6' : '#c9a57322', stroke : 'none', 'pointer-events' : 'none' });
+            const artwork = design.print.artwork, url = artwork && PrintImageURL (artwork.resourceId);
+            if (url) {
+                const clip = make ('clipPath', { id : 'packaging_print_clip' }, make ('defs', {})); make ('path', { d : outlines, 'clip-rule' : 'evenodd' }, clip);
+                const x = this.cadFace === 'outside' ? -(artwork.xMm + artwork.widthMm) : artwork.xMm;
+                const image = make ('image', { x, y : -(artwork.yMm + artwork.heightMm), width : artwork.widthMm, height : artwork.heightMm, preserveAspectRatio : 'none', 'clip-path' : 'url(#packaging_print_clip)', opacity : .92, 'pointer-events' : 'none', 'data-print-artwork' : artwork.resourceId });
+                image.setAttribute ('href', url); if (this.cadFace === 'outside') { image.setAttribute ('transform', 'translate(' + (2 * x + artwork.widthMm) + ' 0) scale(-1 1)'); }
+            }
+        }
         for (const path of [...design.paths, ...(this.draft.length ? [{ id : 'draft', type : this.draftType, closed : false, points : this.draft }] : [])]) {
             const selected = this.selectedPaths.has (path.id) || path.id === this.active; const d = path.points.map ((point, index) => (index ? 'L' : 'M') + faceX (point[0]) + ' ' + -point[1]).join (' ') + (path.closed ? 'Z' : '');
             if (path.id !== 'draft') { make ('path', { d, fill : 'none', stroke : 'transparent', 'stroke-width' : 12, 'vector-effect' : 'non-scaling-stroke', 'data-hit-path' : path.id, 'pointer-events' : 'stroke' }); }
-            make ('path', { d, fill : path.closed && path.type === 'cut' ? '#b8926112' : 'none', stroke : path.type === 'cut' ? '#e34b4b' : '#318cdd', 'stroke-width' : selected ? 3 : 2, 'vector-effect' : 'non-scaling-stroke', 'stroke-dasharray' : path.process?.kind?.includes ('perforation') ? (path.process.cutMm + ' ' + path.process.tieMm) : path.type === 'score' ? '7 5' : 'none', 'data-path' : path.id, 'pointer-events' : 'stroke' });
+            make ('path', { d, fill : path.closed && path.type === 'cut' && !design.print ? '#b8926112' : 'none', stroke : path.type === 'cut' ? '#e34b4b' : '#318cdd', 'stroke-width' : selected ? 3 : 2, 'vector-effect' : 'non-scaling-stroke', 'stroke-dasharray' : path.process?.kind?.includes ('perforation') ? (path.process.cutMm + ' ' + path.process.tieMm) : path.type === 'score' ? '7 5' : 'none', 'data-path' : path.id, 'pointer-events' : 'stroke' });
             if (selected || path.id === 'draft') { path.points.forEach ((point) => make ('circle', { cx : faceX (point[0]), cy : -point[1], r : this.view.width / 240, fill : path.type === 'cut' ? '#e34b4b' : '#318cdd', 'pointer-events' : 'none' })); }
         }
         const measurements = this.EngineeringInspect ();

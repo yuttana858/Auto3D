@@ -2786,6 +2786,239 @@
       }
     },
     {
+      "id": "packaging.path.standard_hole",
+      "title": "Draw universal collar hole",
+      "category": "Packaging",
+      "description": "Same as Add 12 oz collar hole in the CAD Shape tools: add the universal collar hole of a can standard (12oz-202: 16 tabs, tips Ø 55 mm, reliefs Ø 64 mm, 1 mm slits) centred at center (display units unless units=mm). One Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "center": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            }
+          },
+          "standard": {
+            "type": "string",
+            "enum": [
+              "12oz-202"
+            ]
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "display",
+              "mm"
+            ]
+          }
+        },
+        "required": [
+          "center"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "center": [
+          40,
+          40
+        ],
+        "units": "mm"
+      }
+    },
+    {
+      "id": "packaging.print.inspect",
+      "title": "Inspect board print",
+      "category": "Packaging",
+      "description": "Read the CAD design print: board top (natural or white), artwork image and placement on the dieline (mm, x/y = lower-left corner), whether the image is loaded and whether a linked flat board shows it in 3D.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.print.ground",
+      "title": "Set board top",
+      "category": "Packaging",
+      "description": "Same as Board top in the CAD Print section: natural kraft or white top. Updates the linked flat board (collar, pad or custom dieline) in 3D in the same Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ground": {
+            "type": "string",
+            "enum": [
+              "natural",
+              "white"
+            ]
+          }
+        },
+        "required": [
+          "ground"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "ground": "white"
+      }
+    },
+    {
+      "id": "packaging.print.demo",
+      "title": "Add demo artwork",
+      "category": "Packaging",
+      "description": "Same as Demo artwork in the CAD Print section: draw a sparkling-water demo design sized to the dieline (locally, no network) and place it (fit cover by default). Cut lines crop it; the linked flat board updates in 3D. One Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          },
+          "subtitle": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "fit": {
+            "type": "string",
+            "enum": [
+              "cover",
+              "contain",
+              "stretch"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "title": "SPARKLING"
+      }
+    },
+    {
+      "id": "packaging.print.artwork",
+      "title": "Add board artwork",
+      "category": "Packaging",
+      "description": "Add a PNG, JPEG or WebP image (base64 data URL, up to 4 MiB) as the board artwork and place it on the dieline (fit cover by default). The image stays local in this session; the linked flat board updates in 3D. One Undo step. Use packaging.print.open_file to let the user choose a file instead.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dataUrl": {
+            "type": "string",
+            "minLength": 32,
+            "maxLength": 5600000,
+            "pattern": "^data:image/(png|jpeg|webp);base64,"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "fit": {
+            "type": "string",
+            "enum": [
+              "cover",
+              "contain",
+              "stretch"
+            ]
+          }
+        },
+        "required": [
+          "dataUrl"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "dataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==",
+        "fit": "cover"
+      }
+    },
+    {
+      "id": "packaging.print.open_file",
+      "title": "Choose board artwork file",
+      "category": "Packaging",
+      "description": "Same as Load artwork… in the CAD Print section: open the browser file picker so the user chooses an image. Interactive: nothing changes until the user picks a file.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "packaging.print.place",
+      "title": "Place board artwork",
+      "category": "Packaging",
+      "description": "Move or resize the artwork on the dieline (mm; x/y = lower-left corner), or refit it over the dieline with fit cover, contain or stretch. The linked flat board updates in 3D. One Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fit": {
+            "type": "string",
+            "enum": [
+              "cover",
+              "contain",
+              "stretch"
+            ]
+          },
+          "xMm": {
+            "type": "number",
+            "minimum": -100000,
+            "maximum": 100000
+          },
+          "yMm": {
+            "type": "number",
+            "minimum": -100000,
+            "maximum": 100000
+          },
+          "widthMm": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 100000
+          },
+          "heightMm": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 100000
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "fit": "contain"
+      }
+    },
+    {
+      "id": "packaging.print.clear",
+      "title": "Remove board artwork",
+      "category": "Packaging",
+      "description": "Same as Remove artwork in the CAD Print section; the board top stays. One Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
       "id": "packaging.path.round_corners",
       "title": "Round CAD corners",
       "category": "Packaging",
@@ -3606,6 +3839,14 @@
       "inputSchema": {
         "type": "object",
         "properties": {
+          "design": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "12oz-202",
+              "custom"
+            ]
+          },
           "boardId": {
             "type": "string",
             "enum": [
@@ -3658,11 +3899,19 @@
       "id": "packaging.accessories.collar",
       "title": "Add can collar",
       "category": "Packaging",
-      "description": "Same as Add can collar in the Accessories tab: add a paperboard collar over the selected group or array of upright cans (1–24, one size, e.g. a 3 × 2 array for a six-pack). Each can gets a round hole split into tabs by relief slits; omit tuckMm for automatic tuck up to 1.5 mm inside the rim; explicit tuck must clear the can neck through the full board thickness. The flat collar keeps 0.0254 mm clearance from the neck and below the rim; tab bending during application is not simulated; reliefs end reliefMm past the rim (default 3) but keep a 1.5 mm web between holes. Corners are rounded (default follows the corner cans). A CAD board profile grouped with the cans; it lowers onto them. One Undo step.",
+      "description": "Same as Add can collar in the Accessories tab: add a paperboard collar over the selected group or array of upright cans (1–24, one size, e.g. a 3 × 2 array for a six-pack). design auto (default) uses the universal 12 oz design (12oz-202: 16 tabs 4.5 mm tall, tips Ø 55, reliefs Ø 64, 1 mm slits; the same hole for every pack) when the rims fit it and a custom fit otherwise; custom fits tuck, reliefs and tabs to the sensed rims. Paperboard collars have a white top. Each can gets a round hole split into tabs by relief slits; omit tuckMm for automatic tuck up to 1.5 mm inside the rim; explicit tuck must clear the can neck through the full board thickness. The flat collar keeps 0.0254 mm clearance from the neck and below the rim; tab bending during application is not simulated; reliefs end reliefMm past the rim (default 3) but keep a 1.5 mm web between holes. Corners are rounded (default follows the corner cans). A CAD board profile grouped with the cans; it lowers onto them. One Undo step.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
         "properties": {
+          "design": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "12oz-202",
+              "custom"
+            ]
+          },
           "boardId": {
             "type": "string",
             "enum": [
@@ -3710,6 +3959,20 @@
       "example": {
         "boardId": "cuk-24pt"
       }
+    },
+    {
+      "id": "packaging.accessories.collar.artwork",
+      "title": "Edit can collar artwork",
+      "category": "Packaging",
+      "description": "Same as Edit collar artwork in CAD in the Can collar section: select the collar of the selected cans (or the selected collar) and open it in the CAD designer, whose Print section sets the board top and artwork (packaging.print.*). Does not change the scene.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
     },
     {
       "id": "packaging.tab",

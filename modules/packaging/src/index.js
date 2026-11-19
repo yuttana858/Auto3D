@@ -34,5 +34,6 @@ export { CreatePallet } from './pallet.js';
 export * from './accessories.js';
 export { AccessoriesPanel } from './accessoriespanel.js';
 export { FilletPolygon, RoundedRectangle, CircleOutline, ReliefHoleOutline } from './cadshapes.js';
-export { SenseCanRim, CreateCanCollarPlan, CollarBoards, DefaultCollarOptions, MaxCollarCans } from './cancollar.js';
+export { SenseCanRim, CanRadiusInSlab, CreateCanCollarPlan, CollarBoards, CollarStandards, CollarStandard, StandardReliefHole, DefaultCollarOptions, MaxCollarCans, CollarNeckClearanceMm } from './cancollar.js';
+export { ValidatePrint, FitArtwork, ApplyBoardPrint, PrintGrounds, PrintMimes, WhiteTopColor } from './print.js';
 export * from './partitionnest.js';
