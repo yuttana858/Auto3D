@@ -1,8 +1,28 @@
 # Auto3D development log and handoff
 
+## Integrated animation and can-collar release — Auto3D 0.94.0 candidate
+
+Packaging 1.17.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0. Consolidates #158 visibility/lifetime tracks, #159 embedded clip scheduling, #160 array timeline reveals, #162 macro step timing, and #166 can collars/CAD shape tools into #162, preserving main through #164 (`cfd03f6`) and its shared account macro library. Resolves code, version and release-note conflicts without dropping either workstream. See [release-0940.md](release-0940.md). Combined validation and merge status are recorded in PR #162.
+
 ## Can collar and CAD shape tools — Auto3D 0.93.0 / Packaging 1.17.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0 (2026-11-19)
 
 Candidate on `claude/dazzling-faraday-rhti3h`, not deployed. The Accessories tab adds a Can collar for a selected group or array of upright cans (for example a 3 × 2 six-pack). The rim is sensed from the geometry, each can gets a tabbed relief hole tucked under its rim, the corners are rounded, and the collar is a grouped CAD board profile added in one Undo step. The CAD designer adds Shape tools (round corners, circle, relief hole). New commands: `packaging.accessories.collar(.inspect)` and `packaging.path.round_corners/circle/relief_hole`. See docs/release-0930.md.
+
+## Macro step timing — Auto3D 0.93.0 candidate
+
+Stacked on PR #160. Recorded macros support per-step durations and pauses; timing is editable in the macro builder and available to agents. Lighting remains under the app’s existing lighting settings. Overlapping steps, automatic creation/deletion, and procedural recording remain open; see release-macro-timing.md. Not deployed.
+
+## Array reveal on the shared timeline — Auto3D 0.92.0 candidate
+
+Stacked on PR #159. Existing selected objects can receive staggered reveal motion and visibility tracks; standard macros can create an array and pass copy IDs to the scheduler. The active object can remain in place. UX review clarified selection, timing and hidden-before-reveal behavior. Existing tracks are protected. See release-animation-array.md. Not deployed.
+
+## Embedded clips on the shared timeline — Auto3D 0.91.0 candidate
+
+Stacked on PR #158. Schedules paused embedded clips on the shared timeline with start, duration, speed and looping; seeking, playback and video export sample the same timeline. Adds an Animation panel control, object-track clip spans, agent commands and archive persistence. Unmanaged clips retain their existing independent behavior. Array recording and macro-generated procedural actions remain future work. See release-animation-clips.md. Not deployed.
+
+## Object visibility and lifetime timeline — Auto3D 0.90.0 candidate
+
+Stacked on PR #157. Adds discrete, undoable visibility keyframes and lifetime ranges for existing scene objects, a compact Animation panel editor, macro visibility capture, session persistence and agent controls. UI/UX review was performed independently; selected-object context, local feedback, reset on selection change, and marker legends are included. This does not record object creation or permanent deletion. See release-animation-visibility.md. Not deployed.
 
 ## Shared macro library — Auto3D 0.92.0 (2026-11-19)
 

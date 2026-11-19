@@ -3658,7 +3658,7 @@
       "id": "packaging.accessories.collar",
       "title": "Add can collar",
       "category": "Packaging",
-      "description": "Same as Add can collar in the Accessories tab: add a paperboard collar over the selected group or array of upright cans (1–24, one size, e.g. a 3 × 2 array for a six-pack). Each can gets a round hole split into tabs by relief slits; tab tips reach tuckMm (default 1.5) inside the rim and the collar top meets the rim underside, so the tabs tuck under it; reliefs end reliefMm past the rim (default 3) but keep a 1.5 mm web between holes. Corners are rounded (default follows the corner cans). A CAD board profile grouped with the cans; it lowers onto them. One Undo step.",
+      "description": "Same as Add can collar in the Accessories tab: add a paperboard collar over the selected group or array of upright cans (1–24, one size, e.g. a 3 × 2 array for a six-pack). Each can gets a round hole split into tabs by relief slits; omit tuckMm for automatic tuck up to 1.5 mm inside the rim; explicit tuck must clear the can neck through the full board thickness. The flat collar keeps 0.0254 mm clearance from the neck and below the rim; tab bending during application is not simulated; reliefs end reliefMm past the rim (default 3) but keep a 1.5 mm web between holes. Corners are rounded (default follows the corner cans). A CAD board profile grouped with the cans; it lowers onto them. One Undo step.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -3708,8 +3708,7 @@
         "additionalProperties": false
       },
       "example": {
-        "boardId": "cuk-24pt",
-        "tuckMm": 1.5
+        "boardId": "cuk-24pt"
       }
     },
     {
@@ -6879,6 +6878,255 @@
       }
     },
     {
+      "id": "animation.visibility.inspect",
+      "title": "Inspect object visibility track",
+      "category": "Animation",
+      "description": "Read an existing object’s discrete visibility keys, editor visibility and effective visibility at the timeline playhead.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "objectId"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "objectId": "object-1"
+      }
+    },
+    {
+      "id": "animation.visibility.keyframe",
+      "title": "Set object visibility keyframe",
+      "category": "Animation",
+      "description": "Show or hide an existing object at a specific timeline time. Visibility changes are discrete; the saved editor visibility is unchanged. Replaces a visibility keyframe at the same time and supports Undo.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "time": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3600
+          },
+          "visible": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "objectId",
+          "visible"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "objectId": "object-1",
+        "time": 2,
+        "visible": true
+      }
+    },
+    {
+      "id": "animation.visibility.lifetime",
+      "title": "Set object lifetime",
+      "category": "Animation",
+      "description": "Show an existing object from start time and hide it at optional end time. Replaces its visibility track with an undoable lifetime; it does not create or delete the model.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "start": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3600
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 3600
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "objectId",
+          "start"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "objectId": "object-1",
+        "start": 1,
+        "end": 5
+      }
+    },
+    {
+      "id": "animation.visibility.clear",
+      "title": "Clear object visibility track",
+      "category": "Animation",
+      "description": "Remove all visibility keyframes for an object and restore its editor visibility. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "objectId"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "objectId": "object-1"
+      }
+    },
+    {
+      "id": "animation.array.schedule",
+      "title": "Schedule array reveal",
+      "category": "Animation",
+      "description": "Create staggered drop and visibility tracks for existing visible objects with no existing motion, visibility or fold tracks. Does not create objects. Ordered objectIds determine reveal order; dropHeight uses model units. Undo supported. First create an array with animate false, then pass its objectIds.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 999,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          },
+          "time": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3600
+          },
+          "duration": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 15
+          },
+          "dropHeight": {
+            "type": "number",
+            "minimum": 0.000001,
+            "maximum": 1000000
+          }
+        },
+        "required": [
+          "objectIds"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "objectIds": [
+          "object-1",
+          "object-2"
+        ],
+        "time": 0,
+        "duration": 4,
+        "dropHeight": 1
+      }
+    },
+    {
+      "id": "animation.clip.add",
+      "title": "Add embedded clip to timeline",
+      "category": "Animation",
+      "description": "Schedule a paused embedded clip for an existing model on the shared timeline. Start and duration are seconds; speed and loop control clip sampling. Overlaps on the same object are rejected. Preview and video export follow this same timeline. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "clip": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "time": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3600
+          },
+          "duration": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 3600
+          },
+          "speed": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 10
+          },
+          "loop": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "objectId",
+          "clip",
+          "duration"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "objectId": "object-1",
+        "clip": 0,
+        "time": 1,
+        "duration": 3,
+        "speed": 1,
+        "loop": false
+      }
+    },
+    {
+      "id": "animation.clip.delete",
+      "title": "Remove embedded clip from timeline",
+      "category": "Animation",
+      "description": "Remove one embedded clip timeline action by ID. Undo restores it.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "clip-action-id"
+      }
+    },
+    {
       "id": "animation.action.open",
       "title": "Open Action keyframe options",
       "category": "Animation",
@@ -7524,7 +7772,7 @@
       "id": "animation.macro.record",
       "title": "Run macro and record animation",
       "category": "Animation",
-      "description": "Run a saved or supplied macro and record object transforms and camera views as sequential keyframes. Requires an empty stopped timeline and 1–100 existing objects. Unsupported commands, including creation, deletion, materials and procedural animation, are rejected before execution. Completed macro steps remain if a later step fails. Object/camera changes are interpolated over stepSeconds; the recorded timeline is one undo step.",
+      "description": "Run a saved or supplied macro and record object transforms, visibility and camera views as sequential keyframes. Set step.animation.duration and pauseAfter in seconds, or use stepSeconds as the default duration. Requires an empty stopped timeline and 1–100 existing objects. Unsupported commands, including creation, deletion, materials and procedural animation, are rejected before execution. Completed macro steps remain if a later step fails. The recorded timeline is one undo step.",
       "mutates": true,
       "inputSchema": {
         "type": "object",

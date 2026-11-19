@@ -589,6 +589,7 @@ export class SessionEditor
             }
             this.document.objects.forEach ((object) => { object.threeObject.visible = object.visible; });
             await PreparePackagingPresentations (this.document.objects, this.document.model.materials, this.document.model.GetUnit ());
+            this.timeline.ApplyVisibility ();
             if (beforeDisplay) { beforeDisplay (); }
             this.motionOverride?.(); // A running sequence (Auto Pack) keeps its in-flight placement across rebuilds.
             this.website.navigator.Clear ();
@@ -601,7 +602,7 @@ export class SessionEditor
             this.website.sidebar.detailsPanel.modelFormat = 'SESSION';
             this.website.UpdateMeshesVisibility ();
             this.website.sceneEffects?.ApplyObjectSettings (this.document.objects);
-            await this.packaging.presentation?.PrepareAll (); this.packaging.presentation?.Apply (this.timeline.time, false);
+            await this.packaging.presentation?.PrepareAll (); this.timeline.ApplyEmbeddedClips (); this.packaging.presentation?.Apply (this.timeline.time, false);
             this.RefreshUI (); this.Select (this.selected); this.website.sceneEffects?.Refresh (); this.website.viewModes?.Refresh (); this.website.viewer.Render ();
         } finally { this.busy = false; this.RefreshButtons (); this.website.materialPanel?.Update (); }
     }
@@ -645,6 +646,14 @@ export class SessionEditor
         this.website.viewer?.RequestRender?.();
     }
     SelectedObjects () { return this.document.objects.filter ((object) => this.selectedIds?.has (object.id)); }
+    UpdateTransformControls ()
+    {
+        this.controls.detach ();
+        if (this.mode === 'select' || this.readOnly) { return; }
+        const selection = this.SelectedObjects ().filter (item => item.threeObject?.visible);
+        if (selection.length > 1) { const bounds = new THREE.Box3 (); selection.forEach (item => bounds.union (new THREE.Box3 ().setFromObject (item.threeObject))); this.selectionPivot.position.copy (bounds.getCenter (new THREE.Vector3 ())); this.selectionPivot.rotation.set (0, 0, 0); this.selectionPivot.scale.set (1, 1, 1); this.selectionPivot.updateMatrix (); this.controls.setMode (this.mode); this.controls.attach (this.selectionPivot); }
+        else if (selection.length === 1 || this.selected?.threeObject?.visible) { this.controls.setMode (this.mode); this.controls.attach ((selection[0] || this.selected).threeObject); }
+    }
     Select (object, fromNavigator = false, additive = false, single = false)
     {
         if (this.facing?.active && this.facing.object !== object) { this.facing.Stop (); }
@@ -652,10 +661,7 @@ export class SessionEditor
         if (!this.selectedIds) { this.selectedIds = new Set (); }
         if (!additive) { this.selectedIds.clear (); }
         if (this.selected) { const group = !single && this.selected.userData?._auto3dGroup; this.document.objects.filter ((item) => item === this.selected || (group && item.userData?._auto3dGroup === group)).forEach ((item) => this.selectedIds.add (item.id)); }
-        this.controls.detach ();
-        const selection = this.SelectedObjects ();
-        if (selection.length > 1 && this.mode !== 'select' && !this.readOnly) { const bounds = new THREE.Box3 (); selection.forEach ((item) => { if (item.threeObject) { bounds.union (new THREE.Box3 ().setFromObject (item.threeObject)); } }); this.selectionPivot.position.copy (bounds.getCenter (new THREE.Vector3 ())); this.selectionPivot.rotation.set (0, 0, 0); this.selectionPivot.scale.set (1, 1, 1); this.selectionPivot.updateMatrix (); this.controls.setMode (this.mode); this.controls.attach (this.selectionPivot); }
-        else if (this.selected?.threeObject && this.selected.visible && this.mode !== 'select') { this.controls.setMode (this.mode); this.controls.attach (this.selected.threeObject); }
+        this.UpdateTransformControls ();
         this.transformPanel.hidden = !this.selected || this.mode === 'select'; this.transformFloat?.Apply ();
         if (!fromNavigator && this.selected) {
             let first = null; this.document.model.EnumerateMeshInstances ((instance) => { if (!first && this.document.Owner (instance) === this.selected) { first = instance.id; } });
@@ -695,11 +701,11 @@ export class SessionEditor
 
     UpdateSelectionBox ()
     {
-        if (this.packaging?.foldOperation || this.packaging?.presentation?.HasVisiblePreview () || this.arrayOperation || !this.selected?.threeObject || !this.selected.visible) {
+        if (this.packaging?.foldOperation || this.packaging?.presentation?.HasVisiblePreview () || this.arrayOperation || !this.selected?.threeObject?.visible) {
             this.selectionBox.visible = false;
             return;
         }
-        this.selectionBounds.makeEmpty (); (this.SelectedObjects ().length ? this.SelectedObjects () : [this.selected]).forEach ((object) => { if (object.threeObject && object.visible) { const include = () => this.selectionBounds.union (new THREE.Box3 ().setFromObject (object.threeObject)); if (this.packaging?.presentation) { this.packaging.presentation.WithOriginal (object, include); } else { include (); } } });
+        this.selectionBounds.makeEmpty (); (this.SelectedObjects ().length ? this.SelectedObjects () : [this.selected]).forEach ((object) => { if (object.threeObject?.visible) { const include = () => this.selectionBounds.union (new THREE.Box3 ().setFromObject (object.threeObject)); if (this.packaging?.presentation) { this.packaging.presentation.WithOriginal (object, include); } else { include (); } } });
         this.selectionBox.visible = !this.selectionBounds.isEmpty ();
         this.selectionBox.updateMatrixWorld (true);
     }
@@ -1118,8 +1124,10 @@ export class SessionEditor
         const entries = timeline.cameraKeyframes.map ((keyframe) => ({ type : 'camera', keyframe, object : null, label : 'Camera' }));
         for (const object of this.document.objects) {
             timeline.NormalizeObjectKeyframes (object).forEach ((keyframe) => entries.push ({ type : 'object', keyframe, object, label : object.name }));
+            (object.visibilityKeys || []).forEach (keyframe => entries.push ({ type : 'visibility', keyframe, object, label : object.name + (keyframe.visible ? ' · Show' : ' · Hide') }));
         }
         for (const action of timeline.actions) { const object = this.document.objects.find (object => object.id === action.objectId); if (object) { entries.push ({ type : 'action', keyframe : action, object, label : object.name + ' · ' + action.direction + ' fold action (' + action.duration + ' s)' }); } }
+        for (const clip of timeline.embeddedClips) { const object = this.document.objects.find (item => item.id === clip.objectId); if (object) { entries.push ({ type : 'clip', keyframe : clip, object, label : object.name + ' · embedded clip ' + (clip.clip + 1) + ' (' + clip.duration + ' s)' }); } }
         entries.sort ((left, right) => left.keyframe.time - right.keyframe.time || left.type.localeCompare (right.type));
         if (!entries.length) {
             Element ('p', 'section_hint', 'Set the timeline time, position an object or the viewer camera, then save a keyframe. Smooth tweening is applied between keyframes by default.', keys);
@@ -1129,12 +1137,12 @@ export class SessionEditor
                 const seek = Element ('button', 'timeline_keyframe_seek', entry.keyframe.time.toFixed (2) + 's · ' + entry.label, row);
                 seek.title = entry.type === 'camera'
                     ? 'Camera · ' + entry.keyframe.azimuth.toFixed (1) + '° az · ' + entry.keyframe.elevation.toFixed (1) + '° el · ' + DisplayLength (entry.keyframe.distance, this.document.model.GetUnit (), this.website.preferences.units) + ' distance'
-                    : entry.label + (entry.type === 'action' ? ' · procedural fold' : ' · ' + entry.keyframe.interpolation + ' tween');
+                    : entry.label + (entry.type === 'action' ? ' · procedural fold' : entry.type === 'visibility' ? ' · discrete visibility' : entry.type === 'clip' ? ' · embedded clip' : ' · ' + entry.keyframe.interpolation + ' tween');
                 seek.addEventListener ('click', () => { timeline.Seek (entry.keyframe.time); this.AnimationUI (); });
-                Element ('span', 'timeline_keyframe_mode', entry.type === 'action' ? 'Action' : entry.keyframe.interpolation, row);
+                Element ('span', 'timeline_keyframe_mode', entry.type === 'action' ? 'Action' : entry.type === 'visibility' ? 'Visibility' : entry.type === 'clip' ? 'Clip' : entry.keyframe.interpolation, row);
                 if (!this.readOnly) {
                     const remove = Element ('button', 'timeline_keyframe_delete', '×', row); remove.title = 'Delete keyframe';
-                    remove.addEventListener ('click', () => { if (entry.type === 'action') { timeline.DeleteAction (entry.keyframe.id); } else { timeline.DeleteKeyframe (entry.type, entry.keyframe.id, entry.object); } this.MarkDirty (); this.AnimationUI (); });
+                    remove.addEventListener ('click', () => { if (entry.type === 'action') { timeline.DeleteAction (entry.keyframe.id); } else if (entry.type === 'clip') { timeline.DeleteEmbeddedClip (entry.keyframe.id); } else if (entry.type === 'visibility') { timeline.SetVisibilityKeys (entry.object, entry.object.visibilityKeys.filter (key => key.id !== entry.keyframe.id)); } else { timeline.DeleteKeyframe (entry.type, entry.keyframe.id, entry.object); } this.MarkDirty (); this.AnimationUI (); });
                 }
             }
         }
@@ -1154,7 +1162,8 @@ export class SessionEditor
         const clipSettings = Element ('div', 'animation_settings', undefined, embedded);
         const speedLabel = Element ('label', null, 'Speed', clipSettings); const speed = Element ('select', null, undefined, speedLabel); speed.setAttribute ('aria-label', 'Animation speed'); [0.25, 0.5, 1, 1.5, 2].forEach ((value) => speed.add (new Option (value + '×', value))); speed.value = String (player.state.speed); speed.addEventListener ('change', () => { player.state.speed = Number (speed.value); this.MarkDirty (); });
         const clipLoopLabel = Element ('label', null, 'Loop', clipSettings); const clipLoop = Element ('input', null, undefined, clipLoopLabel); clipLoop.type = 'checkbox'; clipLoop.checked = player.state.loop !== false; clipLoop.setAttribute ('aria-label', 'Loop embedded animation'); clipLoop.addEventListener ('change', () => { player.SetLoop (clipLoop.checked); this.MarkDirty (); });
-        const clipScrub = Element ('input', null, undefined, embedded); clipScrub.type = 'range'; clipScrub.min = '0'; clipScrub.max = String (player.clips[player.state.clip].duration); clipScrub.step = '0.01'; clipScrub.value = String (player.state.time); clipScrub.setAttribute ('aria-label', 'Embedded animation timeline'); clipScrub.addEventListener ('input', () => { player.Seek (Number (clipScrub.value)); this.MarkDirty (); this.UpdateDetails (); }); player.onTime = (time) => { if (document.activeElement !== clipScrub) { clipScrub.value = String (time); } }; player.onPlaybackChanged = (playing) => { clipPlay.textContent = playing ? 'Pause' : 'Play'; this.MarkDirty (); };
+        const clipScrub = Element ('input', null, undefined, embedded); clipScrub.type = 'range'; clipScrub.min = '0'; clipScrub.max = String (player.clips[player.state.clip].duration); clipScrub.step = '0.01'; clipScrub.value = String (player.state.time); clipScrub.setAttribute ('aria-label', 'Embedded animation timeline'); clipScrub.addEventListener ('input', () => { player.Seek (Number (clipScrub.value)); this.MarkDirty (); this.UpdateDetails (); }); player.onTime = (time) => { if (document.activeElement !== clipScrub) { clipScrub.value = String (time); } }; player.onPlaybackChanged = (playing) => { clipPlay.textContent = playing ? 'Pause' : 'Play'; this.MarkDirty (); this.website.animationPanel?.Refresh (); };
+        if (timeline.embeddedClips.some (item => item.objectId === this.selected.id)) { [clips, clipPlay, clipReset, speed, clipLoop, clipScrub].forEach (control => { control.disabled = true; }); Element ('p', 'section_hint', 'Controlled by the timeline; remove the clip actions to use independent playback.', embedded); }
     }
 
     FitScene ()
@@ -1379,7 +1388,7 @@ export class SessionEditor
     {
         if (this.readOnly || this.busy || !this.selected) { return; }
         const objects = this.SelectedObjects ().length ? this.SelectedObjects () : [this.selected]; const records = objects.map ((object) => ({ object, before : object.visible })); const after = !this.selected.visible;
-        const apply = (restore) => { records.forEach ((item) => { item.object.visible = restore ? item.before : after; item.object.threeObject.visible = item.object.visible; }); this.website.UpdateMeshesVisibility (); this.Select (this.selected, false, true); }; apply (false); this.history.Push ({ undo : () => apply (true), redo : () => apply (false) }); this.RefreshButtons ();
+        const apply = (restore) => { records.forEach ((item) => { item.object.visible = restore ? item.before : after; item.object.threeObject.visible = item.object.visible; }); this.website.UpdateMeshesVisibility (); this.timeline.ApplyVisibility (); this.Select (this.selected, false, true); }; apply (false); this.history.Push ({ undo : () => apply (true), redo : () => apply (false) }); this.RefreshButtons ();
     }
     // Sets the orbit pivot to the selection's center. `aim` also points the view at it (camera.orbit.focus_selected);
     // right-drag passes false, so eye and view center orbit together around the object and the framing is kept.
@@ -1465,25 +1474,27 @@ export class SessionEditor
         const target = this.document; const owner = this.website.auth?.user?.id; const previous = this.selected; const selection = new Set (this.selectedIds || []);
         if (!saved.document.objects.length) { throw new Error ('The saved Library item has no models to add.'); }
         if (target.objects.length + saved.document.objects.length > 1000) { throw new Error ('Adding this save would exceed 1,000 scene objects.'); }
-        const added = []; const firstIndex = target.objects.length; const meshes = target.model.meshes.length; const materials = target.model.materials.length; const unit = target.model.GetUnit (); const groups = new Map (); const objectIds = new Map (); const previousActions = this.timeline?.actions || []; let importedActions = [];
+        const added = []; const firstIndex = target.objects.length; const meshes = target.model.meshes.length; const materials = target.model.materials.length; const unit = target.model.GetUnit (); const groups = new Map (); const objectIds = new Map (); const timeline = this.timeline, previousTimeline = timeline?.Serialize (); let importedTimeline;
+        const applyTimeline = forward => { if (!timeline) { return; } timeline.Load (forward ? importedTimeline : previousTimeline); if (forward && previousTimeline.rangeEnd === previousTimeline.duration) { timeline.rangeEnd = timeline.duration; } };
         try {
             for (const source of saved.document.objects) {
                 const model = saved.document.CompactModel ([source], true); model.root = model.root.GetChildNode (0);
                 const object = target.AddImported (model, source.name, Direction.Y, false); added.push (object); objectIds.set (source.id, object.id);
-                Object.assign (object, TransformState (source), { source : source.source, packagingProfile : source.packagingProfile, visible : source.visible, hiddenParts : [...source.hiddenParts], unit : source.unit, userData : { ...source.userData }, castShadow : source.castShadow !== false, receiveShadow : source.receiveShadow !== false, keyframes : source.keyframes.map (frame => ({ ...frame, id : crypto.randomUUID (), position : [...frame.position], rotation : [...frame.rotation], scale : [...frame.scale] })), animationAsset : source.animationAsset, playback : source.playback ? { ...source.playback, playing : false } : undefined });
+                Object.assign (object, TransformState (source), { source : source.source, packagingProfile : source.packagingProfile, visible : source.visible, hiddenParts : [...source.hiddenParts], unit : source.unit, userData : { ...source.userData }, castShadow : source.castShadow !== false, receiveShadow : source.receiveShadow !== false, keyframes : source.keyframes.map (frame => ({ ...frame, id : crypto.randomUUID (), position : [...frame.position], rotation : [...frame.rotation], scale : [...frame.scale] })), visibilityKeys : (source.visibilityKeys || []).map (key => ({ ...key, id : crypto.randomUUID () })), animationAsset : source.animationAsset, playback : source.playback ? { ...source.playback, playing : false } : undefined });
                 const group = object.userData._auto3dGroup; if (group) { if (!groups.has (group)) { groups.set (group, crypto.randomUUID ()); } object.userData._auto3dGroup = groups.get (group); }
                 target.ApplyTransform (object);
             }
-            importedActions = (saved.view?.timeline?.actions || []).filter (action => objectIds.has (action.objectId)).map (action => ({ ...action, id : crypto.randomUUID (), objectId : objectIds.get (action.objectId) }));
-            if (this.timeline) { this.timeline.actions = [...previousActions, ...importedActions]; this.timeline.ExtendDurationForKeys (); }
+            const remap = actions => (actions || []).filter (action => objectIds.has (action.objectId)).map (action => ({ ...action, id : crypto.randomUUID (), objectId : objectIds.get (action.objectId) }));
+            importedTimeline = { ...previousTimeline, actions : [...(previousTimeline?.actions || []), ...remap (saved.view?.timeline?.actions)], embeddedClips : [...(previousTimeline?.embeddedClips || []), ...remap (saved.view?.timeline?.embeddedClips)] }; applyTimeline (true);
             this.selected = added[0]; this.selectedIds = new Set ([added[0].id]); await this.Render (true);
             if (this.document !== target || this.website.auth?.user?.id !== owner || this.website.accountReady === false || this.readOnly) { throw new Error ('Account or workspace changed while adding the saved model.'); }
             if (place) { place (this, added); }
-            this.history.Push ({ undo : async () => { added.forEach (object => target.Remove (object)); if (this.timeline) { this.timeline.actions = previousActions; } this.selected = previous; this.selectedIds = new Set (selection); await this.Render (); }, redo : async () => { added.forEach ((object, index) => target.Restore (object, firstIndex + index)); if (this.timeline) { this.timeline.actions = [...previousActions, ...importedActions]; } this.selected = added[0]; this.selectedIds = new Set ([added[0].id]); await this.Render (); } });
+            const checkTarget = () => { if (this.document !== target || this.website.auth?.user?.id !== owner) { throw new Error ('This imported animation belongs to another session.'); } };
+            this.history.Push ({ undo : async () => { checkTarget (); added.forEach (object => target.Remove (object)); applyTimeline (false); this.selected = previous; this.selectedIds = new Set (selection); await this.Render (); }, redo : async () => { checkTarget (); added.forEach ((object, index) => target.Restore (object, firstIndex + index)); applyTimeline (true); this.selected = added[0]; this.selectedIds = new Set ([added[0].id]); await this.Render (); } });
             this.Status ('Added ' + added.length + ' model(s) from ' + saved.document.name + ' · selected ' + added[0].name);
             return { objectIds : added.map (object => object.id), objectCount : added.length };
         } catch (error) {
-            added.forEach (object => target.Remove (object)); if (this.timeline) { this.timeline.actions = previousActions; } target.model.meshes.length = meshes; target.model.materials.length = materials; target.model.SetUnit (unit);
+            added.forEach (object => target.Remove (object)); if (this.document === target) { applyTimeline (false); } target.model.meshes.length = meshes; target.model.materials.length = materials; target.model.SetUnit (unit);
             if (this.document === target) { this.selected = previous; this.selectedIds = selection; try { await this.Render (); } catch { /* Keep the original import error. */ } } throw error;
         }
     }

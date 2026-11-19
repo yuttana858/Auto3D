@@ -319,7 +319,9 @@ export class ViewerMainModel
         let iSectObjects = raycaster.intersectObject (this.mainModel.GetRootObject (), true);
         for (let i = 0; i < iSectObjects.length; i++) {
             let iSectObject = iSectObjects[i];
-            if (!iSectObject.object.visible) {
+            let visible = true;
+            for (let ancestor = iSectObject.object; ancestor; ancestor = ancestor.parent) { if (!ancestor.visible) { visible = false; break; } }
+            if (!visible) {
                 continue;
             }
             if (iSectObject.object.isMesh) {

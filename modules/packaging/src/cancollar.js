@@ -18,6 +18,7 @@ export const CollarBoards = Object.freeze ([
 ]);
 export const DefaultCollarOptions = Object.freeze ({ boardId : 'cuk-24pt', tuckMm : 1.5, reliefMm : 3, marginMm : 5, cornerRadiusMm : null, tabs : 0, notchWidthMm : 1.2, webMm : 1.5 });
 export const MaxCollarCans = 24;
+export const CollarNeckClearanceMm = 0.0254;
 const PointBudget = 1950;
 
 const range = (value, name, min, max) => { if (typeof value !== 'number' || !Number.isFinite (value) || value < min || value > max) { throw new Error (name + ' must be ' + min + '–' + max + ' mm.'); } return value; };
@@ -56,14 +57,41 @@ export function SenseCanRim (positions, { center = null } = {})
     return { center : axis, bottomMm : minY, topMm : maxY, heightMm : height, diameterMm : Math.max (width, depth), rimRadiusMm : rim, rimBottomMm : rimBottom, rimHeightMm : rimHeight, neckRadiusMm : neck, undercutMm : rim - neck };
 }
 
+// Conservative radial envelope of triangle surfaces through the actual board slab.
+// Clipping at both slab planes includes sloped neck faces even when no mesh vertex lies in the slab.
+export function CanRadiusInSlab (positions, center, bottom, top)
+{
+    if (!positions.length || positions.length % 9 || !Array.isArray (center) || center.length !== 2 || !center.every (Number.isFinite) || !Number.isFinite (bottom) || !Number.isFinite (top) || bottom >= top) { throw new Error ('Invalid can collar slab.'); }
+    let radius = 0;
+    const include = (x, z) => { radius = Math.max (radius, Math.hypot (x - center[0], z - center[1])); };
+    for (let i = 0; i < positions.length; i += 9) {
+        for (let j = 0; j < 3; j++) {
+            const a = i + j * 3, b = i + ((j + 1) % 3) * 3, y = positions[a + 1], nextY = positions[b + 1];
+            if (y >= bottom && y <= top) { include (positions[a], positions[a + 2]); }
+            for (const plane of [bottom, top]) {
+                if ((y < plane && nextY > plane) || (y > plane && nextY < plane)) { const f = (plane - y) / (nextY - y); include (positions[a] + (positions[b] - positions[a]) * f, positions[a + 2] + (positions[b + 2] - positions[a + 2]) * f); }
+            }
+        }
+    }
+    if (!Number.isFinite (radius) || radius <= 0) { throw new Error ('No can surface was found through the collar thickness.'); }
+    return radius;
+}
+
+function HoleInnerRadius (points, center)
+{
+    return Math.min (...points.map ((p, i) => { const q = points[(i + 1) % points.length], dx = q[0] - p[0], dy = q[1] - p[1], f = Math.max (0, Math.min (1, ((center[0] - p[0]) * dx + (center[1] - p[1]) * dy) / (dx * dx + dy * dy))); return Math.hypot (p[0] + f * dx - center[0], p[1] + f * dy - center[1]); }));
+}
+
 // Collar profile for cans at world centres (x, z mm), all with the same rim radius.
-export function CreateCanCollarPlan ({ cans, rimRadiusMm, thickness, tuckMm = DefaultCollarOptions.tuckMm, reliefMm = DefaultCollarOptions.reliefMm, marginMm = DefaultCollarOptions.marginMm, cornerRadiusMm = null, tabs = 0, notchWidthMm = DefaultCollarOptions.notchWidthMm, webMm = DefaultCollarOptions.webMm, name = 'Can collar', grade = 'Custom' } = {})
+export function CreateCanCollarPlan ({ cans, rimRadiusMm, neckRadiusMm = null, thickness, tuckMm = null, reliefMm = DefaultCollarOptions.reliefMm, marginMm = DefaultCollarOptions.marginMm, cornerRadiusMm = null, tabs = 0, notchWidthMm = DefaultCollarOptions.notchWidthMm, webMm = DefaultCollarOptions.webMm, name = 'Can collar', grade = 'Custom' } = {})
 {
     if (!Array.isArray (cans) || cans.length < 1 || cans.length > MaxCollarCans) { throw new Error ('A can collar holds 1–' + MaxCollarCans + ' cans.'); }
     cans.forEach ((can, i) => { if (!Array.isArray (can) || can.length !== 2 || !can.every (Number.isFinite)) { throw new Error ('Can ' + (i + 1) + ' needs an [x, z] centre in mm.'); } });
     const rim = range (rimRadiusMm, 'Rim radius', 2, 200), t = range (thickness, 'Collar caliper', 0.1, 5);
+    const automaticTuck = tuckMm === null; tuckMm ??= DefaultCollarOptions.tuckMm; const requestedTuckMm = tuckMm;
     range (tuckMm, 'Tuck', 0.3, Math.min (10, rim * 0.4)); range (reliefMm, 'Relief beyond the rim', 0.5, 20); range (marginMm, 'Edge margin', 1, 50); range (notchWidthMm, 'Relief slit width', 0.3, 5); range (webMm, 'Board web between holes', 0.5, 20);
-    const holeRadius = rim - tuckMm;
+    if (neckRadiusMm !== null) { range (neckRadiusMm, 'Neck radius', 0.001, rim); }
+    let holeRadius = rim - tuckMm;
     // Reliefs reach past the rim, but always leave a web of board between neighbouring holes.
     let nearest = Infinity;
     for (let i = 0; i < cans.length; i++) { for (let j = i + 1; j < cans.length; j++) { nearest = Math.min (nearest, Math.hypot (cans[i][0] - cans[j][0], cans[i][1] - cans[j][1])); } }
@@ -81,8 +109,16 @@ export function CreateCanCollarPlan ({ cans, rimRadiusMm, thickness, tuckMm = De
     // Spend the 2000-point design budget evenly across the holes: fewer points along each tab tip for big packs.
     const perHole = (PointBudget - outline.length) / cans.length, tipPoints = Math.max (0, Math.min (3, Math.floor (perHole / tabCount) - 3));
     if (tabCount * 3 > perHole) { throw new Error ('Too many tabs for ' + cans.length + ' cans. Use fewer tabs.'); }
+    if (neckRadiusMm !== null && automaticTuck) {
+        // Tab tips are straight chords. Their inscribed radius, not just their vertex radius, must clear the neck.
+        holeRadius = Math.max (holeRadius, (neckRadiusMm + CollarNeckClearanceMm) / Math.cos (Math.PI / tabCount / (tipPoints + 1)));
+        tuckMm = rim - holeRadius;
+        if (tuckMm < 0.3) { throw new Error ('The can neck leaves too little room for a flat collar with this board and tab count. Choose a thinner board or more tabs.'); }
+    }
     const shift = p => [p[0] - min[0], p[1] - min[1]];
     const holes = cans.map ((can, i) => ({ id : 'can-' + (i + 1), type : 'cut', closed : true, points : ReliefHoleOutline ({ center : [can[0], -can[1]], holeRadius, reliefRadius, tabs : tabCount, notchWidthMm, tipPoints, rotation : Math.PI / tabCount }).map (shift) }));
+    const innerRadius = HoleInnerRadius (holes[0].points, shift ([cans[0][0], -cans[0][1]]));
+    if (neckRadiusMm !== null && innerRadius < neckRadiusMm + CollarNeckClearanceMm - 1e-7) { throw new Error ('This tuck intersects the can neck through the collar thickness. Reduce tuck or leave it blank for automatic fit.'); }
     const paths = [{ id : 'outline', type : 'cut', closed : true, points : outline.map (shift) }, ...holes];
     PackagingContours ({ version : 1, name, grade, thickness : t, paths }); // Throws if any hole crosses the outline or another hole.
     // Measurement layer: overall length and width across the outline, and the first hole's tab tip and relief
@@ -99,5 +135,5 @@ export function CreateCanCollarPlan ({ cans, rimRadiusMm, thickness, tuckMm = De
     engineering.dimensions = references.map (ref => ({ ...ref, mode : 'auto', basis : 'score', targetMm : null, toleranceMm : null }));
     const profile = ValidatePackaging ({ version : 1, name, grade, thickness : t, paths, engineering });
     const lengthMm = max[0] - min[0], widthMm = max[1] - min[1];
-    return { version : 1, units : 'mm', kind : 'can-collar', cans : cans.length, thicknessMm : t, rimRadiusMm : rim, holeRadiusMm : holeRadius, reliefRadiusMm : reliefRadius, tuckMm, tabs : tabCount, notchWidthMm, cornerRadiusMm : radius, marginMm, webMm : Math.min (...cans.flatMap ((a, i) => cans.slice (i + 1).map (b => Math.hypot (a[0] - b[0], a[1] - b[1]) - 2 * reliefRadius)), Infinity), sizeMm : { length : lengthMm, width : widthMm }, worldMinMm : [min[0], -max[1]], points : profile.paths.reduce ((sum, p) => sum + p.points.length, 0), profile };
+    return { version : 1, units : 'mm', kind : 'can-collar', cans : cans.length, thicknessMm : t, rimRadiusMm : rim, holeRadiusMm : holeRadius, reliefRadiusMm : reliefRadius, tuckMm, requestedTuckMm, automaticTuck, neckRadiusMm, neckClearanceMm : neckRadiusMm === null ? null : innerRadius - neckRadiusMm, tabs : tabCount, notchWidthMm, cornerRadiusMm : radius, marginMm, webMm : Math.min (...cans.flatMap ((a, i) => cans.slice (i + 1).map (b => Math.hypot (a[0] - b[0], a[1] - b[1]) - 2 * reliefRadius)), Infinity), sizeMm : { length : lengthMm, width : widthMm }, worldMinMm : [min[0], -max[1]], points : profile.paths.reduce ((sum, p) => sum + p.points.length, 0), profile };
 }
