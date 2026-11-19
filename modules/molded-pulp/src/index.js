@@ -12,8 +12,8 @@ export { PulpDefinition, ValidatePulpDefinition, MaxStoredProducts } from './def
 export { NurbsShell, MaxOutputSide } from './nurbs/shell.js';
 export { ShellBrep, BrepEdgeUses } from './nurbs/brep.js';
 export { WriteStep, WriteSurfaceStep, StepReal } from './nurbs/step.js';
-export { ProductSurface, ProductSurfaceProblem, SurfaceEdgeUses } from './nurbs/surface.js';
-export { Degree, ClampedKnots, Greville, FindSpan, BasisFuns, CurvePoint, SurfacePoint, AxisBasis, FitGrid, FitAxis, EvalGrid, KnotSpans, InsertKnot, ClampUniformPeriodic } from './nurbs/bspline.js';
+export { ProductSurface, ProductSurfaceProblem, SurfaceEdgeUses, EndBlend, FloorBlend, PlateauLand } from './nurbs/surface.js';
+export { Degree, ClampedKnots, Greville, FindSpan, BasisFuns, CurvePoint, SurfacePoint, AxisBasis, FitGrid, FitAxis, EvalGrid, KnotSpans, InsertKnot, ClampUniformPeriodic, SplitSurfaceV, SplitSurfaceU } from './nurbs/bspline.js';
 export { IsoContours } from './nurbs/contours.js';
 export { FitPeriodic, PeriodicPoint, SeamOrder } from './nurbs/periodic.js';
 export { SurfaceDistance } from './nurbs/measure.js';

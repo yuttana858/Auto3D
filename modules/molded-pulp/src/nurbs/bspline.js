@@ -215,3 +215,15 @@ export function SplitSurfaceV (surface, v)
     // Knot v at indices s … s + q − 1: the curve passes through control s − 1 there.
     return { lower : part (0, s, [...knots.subarray (0, s + q), v]), upper : part (s - 1, rows, [v, ...knots.subarray (s)]) };
 }
+
+// The same split in the U direction (by transposing): { left, right } meet in the iso curve at u.
+export function SplitSurfaceU (surface, u)
+{
+    const transpose = sf => {
+        const points = new Float64Array (sf.points.length);
+        for (let b = 0; b < sf.countV; b++) { for (let a = 0; a < sf.countU; a++) { for (let k = 0; k < 3; k++) { points[(a * sf.countV + b) * 3 + k] = sf.points[(b * sf.countU + a) * 3 + k]; } } }
+        return { ...sf, degreeU : sf.degreeV, degreeV : sf.degreeU, knotsU : sf.knotsV, knotsV : sf.knotsU, countU : sf.countV, countV : sf.countU, points };
+    };
+    const { lower, upper } = SplitSurfaceV (transpose (surface), u);
+    return { left : transpose (lower), right : transpose (upper) };
+}

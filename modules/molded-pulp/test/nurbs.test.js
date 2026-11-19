@@ -5,7 +5,7 @@ import { ClampedKnots, Greville, FindSpan, BasisFuns, CurvePoint, SurfacePoint, 
 import { NurbsShell, MaxOutputSide } from '../src/nurbs/shell.js';
 import { ShellBrep, BrepEdgeUses } from '../src/nurbs/brep.js';
 import { WriteStep, WriteSurfaceStep, StepReal } from '../src/nurbs/step.js';
-import { ProductSurface, ProductSurfaceProblem, SurfaceEdgeUses, FloorBlend } from '../src/nurbs/surface.js';
+import { ProductSurface, ProductSurfaceProblem, SurfaceEdgeUses, FloorBlend, EndBlend } from '../src/nurbs/surface.js';
 import { ClampUniformPeriodic, InsertKnot, SplitSurfaceV } from '../src/nurbs/bspline.js';
 import { FormShell } from '../src/plan.js';
 import { PulpTypes } from '../src/state.js';
@@ -13,7 +13,7 @@ import { IsoContours, PolygonArea } from '../src/nurbs/contours.js';
 import { SeamOrder, FitPeriodic, PeriodicPoint, OutlineDeviation } from '../src/nurbs/periodic.js';
 import { SurfaceDistance } from '../src/nurbs/measure.js';
 import { LoftPocketWalls } from '../src/nurbs/loft.js';
-import { FitOpen, OpenPoint, OpenKnots, OpenParams, OutlineCorners } from '../src/nurbs/open.js';
+import { FitOpen, OpenPoint, OpenKnots, OpenParams, OutlineCorners, RoundedOutline } from '../src/nurbs/open.js';
 
 function Cylinder (cx, cz, radius, height, out, segments = 48)
 {
@@ -205,7 +205,8 @@ describe ('Molded Pulp smooth product surface output', function () {
         // Skirt sides share one height knot vector, so neighbours share their corner columns.
         const sides = loft.walls.filter (w => w.kind === 'skirt'); assert.equal (new Set (sides.map (w => w.heightControls)).size, 1);
         const surface = ProductSurface (loft, { baseY : shell.rect.baseY, id : 'Tray' });
-        assert.equal (surface.faces.length, 17); assert.deepEqual (surface.faces.map (f => f.kind).filter (k => k === 'plane').length, 7);
+        // Closed pocket walls are written as two halves each: 12 + 4 skirt sides + 6 floors + the plateau.
+        assert.equal (surface.faces.length, 23); assert.deepEqual (surface.faces.map (f => f.kind).filter (k => k === 'plane').length, 7);
         // Every edge is used once in each direction, except the four open skirt bottom edges (once each).
         const uses = SurfaceEdgeUses (surface), once = uses.filter (u => u.forward + u.reversed === 1);
         assert.equal (once.length, 4); assert.ok (uses.every (u => (u.forward === 1 && u.reversed === 1) || u.forward + u.reversed === 1));
@@ -216,20 +217,20 @@ describe ('Molded Pulp smooth product surface output', function () {
         for (const face of surface.faces.filter (f => f.kind === 'plane')) {
             for (const b of face.bounds) { for (const [e] of b.loop) { assert.ok (surface.edges[e].points.every (p => Math.abs (p[1] - face.origin[1]) < 1e-9), face.name); } }
         }
-        // Face normals (Su × Sv, flipped when not sameSense) point to the product side: into each pocket (towards the mean of
-        // its controls) and away from the tray on the skirt.
+        // Face normals (Su × Sv, flipped when not sameSense) point to the product side: into each pocket (towards its seed)
+        // and away from the tray on the skirt.
         const centre = [shell.rect.x0 + shell.rect.lengthMm / 2, shell.rect.z0 + shell.rect.widthMm / 2];
         for (const face of surface.faces.filter (f => f.kind === 'bspline')) {
             const sf = face.surface, u = 0.37 * sf.knotsU.at (-1) + 0.63 * sf.knotsU[0], v = (sf.knotsV[0] + sf.knotsV.at (-1)) / 2, h = 1e-5;
             const p = SurfacePoint (sf, u, v), du = SurfacePoint (sf, u + h, v).map ((x, i) => x - p[i]), dv = SurfacePoint (sf, u, v + h).map ((x, i) => x - p[i]);
             const n = [du[1] * dv[2] - du[2] * dv[1], du[2] * dv[0] - du[0] * dv[2], du[0] * dv[1] - du[1] * dv[0]].map (x => face.sameSense ? x : -x);
-            let mx = 0, mz = 0; for (let k = 0; k < sf.points.length; k += 3) { mx += sf.points[k]; mz += sf.points[k + 2]; } mx /= sf.points.length / 3; mz /= sf.points.length / 3;
-            const towards = face.name.startsWith ('Pocket') ? [mx - p[0], mz - p[2]] : [p[0] - centre[0], p[2] - centre[1]];
+            const pocket = loft.walls.find (w => w.kind === 'pocket' && (face.name === w.id + ' a' || face.name === w.id + ' b'));
+            const towards = pocket ? [pocket.seed[0] - p[0], pocket.seed[1] - p[2]] : [p[0] - centre[0], p[2] - centre[1]];
             assert.ok (n[0] * towards[0] + n[2] * towards[1] > 0, face.name + ' faces the product side');
         }
         const text = WriteSurfaceStep ([surface], { name : 'Six can tray', timestamp : '2026-11-19T00:00:00' });
         assert.match (text, /^ISO-10303-21;/); assert.match (text, /OPEN_SHELL\('Tray'/); assert.match (text, /SHELL_BASED_SURFACE_MODEL/); assert.match (text, /MANIFOLD_SURFACE_SHAPE_REPRESENTATION/);
-        assert.equal ((text.match (/ADVANCED_FACE\(/g) || []).length, 17); assert.equal ((text.match (/EDGE_CURVE\(/g) || []).length, surface.edges.length);
+        assert.equal ((text.match (/ADVANCED_FACE\(/g) || []).length, 23); assert.equal ((text.match (/EDGE_CURVE\(/g) || []).length, surface.edges.length);
         assert.throws (() => WriteSurfaceStep ([]), /Form a tray/);
 
         // Floor fillets: each wall is split exactly at floor + r and a cubic blend joins it to the floor, tangent to both.
@@ -247,8 +248,52 @@ describe ('Molded Pulp smooth product surface output', function () {
             assert.ok (Math.hypot (...cross) < 1e-6 * Math.hypot (...b1) * Math.hypot (...w1), 'tangent to the wall');
         }
         const filleted = ProductSurface (loft, { baseY : shell.rect.baseY, id : 'Tray', floorFilletMm : 4 });
-        assert.equal (filleted.faces.length, 23); assert.equal (filleted.faces.filter (f => f.name.endsWith ('floor fillet')).length, 6);
+        assert.equal (filleted.faces.length, 35); assert.equal (filleted.faces.filter (f => / floor fillet [ab]$/.test (f.name)).length, 12);
         assert.equal (SurfaceEdgeUses (filleted).filter (u => u.forward + u.reversed === 1).length, 4);
-        assert.match (ProductSurfaceProblem (loft, { floorFilletMm : 20 }), /at most 40% of the form depth/);
+        assert.match (ProductSurfaceProblem (loft, { floorFilletMm : 30 }), /at most 80% of the form depth/);
+        assert.match (ProductSurfaceProblem (loft, { rimFilletMm : 4 }), /Round the skirt corners/);
+    });
+});
+
+describe ('Molded Pulp fully rounded product surface', function () {
+    this.timeout (180000);
+    it ('rounds the skirt corners and fillets every rim, tangent to the walls and the plateau', () => {
+        const base = { ...DefaultPulpDraft ('type2'), formDepthMm : 35, detail : 'standard', ribs : 'off', lugs : 'off', skirtWall : true };
+        const loftOf = draft => { const shell = FormShell (SixPack (86, 48), draft, { keepSurfaces : true }); return { shell, loft : LoftPocketWalls (shell.grid, shell.surfaces.top, { depthMm : shell.metrics.achievedDepthMm, wallToleranceMm : 0.25 * PulpTypes.type2.toleranceMm, skirtWall : true, skirtCornerMm : 10 }) }; };
+        // Default extra material leaves 3.5 mm of plateau between the corner pockets and the skirt: no room for 4 mm rims.
+        const narrow = loftOf (base).loft;
+        assert.equal (narrow.ok, true, narrow.reason); assert.match (ProductSurfaceProblem (narrow, { rimFilletMm : 4 }), /too narrow for two 4 mm rim fillets/);
+        const { shell, loft } = loftOf ({ ...base, extraLengthMm : 40, extraWidthMm : 40 });
+        const skirt = loft.walls.find (w => w.kind === 'skirt');
+        assert.equal (skirt.id, 'Outer skirt'); assert.equal (skirt.surface.closedU, true); assert.ok (skirt.withinTolerance, String (skirt.maxDistanceMm));
+        assert.equal (ProductSurfaceProblem (loft, { floorFilletMm : 4, rimFilletMm : 4 }), null);
+        const surface = ProductSurface (loft, { baseY : shell.rect.baseY, floorFilletMm : 4, rimFilletMm : 4 });
+        // 6 pockets × 3 bands × 2 halves, the skirt and its top fillet × 2 halves, 6 floors, the plateau.
+        assert.equal (surface.faces.length, 47);
+        const uses = SurfaceEdgeUses (surface); assert.equal (uses.filter (u => u.forward + u.reversed === 1).length, 2, 'only the skirt bottom is open');
+        assert.ok (uses.every (u => (u.forward === 1 && u.reversed === 1) || u.forward + u.reversed === 1));
+        const plateau = surface.faces.find (f => f.name === 'Plateau'); assert.equal (plateau.bounds.length, 7);
+        for (const b of plateau.bounds) { for (const [e] of b.loop) { assert.ok (surface.edges[e].points.every (p => Math.abs (p[1] - plateau.origin[1]) < 1e-9)); } }
+        // Rim blend: meets the trimmed wall and leaves the plateau horizontally (tangent to both).
+        const wall = loft.walls[0], { wall : trimmed, surface : rim } = EndBlend (wall.surface, wall.seed, 4, 'top', -1), top = trimmed.knotsV.at (-1), h = 1e-6;
+        for (let q = 0; q <= 20; q++) {
+            const u = q / 20, a = SurfacePoint (rim, u, 0), w = SurfacePoint (trimmed, u, top);
+            assert.ok (Math.hypot (a[0] - w[0], a[1] - w[1], a[2] - w[2]) < 1e-9);
+            const r1 = SurfacePoint (rim, u, 1); assert.ok (Math.abs (r1[1] - (top + 4)) < 1e-9, 'ends on the plateau');
+            assert.ok (Math.abs (SurfacePoint (rim, u, 1 - h)[1] - r1[1]) < 1e-9, 'horizontal into the plateau');
+            const b0 = SurfacePoint (rim, u, h).map ((x, i) => x - a[i]), w0 = SurfacePoint (trimmed, u, top - h).map ((x, i) => w[i] - x);
+            const cross = [b0[1] * w0[2] - b0[2] * w0[1], b0[2] * w0[0] - b0[0] * w0[2], b0[0] * w0[1] - b0[1] * w0[0]];
+            assert.ok (Math.hypot (...cross) < 1e-6 * Math.hypot (...b0) * Math.hypot (...w0), 'tangent to the wall');
+            // Away from the pocket: the plateau side of the rim is farther from the seed than the wall top.
+            assert.ok (Math.hypot (r1[0] - wall.seed[0], r1[2] - wall.seed[1]) > Math.hypot (w[0] - wall.seed[0], w[2] - wall.seed[1]));
+        }
+        const text = WriteSurfaceStep ([surface], { name : 'Rounded six can tray', timestamp : '2026-11-19T00:00:00' });
+        assert.equal ((text.match (/ADVANCED_FACE\(/g) || []).length, 47);
+    });
+    it ('rebuilds a sharp-cornered outline with tangent arcs', () => {
+        const rect = []; for (let i = 0; i < 40; i++) { rect.push ([i, 0]); } for (let i = 0; i < 20; i++) { rect.push ([40, i]); } for (let i = 40; i > 0; i--) { rect.push ([i, 20]); } for (let i = 20; i > 0; i--) { rect.push ([0, i]); }
+        const r = RoundedOutline (rect, OutlineCorners (rect), 5);
+        assert.ok (r.apexes.every ((p, i) => Math.hypot (p[0] - [0, 40, 40, 0][i], p[1] - [0, 0, 20, 20][i]) < 1e-9)); assert.ok (Math.abs (r.reach - 5) < 1e-9);
+        const arc = r.points.filter (p => p[0] < 5 && p[1] < 5).map (p => Math.hypot (p[0] - 5, p[1] - 5)); assert.ok (arc.length > 5 && arc.every (d => Math.abs (d - 5) < 1e-9));
     });
 });

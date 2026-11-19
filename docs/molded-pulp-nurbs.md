@@ -220,10 +220,31 @@ On real Primary Products cans (3 × 2, 20 mm gap, Type 2, 35 mm, standard):
    | (a) Local | Tool side from the review field as Phase 1 degree-1 faces, joined to the smooth product side by a foot band at the sheet edge | Valid now, but the tool side stays dense |
    | (b) Cloud (recommended) | Cloud 3D Studio's OpenCASCADE thickens the smooth product-side shell (`BRepOffsetAPI_MakeThickSolid`) and returns a validated STEP | Compact and smooth on both sides, with ridges handled by the kernel |
    | (c) Local offset | Offset each product-side face and intersect neighbours ourselves | The most work and the least robust |
-5. Rim and floor fillets as the loft's end sections.
-5. Tool side by offsetting the outlines by the thickness in plan.
-6. Faces with inner loops in `brep.js`, sewing, and STEP output of the lofted shell. Then the OpenCASCADE gate.
-7. T2: split walls into bands at the join height, plus a saddle patch. Until then, the shell keeps the Phase 1 output and reports why.
+   **Decided: (b) Cloud.** See "Product surface output and the tool side" below.
+5. T2: split walls into bands at the join height, plus a saddle patch. Until then, the shell keeps the Phase 1 output and reports why.
+6. Domed can bases: fitted floor patches (today `patch-needed`).
+7. In the app: an "Export smooth surface (STEP)" action and agent command, then the owned cloud thicken job.
+
+#### Product surface output and the tool side
+
+`ProductSurface` (`src/nurbs/surface.js`) builds the product side as one open shell; `WriteSurfaceStep` writes it as an AP214 `OPEN_SHELL` in mm.
+- **Topology.** Pocket walls, the skirt, floor planes and the plateau with a hole per pocket. Neighbours share their boundary curves exactly: closed walls are clamped by knot insertion, so every boundary is a control row or column. Only the skirt bottom is open.
+- **Halves.** Closed walls and blends are written as two halves (u in [0, ½] and [½, 1]); OpenCASCADE reports a face that closes on itself as self-intersecting.
+- **Fillets** (`floorFilletMm`, `rimFilletMm`). `EndBlend` splits a wall exactly at r from its floor or top and adds a cubic blend with the wall's U knots. The blend is tangent to the plane (horizontal handles) and to the wall (handles along its height derivative at one constant scale).
+- **Rounded skirt** (`skirtCornerMm` in `LoftPocketWalls`). Each level's skirt outline becomes straight sides (least-squares lines) joined by tangent arcs, and the skirt is lofted as one closed wall. The review distance skips the corner zones, which leave the review's sharp corners on purpose; there each outline fit is held to its own rounded outline.
+- **Checks before writing** (`ProductSurfaceProblem`): the skirt is on; rim fillets need the rounded (closed) skirt; floors are flat; the fillets fit the depth; and every plateau strip (`PlateauLand`) holds two rim fillets.
+
+Cloud 3D Studio thickens the surface (`cloud3d thicken`, Cloud 3D Studio `docs/pulp-thicken.md`). Results on T1 (Type 2, 35 mm, standard detail):
+
+| Product surface | Thickening (inside) |
+| --- | --- |
+| Sharp creases (17 faces) | One valid solid up to 1.8 mm; from 2 mm OCCT splits pocket floors off |
+| Floor fillets only (4 mm) | Same: pockets with the plateau, or the skirt with the plateau, thicken at 3 mm; the full tray does not |
+| Every crease rounded: 4 mm floor and rim fillets, 10 mm skirt corners, 40 mm extra material (47 faces) | One offset, no joins, at 2, 3 and 4 mm. Every sample passes, minimum thickness equals the request, volume within 1% of area × t. The bounded job publishes STEP and manifest at 3 mm |
+
+Design limits:
+- A rim radius must exceed the pulp thickness, because it shrinks by the thickness on the tool side.
+- Each plateau strip must hold two rim fillets. With the default 20 mm extra material, T1 has only 3.5 mm of plateau between the corner pockets and the skirt, so 3 mm pulp with rounded rims needs more extra material.
 
 ## Phase 3: Cloud 3D Studio
 

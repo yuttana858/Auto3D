@@ -4,9 +4,9 @@
 // placement). Outlines come from iso-contours of the review field; the result is checked by true 3D distance to it.
 import { Degree, ClampedKnots, Greville, AxisBasis, FitAxis, FindSpan, BasisFuns, ClampUniformPeriodic } from './bspline.js';
 import { IsoContours, Centroid, PolygonArea, OutlineWindow } from './contours.js';
-import { SeamOrder, FitPeriodic, PeriodicPoint } from './periodic.js';
+import { SeamOrder, FitPeriodic, PeriodicPoint, OutlineDeviation } from './periodic.js';
 import { SurfaceDistance } from './measure.js';
-import { OpenKnots, OpenPoint, OpenParams, FitOpen, OutlineCorners } from './open.js';
+import { OpenKnots, OpenPoint, OpenParams, FitOpen, OutlineCorners, RoundedOutline } from './open.js';
 
 function Inside (points, x, z)
 {
@@ -27,7 +27,7 @@ function PeriodicKnots (m) { return Float64Array.from ({ length : m + 2 * Degree
 // limit), levelStepMm, insetMm (levels stop this far from floor and plateau; the creases become fillets later).
 // floorMm: the floor height of this surface (0 for the product side; −thickness for the tool side); depthMm is the plateau
 // height, measured on the same scale.
-export function LoftPocketWalls (grid, H, { depthMm, floorMm = 0, outlineToleranceMm = Math.max (0.15, 0.6 * Math.max (grid.dx, grid.dz)), wallToleranceMm = 0.3, levelStepMm = 1, insetMm = 0.25, maxOutlineControls = 256, skirtWall = false } = {})
+export function LoftPocketWalls (grid, H, { depthMm, floorMm = 0, outlineToleranceMm = Math.max (0.15, 0.6 * Math.max (grid.dx, grid.dz)), wallToleranceMm = 0.3, levelStepMm = 1, insetMm = 0.25, maxOutlineControls = 256, skirtWall = false, skirtCornerMm = 0 } = {})
 {
     const lo = floorMm + insetMm, hi = depthMm - insetMm;
     if (!(hi - lo > 2 * levelStepMm)) { return { ok : false, reason : 'The form depth is too shallow for lofted walls.', walls : [], merges : [] }; }
@@ -81,10 +81,13 @@ export function LoftPocketWalls (grid, H, { depthMm, floorMm = 0, outlineToleran
     // a straight side stays at a few controls instead of following the review grid's ripple. open: sides between two
     // corners (clamped cubics with pinned ends) instead of closed loops.
     // heightControls: use exactly this many height controls (sides that meet at corners share one height knot vector).
-    const loft = (outlines, seed, id, kind, open = false, heightControls = 0) => {
+    // exempt (x, z): plan points the review surface does not judge (rounded skirt corners, which leave the review's sharp
+    // corners on purpose); there each outline fit is held to its own outline instead.
+    const loft = (outlines, seed, id, kind, open = false, heightControls = 0, exempt = null) => {
         let best = null;
         for (let m = open ? 4 : 12; ; m = Math.min (maxOutlineControls, Math.ceil (m * 1.5))) {
             const fits = outlines.map (o => open ? FitOpen (o.points, o.params, m) : FitPeriodic (o.points, o.params, m));
+            const outlineError = exempt ? Math.max (...outlines.map ((o, k) => OutlineDeviation (o.points, fits[k], 8, o.params))) : 0;
             const knotsU = open ? OpenKnots (m) : PeriodicKnots (m), values = new Float64Array (count * m * 2);
             for (let k = 0; k < count; k++) { for (let i = 0; i < m; i++) { values[(k * m + i) * 2] = fits[k][i][0]; values[(k * m + i) * 2 + 1] = fits[k][i][1]; } }
             for (let n = heightControls || 4; ; n = Math.min (count, n * 2)) {
@@ -92,10 +95,10 @@ export function LoftPocketWalls (grid, H, { depthMm, floorMm = 0, outlineToleran
                 const controls = FitAxis (values, m * 2, AxisBasis (knotsV, vs));
                 const ringAt = v => { const s = FindSpan (knotsV, v), N = BasisFuns (knotsV, s, v), ring = []; for (let i = 0; i < m; i++) { let x = 0, z = 0; for (let r = 0; r <= Degree; r++) { const b = s - Degree + r; x += N[r] * controls[(b * m + i) * 2]; z += N[r] * controls[(b * m + i) * 2 + 1]; } ring.push ([x, z]); } return ring; };
                 // Worst 3D distance over the wall, stopping at the first sample beyond the tolerance (a failed try is cheap).
-                let max = 0; const rows = 2 * (count - 1);
+                let max = outlineError; const rows = 2 * (count - 1);
                 rows : for (let r = 0; r <= rows; r++) {
                     const v = v0 + (v1 - v0) * r / rows, ring = ringAt (v);
-                    for (let q = 0; q <= 2 * m - (open ? 0 : 1); q++) { const [x, z] = open ? OpenPoint (ring, knotsU, q / (2 * m)) : PeriodicPoint (ring, q / (2 * m)); max = Math.max (max, distance (x, v, z)); if (max > wallToleranceMm) { break rows; } }
+                    for (let q = 0; q <= 2 * m - (open ? 0 : 1); q++) { const [x, z] = open ? OpenPoint (ring, knotsU, q / (2 * m)) : PeriodicPoint (ring, q / (2 * m)); if (exempt?.(x, z)) { continue; } max = Math.max (max, distance (x, v, z)); if (max > wallToleranceMm) { break rows; } }
                 }
                 const wall = { m, n, knotsU, knotsV, controls, gv : Greville (knotsV), max };
                 if (!best || wall.max < best.max) { best = wall; }
@@ -136,7 +139,15 @@ export function LoftPocketWalls (grid, H, { depthMm, floorMm = 0, outlineToleran
         // corners and loft each side between them. Neighbouring sides share the corner points, so they meet in a common
         // corner edge. Without stable corners (a rounded outline) the skirt is one closed loft.
         const corners = skirt.map (o => OutlineCorners (o.points));
-        if (corners[0].length >= 3 && corners.every (c => c.length === corners[0].length)) {
+        const cornered = corners[0].length >= 3 && corners.every (c => c.length === corners[0].length);
+        if (cornered && skirtCornerMm > 0) {
+            // Rounded plan corners: every level's sides become straight lines joined by arcs of skirtCornerMm, and the skirt
+            // is one closed wall like a pocket. Points near the sharp review corners are exempt from the review distance.
+            const rounded = skirt.map ((o, k) => RoundedOutline (o.points, corners[k], skirtCornerMm));
+            const reach = Math.max (...rounded.map (r => r.reach)) + 1.5, apexes = rounded.flatMap (r => r.apexes);
+            const exempt = (x, z) => apexes.some (([ax, az]) => Math.hypot (x - ax, z - az) <= reach);
+            walls.push (loft (rounded.map (r => SeamOrder (r.points, centre)), centre, 'Outer skirt', 'skirt', false, 0, exempt));
+        } else if (cornered) {
             const stacks = corners[0].map ((_, side) => skirt.map ((o, k) => {
                 const c = corners[k], from = c[side], to = c[(side + 1) % c.length], points = [];
                 for (let i = from; ; i = (i + 1) % o.points.length) { points.push (o.points[i]); if (i === to) { break; } }

@@ -65,3 +65,38 @@ export function OutlineCorners (points, { spanMm = 3, minDeg = 50, minGap = 10 }
     }
     return corners.sort ((a, b) => a - b);
 }
+
+// A closed outline with sharp corners (indices from OutlineCorners) rebuilt as straight sides joined by arcs of radius r:
+// each side is the least-squares line through its middle 80%, neighbouring lines meet at an apex, and the arc is tangent
+// to both. Returns { points (about every spacingMm), apexes, reach (largest apex-to-tangent-point distance) }.
+export function RoundedOutline (points, corners, r, spacingMm = 0.5)
+{
+    const n = points.length, k = corners.length, lines = [];
+    for (let i = 0; i < k; i++) {
+        const from = corners[i], to = corners[(i + 1) % k], side = [];
+        for (let j = from; ; j = (j + 1) % n) { side.push (points[j]); if (j === to) { break; } }
+        const middle = side.slice (Math.floor (side.length * 0.1), Math.ceil (side.length * 0.9));
+        const cx = middle.reduce ((s, p) => s + p[0], 0) / middle.length, cz = middle.reduce ((s, p) => s + p[1], 0) / middle.length;
+        let xx = 0, xz = 0, zz = 0; for (const [x, z] of middle) { xx += (x - cx) ** 2; xz += (x - cx) * (z - cz); zz += (z - cz) ** 2; }
+        const angle = 0.5 * Math.atan2 (2 * xz, xx - zz); let d = [Math.cos (angle), Math.sin (angle)];
+        // Point the direction along the outline (from this side's start corner to its end corner).
+        if ((side.at (-1)[0] - side[0][0]) * d[0] + (side.at (-1)[1] - side[0][1]) * d[1] < 0) { d = [-d[0], -d[1]]; }
+        lines.push ({ c : [cx, cz], d });
+    }
+    const meet = (a, b) => { const det = a.d[0] * -b.d[1] + b.d[0] * a.d[1], t = ((b.c[0] - a.c[0]) * -b.d[1] + b.d[0] * (b.c[1] - a.c[1])) / det; return [a.c[0] + t * a.d[0], a.c[1] + t * a.d[1]]; };
+    const apexes = lines.map ((line, i) => meet (lines[(i - 1 + k) % k], line));
+    const out = [], arcs = []; let reach = 0;
+    for (let i = 0; i < k; i++) {
+        const a = lines[(i - 1 + k) % k].d, b = lines[i].d, Q = apexes[i], cross = a[0] * b[1] - a[1] * b[0], turn = Math.atan2 (Math.abs (cross), a[0] * b[0] + a[1] * b[1]);
+        const t = r * Math.tan (turn / 2); reach = Math.max (reach, t);
+        const tin = [Q[0] - a[0] * t, Q[1] - a[1] * t], side = Math.sign (cross) || 1, centre = [tin[0] - a[1] * r * side, tin[1] + a[0] * r * side];
+        const start = Math.atan2 (tin[1] - centre[1], tin[0] - centre[0]), steps = Math.max (2, Math.ceil (r * turn / spacingMm));
+        arcs.push (Array.from ({ length : steps + 1 }, (_, s) => { const g = start + side * turn * s / steps; return [centre[0] + r * Math.cos (g), centre[1] + r * Math.sin (g)]; }));
+    }
+    for (let i = 0; i < k; i++) {
+        const arc = arcs[i], next = arcs[(i + 1) % k][0], end = arc.at (-1), length = Math.hypot (next[0] - end[0], next[1] - end[1]), steps = Math.max (1, Math.ceil (length / spacingMm));
+        out.push (...arc);
+        for (let s = 1; s < steps; s++) { out.push ([end[0] + (next[0] - end[0]) * s / steps, end[1] + (next[1] - end[1]) * s / steps]); }
+    }
+    return { points : out, apexes, reach };
+}
