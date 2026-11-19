@@ -1,60 +1,35 @@
-# Auto3D 0.92.0 — Can collar and CAD shape tools
+# Auto3D 0.92.0 / Packaging 1.16.1 / Primary Products 0.15.0 / Molded Pulp 0.3.0
 
-Packaging **1.17.0**, Primary Products 0.15.0, Molded Pulp 0.3.0. Based on main after Auto3D 0.91.1. Not deployed.
+Shared macro library. Based on main after #163 (0.91.1). No module changes.
 
-## Can collar (Accessories)
+## What changed
 
-The Accessories tab has a new **Can collar** section. It adds a paperboard carrier over a selected group or array of upright cans; for a six-pack, array one can 3 × 2.
+- **Macros are saved to the account, in one shared library.** Every signed-in account sees and can run every saved macro (for example `demo1`), from any browser. Previously macros lived only in the browser that saved them.
+- **Owner or administrator only.** A macro can be replaced or deleted only by the account that saved it or by an Auto3D administrator. Everyone else can run and export it. An administrator's replace keeps the original owner and records `updated_by`.
+- **Who saved it.** Each macro shows "by <name>": the account name, or the part of the email before @. Owner IDs and email addresses are not sent to other accounts.
+- **Stale saves are refused.** The dialog sends the listed `revision`; if someone saved the macro since, the save is refused with a message to reload.
+- **Browser macros are not lost.** Macros saved earlier only in a browser still appear, labelled "this browser only". **Move browser macros to shared library** (`macro.library.upload_browser`) copies them over as an explicit action; names already in the library are skipped, never overwritten.
+- **No silent fallback.** If the account API is unavailable, saving fails with a message; nothing is written to browser storage instead.
+- **Limits.** Names are 1–100 characters; macros are version 1 with 1–100 steps and at most 64 KiB; each account can save up to 200 macros.
 
-- **Rim sensing.** Each can's top rim is sensed from its geometry (`SenseCanRim`), so library, imported and Primary Products cans all work. The sensor finds:
-  - the rim radius (widest point in the top of the can)
-  - the rim underside
-  - the neck under it
+## Commands
 
-  A can whose top is not wider than its neck is refused ("No rim to tuck under"). So are cans of different rim sizes and cans standing at different heights.
-- **Holes and tabs.** Each can gets a round hole split into tabs by radial V relief slits.
-  - The tab tips reach **Tuck under rim** inside the rim (default 1.5 mm).
-  - The collar's top face meets the rim underside, so the tabs tuck under the rim.
-  - The slits end **Reliefs past rim** beyond the rim (default 3 mm), so the tabs can flex over it. They always leave at least 1.5 mm of board between neighbouring holes.
-  - Tabs per can are automatic (about one every 11 mm, 8–24), or 4–48 by choice.
-- **Outline.** A rounded rectangle, **Edge margin** beyond the relief rings (default 5 mm). By default the corners follow the corner cans; a corner radius can be set instead.
-- **Board.** SBS 24 pt, CUK 24 pt (default), CUK 28 pt, Kraft 32 pt or Molded fiber 1.2 mm.
-- **In the scene.** The collar is a CAD board profile like the other accessories, grouped with the cans. It lowers onto them with the usual drop-in and is one Undo step.
-  - Its measurement layer shows the overall length and width, the tab-tip diameter and the relief diameter.
-  - It opens in the CAD designer and exports as SVG, EPS or DXF.
-  - A second collar for the same cans is refused.
-- **Display.** The collar is shown flat. In real use the tabs bend up as it is pressed on; the board does not show that bend yet.
+- `macro.list`: every shared macro, with `savedBy`, `mine`, `canEdit`, `revision` and `location` (`shared` or `browser`). `name` and `macro` are unchanged, so `run macro <name>` and saved-macro steps keep working.
+- `macro.save { name, definition, revision? }`: saves to the shared library.
+- `macro.delete { name }`, `macro.export { name }`: work for shared and browser-only macros; deleting someone else's macro is refused before any request.
+- New: `macro.library.inspect` (reachable, administrator, counts) and `macro.library.upload_browser`.
+- `animation.macro.record { name }` finds macros in the shared library.
 
-The planner is pure: `modules/packaging/src/cancollar.js` (`SenseCanRim`, `CreateCanCollarPlan`, `CollarBoards`). The host part is `source/website/cancollarworkspace.js` (`CanCollarWorkspace`, at `packaging.canCollar`).
+## Server and database
 
-## CAD shape tools
+- Route: `functions/api/macros.js` (`GET`, `PUT`, `DELETE`; same-origin writes; 64 KiB body). The verified session user is passed to the database; IDs in the request body are refused.
+- Migration: `supabase/migrations/20261119120000_shared_macro_library.sql` adds `public.auto3d_macros` (unique case-insensitive names) and service-role-only functions `auto3d_macro_save`, `auto3d_macro_delete` and `auto3d_macro_is_admin`. The owner/administrator rule and revision check are enforced in the database. Browser roles (`anon`, `authenticated`) cannot read the table or call the functions. Administrators come from `auto3d_admin_emails`.
+- Shape check shared by browser and server: `source/website/macroshape.js`. The browser also checks that every command exists.
 
-The CAD designer has a new **Shape tools** section (round corners, circle, relief hole). It uses the shared `modules/packaging/src/cadshapes.js`, the same code the collar is built with:
-
-- **Round selected corners.** Replaces the corners of the selected closed outlines with tangent arcs, for convex and concave corners. A radius too big for a corner shrinks to half its shorter edge. One Undo step.
-- **Add circle.** A closed circular path centred on Point X / Y.
-- **Add relief hole.** A round cut hole with tabs and V relief slits (tab radius, relief radius, tabs).
-
-## Agent commands
-
-- `packaging.accessories.collar.inspect` and `packaging.accessories.collar`. Options: `boardId`, `tuckMm`, `reliefMm`, `marginMm`, `cornerRadiusMm`, `tabs`, `notchWidthMm`.
-- `packaging.path.round_corners`, `packaging.path.circle` and `packaging.path.relief_hole`.
+**Deployment order:** apply the migration before the Pages deploy. Until it is applied, the library reports itself unavailable and saves fail; browser-only macros still list and run.
 
 ## Validation
 
-- `npm --prefix modules/packaging test`: 103 passing. New `cancollar.test.js` covers:
-  - fillet geometry and area
-  - concave corners and shrinking a radius that does not fit
-  - circles and relief holes
-  - rim, underside and neck sensing
-  - refusing non-round models and models with no rim
-  - six-pack plan size, holes, web and measurement layer
-  - the point budget for 24 cans
-- `npm test`: 1080 passing.
-- Browser test `can-collar` is in the CI suite. It covers:
-  - a standard beverage can arrayed 3 × 2
-  - inspect, then Add can collar from the panel
-  - grouping, one Undo and Redo
-  - the CAD profile (7 paths)
-  - refusing a duplicate collar
-  - the shape tools
+- Database: `test/security/macros-bootstrap.sql` + migration + `test/security/macros-access.sql` on local PostgreSQL 16 (browser roles refused; other accounts cannot replace or delete; unconfirmed accounts cannot save; untrimmed names and invalid definitions refused; stale revisions refused; case-insensitive administrator replace keeps the owner; delete; 200-macro limit). Added to CI.
+- Unit: `test/macro-library.test.js` (shape and names; route listing, verified-actor-only RPC arguments, refused extra fields, error mapping without leaking details; commands save/list/export/delete; no browser fallback when the API is down; owner/administrator rules; moving browser macros without overwriting).
+- Browser: `command-design` (save to the shared library, "by" label) and `workspace-commands` (`macro.save` reaches the library, `run macro` runs it) with an in-memory `/api/macros` (`test/browser/macro-api-mock.mjs`).

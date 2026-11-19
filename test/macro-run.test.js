@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { CreateAgentCommands } from '../source/website/agentcommands.js';
 import { CheckMacro, MacroWarnings } from '../source/website/commandregistry.js';
+
 import { SceneHistory } from '../source/website/scenedocument.js';
 
 const schema = { type : 'object', properties : {} };
@@ -8,12 +9,6 @@ function Fixture ()
 {
     const editor = { document : { objects : [] }, history : new SceneHistory (), busy : false }; const registry = CreateAgentCommands ({ sessionEditor : editor });
     return { editor, registry };
-}
-function Storage ()
-{
-    const store = new Map (); const previous = globalThis.localStorage;
-    globalThis.localStorage = { getItem : key => store.has (key) ? store.get (key) : null, setItem : (key, value) => store.set (key, String (value)), removeItem : key => store.delete (key) };
-    return () => { globalThis.localStorage = previous; };
 }
 
 describe ('Macro runs', () => {
@@ -44,23 +39,13 @@ describe ('Macro runs', () => {
         const failed = await registry.RunMacro ({ version : 1, steps : [{ id : 'a', command : 'test.add' }, { id : 'b', command : 'test.add' }, { id : 'c', command : 'test.fail' }] });
         assert.equal (failed.failedStep, 'c'); assert.equal (value, 5); await editor.history.Undo (); assert.equal (value, 3);
     });
+    it ('warns about account-specific IDs but not references or nominal boards', () => {
+        assert.equal (MacroWarnings ({ steps : [{ id : 'board', arguments : { id : 'account-board-7' } }] })[0].step, 'board');
+        assert.deepEqual (MacroWarnings ({ steps : [{ id : 'b', arguments : { id : 'nominal-e', objectId : { $ref : 'a.id' } } }] }), []);
+    });
     it ('only lets a session tab change be the last step', () => {
         const { registry } = Fixture ();
         assert.throws (() => CheckMacro ({ version : 1, steps : [{ id : 'tab', command : 'session.tabs.new' }, { id : 'fit', command : 'view.fit' }] }, registry.commands), /only be the last step/);
         assert.doesNotThrow (() => CheckMacro ({ version : 1, steps : [{ id : 'fit', command : 'view.fit' }, { id : 'tab', command : 'session.tabs.new' }] }, registry.commands));
-    });
-    it ('saves, exports and deletes macros with replay warnings', async () => {
-        const restore = Storage ();
-        try {
-            const { registry } = Fixture ();
-            const macro = { version : 1, steps : [{ id : 'board', command : 'packaging.boards.select', arguments : { id : 'account-board-7' } }, { id : 'fit', command : 'view.fit', arguments : {} }] };
-            const saved = await registry.Execute ('macro.save', { name : 'Demo1', definition : JSON.stringify (macro) }); assert.equal (saved.ok, true, JSON.stringify (saved));
-            assert.equal (saved.result.warnings.length, 1); assert.equal (saved.result.warnings[0].step, 'board');
-            assert.deepEqual (MacroWarnings ({ steps : [{ id : 'b', arguments : { id : 'nominal-e', objectId : { $ref : 'a.id' } } }] }), []);
-            const exported = await registry.Execute ('macro.export', { name : 'demo1' }); assert.deepEqual (JSON.parse (exported.result.definition), macro);
-            assert.equal ((await registry.Execute ('macro.save', { name : 'Bad', definition : JSON.stringify ({ version : 1, steps : [{ id : 'x', command : 'no.such' }] }) })).ok, false);
-            assert.equal ((await registry.Execute ('macro.delete', { name : 'DEMO1' })).result.remaining, 0);
-            assert.equal ((await registry.Execute ('macro.delete', { name : 'demo1' })).ok, false);
-        } finally { restore (); }
     });
 });
