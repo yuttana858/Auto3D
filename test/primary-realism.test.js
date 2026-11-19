@@ -40,7 +40,14 @@ describe ('Primary Products realistic construction and surfaces', function () {
         const can = module.CreatePrimaryProduct (module.ProductDesign ('standard-beverage'));
         assert.ok (can.components.some (m => m.id === 'pull-tab'));
         const y = id => can.components.find (m => m.id === id).positions.filter ((v, i) => i % 3 === 1);
-        assert.ok (Math.max (...y ('body')) < Math.min (...y ('opening-score')), 'The closed body must not hide the scored end.');
+        // The body's closing disk stays below the countersunk lid (inside the lid panel's radius), so it cannot hide the score.
+        const body = can.components.find (m => m.id === 'body'), inner = []; for (let i = 0; i < body.positions.length; i += 3) { if (Math.hypot (body.positions[i], body.positions[i + 2]) < can.definition.diameterMm * .3) { inner.push (body.positions[i + 1]); } }
+        assert.ok (Math.max (...inner) < Math.min (...y ('opening-score')), 'The closed body must not hide the scored end.');
+        // Real two-piece construction: a domed base about 10 mm deep and a standing ring well inside the diameter.
+        const bottom = []; for (let i = 0; i < body.positions.length; i += 3) { if (body.positions[i + 1] < .01) { bottom.push (Math.hypot (body.positions[i], body.positions[i + 2])); } }
+        assert.ok (Math.max (...bottom) < can.definition.diameterMm * .4, 'stands on its ring');
+        const apex = []; for (let i = 0; i < body.positions.length; i += 3) { if (Math.hypot (body.positions[i], body.positions[i + 2]) < .5 && body.positions[i + 1] < 50) { apex.push (body.positions[i + 1]); } }
+        assert.ok (Math.min (...apex) > 9, 'domed base about 10 mm deep at its apex');
         assert.ok (!module.CreatePrimaryProduct (module.ProductDesign ('food-can')).components.some (m => m.id === 'pull-tab'));
         const d = module.ProductDesign ('boston-inspired'), rounded = module.CreatePrimaryProduct (d), sloped = module.CreatePrimaryProduct ({ ...d, details : { ...d.details, shoulder : 'sloped' } }); assert.ok (rounded.components[0].positions.length > sloped.components[0].positions.length);
         assert.ok (module.CreatePrimaryProduct (module.ProductDesign ('retail-compact')).components.some (m => m.id === 'hinge'));
