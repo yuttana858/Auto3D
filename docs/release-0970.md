@@ -2,7 +2,7 @@
 
 Packaging **1.18.0** / Primary Products **0.17.0** / Molded Pulp **0.3.0**.
 
-Based on main `5c74f93145d0ffa5dedf9101189677e3776d8d83`, which includes merged PR #168. This development batch is not deployed.
+Draft [PR #172](https://github.com/yuttana858/Auto3D/pull/172), based on main `5c74f93145d0ffa5dedf9101189677e3776d8d83`, which includes merged PR #168. This development batch is not deployed.
 
 ## Manual controls
 
@@ -22,4 +22,4 @@ This batch applies automatic placement to Primary Products. Standalone Packaging
 
 `primary.generate` and `primary.designs.generate` use the same placement path as the panel. `primary.scale` accepts optional `objectId` to reject a stale selection; its public relative factor range remains 0.1–10. Both command catalogs are regenerated from the registry.
 
-Validation results are recorded in the PR and project log. The full browser release gate remains separate from focused development checks; draft/skipped workflows do not count as passing validation.
+Validation results are recorded in [the validation record](validation/primary-live-placement-0970.md), PR and project log. The full browser release gate remains separate from focused development checks; draft/skipped workflows do not count as passing validation.
