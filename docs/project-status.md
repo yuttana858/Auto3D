@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Recorded array creation — Auto3D 0.96.0 candidate
+
+Stacked on PR #167. Macro recording creates arrays and tracks copy visibility and drop motion on the shared timeline. Copies can be referenced by later macro steps; one Undo reverses the whole run. Lighting remains configured in the app. Automatic camera fit is not recorded; general object creation, deletion and material animation remain open. See release-0960.md. Not deployed.
+
 ## Procedural macro recording — Auto3D 0.95.0 candidate
 
 Stacked on PR #162. Supported recorded macros schedule generated-box fold/unfold actions and paused imported clips at the sequential step time. The macro builder accepts integer fields and explains procedural timing. The app’s lighting remains unchanged. Automatic creation/deletion, material changes, procedural arrays and overlapping steps remain future work. See release-0950.md. Not deployed.

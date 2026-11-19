@@ -6,6 +6,7 @@ import { TimelineFoldSample } from '../source/website/timelineactions.js';
 import { TimelineClipSample } from '../source/website/timelineclips.js';
 import { SceneHistory } from '../source/website/scenedocument.js';
 import { CreateAgentCommands } from '../source/website/agentcommands.js';
+import { BoxGeometry, Mesh, MeshBasicMaterial } from 'three';
 
 describe ('Macro animation recording', () => {
     function fixture () {
@@ -66,6 +67,28 @@ describe ('Macro animation recording', () => {
         const macro = { version : 1, steps : [{ id : 'fold', command : 'animation.action.add', arguments : { time : 4 } }] }; await assert.rejects (RecordMacroAnimation (editor, registry, macro), /remove the time/);
         macro.steps[0].arguments = { duration : 2 }; macro.steps.push ({ id : 'bad', command : 'camera.fov', arguments : { fov : 45 } }); registry.commands.get ('camera.fov').handler = () => { throw new Error ('Camera failed'); };
         const result = await RecordMacroAnimation (editor, registry, macro); assert.equal (result.recorded, false); assert.equal (editor.timeline.actions.length, 0); assert.equal (object.keyframes.length, 0);
+    });
+    it ('records array copy visibility and drop motion at the correct sequence position', async () => {
+        const { editor, registry, object } = fixture (); object.threeObject = new Mesh (new BoxGeometry (2, 2, 2), new MeshBasicMaterial ()); editor.selected = object;
+        const schema = { type : 'object', properties : { width : { type : 'number' }, length : { type : 'number' }, height : { type : 'number' }, animate : { type : 'boolean' } }, required : ['width', 'length', 'height'], additionalProperties : false };
+        registry.Register ({ id : 'object.array', inputSchema : schema, mutates : true }, ({ animate }) => { assert.equal (animate, false); const copy = { id : 'copy', position : [2, 0, 0], rotation : [0, 0, 0], scale : [1, 1, 1], keyframes : [], visible : true }; editor.document.objects.push (copy); return { objectIds : ['copy'] }; });
+        const macro = { version : 1, steps : [{ id : 'move', command : 'object.transform', arguments : { x : 1 } }, { id : 'copies', command : 'object.array', arguments : { width : 2, length : 1, height : 1 }, animation : { duration : 4 } }] };
+        const result = await RecordMacroAnimation (editor, registry, macro); assert.equal (result.recorded, true); assert.equal (result.duration, 6); assert.deepEqual (result.completed[1].objectIds, ['copy']); const copy = editor.document.objects[1];
+        assert.deepEqual (copy.visibilityKeys.map (key => key.visible), [false, true]); assert.ok (copy.visibilityKeys[1].time > 2 && copy.visibilityKeys[1].time < 6); assert.equal (copy.keyframes[0].position[1], 2.5); assert.equal (copy.keyframes.at (-1).time, 6);
+        assert.ok (editor.timeline.ObjectStateAt (copy, 2.4).position[1] < 2.5);
+    });
+    it ('rejects oversized recorded arrays before creating any copies', async () => {
+        const { editor, registry, object } = fixture (); object.threeObject = new Mesh (new BoxGeometry (1, 1, 1), new MeshBasicMaterial ()); editor.selected = object;
+        registry.Register ({ id : 'object.array', inputSchema : { type : 'object', properties : { width : { type : 'number' }, length : { type : 'number' }, height : { type : 'number' } }, required : ['width', 'length', 'height'], additionalProperties : false }, mutates : true }, () => { throw new Error ('Must not create'); });
+        const result = await RecordMacroAnimation (editor, registry, { version : 1, steps : [{ id : 'copies', command : 'object.array', arguments : { width : 10, length : 10, height : 2 } }] }); assert.equal (result.recorded, false); assert.match (result.error.message, /100 total/); assert.equal (editor.document.objects.length, 1);
+    });
+    it ('keeps a non-animated array hidden until its step ends and rejects a hidden source', async () => {
+        const { editor, registry, object } = fixture (); object.threeObject = new Mesh (new BoxGeometry (1, 1, 1), new MeshBasicMaterial ()); editor.selected = object;
+        const schema = { type : 'object', properties : { width : { type : 'number' }, length : { type : 'number' }, height : { type : 'number' }, animate : { type : 'boolean' } }, required : ['width', 'length', 'height'], additionalProperties : false };
+        registry.Register ({ id : 'object.array', inputSchema : schema, mutates : true }, () => { const copy = { id : 'copy', position : [1, 0, 0], rotation : [0, 0, 0], scale : [1, 1, 1], keyframes : [], visible : true }; editor.document.objects.push (copy); return { objectIds : ['copy'] }; });
+        const macro = { version : 1, steps : [{ id : 'copy', command : 'object.array', arguments : { width : 2, length : 1, height : 1, animate : false } }] };
+        object.visible = false; const failed = await RecordMacroAnimation (editor, registry, macro); assert.equal (failed.recorded, false); assert.match (failed.error.message, /visible/); assert.equal (editor.document.objects.length, 1);
+        object.visible = true; const result = await RecordMacroAnimation (editor, registry, macro); assert.equal (result.recorded, true); assert.deepEqual (editor.document.objects[1].visibilityKeys.map (key => [key.time, key.visible]), [[0, false], [2, true]]);
     });
     it ('rejects unsupported operations before executing any step', async () => {
         const { editor, registry, object } = fixture (); await assert.rejects (RecordMacroAnimation (editor, registry, { version : 1, steps : [{ id : 'move', command : 'object.transform', arguments : { x : 4 } }, { id : 'remove', command : 'object.delete', arguments : {} }] }), /Cannot record/); assert.equal (object.position[0], 0); assert.equal (object.keyframes.length, 0);
