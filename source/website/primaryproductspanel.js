@@ -34,11 +34,27 @@ export class PrimaryProductsPanel
     }
     Live () { return this.liveUpdates || (this.liveUpdates = new PrimaryProductLiveUpdates (this)); }
     LiveConfigure (changes, objectId) { return this.Live ().Apply (changes, objectId); }
+    EditContext ()
+    {
+        const document = this.website.sessionEditor.document, owner = this.website.auth?.user?.id || null;
+        if (!this.editContext || this.editContext.document !== document || this.editContext.owner !== owner) {
+            this.editContext = { document, owner, revision : (this.editContext?.revision || 0) + 1 };
+        }
+        return this.editContext.revision;
+    }
+    ScaleBlocked ()
+    {
+        const editor = this.website.sessionEditor, context = this.scaling;
+        if (context && editor.document === context.document && this.website.auth?.user?.id === context.owner && (editor.selected?.id || null) === context.objectId) {
+            return !this.website.auth?.user || this.website.accountReady === false || editor.readOnly;
+        }
+        return this.Blocked ();
+    }
     SyncSelected (force = false)
     {
         if (this.liveUpdates?.active || this.products?.active || this.website.sessionEditor.busy || !this.website.auth?.user || this.website.accountReady === false) { return false; }
         let selected; try { selected = this.products.Selected (); } catch { this.selectionKey = null; this.artworkTarget = null; return false; }
-        const key = selected.object.id + JSON.stringify (selected.definition);
+        const key = this.EditContext () + ':' + selected.object.id + JSON.stringify (selected.definition);
         if (!force && key === this.selectionKey) { return false; }
         this.selectionKey = key;
         try {
@@ -47,7 +63,7 @@ export class PrimaryProductsPanel
         } catch (error) { this.workspace?.ReportError?.(error.message); return false; }
     }
     RefreshAvailability () { if (this.SyncSelected ()) { this.workspace?.Refresh (); } else { this.workspace?.SetDisabled (); } this.profileEditor?.Sync (); }
-    Inspect () { const shape = this.draft.family === 'bottle' ? BottleShape (this.draft) : null; return { catalogCategory : this.catalogCategory || 'bottles', catalogOpen : this.catalogOpen === true, profile : shape ? { ...shape, bodyHeightMm : this.draft.heightMm - shape.shoulderHeightMm - shape.neckHeightMm - shape.capHeightMm } : null, schemaVersion : 1, units : 'mm', ...this.draft, artwork : this.artwork?.Inspect () || [], draftOnly : false, generationAvailable : true, liveObjectId : this.LiveTarget () ? this.website.sessionEditor.selected.id : null, liveUpdating : this.liveUpdates?.active === true, callouts : this.callouts, unavailableReason : this.UnavailableReason (), generating : this.products?.active === true }; }
+    Inspect () { const shape = this.draft.family === 'bottle' ? BottleShape (this.draft) : null; return { catalogCategory : this.catalogCategory || 'bottles', catalogOpen : this.catalogOpen === true, profile : shape ? { ...shape, bodyHeightMm : this.draft.heightMm - shape.shoulderHeightMm - shape.neckHeightMm - shape.capHeightMm } : null, schemaVersion : 1, editContext : this.EditContext (), units : 'mm', ...this.draft, artwork : this.artwork?.Inspect () || [], draftOnly : false, generationAvailable : true, liveObjectId : this.LiveTarget () ? this.website.sessionEditor.selected.id : null, liveUpdating : this.liveUpdates?.active === true, callouts : this.callouts, unavailableReason : this.UnavailableReason (), generating : this.products?.active === true }; }
     Configure (changes)
     {
         if (this.Blocked ()) { throw new Error ('Open an editable session before changing the product draft.'); }
@@ -77,14 +93,25 @@ export class PrimaryProductsPanel
         this.website.sessionEditor.Focus (); this.website.viewer?.navigation?.FinishCameraMovement ();
         return { objectId : object.id, fitted : true };
     }
-    async Scale ({ factor, scaleArtwork = true })
+    async Scale ({ factor, scaleArtwork = true, objectId }, { live = false } = {})
     {
         if (this.Blocked () || typeof scaleArtwork !== 'boolean') { throw new Error ('Open an editable session and choose whether to scale artwork.'); }
-        const next = UpdateProductDraft (this.draft, ScaleProductChanges (this.draft, factor));
+        const editor = this.website.sessionEditor, document = editor.document, owner = this.website.auth?.user?.id;
+        const target = this.LiveTarget () ? editor.selected : null;
+        if (objectId !== undefined && objectId !== (target?.id || null)) { throw new Error ('The selected product changed. Edit its current size.'); }
+        const next = UpdateProductDraft (this.draft, ScaleProductChanges (this.draft, factor, { live }));
         const entries = ValidateProductArtwork (next, this.artwork.Inspect ().map (a => scaleArtwork ? { ...a, widthMm : a.widthMm*factor, heightMm : a.heightMm*factor, ...(a.cad ? { cad : ScaleLabelCAD (a.cad, a.widthMm*factor, a.heightMm*factor) } : {}), ...(a.offsetXmm !== undefined ? { offsetXmm : a.offsetXmm*factor } : {}), ...(a.offsetYmm !== undefined ? { offsetYmm : a.offsetYmm*factor } : {}) } : a));
         const before = this.draft, arts = this.artwork.entries; this.draft = next; this.artwork.entries = entries;
-        try { const target = this.LiveTarget (), result = target ? await this.products.Generate (true, true) : null; this.Refresh (); return { ...ProductSize (next), updated : Boolean (result), objectId : result?.objectId || null, scaleArtwork }; }
-        catch (error) { this.draft = before; this.artwork.entries = arts; this.Refresh (); throw error; }
+        this.scaling = { document, owner, objectId : target?.id || null };
+        try { const result = target ? await this.products.Generate (true, true) : null; this.Refresh (); return { ...ProductSize (next), updated : Boolean (result), objectId : result?.objectId || null, scaleArtwork }; }
+        catch (error) {
+            if (editor.document === document && this.website.auth?.user?.id === owner) {
+                if (editor.selected === target) { this.draft = before; this.artwork.entries = arts; }
+                this.SyncSelected (true); this.Refresh ();
+            }
+            throw error;
+        }
+        finally { this.scaling = null; this.Refresh (); }
     }
     Catalog (category = 'bottles', open = true)
     {
@@ -205,7 +232,7 @@ export class PrimaryProductsPanel
                 }
                 const url = new URL (moduleUrl); if (this.attempts) { url.searchParams.set ('retry', String (this.attempts)); } this.attempts = (this.attempts || 0) + 1;
                 const module = await import (url.href); if (module.PrimaryProductsAPIVersion !== 1) { throw new Error ('Unsupported Primary Products module.'); } this.module = module; this.panel.replaceChildren ();
-                this.workspace = new module.PrimaryProductsPanel ({ openProfile : () => this.profileEditor.Open (), setDetails : changes => this.LiveDetails (changes), scaleProduct : args => this.Scale (args), openMaterials : () => this.OpenMaterials (), applyArtwork : () => this.ApplyArtwork (), catalog : (category, open) => this.Catalog (category, open), selectDesign : id => this.SelectDesign (id), generateDesign : id => this.GenerateDesign (id), setCallouts : visible => this.SetCallouts (visible), setDimensions : dimensions => this.LiveConfigure (DimensionChanges (this.draft, dimensions)), inspect : () => this.Inspect (), configure : changes => this.Configure (changes), liveConfigure : changes => this.LiveConfigure (changes), liveBlocked : () => this.Live ().Blocked (), openLabelCAD : zone => this.labelCAD.Open ({ zone }), fitSelected : () => this.FitSelected (), reset : () => this.Reset (), generate : () => this.products.Generate (), update : () => this.products.Generate (true), loadSelected : () => this.products.LoadSelected (), artworkOpen : () => this.artwork.Open (), artworkText : args => this.ChangeArtwork (() => this.artwork.Text (args)), artworkRemove : zone => this.ChangeArtwork (() => this.artwork.Remove ({ zone })), artworkMapping : args => this.ChangeArtwork (() => this.artwork.Mapping (args)), artworkPreview : zone => { if (this.previewUrl) { URL.revokeObjectURL (this.previewUrl); this.previewUrl = null; } const a = this.artwork.entries.find (a => a.zone === zone), r = a && this.artwork.resources.get (a.resourceId); if (r) { this.previewUrl = URL.createObjectURL (new Blob ([r.buffer], { type : a.mime })); } return this.previewUrl; }, units : () => this.website.preferences.units, blocked : () => this.Blocked () }, this.panel);
+                this.workspace = new module.PrimaryProductsPanel ({ openProfile : () => this.profileEditor.Open (), setDetails : changes => this.LiveDetails (changes), scaleProduct : args => this.Scale (args, { live : true }), scaleBlocked : () => this.ScaleBlocked (), openMaterials : () => this.OpenMaterials (), applyArtwork : () => this.ApplyArtwork (), catalog : (category, open) => this.Catalog (category, open), selectDesign : id => this.SelectDesign (id), generateDesign : id => this.GenerateDesign (id), setCallouts : visible => this.SetCallouts (visible), setDimensions : dimensions => this.LiveConfigure (DimensionChanges (this.draft, dimensions)), inspect : () => this.Inspect (), configure : changes => this.Configure (changes), liveConfigure : changes => this.LiveConfigure (changes), liveBlocked : () => this.Live ().Blocked (), openLabelCAD : zone => this.labelCAD.Open ({ zone }), fitSelected : () => this.FitSelected (), reset : () => this.Reset (), generate : () => this.products.Generate (), update : () => this.products.Generate (true), loadSelected : () => this.products.LoadSelected (), artworkOpen : () => this.artwork.Open (), artworkText : args => this.ChangeArtwork (() => this.artwork.Text (args)), artworkRemove : zone => this.ChangeArtwork (() => this.artwork.Remove ({ zone })), artworkMapping : args => this.ChangeArtwork (() => this.artwork.Mapping (args)), artworkPreview : zone => { if (this.previewUrl) { URL.revokeObjectURL (this.previewUrl); this.previewUrl = null; } const a = this.artwork.entries.find (a => a.zone === zone), r = a && this.artwork.resources.get (a.resourceId); if (r) { this.previewUrl = URL.createObjectURL (new Blob ([r.buffer], { type : a.mime })); } return this.previewUrl; }, units : () => this.website.preferences.units, blocked : () => this.Blocked () }, this.panel);
             })().catch (error => { this.loading = null; this.panel.textContent = error.message; throw error; });
         }
         await this.loading; this.Refresh ();

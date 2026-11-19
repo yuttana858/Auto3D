@@ -1,4 +1,4 @@
-# Primary Products 0.16.0
+# Primary Products 0.17.0
 
 Independent bottle/can/pouch/closed-clamshell UI and neutral geometry package, API 1. No Auto3D engine, account or Packaging imports. Auto3D integrates its lazy module bundle through separate host adapter/workspace services.
 
@@ -62,3 +62,7 @@ The host opens the existing Packaging CAD editor through a neutral external-prof
 Compatible self-contained SVG shapes become editable paths, with curved segments flattened to a bounded 0.025 mm approximation. The converter allows up to 80 artwork paths/1,800 points, leaving room for the cut outline. Text, raster images and unsupported SVG paint use an explicitly disclosed color trace: up to eight colors, adaptive sampling from 128 down to 8 pixels on the longest side, and thresholded partial transparency. The result can lose detail and is shown for review before Apply; it is not font outlining or a lossless image-to-vector conversion. Original text/SVG/image import remains available outside this conversion workflow. Applying derived CAD replaces the active label source; the previous source is retained by normal Undo rather than embedded as another image in metadata.
 
 Host commands include `primary.live.configure`, `primary.fit`, `primary.label.cad.open/inspect/apply` and shared `packaging.path.*` / `packaging.artwork.style`. The bridge checks account, session, selection and conversion generation before mutation and invalidates stale work. See [the current UI contract](../../docs/primary-products-ui.md).
+
+## Live scale (0.17.0)
+
+Uniform scale updates the selected product after a brief typing pause or immediately on Enter/blur. The percentage remains relative to the current editing baseline: changing 125% to 130% ends at 130%, rather than compounding two multipliers. Selection, units or external dimension changes reset the baseline to 100%. The neutral `LiveProductScale` serializes rebuilds and coalesces pending percentages; `scaleProduct` receives an optional pinned `objectId` and `scaleBlocked` keeps only this field available during its own rebuild. The host owns scene placement and spaces new products beside existing geometry; module geometry stays centered in its local coordinates.

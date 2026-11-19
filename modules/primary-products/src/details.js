@@ -38,9 +38,11 @@ export function ValidateProductDetails (d, input, explicit = true)
     if (Object.hasOwn (GlassThicknessPresets, next.glassPreset)) { const preset = GlassThicknessPresets[next.glassPreset]; if (next.wallMm !== preset.wallMm || next.baseMm !== preset.baseMm) { next.glassPreset = 'custom'; } }
     return next;
 }
-export function ScaleProductChanges (d, factor)
+export function ScaleProductChanges (d, factor, { live = false } = {})
 {
-    if (!Number.isFinite (factor) || factor < .1 || factor > 10) { throw new Error ('Scale must be 0.1–10 times the current size.'); }
+    // Live percentage controls may move directly between 10% and 1000% of their
+    // starting size. Public relative scaling keeps its existing 0.1–10 range.
+    if (!Number.isFinite (factor) || factor < (live ? .01 : .1) || factor > (live ? 100 : 10)) { throw new Error (live ? 'Enter a scale from 10% to 1000%.' : 'Scale must be 0.1–10 times the current size.'); }
     const changes = { heightMm : d.heightMm * factor };
     for (const key of ['widthMm', 'depthMm', 'diameterMm']) { if (d[key] !== undefined) { changes[key] = d[key] * factor; } }
     if (d.bottleShape) { changes.bottleShape = Object.fromEntries (Object.entries (d.bottleShape).map (([k, n]) => [k, n * factor])); }

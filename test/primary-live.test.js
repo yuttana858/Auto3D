@@ -6,6 +6,7 @@ import { PrimaryProductsArtwork } from '../source/website/primaryproductsartwork
 import { PrimaryProfileWorkspace } from '../source/website/primaryprofileworkspace.js';
 import { SceneDocument, SceneHistory } from '../source/website/scenedocument.js';
 import { CreateAgentCommands } from '../source/website/agentcommands.js';
+import { PackSession, ReadSession } from '../source/website/sessionarchive.js';
 
 function fixture ()
 {
@@ -76,5 +77,50 @@ describe ('Selected product live controls', function () {
         await panel.LiveDetails ({ textureStrength : .8, textureScaleMm : 40 });
         assert.match (body ().bumpMap.name, /0.8/); assert.ok (Math.abs (body ().bumpMap.scale.y - panel.draft.heightMm / 40) < 1e-9); assert.equal (body ().clearcoat, .73);
         await editor.history.Undo (); assert.equal (body ().bumpMap, null);
+    });
+    it ('pins live scaling to the original selection and preserves the newer selection on cancellation', async () => {
+        const { panel, editor } = fixture (); await panel.products.Generate (); const first = editor.selected;
+        await panel.products.Generate (); const second = editor.selected; editor.selected = first; panel.Refresh ();
+        await assert.rejects (panel.Scale ({ factor : 1.25, objectId : second.id }, { live : true }), /changed/);
+        const history = editor.history.undo.length, release = holdNextLoad (panel);
+        const pending = panel.Scale ({ factor : 1.25, objectId : first.id }, { live : true });
+        assert.equal (panel.ScaleBlocked (), false); assert.equal (panel.Live ().Blocked (), true);
+        editor.selected = second; assert.equal (panel.ScaleBlocked (), true);
+        const rejected = assert.rejects (pending, /changed/); release (); await rejected;
+        assert.equal (editor.selected, second); assert.equal (editor.history.undo.length, history);
+        assert.deepEqual (panel.draft, panel.products.Selected ().definition.draft); assert.equal (panel.scaling, null);
+    });
+    it ('keeps live scale rollback out of a replacement account or session', async () => {
+        const { panel, editor, website } = fixture (); await panel.products.Generate ();
+        const release = holdNextLoad (panel), original = editor.document;
+        const pending = panel.Scale ({ factor : 1.25, objectId : editor.selected.id }, { live : true });
+        editor.document = new SceneDocument (); editor.selected = null; website.auth.user = { id : 'another-owner' };
+        const replacement = module.DefaultProductDraft ('can'); panel.draft = replacement; panel.artwork.Clear ();
+        const rejected = assert.rejects (pending, /changed/); release (); await rejected;
+        assert.equal (panel.draft, replacement); assert.equal (original.objects.length, 1); assert.equal (editor.document.objects.length, 0);
+    });
+    it ('keeps command scaling factor limits while accepting pinned selected targets', async () => {
+        const { panel, editor, registry } = fixture (); await panel.products.Generate ();
+        const id = editor.selected.id;
+        assert.equal ((await registry.Execute ('primary.scale', { factor : 1.25, objectId : id })).ok, true);
+        assert.equal ((await registry.Execute ('primary.scale', { factor : 1.25, objectId : 'stale' })).ok, false);
+        assert.equal ((await registry.Execute ('primary.scale', { factor : .01 })).ok, false);
+        assert.equal ((await registry.Execute ('primary.scale', { factor : 100 })).ok, false);
+        assert.equal (editor.selected.id, id); assert.equal (editor.document.objects.length, 1);
+    });
+    it ('changes the opaque edit context when the document or account changes', () => {
+        const { panel, editor, website } = fixture (), first = panel.Inspect ().editContext;
+        assert.equal (panel.Inspect ().editContext, first);
+        editor.document = new SceneDocument (); const second = panel.Inspect ().editContext; assert.notEqual (second, first);
+        website.auth.user = { id : 'new-owner' }; assert.notEqual (panel.Inspect ().editContext, second);
+        assert.equal (typeof panel.Inspect ().editContext, 'number');
+    });
+    it ('loads the actual draft when a replacement document reuses the same saved object ID', async () => {
+        const { panel, editor } = fixture (); await panel.products.Generate (); panel.Refresh ();
+        const saved = PackSession (editor.document), before = structuredClone (panel.draft), release = holdNextLoad (panel);
+        const pending = panel.Scale ({ factor : 1.25, objectId : editor.selected.id }, { live : true });
+        editor.document = ReadSession (saved).document; editor.selected = editor.document.objects[0];
+        const rejected = assert.rejects (pending, /changed/); release (); await rejected;
+        assert.deepEqual (panel.draft, before); assert.deepEqual (panel.draft, panel.products.Selected ().definition.draft);
     });
 });
