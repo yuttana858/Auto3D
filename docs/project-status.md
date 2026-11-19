@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Private alternative-reader proof transport — Auto3D 0.91.1 (2026-11-18)
+
+Packaging 1.16.1 / Primary Products 0.15.0 / Molded Pulp 0.3.0 unchanged. Adds a short-lived operator-only read capability so a retained failed Parasolid can go directly from private R2 to an isolated Modal proof. No retries, retention or model-publication changes. Based on main 0.91.0; PR #163, CI/deployment pending. See [release-0911.md](release-0911.md).
+
 ## Integration release in #155 — Auto3D 0.91.0 / Packaging 1.16.1 (2026-11-18)
 
 Primary Products 0.15.0 / Molded Pulp 0.3.0 are preserved; Packaging 1.16.1 is #156's Auto Pack change on top of #161's 1.16.0. Based on main after #161 (0.90.0); renumbered from 0.89.0 and 0.90.0. #156 (Auto Pack compact controls and fold timeline, prepared as 0.88.1) and #157 (macro animation recording and collapsible tracks) are stacked here; a macro recording is one Undo step. Based on main after #154 (0.89.0). Not deployed. Agent pairings last 24 hours, follow the window's active tab and survive reloads (these commits missed the #148 merge). Read-only Supabase tools are auto-approved in `.claude/settings.json`. Macro steps wait for playback, one Undo reverses a run, tab changes are allowed only as the last step, saved macros can be deleted and exported, and saving warns about account-specific IDs. The Advance animation controls are one minimal toolbar line. See [release-0910.md](release-0910.md). Next: store macros in the account.

@@ -1,11 +1,13 @@
 import { Reply } from '../../_lib/accountstorage.js';
 import { JobDatabase, JobBucket, ControlKey, SafeEqual, ChangeJob, DispatchJob, DeleteJobObjects } from '../../_lib/conversionjobs.js';
+import { IssueProof } from '../../_lib/conversionproof.js';
 export async function onRequest ({ request, env })
 {
     try {
         if (!SafeEqual (request.headers.get ('Authorization'), 'Bearer ' + await ControlKey (env))) { return Reply ({ error : 'Not found.' }, 404); }
         JobBucket (env);
         const path = new URL (request.url).pathname;
+        if (path === '/internal/conversion-control/proof' && request.method === 'POST') { return Reply (await IssueProof (env, request)); }
         if (path === '/internal/conversion-control/health' && request.method === 'GET') { await JobDatabase (env, 'auto3d_conversion_jobs?select=id&limit=1'); return Reply ({ ready : true, protocol : 1 }); }
         if (path !== '/internal/conversion-control/reconcile' || request.method !== 'POST') { return Reply ({ error : 'Not found.' }, 404); }
         const now = new Date ().toISOString ();
