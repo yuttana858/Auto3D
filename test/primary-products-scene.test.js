@@ -20,12 +20,13 @@ function Fixture (load = async () => module)
     panel.products = new PrimaryProductsWorkspace (panel, load); return { panel, editor, workspace : panel.products };
 }
 describe ('Primary Products scene integration', function () {
-    it ('generates opaque components through strict shared commands, with one undo/redo step', async function () {
+    it ('generates glass bottle components through strict shared commands, with one undo/redo step', async function () {
         const { panel, editor } = Fixture (); const commands = CreateAgentCommands ({ sessionEditor : editor, primaryProductsPanel : panel });
         assert.equal ((await commands.Execute ('primary.generate', { unexpected : true })).ok, false);
         const r = await commands.Execute ('primary.generate'); assert.equal (r.ok, true, JSON.stringify (r));
-        assert.deepEqual (r.result.components, ['body', 'cap']); assert.equal (editor.document.objects.length, 1); assert.equal (editor.history.undo.length, 1);
+        assert.deepEqual (r.result.components, ['body', 'cap', 'neck-ring']); assert.equal (editor.document.objects.length, 1); assert.equal (editor.history.undo.length, 1);
         const model = editor.document.model; assert.equal (model.materials[0].metalness, 0); assert.equal (model.materials[0].roughness, panel.draft.roughness);
+        assert.ok (model.materials[0].transmission > .9); assert.ok (model.materials[0].thickness > 0);
         await editor.history.Undo (); assert.equal (editor.document.objects.length, 0);
         await editor.history.Redo (); assert.equal (editor.selected.id, r.result.objectId); assert.equal (editor.document.objects.length, 1);
     });

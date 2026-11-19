@@ -1,4 +1,4 @@
-# Packaging module v1.11.0
+# Packaging module v1.18.0
 
 A separate package for FEFCO 0200–0203 boxes, canonical-mm dielines, physical board extrusion, kraft textures, catalog controls and flat-sheet unfolding. It can be developed or copied to a separate repository without Auto3D source. Its only runtime dependencies are Three.js and fflate, under MIT licenses.
 
@@ -16,7 +16,7 @@ For a standalone checkout of this folder, install Node.js 22+, run `npm install`
 
 | File | Responsibility |
 | --- | --- |
-| src/profile.js | Archive-safe profile validation, contours, bounds, calipers and SVG/DXF |
+| src/profile.js | Archive-safe profile validation, contours, bounds, calipers and SVG/DXF/EPS |
 | src/fefco.js | FEFCO dimensions, validation and original concept layouts |
 | src/geometry.js, mesh.js | Folded boxes, connected flat boards and neutral mesh data |
 | src/dimensions.js | Inside/outside fit reserve and caliper/layer math |
@@ -114,3 +114,12 @@ Accessories APIs: `CreatePadPlan({ insideMm, thickness, positions, clearanceMm }
 Nested partitions: `AnalyzeProductLayout({ boxes })` groups product bounds (carton frame: 0 = length, 1 = up, 2 = width) into columns, rows and layers. `CreateNestedPartitionPlan({ boxes, thickness, productClearanceMm, slotClearanceMm })` returns the moves that open short gaps, the growth, the cut positions and one interlocking `PartitionStrips` set per layer. `PartitionStrips` builds slotted strips for any cut positions, and `BoardRectangle` builds a pad profile.
 
 Auto pallet APIs: `CreatePalletPlan({ box:{width,length,height}, pallet?, maxHeightMm? })` (column stacking, upright boxes with 90° turns, guillotine dynamic-programming layer pattern, no overhang; placements from the pallet centre), `BestLayerPattern`, `RasterPoints`, `PalletPresets` (`gma-40x48`: 1016 × 1219.2 × 127 mm), `PalletColors` (blue, brown, black), `DefaultPalletMaxHeightMm` (55 in) and `CreatePallet({ color })`, a block pallet in the neutral mesh format with its origin at the centre of the bottom face. `AutoPalletPanel` is the neutral Auto tab section; the host supplies `palletInspect(options)` and `autoPallet(options)`.
+
+
+## Editable artwork layer in v1.18.0
+
+The API-v1 profile path contract also accepts `type: "artwork"` with `closed`, canonical-mm `points`, solid `fill`/`stroke` (`#RRGGBB` or `none`) and `strokeWidth` (0–100 mm). Existing limits remain 100 paths and 2,000 points per profile. Validation rejects external paint references and invalid widths. SVG, DXF and EPS exports retain a separate `ARTWORK` group/layer; SVG/EPS retain fill and stroke, while DXF exports editable polylines with true color.
+
+Artwork paths do not become cut contours, extrusion holes, crease guides, fold hinges or collision solids. Generated fold compatibility compares the original cut/score paths while ignoring artwork, so adding ink paths does not invalidate an otherwise unchanged fold rig. This layer does not add general box-print texture projection.
+
+Auto3D's existing CAD editor renders and edits the artwork layer, including `packaging.artwork.style`. Its neutral external-profile binding lets Primary Products supply label cut/artwork paths and an Apply callback without importing the host into either module. Label rendering, product replacement, account checks and Undo stay in the Primary Products host bridge. Ordinary packaging profiles remain separate from the linked label draft. See [Primary Products 0.16.0](../primary-products/README.md).

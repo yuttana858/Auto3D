@@ -1,6 +1,10 @@
 # Primary Products module — build plan
 
-Status: implementation in progress. The 0.59.0 increment adds unified clamshell browsing, advanced-editor labels and the initial clear glass/PET transmission pipeline with closed presentation cavities. See [0.59.0 and its remaining optical/geometry limits](release-0590.md). Auto3D 0.56.0 / Primary Products 0.7.0 adds the six-category, 24-design bottom drawer, rounded closed clamshell cavities with top/bottom labels, and expanded material presets. See [0.56.0](release-0560.md) and [sourced catalog research and outstanding gates](primary-product-catalog-research.md). Auto3D 0.55.0 / Primary Products 0.6.0 adds optional bottle shoulder, neck and cap dimensions, safe straight-body label zones and persisted profile editing. See [0.55.0](release-0550.md). Primitive/Boolean research and a proposed delivery sequence are in [primitive-solid-editing-research.md](primitive-solid-editing-research.md); this feature is not enabled yet. The [0.52.0 increment](release-0520.md) adds category PBR presets and actual local label artwork application/persistence; clear-pack rendering remains incomplete. UI shell is stacked in #63/#62; independent geometry follows in #64 (module 0.2.0). Opaque scene generation/update and versioned persistence are now in development in module 0.3.0; see [the scene increment](release-0490.md). The 0.50.0 increment adds Generate readiness and opaque pillow pouches; advanced bottle/can artwork/glass gates and other pouch types remain incomplete. See [current increment](release-0500.md). No deployment of that increment is implied. See [geometry progress](primary-products-geometry.md).
+Status: Auto3D 0.96.0 / Primary Products 0.16.0 / Packaging 1.18.0 candidate. Selected generated products now update live from the docked and split profile controls, with serialized edits, Undo and explicit Fit. New bottle defaults/catalog presets use glass shells with separate editable caps; saved explicit materials remain unchanged. Body and circular cap-top labels open in the existing CAD editor with editable cut/artwork paths. SVG conversion and disclosed bounded text/image tracing replace the previously paused CAD prototype. See [the current UI contract](primary-products-ui.md) and [module API](../modules/primary-products/README.md). This status does not imply deployment.
+
+Delivered family work also includes oval/rounded-rectangle bottles, cans, pillow/stand-up/flat-bottom pouches with zipper/spout options, and unified clamshell browsing. Physical labels, materials, static bottle contents and file/recovery authoring data are implemented. Remaining work includes certified manufacturing geometry, articulated closures, dedicated independent 3D draft preview, print bleed/safe-area tooling, advanced distortion compensation and the separately scoped primitive/Boolean track.
+
+The phase tables and detailed proposals below preserve the original plan; they include goals beyond the delivered controls. Current behavior takes precedence over historical draft-only or CAD-pause statements.
 Created: 2026-11-04. Repository baseline: Auto3D 0.47.3, Packaging 1.10.3.
 Proposed package: `@auto3d/primary-products`, initial module version 0.1.0; API version 1.
 
@@ -12,12 +16,12 @@ The main workflow is:
 
 1. Open **Primary Products** as its own module.
 2. Choose a category and preset; enter dimensions in the global mm/in preference.
-3. Adjust shape, closure and component options in an independent draft preview.
+3. Adjust a new-product draft, or select an existing generated product and edit shape, closure and component controls live in the main viewer.
 4. Set component materials and import/place label artwork.
-5. **Generate** creates one logical product object. Later, **Apply changes** replaces that object's generated geometry without changing its ID or placement; one Undo restores the previous product.
+5. **Generate** creates one logical product object. Later, valid live edits rebuild the selected product without changing its ID or placement. Rapid updates are serialized and can be undone together; label CAD uses an explicit **Apply to 3D** step.
 6. Duplicate/array, arrange, animate and render using existing Auto3D tools. Save to file, Device Library or owned Account Library through existing explicit save actions.
 
-Opening the panel, choosing a preset or changing a draft must not modify the main scene, submit an AI task or upload a file. Draft preview and session application are distinct actions. Selecting an existing generated product loads its saved definition for editing. Imported products may be decorated, but do not acquire parametric shape controls automatically.
+Opening the panel and editing an ungenerated draft do not modify the main scene, submit an AI task or upload a file. Controls for a matching selected generated product update it live. CAD label edits remain separate until Apply, and remote saves remain explicit. Selecting an existing generated product loads its saved definition for editing. Imported products may be decorated, but do not acquire parametric shape controls automatically.
 
 ## 2. Categories and reusable geometry
 
@@ -139,7 +143,7 @@ Choose compositing into compatible material maps as the first portable strategy.
 
 Minimal mode: category/preset, dimensions, Generate/Preview, selected-product edit controls, Materials, Artwork and Add/Apply. Extended mode: larger draft preview with shape, material and artwork controls, using the shared module shell. Changing modules, collapsing panels and resizing must preserve drafts and scene state.
 
-Every user-facing action needs a stable strict command using the same service as the UI. Proposed names (not implemented yet):
+Every user-facing action needs a stable strict command using the same service as the UI. The following table preserves the original proposed names; use [the current UI command table](primary-products-ui.md#commands) for delivered names, including live editing and linked label CAD:
 
 | Command | Behavior |
 | --- | --- |
@@ -188,13 +192,15 @@ Deferred by default: exact molded threads/standards, certified capacity/strength
 
 ## Current next increments
 
-Bottle shoulder/neck/cap controls and oval/rounded-rectangle sections (0.9.0) provide the Phase 2 shape increments. Next: physical artwork templates; renderer transmission/IOR/thickness round-trip and hollow-wall spike; then more closures. Stand-up pouches with a bottom gusset (0.11.0), then flat-bottom (box) pouches, zippers and spouts (0.12.0) cover the Phase 3 constructions; tear notches, hang holes, seal-width controls and side-gusset (quad-seal) bags remain. Keep glass disabled until its renderer/geometry gates pass. Finish remaining Phase 1/2 material/export gates alongside these increments; the phase table is not a claim that earlier gates are all complete.
+The 0.16.0 increment delivers live selected-product editing, open-mouth glass shells with wall/base controls, separate cap construction/material controls, body/cap label CAD and preserved portable label mapping. Glass transmission/IOR/thickness and static contents use the existing rendering/archive/export path; old explicit material choices are retained. The linked CAD workflow uses the current shared editor rather than the earlier prototype. Its image/text trace is an approximation for review, limited to eight colors and at most 80 imported artwork paths/1,800 points. Applied CAD is bounded to 100 paths/2,000 points and persists with the baked label; Undo retains the previous source.
+
+Next: dedicated print templates with bleed/safe areas, more closure articulation and manufacturer-calibrated geometry where separately scoped. Pouches already cover stand-up, flat-bottom, zipper and spout construction; tear notches, hang holes, seal-width controls and side-gusset bags remain. The phase table does not imply every originally proposed control or performance target is complete.
 
 The requested primitive/Boolean track starts with conversion benchmarking and editable primitives, then non-destructive body modifiers. Keep clear-pack, Primary family breadth and general solid editing as separately testable increments.
 
 
-## 2026-11-12: realism track; CAD integration paused
+## Historical 2026-11-12 pause — superseded by 0.16.0
 
-The user asked to wait for the other team's CAD rollout. Do not merge the local CAD-label prototype (`feat/primary-cad-labels`, checkpoint `c7ae486`) into this increment. Reconcile its document/layer/coordinate contract with the completed CAD system first. Current PNG/JPEG/WebP label import remains supported.
+On 2026-11-12 the user asked to wait for the other team's CAD rollout, so the local prototype (`feat/primary-cad-labels`, checkpoint `c7ae486`) was excluded from that increment. The later explicit request for body and cap-top label CAD lifted this pause. Version 0.16.0 integrates with the existing CAD path/editor contract through a host bridge; it does not merge that old prototype. PNG/JPEG/WebP and editable text/SVG import remain supported.
 
 The 0.62.0 / Primary Products 0.13.0 candidate adds construction detail throughout the catalog, procedural material textures, translucent materials, label finishes and resizing. It builds on #103's pouch fitments. See [release details](release-0620.md) and [research, limits and next acceptance gates](primary-product-realism-research.md).

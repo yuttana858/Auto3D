@@ -1416,7 +1416,7 @@ export class SessionEditor
         if (!bounds) { return { focused : false, objectIds : [] }; }
         const center = bounds.getCenter (new THREE.Vector3 ());
         this.website.viewer.navigation.orbitCenter = new Coord3D (center.x, center.y, center.z);
-        this.website.viewer.FitSphereToWindow (bounds.getBoundingSphere (new THREE.Sphere ()), true);
+        this.website.viewer.FitBoundsToWindow (bounds, true);
         return { focused : true, objectIds : this.SelectedObjects ().filter (object => object.visible !== false && VisibleSceneBounds (object.threeObject)).map (object => object.id) };
     }
     async Undo () { await this.history.Undo (); this.RefreshUI (); }

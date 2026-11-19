@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Live primary products and CAD labels — Auto3D 0.96.0 candidate
+
+Packaging 1.18.0 / Primary Products 0.16.0 / Molded Pulp 0.3.0. Draft PR #168, based on deployed main 6632010; the separate animation PR #167 reserves 0.95.0. Selected products update from the right panel without generating another object. New bottles default to glass with hollow wall/base presets, independent cap geometry/material/color controls and front/back/wrap/cap-top labels in the shared CAD editor. Viewer fit uses projected selected bounds and live updates preserve navigation. See [release-0960.md](release-0960.md) for behavior, limits and agent commands. One draft batch; not deployed. Final validation: 1,158 app/module tests, 73 MCP tests and 13 focused browser checks passed, including a pixel comparison proving clear glass refracts the grid while opaque material blocks it. The full 100-check browser release gate remains pending; see [validation](validation/primary-live-0960.md).
+
 ## Integrated animation and can-collar release — Auto3D 0.94.0 candidate
 
 Packaging 1.17.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0. Consolidates #158 visibility/lifetime tracks, #159 embedded clip scheduling, #160 array timeline reveals, #162 macro step timing, and #166 can collars/CAD shape tools into #162, preserving main through #164 (`cfd03f6`) and its shared account macro library. Resolves code, version and release-note conflicts without dropping either workstream. See [release-0940.md](release-0940.md). Combined validation and merge status are recorded in PR #162.
