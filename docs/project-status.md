@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Procedural macro recording — Auto3D 0.95.0 candidate
+
+Stacked on PR #162. Supported recorded macros schedule generated-box fold/unfold actions and paused imported clips at the sequential step time. The macro builder accepts integer fields and explains procedural timing. The app’s lighting remains unchanged. Automatic creation/deletion, material changes, procedural arrays and overlapping steps remain future work. See release-0950.md. Not deployed.
+
 ## Integrated animation and can-collar release — Auto3D 0.94.0 candidate
 
 Packaging 1.17.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0. Consolidates #158 visibility/lifetime tracks, #159 embedded clip scheduling, #160 array timeline reveals, #162 macro step timing, and #166 can collars/CAD shape tools into #162, preserving main through #164 (`cfd03f6`) and its shared account macro library. Resolves code, version and release-note conflicts without dropping either workstream. See [release-0940.md](release-0940.md). Combined validation and merge status are recorded in PR #162.

@@ -36,10 +36,10 @@ function ArgumentForm (command, values, parent, website, changed = () => {})
             const row = Element ('div', '', label); row.className = 'command_vector';
             inputs = ['X', 'Y', 'Z'].map ((axis, index) => { const input = Element ('input', '', row); input.type = 'number'; input.step = 'any'; input.placeholder = axis; input.setAttribute ('aria-label', title + ' ' + axis); input.value = values[key]?.[index] ?? ''; return input; });
         } else {
-            const input = Element ('input', '', label); input.type = reference ? 'text' : schema.type === 'boolean' ? 'checkbox' : schema.type === 'number' ? 'number' : 'text';
+            const input = Element ('input', '', label); input.type = reference ? 'text' : schema.type === 'boolean' ? 'checkbox' : ['number', 'integer'].includes (schema.type) ? 'number' : 'text';
             if (schema.type === 'boolean' && !reference) { input.checked = values[key] ?? false; }
             else { input.value = reference ? JSON.stringify (values[key]) : values[key] ?? ''; }
-            if (schema.type === 'number') { input.step = 'any'; if (schema.minimum !== undefined) { input.min = schema.minimum; } if (schema.maximum !== undefined) { input.max = schema.maximum; } }
+            if (['number', 'integer'].includes (schema.type) && !reference) { input.step = schema.type === 'integer' ? '1' : 'any'; if (schema.minimum !== undefined) { input.min = schema.minimum; } if (schema.maximum !== undefined) { input.max = schema.maximum; } }
             inputs = [input];
         }
         const sync = () => { inputs.forEach ((input) => { input.disabled = !enabled.checked; }); changed (); };
@@ -51,7 +51,7 @@ function ArgumentForm (command, values, parent, website, changed = () => {})
             if (reference) { value = JSON.parse (inputs[0].value); }
             else if (schema.type === 'boolean') { value = inputs[0].checked; }
             else if (schema.type === 'array') { value = inputs.map ((input) => { if (input.value === '') { throw new Error ('Enter all ' + title + ' coordinates.'); } return Number (input.value); }); }
-            else if (schema.type === 'number') { if (inputs[0].value === '') { throw new Error ('Enter ' + title + '.'); } value = Number (inputs[0].value); }
+            else if (['number', 'integer'].includes (schema.type)) { if (inputs[0].value === '') { throw new Error ('Enter ' + title + '.'); } value = Number (inputs[0].value); if (schema.type === 'integer' && !Number.isInteger (value)) { throw new Error (title + ' must be a whole number.'); } }
             else { value = inputs[0].value; }
             return [key, value];
         });
@@ -109,7 +109,8 @@ export function OpenCommandPanel (website)
                 const form = Element ('div', '', card);
                 const read = ArgumentForm (command, step.arguments || {}, form, website);
                 const timing = Section ('Animation timing', card);
-                Element ('p', 'Used when recording. Blank duration uses 2 seconds; blank pause uses 0 seconds. Timing changes are applied as you type.', timing);
+                const procedural = ['packaging.fefco.animate', 'animation.action.add', 'animation.clip.add'].includes (step.command);
+                Element ('p', procedural ? 'Recording uses the command duration unless overridden here.' + (step.command === 'packaging.fefco.animate' ? '' : ' Leave Time blank so the sequence determines the start.') + ' Blank pause uses 0 seconds. Timing changes apply as you type.' : 'Used when recording. Blank duration uses 2 seconds; blank pause uses 0 seconds. Timing changes are applied as you type.', timing);
                 const durationLabel = Element ('label', 'Duration (seconds)', timing); const duration = Element ('input', '', durationLabel); duration.type = 'number'; duration.min = '0.1'; duration.max = '30'; duration.step = 'any'; duration.value = step.animation?.duration ?? ''; duration.setAttribute ('aria-label', 'Animation duration for step ' + (index + 1)); duration.dataset.animationTiming = '';
                 const pauseLabel = Element ('label', 'Pause after (seconds)', timing); const pause = Element ('input', '', pauseLabel); pause.type = 'number'; pause.min = '0'; pause.max = '30'; pause.step = 'any'; pause.value = step.animation?.pauseAfter ?? ''; pause.setAttribute ('aria-label', 'Animation pause after step ' + (index + 1)); pause.dataset.animationTiming = '';
                 const timingStatus = Element ('p', '', timing); timingStatus.setAttribute ('role', 'status');
@@ -153,6 +154,7 @@ export function OpenCommandPanel (website)
     macros.appendChild (upload); upload.onclick = () => attempt (async () => { const result = await registry.Execute ('macro.library.upload_browser'); if (!result.ok) { throw new Error (result.error.message); } await refresh (); output.textContent = 'Moved ' + result.result.uploaded.length + ' macro' + (result.result.uploaded.length === 1 ? '' : 's') + ' to the shared library.' + (result.result.skipped.length ? ' Kept in this browser: ' + result.result.skipped.map (item => item.name + ' (' + item.reason + ')').join ('; ') : ''); });
     const play = Element ('button', 'Run macro', macros); play.className = 'workspace_primary'; play.onclick = () => attempt (async () => { play.disabled = true; output.textContent = 'Running macro…'; try { const result = await registry.RunMacro (macro); showResult (result); output.textContent = result.ok ? 'Macro completed.' : result.error.message; } finally { play.disabled = false; } });
     const record = Element ('button', 'Run and record animation', macros); record.onclick = () => attempt (async () => { validateTiming (); record.disabled = true; output.textContent = 'Recording macro…'; try { const result = await registry.Execute ('animation.macro.record', { definition : JSON.stringify (macro) }); showResult (result); output.textContent = result.ok && result.result.recorded ? 'Macro animation recorded.' : result.error?.message || result.result?.error?.message || 'Recording stopped.'; } finally { record.disabled = false; } });
+    Element ('p', 'Recording supports existing models, camera moves, box folds and paused embedded clips. For fold and clip timeline steps, leave Time unchecked: the sequence sets the start.', macros);
     Element ('button', 'Stop after current step', macros).onclick = () => registry.Cancel ();
     search.oninput = render; show (commands.find ((command) => command.id === 'object.array') || commands[0]); render (); renderSteps (); refresh ();
 }
