@@ -5,8 +5,8 @@ import { ClampedKnots, Greville, FindSpan, BasisFuns, CurvePoint, SurfacePoint, 
 import { NurbsShell, MaxOutputSide } from '../src/nurbs/shell.js';
 import { ShellBrep, BrepEdgeUses } from '../src/nurbs/brep.js';
 import { WriteStep, WriteSurfaceStep, StepReal } from '../src/nurbs/step.js';
-import { ProductSurface, ProductSurfaceProblem, SurfaceEdgeUses } from '../src/nurbs/surface.js';
-import { ClampUniformPeriodic, InsertKnot } from '../src/nurbs/bspline.js';
+import { ProductSurface, ProductSurfaceProblem, SurfaceEdgeUses, FloorBlend } from '../src/nurbs/surface.js';
+import { ClampUniformPeriodic, InsertKnot, SplitSurfaceV } from '../src/nurbs/bspline.js';
 import { FormShell } from '../src/plan.js';
 import { PulpTypes } from '../src/state.js';
 import { IsoContours, PolygonArea } from '../src/nurbs/contours.js';
@@ -231,5 +231,24 @@ describe ('Molded Pulp smooth product surface output', function () {
         assert.match (text, /^ISO-10303-21;/); assert.match (text, /OPEN_SHELL\('Tray'/); assert.match (text, /SHELL_BASED_SURFACE_MODEL/); assert.match (text, /MANIFOLD_SURFACE_SHAPE_REPRESENTATION/);
         assert.equal ((text.match (/ADVANCED_FACE\(/g) || []).length, 17); assert.equal ((text.match (/EDGE_CURVE\(/g) || []).length, surface.edges.length);
         assert.throws (() => WriteSurfaceStep ([]), /Form a tray/);
+
+        // Floor fillets: each wall is split exactly at floor + r and a cubic blend joins it to the floor, tangent to both.
+        const wall = loft.walls[0], r = 4, { lower, upper } = SplitSurfaceV (wall.surface, r);
+        for (const [u, v] of [[0.2, 1], [0.7, 3], [0.4, 20]]) { const a = SurfacePoint (wall.surface, u, v), b = SurfacePoint (v <= r ? lower : upper, u, v); assert.ok (Math.hypot (a[0] - b[0], a[1] - b[1], a[2] - b[2]) < 1e-9); }
+        const { wall : trimmed, surface : blend } = FloorBlend (wall.surface, wall.seed, r), h = 1e-6;
+        for (let q = 0; q <= 20; q++) {
+            const u = q / 20, top = SurfacePoint (blend, u, 1), foot = SurfacePoint (trimmed, u, r);
+            assert.ok (Math.hypot (top[0] - foot[0], top[1] - foot[1], top[2] - foot[2]) < 1e-9, 'blend meets the trimmed wall');
+            assert.ok (Math.abs (SurfacePoint (blend, u, 0)[1]) < 1e-12, 'blend starts on the floor');
+            // Tangent to the floor: the blend leaves it horizontally. Tangent to the wall: parallel height derivatives.
+            const b0 = SurfacePoint (blend, u, h); assert.ok (Math.abs (b0[1]) < 1e-9);
+            const b1 = SurfacePoint (blend, u, 1 - h).map ((x, i) => top[i] - x), w1 = SurfacePoint (trimmed, u, r + h).map ((x, i) => x - foot[i]);
+            const cross = [b1[1] * w1[2] - b1[2] * w1[1], b1[2] * w1[0] - b1[0] * w1[2], b1[0] * w1[1] - b1[1] * w1[0]];
+            assert.ok (Math.hypot (...cross) < 1e-6 * Math.hypot (...b1) * Math.hypot (...w1), 'tangent to the wall');
+        }
+        const filleted = ProductSurface (loft, { baseY : shell.rect.baseY, id : 'Tray', floorFilletMm : 4 });
+        assert.equal (filleted.faces.length, 23); assert.equal (filleted.faces.filter (f => f.name.endsWith ('floor fillet')).length, 6);
+        assert.equal (SurfaceEdgeUses (filleted).filter (u => u.forward + u.reversed === 1).length, 4);
+        assert.match (ProductSurfaceProblem (loft, { floorFilletMm : 20 }), /at most 40% of the form depth/);
     });
 });

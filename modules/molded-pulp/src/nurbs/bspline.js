@@ -191,3 +191,27 @@ export function ClampUniformPeriodic (ring, m, dim = 2)
     const clamped = new Float64Array (m + 3 + 4); clamped.set (knots.subarray (3, m + 8), 1); clamped[0] = 0; clamped[clamped.length - 1] = 1;
     return { knots : clamped, points : points.slice (2 * dim, (m + 5) * dim) };
 }
+
+// Split a clamped surface at height parameter v (0 < v inside the V range) into the parts below and above, exactly: v is
+// inserted until it has multiplicity p, and the shared control row is the iso curve at v (same U knots), so the two parts
+// meet in a common boundary curve. Returns { lower, upper } surfaces with the same U structure.
+export function SplitSurfaceV (surface, v)
+{
+    const { countU, countV, knotsV, points } = surface, q = surface.degreeV;
+    let knots = knotsV, columns = [];
+    for (let a = 0; a < countU; a++) { const c = new Float64Array (countV * 3); for (let b = 0; b < countV; b++) { for (let k = 0; k < 3; k++) { c[b * 3 + k] = points[(b * countU + a) * 3 + k]; } } columns.push (c); }
+    let multiplicity = knots.filter (k => k === v).length;
+    while (multiplicity < q) {
+        let next = null;
+        columns = columns.map (c => { const r = InsertKnot (knots, c, 3, v, q); next = r.knots; return r.points; });
+        knots = next; multiplicity++;
+    }
+    const s = knots.indexOf (v), rows = columns[0].length / 3;
+    const part = (from, to, partKnots) => {
+        const n = to - from, out = new Float64Array (countU * n * 3);
+        for (let b = 0; b < n; b++) { for (let a = 0; a < countU; a++) { for (let k = 0; k < 3; k++) { out[(b * countU + a) * 3 + k] = columns[a][(from + b) * 3 + k]; } } }
+        return { ...surface, knotsV : Float64Array.from (partKnots), countV : n, points : out };
+    };
+    // Knot v at indices s … s + q − 1: the curve passes through control s − 1 there.
+    return { lower : part (0, s, [...knots.subarray (0, s + q), v]), upper : part (s - 1, rows, [v, ...knots.subarray (s)]) };
+}
