@@ -2,7 +2,7 @@
 // stack of its outlines at increasing height, so each wall is one B-spline surface S(t, h): t runs once around the
 // pocket (periodic cubic, uniform knots) and h is the height (clamped cubic; y = h exactly through Greville
 // placement). Outlines come from iso-contours of the review field; the result is checked by true 3D distance to it.
-import { Degree, ClampedKnots, Greville, AxisBasis, FitAxis, FindSpan, BasisFuns } from './bspline.js';
+import { Degree, ClampedKnots, Greville, AxisBasis, FitAxis, FindSpan, BasisFuns, ClampUniformPeriodic } from './bspline.js';
 import { IsoContours, Centroid, PolygonArea, OutlineWindow } from './contours.js';
 import { SeamOrder, FitPeriodic, PeriodicPoint } from './periodic.js';
 import { SurfaceDistance } from './measure.js';
@@ -80,13 +80,14 @@ export function LoftPocketWalls (grid, H, { depthMm, floorMm = 0, outlineToleran
     // the height control count n grow only until the wall is within the 3D distance tolerance of the review surface, so
     // a straight side stays at a few controls instead of following the review grid's ripple. open: sides between two
     // corners (clamped cubics with pinned ends) instead of closed loops.
-    const loft = (outlines, seed, id, kind, open = false) => {
+    // heightControls: use exactly this many height controls (sides that meet at corners share one height knot vector).
+    const loft = (outlines, seed, id, kind, open = false, heightControls = 0) => {
         let best = null;
         for (let m = open ? 4 : 12; ; m = Math.min (maxOutlineControls, Math.ceil (m * 1.5))) {
             const fits = outlines.map (o => open ? FitOpen (o.points, o.params, m) : FitPeriodic (o.points, o.params, m));
             const knotsU = open ? OpenKnots (m) : PeriodicKnots (m), values = new Float64Array (count * m * 2);
             for (let k = 0; k < count; k++) { for (let i = 0; i < m; i++) { values[(k * m + i) * 2] = fits[k][i][0]; values[(k * m + i) * 2 + 1] = fits[k][i][1]; } }
-            for (let n = 4; ; n = Math.min (count, n * 2)) {
+            for (let n = heightControls || 4; ; n = Math.min (count, n * 2)) {
                 const knotsV = ClampedKnots (Array.from ({ length : n - Degree - 1 }, (_, i) => v0 + (v1 - v0) * (i + 1) / (n - Degree)), v0, v1);
                 const controls = FitAxis (values, m * 2, AxisBasis (knotsV, vs));
                 const ringAt = v => { const s = FindSpan (knotsV, v), N = BasisFuns (knotsV, s, v), ring = []; for (let i = 0; i < m; i++) { let x = 0, z = 0; for (let r = 0; r <= Degree; r++) { const b = s - Degree + r; x += N[r] * controls[(b * m + i) * 2]; z += N[r] * controls[(b * m + i) * 2 + 1]; } ring.push ([x, z]); } return ring; };
@@ -99,17 +100,25 @@ export function LoftPocketWalls (grid, H, { depthMm, floorMm = 0, outlineToleran
                 const wall = { m, n, knotsU, knotsV, controls, gv : Greville (knotsV), max };
                 if (!best || wall.max < best.max) { best = wall; }
                 if (max <= wallToleranceMm) { best = wall; break; }
-                if (n >= count) { break; }
+                if (n >= count || heightControls) { break; }
             }
             if (best.max <= wallToleranceMm || m >= maxOutlineControls) { break; }
         }
-        const { m, n, knotsU } = best;
-        // Surface: U periodic (m + 3 wrapped controls) or clamped (open sides), V clamped in height; point (x, y = v, z).
+        const { m, n } = best;
+        // Surface clamped in both directions; point (x, y = v, z). A closed wall's periodic rings are rewritten in clamped
+        // form (the same curves, m + 3 controls), so every boundary is a control row or column: its first and last
+        // columns are the seam, made bitwise equal.
         const countU = open ? m : m + Degree, points = new Float64Array (countU * n * 3);
-        for (let b = 0; b < n; b++) { for (let a = 0; a < countU; a++) { const i = a % m, k = (b * countU + a) * 3; points[k] = best.controls[(b * m + i) * 2]; points[k + 1] = best.gv[b]; points[k + 2] = best.controls[(b * m + i) * 2 + 1]; } }
+        let knotsU = best.knotsU;
+        for (let b = 0; b < n; b++) {
+            const ring = best.controls.subarray (b * m * 2, (b + 1) * m * 2), row = open ? ring : ClampUniformPeriodic (ring, m);
+            if (!open) { knotsU = row.knots; }
+            const xz = open ? ring : row.points;
+            for (let a = 0; a < countU; a++) { const i = !open && a === countU - 1 ? 0 : a, k = (b * countU + a) * 3; points[k] = xz[i * 2]; points[k + 1] = best.gv[b]; points[k + 2] = xz[i * 2 + 1]; }
+        }
         return {
             id, kind, seed, areaMm2 : Math.abs (PolygonArea (outlines[0].points)),
-            surface : { degreeU : Degree, degreeV : Degree, periodicU : !open, knotsU, knotsV : best.knotsV, countU, countV : n, points },
+            surface : { degreeU : Degree, degreeV : Degree, closedU : !open, knotsU, knotsV : best.knotsV, countU, countV : n, points },
             outlineControls : m, heightControls : n, maxDistanceMm : best.max, withinTolerance : best.max <= wallToleranceMm
         };
     };
@@ -128,19 +137,21 @@ export function LoftPocketWalls (grid, H, { depthMm, floorMm = 0, outlineToleran
         // corner edge. Without stable corners (a rounded outline) the skirt is one closed loft.
         const corners = skirt.map (o => OutlineCorners (o.points));
         if (corners[0].length >= 3 && corners.every (c => c.length === corners[0].length)) {
-            for (let side = 0; side < corners[0].length; side++) {
-                const sides = skirt.map ((o, k) => {
-                    const c = corners[k], from = c[side], to = c[(side + 1) % c.length], points = [];
-                    for (let i = from; ; i = (i + 1) % o.points.length) { points.push (o.points[i]); if (i === to) { break; } }
-                    return { points, params : OpenParams (points) };
-                });
-                walls.push (loft (sides, centre, 'Outer skirt side ' + (side + 1), 'skirt', true));
-            }
+            const stacks = corners[0].map ((_, side) => skirt.map ((o, k) => {
+                const c = corners[k], from = c[side], to = c[(side + 1) % c.length], points = [];
+                for (let i = from; ; i = (i + 1) % o.points.length) { points.push (o.points[i]); if (i === to) { break; } }
+                return { points, params : OpenParams (points) };
+            }));
+            let sides = stacks.map ((stack, side) => loft (stack, centre, 'Outer skirt side ' + (side + 1), 'skirt', true));
+            // Neighbouring sides share their corner edge only with one height knot vector: refit with the largest count.
+            const n = Math.max (...sides.map (w => w.heightControls));
+            if (sides.some (w => w.heightControls !== n)) { sides = stacks.map ((stack, side) => loft (stack, centre, 'Outer skirt side ' + (side + 1), 'skirt', true, n)); }
+            walls.push (...sides);
         } else { walls.push (loft (skirt, centre, 'Outer skirt', 'skirt')); }
     }
     // Flat faces bounded by the walls' end curves. A wall is clamped in height, so its bottom (v = 0) and top (v = depthMm)
     // curves are exactly its first and last control rows: the faces and walls share these edges.
-    const edge = (wall, top) => { const sf = wall.surface, b = top ? sf.countV - 1 : 0, pts = []; for (let a = 0; a < sf.countU; a++) { const k = (b * sf.countU + a) * 3; pts.push ([sf.points[k], sf.points[k + 2]]); } return { wall : wall.id, periodic : sf.periodicU, degree : sf.degreeU, knots : sf.knotsU, points : pts, y : top ? v1 : v0 }; };
+    const edge = (wall, top) => { const sf = wall.surface, b = top ? sf.countV - 1 : 0, pts = []; for (let a = 0; a < sf.countU; a++) { const k = (b * sf.countU + a) * 3; pts.push ([sf.points[k], sf.points[k + 2]]); } return { wall : wall.id, closed : sf.closedU, degree : sf.degreeU, knots : sf.knotsU, points : pts, y : top ? v1 : v0 }; };
     const pocketWalls = walls.filter (w => w.kind === 'pocket'), skirtWalls = walls.filter (w => w.kind === 'skirt');
     const faces = [];
     // Pocket floors: planes at y = 0 only where the review floor is flat inside the pocket's lowest outline (within the

@@ -161,3 +161,33 @@ export function FitAxis (values, columns, basis)
     }
     return out;
 }
+
+// Boehm knot insertion (The NURBS Book A5.1, one knot): points is a flat array of control points of dimension dim.
+// The curve is unchanged; returns the new knots and points.
+export function InsertKnot (knots, points, dim, u, p = Degree)
+{
+    let k = p; while (k + 1 < knots.length - p - 1 && knots[k + 1] <= u) { k++; }
+    const count = points.length / dim, outKnots = new Float64Array (knots.length + 1), out = new Float64Array ((count + 1) * dim);
+    outKnots.set (knots.subarray (0, k + 1)); outKnots[k + 1] = u; outKnots.set (knots.subarray (k + 1), k + 2);
+    for (let i = 0; i <= count; i++) {
+        let a; if (i <= k - p) { a = 1; } else if (i >= k + 1) { a = 0; } else { const d = knots[i + p] - knots[i]; a = d > 0 ? (u - knots[i]) / d : 0; }
+        for (let c = 0; c < dim; c++) {
+            const here = i < count ? points[i * dim + c] : 0, before = i > 0 ? points[(i - 1) * dim + c] : 0;
+            out[i * dim + c] = i <= k - p ? here : i >= k + 1 ? before : a * here + (1 - a) * before;
+        }
+    }
+    return { knots : outKnots, points : out };
+}
+
+// A uniform periodic cubic with m controls over [0, 1) (control i + m = control i), rewritten as the same curve in clamped
+// form: m + 3 controls, knots 0 ×4, 1/m … (m − 1)/m, 1 ×4. The first and last controls are both the curve point at 0 (the
+// seam), so a closed wall's boundary curves are plain control rows. ring: flat [x, z, …] of m controls (dim per point).
+export function ClampUniformPeriodic (ring, m, dim = 2)
+{
+    let knots = Float64Array.from ({ length : m + 2 * Degree + 1 }, (_, i) => (i - Degree) / m);
+    let points = new Float64Array ((m + Degree) * dim); for (let i = 0; i < m + Degree; i++) { for (let c = 0; c < dim; c++) { points[i * dim + c] = ring[(i % m) * dim + c]; } }
+    for (const u of [0, 0, 1, 1]) { ({ knots, points } = InsertKnot (knots, points, dim, u)); }
+    // Knot 0 now has multiplicity 3 at indices 3..5 and knot 1 at m + 5..m + 7: keep controls 2..m + 4.
+    const clamped = new Float64Array (m + 3 + 4); clamped.set (knots.subarray (3, m + 8), 1); clamped[0] = 0; clamped[clamped.length - 1] = 1;
+    return { knots : clamped, points : points.slice (2 * dim, (m + 5) * dim) };
+}

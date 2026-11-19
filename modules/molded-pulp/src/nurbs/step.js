@@ -67,10 +67,10 @@ function WriteShell (w, shell)
     return w.Add ('MANIFOLD_SOLID_BREP(' + Text (shell.id) + ',' + w.Add ('CLOSED_SHELL(\'\',' + '(' + faces.join (',') + '))') + ')');
 }
 
-// shells: NurbsShell results (world mm). Returns the STEP file text.
-export function WriteStep (shells, { name = 'Molded pulp', timestamp = new Date ().toISOString ().slice (0, 19) } = {})
+// AP214 file around one shape representation: product structure, mm/radian/steradian units, 0.0001 mm uncertainty.
+// items (w, context) writes the geometry and returns the representation entity's type and item references.
+function StepFile (name, timestamp, items, description)
 {
-    if (!shells.length) { throw new Error ('Form a sheet or tray before exporting STEP.'); }
     const w = new Writer ();
     const context = w.Add ('APPLICATION_CONTEXT(\'core data for automotive mechanical design processes\')');
     w.Add ('APPLICATION_PROTOCOL_DEFINITION(\'international standard\',\'automotive_design\',2000,' + context + ')');
@@ -84,9 +84,54 @@ export function WriteStep (shells, { name = 'Molded pulp', timestamp = new Date 
     const uncertainty = w.Add ('UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.E-04),' + mm + ',\'distance_accuracy_value\',\'confusion accuracy\')');
     const representationContext = w.Add ('( GEOMETRIC_REPRESENTATION_CONTEXT(3) GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT((' + uncertainty + ')) GLOBAL_UNIT_ASSIGNED_CONTEXT((' + mm + ',' + rad + ',' + sr + ')) REPRESENTATION_CONTEXT(\'Context #1\',\'3D Context with UNIT and UNCERTAINTY\') )');
     const placement = w.Add ('AXIS2_PLACEMENT_3D(\'\',' + w.Point ([0, 0, 0]) + ',' + w.Add ('DIRECTION(\'\',(0.,0.,1.))') + ',' + w.Add ('DIRECTION(\'\',(1.,0.,0.))') + ')');
-    const solids = shells.map (shell => WriteShell (w, shell));
-    const representation = w.Add ('ADVANCED_BREP_SHAPE_REPRESENTATION(' + Text (name) + ',(' + [placement, ...solids].join (',') + '),' + representationContext + ')');
+    const { type, refs } = items (w);
+    const representation = w.Add (type + '(' + Text (name) + ',(' + [placement, ...refs].join (',') + '),' + representationContext + ')');
     w.Add ('SHAPE_DEFINITION_REPRESENTATION(' + shape + ',' + representation + ')');
     const file = Text (name.replace (/[^\w .-]+/g, '').trim () || 'molded-pulp') ;
-    return ['ISO-10303-21;', 'HEADER;', 'FILE_DESCRIPTION((\'Auto3D molded pulp B-rep\'),\'2;1\');', 'FILE_NAME(' + file + ',' + Text (timestamp) + ',(\'\'),(\'\'),\'Auto3D\',\'Auto3D Molded Pulp\',\'\');', 'FILE_SCHEMA((\'AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }\'));', 'ENDSEC;', 'DATA;', ...w.lines, 'ENDSEC;', 'END-ISO-10303-21;', ''].join ('\n');
+    return ['ISO-10303-21;', 'HEADER;', 'FILE_DESCRIPTION((' + Text (description) + '),\'2;1\');', 'FILE_NAME(' + file + ',' + Text (timestamp) + ',(\'\'),(\'\'),\'Auto3D\',\'Auto3D Molded Pulp\',\'\');', 'FILE_SCHEMA((\'AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }\'));', 'ENDSEC;', 'DATA;', ...w.lines, 'ENDSEC;', 'END-ISO-10303-21;', ''].join ('\n');
+}
+
+// shells: NurbsShell results (world mm). Returns the STEP file text.
+export function WriteStep (shells, { name = 'Molded pulp', timestamp = new Date ().toISOString ().slice (0, 19) } = {})
+{
+    if (!shells.length) { throw new Error ('Form a sheet or tray before exporting STEP.'); }
+    return StepFile (name, timestamp, w => ({ type : 'ADVANCED_BREP_SHAPE_REPRESENTATION', refs : shells.map (shell => WriteShell (w, shell)) }), 'Auto3D molded pulp B-rep');
+}
+
+const Direction = (w, v) => { const l = Math.hypot (...v); return w.Add ('DIRECTION(\'\',(' + v.map (x => StepReal (x / l)).join (',') + '))'); };
+
+function WriteSurface (w, surface)
+{
+    const flat = points => points.map (p => w.Point (p));
+    const vertex = surface.vertices.map (v => w.Add ('VERTEX_POINT(\'\',' + w.Point (v.point) + ')'));
+    const edge = surface.edges.map (e => {
+        const k = KnotList (e.knots);
+        const curve = w.Add ('B_SPLINE_CURVE_WITH_KNOTS(\'\',' + e.degree + ',(' + flat (e.points).join (',') + '),.UNSPECIFIED.,' + (e.from === e.to ? '.T.' : '.F.') + ',.F.,(' + k.mults.join (',') + '),(' + k.values.map (StepReal).join (',') + '),.UNSPECIFIED.)');
+        return w.Add ('EDGE_CURVE(\'\',' + vertex[e.from] + ',' + vertex[e.to] + ',' + curve + ',.T.)');
+    });
+    const faces = surface.faces.map (face => {
+        let geometry;
+        if (face.kind === 'plane') {
+            geometry = w.Add ('PLANE(\'\',' + w.Add ('AXIS2_PLACEMENT_3D(\'\',' + w.Point (face.origin) + ',' + Direction (w, face.normal) + ',' + Direction (w, face.xAxis) + ')') + ')');
+        } else {
+            const sf = face.surface, u = KnotList (sf.knotsU), v = KnotList (sf.knotsV), rows = [];
+            for (let a = 0; a < sf.countU; a++) { const r = []; for (let b = 0; b < sf.countV; b++) { const k = (b * sf.countU + a) * 3; r.push (w.Point ([sf.points[k], sf.points[k + 1], sf.points[k + 2]])); } rows.push ('(' + r.join (',') + ')'); }
+            geometry = w.Add ('B_SPLINE_SURFACE_WITH_KNOTS(\'\',' + sf.degreeU + ',' + sf.degreeV + ',(' + rows.join (',') + '),.UNSPECIFIED.,.F.,.F.,.F.,(' + u.mults.join (',') + '),(' + v.mults.join (',') + '),(' + u.values.map (StepReal).join (',') + '),(' + v.values.map (StepReal).join (',') + '),.UNSPECIFIED.)');
+        }
+        const bounds = face.bounds.map (b => {
+            const oriented = b.loop.map (([e, forward]) => w.Add ('ORIENTED_EDGE(\'\',*,*,' + edge[e] + ',' + (forward ? '.T.' : '.F.') + ')'));
+            const loop = w.Add ('EDGE_LOOP(\'\',(' + oriented.join (',') + '))');
+            return w.Add ((b.outer ? 'FACE_OUTER_BOUND' : 'FACE_BOUND') + '(\'\',' + loop + ',.T.)');
+        });
+        return w.Add ('ADVANCED_FACE(' + Text (face.name) + ',(' + bounds.join (',') + '),' + geometry + ',' + (face.sameSense ? '.T.' : '.F.') + ')');
+    });
+    return w.Add ('OPEN_SHELL(' + Text (surface.id) + ',(' + faces.join (',') + '))');
+}
+
+// surfaces: ProductSurface results (world mm): the smooth product side of each shell as an open shell, for thickening
+// into the tool side. Returns the STEP file text.
+export function WriteSurfaceStep (surfaces, { name = 'Molded pulp product side', timestamp = new Date ().toISOString ().slice (0, 19) } = {})
+{
+    if (!surfaces.length) { throw new Error ('Form a tray before exporting its smooth surface.'); }
+    return StepFile (name, timestamp, w => ({ type : 'MANIFOLD_SURFACE_SHAPE_REPRESENTATION', refs : [w.Add ('SHELL_BASED_SURFACE_MODEL(\'\',(' + surfaces.map (s => WriteSurface (w, s)).join (',') + '))')] }), 'Auto3D molded pulp product-side surface');
 }

@@ -4,7 +4,9 @@ import { PlanSheet, PlanTray } from '../src/plan.js';
 import { ClampedKnots, Greville, FindSpan, BasisFuns, CurvePoint, SurfacePoint, AxisBasis, FitGrid, EvalGrid } from '../src/nurbs/bspline.js';
 import { NurbsShell, MaxOutputSide } from '../src/nurbs/shell.js';
 import { ShellBrep, BrepEdgeUses } from '../src/nurbs/brep.js';
-import { WriteStep, StepReal } from '../src/nurbs/step.js';
+import { WriteStep, WriteSurfaceStep, StepReal } from '../src/nurbs/step.js';
+import { ProductSurface, ProductSurfaceProblem, SurfaceEdgeUses } from '../src/nurbs/surface.js';
+import { ClampUniformPeriodic, InsertKnot } from '../src/nurbs/bspline.js';
 import { FormShell } from '../src/plan.js';
 import { PulpTypes } from '../src/state.js';
 import { IsoContours, PolygonArea } from '../src/nurbs/contours.js';
@@ -174,5 +176,60 @@ describe ('Molded Pulp smooth wall check and the outer skirt option', function (
         assert.ok (sides.every (w => w.outlineControls === 4), JSON.stringify (sides.map (w => w.outlineControls)));
         assert.deepEqual (on.faces.map (f => f.kind), ['plane', 'plane', 'plane', 'plane', 'plane', 'plane', 'plane']);
         assert.equal (on.faces.at (-1).id, 'Plateau'); assert.equal (on.faces.at (-1).holes, 6);
+    });
+});
+
+describe ('Molded Pulp smooth product surface output', function () {
+    this.timeout (180000);
+    it ('rewrites a periodic cubic in clamped form without changing it', () => {
+        for (const m of [4, 9, 31]) {
+            const ring = Array.from ({ length : m }, (_, i) => [Math.cos (i) * 10 + i, Math.sin (i * 1.3) * 7]), c = ClampUniformPeriodic (ring.flat (), m);
+            assert.equal (c.knots.length, m + 7); assert.equal (c.points.length, (m + 3) * 2);
+            const points = new Float64Array ((m + 3) * 3); for (let i = 0; i < m + 3; i++) { points[i * 3] = c.points[i * 2]; points[i * 3 + 2] = c.points[i * 2 + 1]; }
+            for (let q = 0; q <= 100; q++) {
+                // Standard indexing puts the curve at parameter t where PeriodicPoint has t + 1/m.
+                const a = CurvePoint ({ degree : 3, knots : c.knots, points }, q / 100), b = PeriodicPoint (ring, q / 100 + 1 / m);
+                assert.ok (Math.hypot (a[0] - b[0], a[2] - b[1]) < 1e-9);
+            }
+        }
+        const line = InsertKnot (Float64Array.of (0, 0, 1, 1), Float64Array.of (0, 2), 1, 0.25, 1);
+        assert.deepEqual ([...line.knots], [0, 0, 0.25, 1, 1]); assert.deepEqual ([...line.points], [0, 0.5, 2]);
+    });
+    it ('builds the six-can product side as one open shell with shared edges and writes it as STEP', () => {
+        const draft = { ...DefaultPulpDraft ('type2'), formDepthMm : 35, detail : 'standard', ribs : 'off', lugs : 'off', skirtWall : true };
+        const shell = FormShell (SixPack (86, 48), draft, { keepSurfaces : true });
+        const loft = LoftPocketWalls (shell.grid, shell.surfaces.top, { depthMm : shell.metrics.achievedDepthMm, wallToleranceMm : 0.25 * PulpTypes.type2.toleranceMm, skirtWall : true });
+        assert.equal (ProductSurfaceProblem (loft), null);
+        assert.match (ProductSurfaceProblem ({ ...loft, walls : loft.walls.filter (w => w.kind !== 'skirt') }), /outer skirt wall/);
+        assert.match (ProductSurfaceProblem ({ ...loft, faces : [{ id : 'Pocket 1 floor', kind : 'patch-needed', raisedMm : 4.2 }] }), /raised 4\.2 mm/);
+        // Skirt sides share one height knot vector, so neighbours share their corner columns.
+        const sides = loft.walls.filter (w => w.kind === 'skirt'); assert.equal (new Set (sides.map (w => w.heightControls)).size, 1);
+        const surface = ProductSurface (loft, { baseY : shell.rect.baseY, id : 'Tray' });
+        assert.equal (surface.faces.length, 17); assert.deepEqual (surface.faces.map (f => f.kind).filter (k => k === 'plane').length, 7);
+        // Every edge is used once in each direction, except the four open skirt bottom edges (once each).
+        const uses = SurfaceEdgeUses (surface), once = uses.filter (u => u.forward + u.reversed === 1);
+        assert.equal (once.length, 4); assert.ok (uses.every (u => (u.forward === 1 && u.reversed === 1) || u.forward + u.reversed === 1));
+        // Edge curves end exactly on their vertices; plane boundaries lie in their planes.
+        for (const e of surface.edges) {
+            assert.deepEqual (e.points[0], surface.vertices[e.from].point); assert.deepEqual (e.points.at (-1), surface.vertices[e.to].point);
+        }
+        for (const face of surface.faces.filter (f => f.kind === 'plane')) {
+            for (const b of face.bounds) { for (const [e] of b.loop) { assert.ok (surface.edges[e].points.every (p => Math.abs (p[1] - face.origin[1]) < 1e-9), face.name); } }
+        }
+        // Face normals (Su × Sv, flipped when not sameSense) point to the product side: into each pocket (towards the mean of
+        // its controls) and away from the tray on the skirt.
+        const centre = [shell.rect.x0 + shell.rect.lengthMm / 2, shell.rect.z0 + shell.rect.widthMm / 2];
+        for (const face of surface.faces.filter (f => f.kind === 'bspline')) {
+            const sf = face.surface, u = 0.37 * sf.knotsU.at (-1) + 0.63 * sf.knotsU[0], v = (sf.knotsV[0] + sf.knotsV.at (-1)) / 2, h = 1e-5;
+            const p = SurfacePoint (sf, u, v), du = SurfacePoint (sf, u + h, v).map ((x, i) => x - p[i]), dv = SurfacePoint (sf, u, v + h).map ((x, i) => x - p[i]);
+            const n = [du[1] * dv[2] - du[2] * dv[1], du[2] * dv[0] - du[0] * dv[2], du[0] * dv[1] - du[1] * dv[0]].map (x => face.sameSense ? x : -x);
+            let mx = 0, mz = 0; for (let k = 0; k < sf.points.length; k += 3) { mx += sf.points[k]; mz += sf.points[k + 2]; } mx /= sf.points.length / 3; mz /= sf.points.length / 3;
+            const towards = face.name.startsWith ('Pocket') ? [mx - p[0], mz - p[2]] : [p[0] - centre[0], p[2] - centre[1]];
+            assert.ok (n[0] * towards[0] + n[2] * towards[1] > 0, face.name + ' faces the product side');
+        }
+        const text = WriteSurfaceStep ([surface], { name : 'Six can tray', timestamp : '2026-11-19T00:00:00' });
+        assert.match (text, /^ISO-10303-21;/); assert.match (text, /OPEN_SHELL\('Tray'/); assert.match (text, /SHELL_BASED_SURFACE_MODEL/); assert.match (text, /MANIFOLD_SURFACE_SHAPE_REPRESENTATION/);
+        assert.equal ((text.match (/ADVANCED_FACE\(/g) || []).length, 17); assert.equal ((text.match (/EDGE_CURVE\(/g) || []).length, surface.edges.length);
+        assert.throws (() => WriteSurfaceStep ([]), /Form a tray/);
     });
 });
