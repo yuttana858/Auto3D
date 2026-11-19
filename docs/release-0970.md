@@ -2,27 +2,37 @@
 
 Packaging **1.19.0**, Primary Products 0.16.0, Molded Pulp 0.3.0. Based on main after 0.96.0 (#168); 0.95.0 is reserved by the animation PR #167. Not deployed.
 
-## Universal 12 oz can collar
+## Universal 12 oz can collar with a crease ring and locking tabs
 
-Collars for 12 oz cans now use one universal design. Every collar uses the same hole: the same tab count, tab width, tab height, tip diameter and relief diameter, whatever the pack layout. The design, `12oz-202`, is for a 211 body (Ø 66 mm) with a 202 end (seam Ø about 57.9 mm):
+Collars for 12 oz cans now use one universal design. Every collar uses the same hole (tab count, tab width and length, tip diameter and crease diameter), whatever the pack layout. The design, `12oz-202`, is for a 211 body (Ø 66 mm) with a 202 end (seam Ø about 57.9 mm). Each opening is tight to the can:
 
 | Feature | Value |
 | --- | --- |
-| Tabs | 16 |
-| Tab tips | Ø 55.0 mm, tucking about 1.45 mm under the seam |
-| Relief slits | end at Ø 64.0 mm, so tabs are 4.5 mm tall |
-| Slit width at the tip | 1.0 mm, so tabs are about 9.8 mm wide |
-| Web between touching cans | 2 mm (66 mm pitch) |
+| Crease ring (tab hinge) | Ø 58.1 mm, just outside the seam; the relief slits end on it |
+| Tabs | 16, about 9.5 mm wide at the tip |
+| Tab length | 1.7 mm at the centre, 2.1 mm at the corners |
+| Tab tips | Ø 53.6 mm |
+| Slit width at the tip | 1.0 mm |
+| Web between touching cans | 7.9 mm (66 mm pitch) |
 
-These values were chosen against the library standard beverage can. The tabs clear its neck through the board thickness by about 0.8 mm. The values live in one place: `CollarStandards` in `modules/packaging/src/cancollar.js`.
+- **Crease ring in the dieline.** Each opening has a closed crease (score) path: straight hinge lines between the slit ends (`crease-N`). It exports with the score layer and shows in CAD as blue dashed lines. The measurement layer adds the crease diameter.
+- **Tabs fold up and lock.** On the model, the tabs fold upward along the crease, each about its own hinge line. They tuck into the recess under the seam, with their tips hooked under the seam lip, which locks every can in the collar. The fold is stored in the profile (`tabFold: { version: 1, angleDeg }`, `FoldTabs` in `modules/packaging/src/tabfold.js`), so reopening, Apply CAD and saved sessions all show the same folded board.
+- **Placement solver.** `SolveTabFold` in `cancollar.js` places the collar and picks the fold from the cans' real outline (`CanRadialProfile`). It requires:
+  - the sheet's crease chords clear the can through the board thickness
+  - each tab's inner face clears the can along its centre line and its slit edge, with tab corners included
+  - the tab corners stay under the seam underside
+  - the tips hook at least 0.5 mm under the seam lip
+  - the tabs fold at least 25°
 
+  It prefers the sheet closest to the seam, then the tightest tip. On the library 12 oz can, the sheet sits at 119.2 mm and the tabs fold 25°. The tips rise to 120.14 mm (the seam underside is at 120.17 mm), hook 2.25 mm under the lip and stay at least 0.5 mm from the can.
+- **Fallback.** If no fold fits a can model, the collar lies flat under the rims as before. Custom-fit collars also stay flat. They get the crease ring in the dieline, but their tabs are not folded in 3D.
 - **Choosing the design.** A new **Collar design** setting has three choices:
-  - **Automatic** (default): the universal design when the rims fit it (rim Ø 56.9–58.9 mm, cans at least 65.5 mm apart, tabs clear of the neck), otherwise a custom fit, with the reason shown. Giving tuck, relief, tab or slit values asks Automatic for a custom fit.
+  - **Automatic** (default): the universal design when the rims fit it (rim Ø 56.9–58.05 mm, so the crease stays outside the seam; cans at least 59.6 mm apart), otherwise a custom fit, with the reason shown. Giving tuck, relief, tab or slit values asks Automatic for a custom fit.
   - **12 oz universal**: always the universal design. Cans that do not fit are refused with the reason.
-  - **Custom fit**: the earlier rim-fitted design.
+  - **Custom fit**: the earlier rim-fitted flat design.
 
   With the universal design, the tuck, relief and tab fields are fixed. Board, edge margin and corners still apply.
-- **Naming.** The collar is named "12 oz can collar · N cans", and its saved data records `design: '12oz-202'`.
+- **Naming.** The collar is named "12 oz can collar · N cans". Its saved data records `design: '12oz-202'` and `tabFoldDeg`.
 - **Tied to a CAD design.** `StandardReliefHole` is the hole every 12 oz collar uses. The CAD Shape tools have **Add 12 oz collar hole** (`packaging.path.standard_hole`) to draw it anywhere.
 
 ## White top
@@ -79,6 +89,7 @@ A model in another known unit now keeps its real size when added to a scene. For
 
 ## Validation
 
+- Packaging module: new `tabfold.test.js` covers the fold validation, rigid tabs folded about their crease lines with the sheet left flat, and the solver hooking tabs under the rim of a revolved can (and refusing tabs too long for the recess).
 - Packaging module: new `print.test.js` (7 tests) covers:
   - print validation and artwork fit modes
   - the white top only on the top face
@@ -99,3 +110,4 @@ A model in another known unit now keeps its real size when added to a scene. For
   - Unit tests: 1169 passing. Packaging module: 116 passing. MCP: 73 passing. Lint is clean.
   - 23 of 25 packaging, board, CAD and Primary Products browser tests pass.
   - `packaging-auto-pack` and `packaging-auto-styles` fail the same way on unchanged main (the Auto pane no longer has the elements they wait for after the compact Auto Pack controls), so those failures come from main, not this release.
+- After the crease ring and locking tabs: unit 1172, Packaging module 119 and MCP 73 passing; lint clean. Browser `can-collar`, `import-units`, `packaging-accessories`, `autopack-sequence`, `board-appearance`, `cad-apply`, `packaging-module` and `primary-label-cad` pass.

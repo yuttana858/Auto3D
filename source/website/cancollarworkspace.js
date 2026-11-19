@@ -1,6 +1,6 @@
 import { DropIn } from './dropin.js';
 import { ProgressRecord, ShowProgressPopup, NextFrame } from './progresspopup.js';
-import { SenseCanRim, CanRadiusInSlab, CreateCanCollarPlan, CollarBoards, CollarStandards, DefaultCollarOptions, MaxCollarCans, CollarNeckClearanceMm } from '../../modules/packaging/src/cancollar.js';
+import { SenseCanRim, CanRadiusInSlab, CanRadialProfile, SolveTabFold, CreateCanCollarPlan, CollarBoards, CollarStandards, DefaultCollarOptions, MaxCollarCans, CollarNeckClearanceMm } from '../../modules/packaging/src/cancollar.js';
 import { LoadPackagingModule, PackagingUnitMM } from './packagingadapter.js';
 import { AddBoardPiece, AccessoryData } from './accessoriesworkspace.js';
 
@@ -51,7 +51,8 @@ export class CanCollarWorkspace
             for (const p of vertices) { if (++count > MaxPointsPerCan * 3) { throw new Error ('Simplify ' + object.name + ' below ' + (MaxPointsPerCan).toLocaleString () + ' triangles before adding a collar.'); } points.push (p.x * factor, p.y * factor, p.z * factor); }
         });
         try {
-            const rim = SenseCanRim (points), triangles = [], low = rim.rimBottomMm - Math.max (...CollarBoards.map (b => b.caliperMm)) - 1 - CollarNeckClearanceMm;
+            // Triangles of the top 11 mm under the rim: the neck and shoulder the collar and its folded tabs sit against.
+            const rim = SenseCanRim (points), triangles = [], low = rim.rimBottomMm - 11;
             for (let i = 0; i < points.length; i += 9) { if (Math.min (points[i + 1], points[i + 4], points[i + 7]) <= rim.rimBottomMm && Math.max (points[i + 1], points[i + 4], points[i + 7]) >= low) { triangles.push (...points.slice (i, i + 9)); } }
             return { object, rim, triangles, vertices : count };
         }
@@ -83,15 +84,26 @@ export class CanCollarWorkspace
     {
         const standard = this.Design (c, options), design = CollarStandards.find (d => d.id === standard);
         const name = (design ? design.name.split (' · ')[0] + ' collar' : 'Can collar') + ' · ' + c.cans.length + (c.cans.length === 1 ? ' can' : ' cans');
-        const topMm = c.rimBottomMm - CollarNeckClearanceMm;
-        const neckRadiusMm = Math.max (...c.cans.map (can => CanRadiusInSlab (can.triangles, can.rim.center, topMm - options.board.caliperMm, topMm)));
-        const plan = (id, title) => CreateCanCollarPlan ({ cans : c.cans.map (can => can.rim.center), rimRadiusMm : c.rimRadiusMm, neckRadiusMm, thickness : options.board.caliperMm, tuckMm : options.automaticTuck ? null : options.tuckMm, reliefMm : options.reliefMm, marginMm : options.marginMm, cornerRadiusMm : options.cornerRadiusMm, tabs : options.tabs, notchWidthMm : options.notchWidthMm, name : title, grade : options.board.name, standard : id, print : { version : 1, ground : options.board.ground } });
+        const flatTopMm = c.rimBottomMm - CollarNeckClearanceMm, thickness = options.board.caliperMm;
+        const neckRadiusMm = Math.max (...c.cans.map (can => CanRadiusInSlab (can.triangles, can.rim.center, flatTopMm - thickness, flatTopMm)));
+        const common = { cans : c.cans.map (can => can.rim.center), rimRadiusMm : c.rimRadiusMm, neckRadiusMm, thickness, tuckMm : options.automaticTuck ? null : options.tuckMm, reliefMm : options.reliefMm, marginMm : options.marginMm, cornerRadiusMm : options.cornerRadiusMm, tabs : options.tabs, notchWidthMm : options.notchWidthMm, grade : options.board.name, print : { version : 1, ground : options.board.ground } };
+        const plan = (id, title) => {
+            // A universal design folds its tabs up along the crease to lock under the rims, when the cans allow it:
+            // the solver places the sheet and the fold from the cans' real outline. Otherwise the collar lies flat.
+            if (id) {
+                c.outline ??= CanRadialProfile (c.cans.map (can => ({ triangles : can.triangles, center : can.rim.center })), c.rimBottomMm - 11, c.rimBottomMm + 0.1);
+                const base = CreateCanCollarPlan ({ ...common, name : title, standard : id, tabFold : { version : 1, angleDeg : 0 } });
+                const fold = SolveTabFold ({ outline : c.outline, rimRadiusMm : c.rimRadiusMm, rimBottomMm : c.rimBottomMm, creaseRadiusMm : base.reliefRadiusMm, tabs : base.tabs, tipRadiusMm : base.holeRadiusMm, notchWidthMm : base.notchWidthMm, thickness });
+                if (fold) { return { ...CreateCanCollarPlan ({ ...common, name : title, standard : id, tabFold : { version : 1, angleDeg : fold.angleDeg } }), topMm : fold.sheetTopMm, fold, neckClearanceMm : fold.clearanceMm }; }
+            }
+            return { ...CreateCanCollarPlan ({ ...common, name : title, standard : id }), topMm : flatTopMm, fold : null };
+        };
         // Automatic: the universal design when it fits these cans, otherwise a custom fit (with the reason).
         if (standard && options.design === 'auto') {
-            try { return { ...plan (standard, name), topMm }; }
-            catch (error) { return { ...plan (null, 'Can collar · ' + c.cans.length + (c.cans.length === 1 ? ' can' : ' cans')), topMm, standardRefused : error.message }; }
+            try { return plan (standard, name); }
+            catch (error) { return { ...plan (null, 'Can collar · ' + c.cans.length + (c.cans.length === 1 ? ' can' : ' cans')), standardRefused : error.message }; }
         }
-        return { ...plan (standard, name), topMm };
+        return plan (standard, name);
     }
     // Opens the CAD designer on the collar of the selected cans (or the selected collar), at its Print section.
     EditArtwork ()
@@ -156,7 +168,7 @@ export class CanCollarWorkspace
             // Keep a small axial gap below the rim; the full board slab and tab chords clear each neck.
             const min = [plan.worldMinMm[0], plan.topMm - plan.thicknessMm, plan.worldMinMm[1]];
             collar = AddBoardPiece (module, target, plan.profile, material, { upright : false, runsAlongX : true, min }, c.factor, plan.profile.name, 'Accessory · can collar');
-            collar.userData = { ...group, [AccessoryKey] : JSON.stringify ({ version : 1, kind : 'collar', canIds : cans.map (can => can.id), design : plan.standard?.id || 'custom', boardId : options.board.id, boardName : options.board.name, thicknessMm : plan.thicknessMm, rimRadiusMm : plan.rimRadiusMm, holeRadiusMm : plan.holeRadiusMm, reliefRadiusMm : plan.reliefRadiusMm, tuckMm : plan.tuckMm, tabs : plan.tabs }) };
+            collar.userData = { ...group, [AccessoryKey] : JSON.stringify ({ version : 1, kind : 'collar', canIds : cans.map (can => can.id), design : plan.standard?.id || 'custom', tabFoldDeg : plan.fold?.angleDeg ?? 0, boardId : options.board.id, boardName : options.board.name, thicknessMm : plan.thicknessMm, rimRadiusMm : plan.rimRadiusMm, holeRadiusMm : plan.holeRadiusMm, reliefRadiusMm : plan.reliefRadiusMm, tuckMm : plan.tuckMm, tabs : plan.tabs }) };
             cans.forEach (can => { can.userData = { ...can.userData, ...group }; });
             unchanged (); record.Step ('scene', { detail : 'rendering the collar with the cans' }); await NextFrame ();
             // Hidden through the rebuild, then lowered onto the cans like the other accessories.
@@ -178,7 +190,7 @@ export class CanCollarWorkspace
             throw error;
         } finally { editor.busy = false; editor.RefreshButtons?.(); editor.website.packagingPanel?.Refresh?.(); }
         const { profile, ...summary } = plan;
-        const message = 'Added a ' + cans.length + '-can collar (' + Number (plan.sizeMm.length.toFixed (1)) + ' × ' + Number (plan.sizeMm.width.toFixed (1)) + ' mm, ' + options.board.name + ') with ' + plan.tabs + ' tabs per can and ' + Number (plan.tuckMm.toFixed (3)) + ' mm tuck below the rims. Flat fit clears the necks; tab bending during application is not simulated. Undo removes it.';
+        const message = 'Added a ' + cans.length + '-can collar (' + Number (plan.sizeMm.length.toFixed (1)) + ' × ' + Number (plan.sizeMm.width.toFixed (1)) + ' mm, ' + options.board.name + ') with ' + plan.tabs + ' tabs per can' + (plan.fold ? ': the tabs fold up ' + plan.fold.angleDeg + '° along the crease ring (Ø ' + Number ((2 * plan.reliefRadiusMm).toFixed (1)) + ' mm) and hook ' + plan.fold.lockMm.toFixed (1) + ' mm under each rim, locking the cans. Undo removes it.' : ' and ' + Number (plan.tuckMm.toFixed (3)) + ' mm tuck below the rims. Flat fit clears the necks; tab bending during application is not simulated. Undo removes it.');
         record.Done (message); void popup;
         return { objectId : collar.id, canIds : cans.map (can => can.id), units : 'mm', board : options.board.name, collar : { ...summary, profile : profile.name }, dropIn, progress : record.Inspect (), message };
     }

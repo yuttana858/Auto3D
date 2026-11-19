@@ -77,7 +77,7 @@ describe ('Can collar', () => {
         const cans = []; for (let row = 0; row < 2; row++) { for (let col = 0; col < 3; col++) { cans.push ([col * 66, row * 66]); } }
         const board = CollarBoards.find (b => b.id === 'cuk-24pt');
         const plan = CreateCanCollarPlan ({ cans, rimRadiusMm : 28.9, thickness : board.caliperMm });
-        assert.equal (plan.profile.paths.length, 7); assert.equal (plan.cans, 6);
+        assert.equal (plan.profile.paths.length, 13); assert.equal (plan.cans, 6); assert.equal (plan.profile.paths.filter (p => p.type === 'score' && p.process?.kind === 'crease').length, 6);
         assert.ok (Math.abs (plan.holeRadiusMm - 27.4) < 1e-9);
         // Reliefs go 3 mm past the rim; touching cans still leave a web of board between the holes.
         assert.ok (Math.abs (plan.reliefRadiusMm - 31.9) < 1e-9); assert.ok (Math.abs (plan.webMm - 2.2) < 1e-9);
@@ -101,7 +101,7 @@ describe ('Can collar', () => {
         assert.throws (() => CreateCanCollarPlan ({ cans : [[0, 0], [50, 0]], rimRadiusMm : 28.9, thickness : 0.6 }), /too close/);
         const cans = []; for (let row = 0; row < 4; row++) { for (let col = 0; col < 6; col++) { cans.push ([col * 70, row * 70]); } }
         const plan = CreateCanCollarPlan ({ cans, rimRadiusMm : 28.9, thickness : 0.6 });
-        assert.equal (plan.profile.paths.length, 25); assert.ok (plan.points <= 2000);
+        assert.equal (plan.profile.paths.length, 49); assert.ok (plan.points <= 2000);
         assert.throws (() => CreateCanCollarPlan ({ cans : [...cans, [500, 500]], rimRadiusMm : 28.9, thickness : 0.6 }), /1–24 cans/);
     });
 });

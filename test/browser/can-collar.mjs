@@ -32,7 +32,10 @@ try {
     assert.ok (inspect.rim.bottomMm > 118 && inspect.rim.bottomMm < 122, JSON.stringify (inspect.rim));
     // 12 oz cans get the universal design automatically: the same hole for every pack.
     assert.equal (inspect.collar.cans, 6); assert.equal (inspect.collar.standard.id, '12oz-202'); assert.equal (inspect.collar.tabs, 16);
-    assert.equal (inspect.collar.holeRadiusMm, 27.5); assert.equal (inspect.collar.reliefRadiusMm, 32); assert.equal (inspect.collar.standard.tabHeightMm, 4.5);
+    assert.equal (inspect.collar.holeRadiusMm, 26.8); assert.equal (inspect.collar.reliefRadiusMm, 29.05); assert.ok (Math.abs (inspect.collar.standard.tabHeightMm - 1.692) < 0.001);
+    // Tabs fold up along the crease ring and hook under the rims: tips under the rim underside, inside its lip.
+    const fold = inspect.collar.fold; assert.ok (fold && fold.angleDeg >= 25, JSON.stringify (fold)); assert.ok (fold.tipTopMm < inspect.rim.bottomMm && fold.lockMm >= 0.5);
+    assert.equal (inspect.collar.topMm, fold.sheetTopMm); assert.ok (inspect.collar.reliefRadiusMm > inspect.rim.radiusMm, 'the crease ring is just outside the rim');
     assert.ok (inspect.collar.neckClearanceMm >= .0254 - 1e-7 && inspect.collar.webMm >= 1.5 - 1e-6); assert.equal (inspect.collar.profile, '12 oz can collar · 6 cans');
     assert.equal ((await call ('packaging.accessories.collar.inspect', { design : '12oz-202', tabs : 30, reliefMm : 9 })).collar.tabs, 16, 'the universal design ignores tab and relief options');
     assert.equal ((await call ('packaging.accessories.collar.inspect', { tabs : 20 })).collar.standard, null, 'explicit tabs ask Automatic for a custom fit');
@@ -70,7 +73,7 @@ try {
     await call ('history.redo'); assert.equal ((await call ('scene.inspect')).objects.length, before + 1);
     // The collar profile: rounded outline plus a tabbed relief hole per can.
     await call ('object.select', { objectId : collar.id, single : true }); await call ('packaging.open_selected');
-    const profile = await call ('packaging.inspect'); assert.equal (profile.paths.length, 7); assert.equal (profile.thickness, 0.61);
+    const profile = await call ('packaging.inspect'); assert.equal (profile.paths.length, 13); assert.equal (profile.paths.filter (p => p.type === 'score').length, 6); assert.equal (profile.thickness, 0.61); assert.ok (profile.tabFold.angleDeg >= 25);
     // Print: paperboard collars have a white top; demo artwork in CAD updates the collar model in one Undo step.
     assert.deepEqual ((await call ('packaging.print.inspect')).print, { version : 1, ground : 'white' });
     assert.equal ((await call ('packaging.print.inspect')).rendersOnModel, true);

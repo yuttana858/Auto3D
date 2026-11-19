@@ -62,22 +62,32 @@ describe ('Board print', () => {
 
 describe ('12 oz collar standard', () => {
     const cans = []; for (let row = 0; row < 2; row++) { for (let col = 0; col < 3; col++) { cans.push ([col * 66, row * 66]); } }
-    it ('uses the same hole for every pack: 16 tabs, 4.5 mm tall, tips Ø 55, reliefs Ø 64', () => {
+    it ('uses the same tight hole for every pack: 16 tabs, crease Ø 58.1 just outside the seam, tips Ø 53.6', () => {
         const s = CollarStandard ('12oz-202');
-        assert.equal (s.tabs, 16); assert.equal (s.tabHeightMm, 4.5); assert.ok (Math.abs (s.tabWidthMm - (Math.PI * 55 / 16 - 1)) < 1e-12);
-        const six = CreateCanCollarPlan ({ cans, rimRadiusMm : 28.95, neckRadiusMm : 26.65, thickness : 0.61, standard : '12oz-202', tabs : 30, reliefMm : 9 });
-        const four = CreateCanCollarPlan ({ cans : cans.slice (0, 2).concat (cans.slice (3, 5)), rimRadiusMm : 28.6, neckRadiusMm : 26.65, thickness : 0.61, standard : '12oz-202' });
-        assert.equal (six.tabs, 16); assert.equal (six.holeRadiusMm, 27.5); assert.equal (six.reliefRadiusMm, 32); assert.equal (six.standard.id, '12oz-202');
-        // Every hole is the standard CAD hole, translated: identical shape whatever the pack.
-        const offsets = plan => plan.profile.paths.slice (1).map (path => { const c = path.points.reduce ((s, p) => [s[0] + p[0] / path.points.length, s[1] + p[1] / path.points.length], [0, 0]); return path.points.map (p => [p[0] - c[0], p[1] - c[1]].map (v => Number (v.toFixed (9)))); });
-        const reference = StandardReliefHole ('12oz-202', [0, 0]).map (p => p.map (v => Number (v.toFixed (9))));
-        [...offsets (six), ...offsets (four)].forEach (hole => assert.deepEqual (hole.map (p => p.map (v => Number (v.toFixed (6)))), reference.map (p => p.map (v => Number (v.toFixed (6))))));
-        assert.ok (six.webMm >= 2 - 1e-9);
+        assert.equal (s.tabs, 16); assert.equal (s.creaseDiameterMm, 58.1); assert.equal (s.tipDiameterMm, 53.6);
+        assert.ok (Math.abs (s.tabHeightMm - (29.05 * Math.cos (Math.PI / 16) - 26.8)) < 1e-12); assert.ok (Math.abs (s.tabWidthMm - (Math.PI * 53.6 / 16 - 1)) < 1e-12);
+        const six = CreateCanCollarPlan ({ cans, rimRadiusMm : 28.95, thickness : 0.61, standard : '12oz-202', tabs : 30, reliefMm : 9, tabFold : { version : 1, angleDeg : 25 } });
+        const four = CreateCanCollarPlan ({ cans : cans.slice (0, 2).concat (cans.slice (3, 5)), rimRadiusMm : 28.6, thickness : 0.61, standard : '12oz-202', tabFold : { version : 1, angleDeg : 25 } });
+        assert.equal (six.tabs, 16); assert.equal (six.holeRadiusMm, 26.8); assert.equal (six.reliefRadiusMm, 29.05); assert.equal (six.standard.id, '12oz-202');
+        assert.deepEqual (six.profile.tabFold, { version : 1, angleDeg : 25 });
+        // Every hole is the standard CAD hole, translated; its crease ring joins the slit ends.
+        const centred = path => { const c = path.points.reduce ((s, p) => [s[0] + p[0] / path.points.length, s[1] + p[1] / path.points.length], [0, 0]); return path.points.map (p => [p[0] - c[0], p[1] - c[1]].map (v => Number (v.toFixed (6)) + 0)); };
+        const reference = StandardReliefHole ('12oz-202', [0, 0]).map (p => p.map (v => Number (v.toFixed (6)) + 0));
+        for (const plan of [six, four]) {
+            plan.profile.paths.filter (p => p.id.startsWith ('can-')).forEach (hole => assert.deepEqual (centred (hole), reference));
+            const hole = plan.profile.paths.find (p => p.id === 'can-1'), crease = plan.profile.paths.find (p => p.id === 'crease-1');
+            assert.equal (crease.type, 'score'); assert.equal (crease.process.kind, 'crease'); assert.equal (crease.points.length, 16);
+            crease.points.forEach ((p, k) => assert.deepEqual (p, hole.points[k * 6 + 1]));
+        }
+        assert.ok (six.webMm >= 7.9 - 1e-9);
+        const crease = six.profile.engineering.dimensions.find (d => d.id === 'crease-diameter'); assert.ok (crease);
     });
-    it ('refuses cans that are not 12 oz, too close or whose neck the tabs would cut', () => {
+    it ('refuses cans that are not 12 oz, too close, wider than the crease, or a flat collar that would cut the neck', () => {
         assert.throws (() => CreateCanCollarPlan ({ cans, rimRadiusMm : 26, thickness : 0.61, standard : '12oz-202' }), /do not fit/);
-        assert.throws (() => CreateCanCollarPlan ({ cans : [[0, 0], [65, 0]], rimRadiusMm : 28.9, thickness : 0.61, standard : '12oz-202' }), /at least 65.5 mm/);
+        assert.throws (() => CreateCanCollarPlan ({ cans, rimRadiusMm : 29.2, thickness : 0.61, standard : '12oz-202' }), /do not fit/);
+        assert.throws (() => CreateCanCollarPlan ({ cans : [[0, 0], [59.4, 0]], rimRadiusMm : 28.9, thickness : 0.61, standard : '12oz-202' }), /at least 59.6 mm/);
         assert.throws (() => CreateCanCollarPlan ({ cans, rimRadiusMm : 28.9, neckRadiusMm : 27.6, thickness : 0.61, standard : '12oz-202' }), /cut into this can neck/);
+        assert.doesNotThrow (() => CreateCanCollarPlan ({ cans, rimRadiusMm : 28.9, neckRadiusMm : 27.6, thickness : 0.61, standard : '12oz-202', tabFold : { version : 1, angleDeg : 30 } }));
         assert.throws (() => CollarStandard ('16oz'), /Choose a collar standard/);
     });
     it ('carries the white top print into the collar profile', () => {

@@ -1,6 +1,7 @@
 import { ValidateBoardAppearance } from './appearancesettings.js';
 import { ValidateEngineering } from './engineering.js';
 import { ValidatePrint } from './print.js';
+import { ValidateTabFold } from './tabfold.js';
 export const BoardCalipers = { Custom : null, 'E flute (nominal)' : 1.5, 'B flute (nominal)' : 3, 'C flute (nominal)' : 4, 'A flute (nominal)' : 4.8, 'EB flute (nominal)' : 4.5, 'BC flute (nominal)' : 7, 'ACA flute (nominal)' : 13.6, 'BCB flute (nominal)' : 10 };
 export function NewPackagingDesign () { return { version : 1, name : 'Packaging profile', grade : 'Custom', thickness : 3, paths : [] }; }
 const epsilon = 1e-7;
@@ -51,6 +52,7 @@ export function ValidatePackaging (data)
     }
     if (data.appearance !== undefined) { result.appearance = ValidateBoardAppearance (data.appearance); }
     if (data.print !== undefined && data.print !== null) { result.print = ValidatePrint (data.print); }
+    if (data.tabFold !== undefined && data.tabFold !== null) { result.tabFold = ValidateTabFold (data.tabFold); }
     if (data.engineering !== undefined) { result.engineering = ValidateEngineering (data.engineering, result.paths); if (result.engineering.materials.find (m => m.id === result.engineering.activeMaterialId).caliperMm !== result.thickness) { throw new Error ('Active material caliper must match CAD board thickness.'); } }
     return result;
 }

@@ -3,7 +3,7 @@
 ## Universal 12 oz collar, white top, board artwork, fast collars with progress, import unit fix — Auto3D 0.97.0 / Packaging 1.19.0 / Primary Products 0.16.0 / Molded Pulp 0.3.0 (2026-11-19)
 
 Candidate on `claude/dazzling-faraday-rhti3h`, not deployed.
-- Collars for 12 oz cans use one universal design (`12oz-202`: 16 tabs 4.5 mm tall, tips Ø 55, reliefs Ø 64, 1 mm slits), chosen automatically when the rims fit.
+- Collars for 12 oz cans use one universal design (`12oz-202`: crease ring Ø 58.1 just outside the seam, 16 tabs with tips Ø 53.6, 1 mm slits), chosen automatically when the rims fit. The tabs fold up along the crease and hook under the seam lips, locking the cans.
 - Paperboard collars have a white top.
 - Flat boards take artwork in the CAD Print section, and it updates the 3D board in one Undo step.
 - Adding a collar is about 20× faster (45.7 s → 2.0 s on the sandbox software renderer). Board appearance uses an edge grid with identical output, and board presentation data is cached across renders. A progress popup shows each step with its measured time, a percentage and a bar.

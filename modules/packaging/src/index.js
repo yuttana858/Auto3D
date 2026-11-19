@@ -36,4 +36,5 @@ export { AccessoriesPanel } from './accessoriespanel.js';
 export { FilletPolygon, RoundedRectangle, CircleOutline, ReliefHoleOutline } from './cadshapes.js';
 export { SenseCanRim, CanRadiusInSlab, CreateCanCollarPlan, CollarBoards, CollarStandards, CollarStandard, StandardReliefHole, DefaultCollarOptions, MaxCollarCans, CollarNeckClearanceMm } from './cancollar.js';
 export { ValidatePrint, FitArtwork, ApplyBoardPrint, PrintGrounds, PrintMimes, WhiteTopColor } from './print.js';
+export { ValidateTabFold, CreaseRings, FoldTabs } from './tabfold.js';
 export * from './partitionnest.js';

@@ -8,6 +8,7 @@ import { ReferenceSingleWallStack } from './boardlayers.js';
 import { PackagingContours, ValidatePackaging } from './profile.js';
 import { MeshData } from './mesh.js';
 import { ApplyBoardPrint } from './print.js';
+import { FoldTabs } from './tabfold.js';
 
 export function CreateFefcoBox (input, savedProfile = null)
 {
@@ -37,8 +38,11 @@ export function CreateBoard (input, { textured = false, guides = false } = {})
     if (textured) { meshes[0].triangles.forEach (triangle => { if (triangle.material === 0 && meshes[0].normals[triangle.normals[0]][1] < -.5) { triangle.material = 2; } }); }
     // Printed boards: white top and artwork on the top face, before the presentation mesh samples it.
     if (profile.print) { ApplyBoardPrint (meshes[0], materials, profile.print); }
+    // Fold-up tabs (can collars): folded after print so artwork stays on them. A folded board skips the flat
+    // panel-bow presentation, which assumes the board lies flat.
+    const folded = profile.tabFold?.angleDeg > 0 && FoldTabs (meshes[0], profile) > 0;
     const boundaries = PackagingContours (profile).flatMap (contour => [{ points : contour.outer.map (p => [p[0], 0, -p[1]]) }, ...contour.holes.map (hole => ({ points : hole.map (p => [p[0], 0, -p[1]]), hole : true }))]);
-    const presentationMeshes = [BoardAppearanceMesh (meshes[0], profile, boundaries)];
+    const presentationMeshes = [folded ? meshes[0] : BoardAppearanceMesh (meshes[0], profile, boundaries)];
     if (guides) {
         const cut = { name : 'CUT · dieline edges', vertices : [], normals : [], uvs : [], triangles : [], lines : [] };
         const score = { name : 'SCORE · fold hinges', vertices : [], normals : [], uvs : [], triangles : [], lines : [] };
