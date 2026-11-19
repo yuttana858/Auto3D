@@ -46,7 +46,7 @@ export class PrimaryProductsArtwork
     Mapping ({ zone, ...changes })
     {
         if (this.panel.Blocked ()) { throw new Error ('Open an editable, idle session.'); }
-        if (Object.keys (changes).some (key => !['widthMm', 'heightMm', 'finish', 'offsetXmm', 'offsetYmm'].includes (key))) { throw new Error ('Invalid label placement or finish.'); }
+        if (Object.keys (changes).some (key => !['widthMm', 'heightMm', 'finish', 'offsetXmm', 'offsetYmm', 'bleedMm'].includes (key))) { throw new Error ('Invalid label placement or finish.'); }
         if (!this.entries.some (a => a.zone === zone)) { throw new Error ('Import artwork for this zone first.'); }
         this.entries = ValidateProductArtwork (this.panel.draft, this.entries.map (a => a.zone === zone ? { ...a, ...changes } : a)); this.panel.Refresh (); return this.Inspect ();
     }

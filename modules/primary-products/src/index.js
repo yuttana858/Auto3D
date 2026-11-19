@@ -15,3 +15,5 @@ export { ProfileChanges } from './profilechanges.js';
 
 export { ContentPresets, ValidateContents, ValidateOptics } from './contents.js';
 export { ValidateLabelSource, TextLabelSVG } from './labelsource.js';
+export { LabelDieline, DielineSvg, DielineDxf, DefaultOverlapMm, DielineLimits } from './dieline.js';
+export { CanProfile } from './detailmesh.js';
