@@ -466,6 +466,11 @@ export class Viewer
     FitAllToWindow (animation = true)
     {
         const bounds = VisibleSceneBounds (this.mainModel?.mainModel?.GetRootObject ());
+        return this.FitBoundsToWindow (bounds, animation);
+    }
+
+    FitBoundsToWindow (bounds, animation = true)
+    {
         if (!bounds) { return false; }
         const camera = FitVisibleCamera (this.GetCamera (), bounds, this.canvas.width / this.canvas.height, this.GetProjectionMode () === ProjectionMode.Perspective);
         if (!camera) { return false; }

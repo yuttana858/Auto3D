@@ -8,6 +8,8 @@ import { CreatePouchComponents } from './pouch.js';
 import { DefaultProductDraft, UpdateProductDraft, BottleShape } from './state.js';
 import { BottleSectionOf, SectionOutline } from './section.js';
 import { Revolve } from './revolve.js';
+import { GlassBottle, BottleCap, BottleWall } from './bottleconstruction.js';
+import { GlassBottleMesh } from './bottlemesh.js';
 
 // Neutral indexed meshes: base-centred, Y-up, millimeters; no engine dependencies.
 // Lofted body for oval and rounded-rectangle bottles. Each profile row is either the body section scaled by `scale` or a
@@ -89,20 +91,23 @@ export function CreatePrimaryProduct (input, options = {})
                 rows.splice (5, 0, ...insert);
             }
         }
-        if (section.shape === 'round') { components.push (Revolve ('body', 'body', rows.map (row => [row.radius ?? row.scale * r + (row.radiusBlend || 0), row.y]), segments)); }
+        const glass = GlassBottle (definition), cap = BottleCap (definition);
+        if (glass) { components.push (GlassBottleMesh (definition, segments)); }
+        else if (section.shape === 'round') { components.push (Revolve ('body', 'body', rows.map (row => [row.radius ?? row.scale * r + (row.radiusBlend || 0), row.y]), segments)); }
         else { components.push (Loft ('body', 'body', section, rows, Math.max (segments, 96))); }
         const clear = ProductMaterials[definition.material].transmission > 0;
         let wallMm = 0;
-        if (detailed) { SmoothMesh (components[0]); wallMm = detailed.wallMm; AddInnerWall (components[0], wallMm); }
+        if (glass) { wallMm = BottleWall (definition).wallMm; }
+        else if (detailed) { SmoothMesh (components[0]); wallMm = detailed.wallMm; AddInnerWall (components[0], wallMm); }
         else if (clear) { wallMm = HollowBottle (components[0], definition.diameterMm, section.depthMm, capBottom, ProductMaterials[definition.material].wallMm, shape.neckHeightMm); }
-        components.push (detailed ? CapMesh ('cap', neck * 1.08, capBottom, h, detailed.closure) : cylinder ('cap', 'closure', neck * 1.08, capBottom, h));
-        if (detailed) {
-            components.push (Revolve ('neck-ring', 'closure', [[neck * .97, capBottom - shape.neckHeightMm * .18], [neck * 1.04, capBottom - shape.neckHeightMm * .18], [neck * 1.04, capBottom - shape.neckHeightMm * .04], [neck * .97, capBottom - shape.neckHeightMm * .04], [neck * .97, capBottom - shape.neckHeightMm * .18]], segments));
-            if (detailed.closure === 'fliptop') { const seam = Revolve ('cap-seam', 'closure', [[neck * 1.075, h - shape.capHeightMm * .32], [neck * 1.08, h - shape.capHeightMm * .32], [neck * 1.08, h - shape.capHeightMm * .30], [neck * 1.075, h - shape.capHeightMm * .30], [neck * 1.075, h - shape.capHeightMm * .32]], segments); components.push (seam); }
+        components.push (cap.formed ? CapMesh ('cap', cap.radiusMm, capBottom, h, cap.style, cap.wallMm) : detailed ? CapMesh ('cap', neck * 1.08, capBottom, h, detailed.closure) : cylinder ('cap', 'closure', neck * 1.08, capBottom, h));
+        if (detailed || glass) {
+            components.push (Revolve ('neck-ring', glass ? 'glass-neck' : 'closure', [[neck * .97, capBottom - shape.neckHeightMm * .18], [neck * 1.04, capBottom - shape.neckHeightMm * .18], [neck * 1.04, capBottom - shape.neckHeightMm * .04], [neck * .97, capBottom - shape.neckHeightMm * .04], [neck * .97, capBottom - shape.neckHeightMm * .18]], segments));
+            if (cap.style === 'fliptop') { const seam = Revolve ('cap-seam', 'closure', [[cap.radiusMm * .995, h - shape.capHeightMm * .32], [cap.radiusMm, h - shape.capHeightMm * .32], [cap.radiusMm, h - shape.capHeightMm * .30], [cap.radiusMm * .995, h - shape.capHeightMm * .30], [cap.radiusMm * .995, h - shape.capHeightMm * .32]], segments); components.push (seam); }
         }
         const fill = BottleFill (components[0], definition.contents, wallMm); if (fill) { components.push (fill); }
         const depth = section.depthMm / 2;
-        return { apiVersion : 1, generatorVersion : 1, units : 'mm', definition, components, bounds : { min : [-r, 0, -depth], max : [r, h, depth] }, artworkZones : GetArtworkZones (definition), quality : { construction : 'closed-solid-presentation', section : section.shape, hollowWalls : clear || Boolean (detailed), wallMm, closure : detailed?.closure || 'smooth', cavity : clear || detailed ? 'closed-presentation-cavity' : null, threads : false, pullTab : false } };
+        return { apiVersion : 1, generatorVersion : 1, units : 'mm', definition, components, bounds : { min : [-r, 0, -depth], max : [r, h, depth] }, artworkZones : GetArtworkZones (definition), quality : { construction : glass ? 'formed-glass-presentation' : 'closed-solid-presentation', section : section.shape, hollowWalls : clear || Boolean (detailed), wallMm, ...(glass ? { baseMm : BottleWall (definition).baseMm } : {}), closure : cap.style, capWallMm : cap.formed ? cap.wallMm : 0, cavity : glass ? 'open-mouth-shell' : clear || detailed ? 'closed-presentation-cavity' : null, threads : false, pullTab : false } };
     } else if (definition.details) { components.push (...DetailCan (definition, segments)); } else {
         components.push (cylinder ('body', 'body', r, h * 0.025, h * 0.975));
         components.push (cylinder ('bottom', 'end', r, 0, h * 0.025));

@@ -28,7 +28,13 @@ function Element (tag, parent, text, className)
 export class PackagingWorkspace
 {
     constructor (editor) { this.editor = editor; this.autoPack = new AutoPackWorkspace (this); this.autoPallet = new AutoPalletWorkspace (this); this.accessories = new AccessoriesWorkspace (this); this.canCollar = new CanCollarWorkspace (this); this.presentation = new FoldPresentation (editor); this.dialog = null; this.refreshing = false; this.draft = []; this.active = null; this.selectedPaths = new Set (); this.cadTool = 'select'; this.cadFace = 'inside'; this.creaseProcess = { kind : 'crease' }; this.linkedObjectId = null; this.draftType = 'cut'; this.gridSnapMM = 5; this.displayFactor = 1; this.view = { x : -20, y : -220, width : 340, height : 240 }; }
-    Design () { return this.editor.document.packaging || NewPackagingDesign (); }
+    Design () { return this.externalProfile ? this.externalProfile.design () : this.editor.document.packaging || NewPackagingDesign (); }
+    OpenExternal (profile)
+    {
+        this.Editable (); if (!profile || typeof profile.design !== 'function' || typeof profile.change !== 'function' || typeof profile.apply !== 'function') { throw new Error ('Invalid linked CAD profile.'); }
+        const previous = this.dialog; previous?._auto3dPackagingCleanup?.(); previous?.close (); this.dialog = null; this.externalProfile = profile; this.linkedObjectId = null; this.cadFace = 'inside'; this.controlLayer = 'drawing'; this.gridSnapMM = 0;
+        const result = this.Open (); this.Fit (); return { ...result, external : true };
+    }
     PanelHost () { return { autoInspect : options => this.autoPack.Inspect (options || null), autoPack : options => this.autoPack.Generate (options || {}), autoStyles : () => this.autoPack.Styles (), autoStyle : code => this.autoPack.SetStyle (code), autoRefresh : options => this.autoPack.RefreshBounds (options || {}), autoTop : () => AutoPackTopState (this.editor.selected), toggleTop : () => this.ToggleTop (), palletInspect : options => this.autoPallet.Inspect (options), accessoriesInspect : options => this.accessories.Inspect (options), accessoryBoards : () => this.accessories.Boards (), addPads : options => this.accessories.AddPads (options), addPartitions : options => this.accessories.AddPartitions (options), collarInspect : options => this.canCollar.Inspect (options || {}), addCollar : options => this.canCollar.Add (options || {}), autoPallet : options => this.autoPallet.Generate (options), boards : () => this.BoardInspect (), generationBoard : () => this.generationBoard?.id || null, generationBasis : () => this.generationBasis || 'inside', setGenerationBasis : basis => this.SetGenerationBasis (basis), convertGenerationBasis : changes => this.ConvertGenerationBasis (changes), selectBoard : (id, target) => this.SelectBoard (id, target), boardEditor : () => this.OpenBoardDatabase (), appearance : () => this.AppearanceInspect (), updateAppearance : changes => this.UpdateAppearance (changes), dimensions : () => this.DimensionsInspect (), updateBoardDirection : degrees => this.UpdateBoardDirection (degrees), dimensionMode : basis => this.DimensionMode (basis), updateDimensions : changes => this.UpdateDimensions (changes), dimensionsBlocked : () => this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false || this.editor.busy && !this.dimensionUpdating, inspect : () => this.FefcoInspect (), configure : changes => this.ConfigureFefco (changes), generate : changes => this.GenerateFefco (changes), preset : (code, changes) => this.GeneratePreset (code, changes), designer : () => this.OpenSelected (), measurements : () => { this.OpenSelected (); return this.OpenMeasurements (); }, unfold : () => this.UnfoldSelected (), scrub : (progress, commit) => this.SetFoldScrub (progress, commit), scrubInspect : () => this.FoldScrubInspect (), animate : () => this.AnimateFold (), toggleFold : () => this.ToggleFold (), playbackBlocked : () => this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false, animation : () => this.AnimationInspect (), playback : () => this.FoldInspect (), control : action => this.FoldControl (action), canAnimate : () => Boolean (this.editor.selected?.userData?._auto3dFefco), factor : () => this.Factor (), run : action => this.editor.Run (action), blocked : () => this.editor.busy || this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false, canUnfold : () => this.CanUnfold () }; }
     AppearanceInspect ()
     {
@@ -412,7 +418,7 @@ export class PackagingWorkspace
     EngineeringParameters (profile, selected = this.editor.selected)
     {
         try { const p = selected?.userData?._auto3dFefco ? ValidateFefco (JSON.parse (selected.userData._auto3dFefco)) : ValidateFefco (this.fefco || DefaultFefco);
-            const expected = FefcoProfile (p); return JSON.stringify (expected.paths) === JSON.stringify (profile.paths.map (path => { const copy = { ...path }; delete copy.process; return copy; })) && expected.thickness === profile.thickness ? p : null;
+            const expected = FefcoProfile (p); return JSON.stringify (expected.paths) === JSON.stringify (profile.paths.filter (path => path.type !== 'artwork').map (path => { const copy = { ...path }; delete copy.process; return copy; })) && expected.thickness === profile.thickness ? p : null;
         } catch { return null; }
     }
     async UpdateBoardDirection (degrees)
@@ -458,7 +464,7 @@ export class PackagingWorkspace
     Inspect () { return { ...ValidatePackaging (this.Design ()), units : 'mm', displayUnits : DisplayUnitLabel (this.editor.website.preferences.units), selectedPathId : this.active, selectedPathIds : [...this.selectedPaths], cadFace : this.cadFace, tool : this.cadTool, linkedObjectId : this.linkedObjectId, creaseProcess : { ...this.creaseProcess }, draftType : this.draftType, gridSnapMM : this.gridSnapMM, draftPoints : this.draft.map ((point) => [...point]) }; }
     Change (next)
     {
-        this.Editable (); const before = this.editor.document.packaging ? ValidatePackaging (this.editor.document.packaging) : null; const after = ValidatePackaging (next); if (after.engineering && EngineeringMeasurements (after).dimensions.some (d => d.mode === 'parametric' && !d.targetMet)) { throw new Error ('This edit conflicts with a parametric measurement. Update its target or switch it to Auto.'); } const target = this.editor.document;
+        this.Editable (); if (this.externalProfile) { const result = this.externalProfile.change (ValidatePackaging (next)); this.Refresh (); return result; } const before = this.editor.document.packaging ? ValidatePackaging (this.editor.document.packaging) : null; const after = ValidatePackaging (next); if (after.engineering && EngineeringMeasurements (after).dimensions.some (d => d.mode === 'parametric' && !d.targetMet)) { throw new Error ('This edit conflicts with a parametric measurement. Update its target or switch it to Auto.'); } const target = this.editor.document;
         const apply = (value) => { target.packaging = value ? ValidatePackaging (value) : null; this.Refresh (); };
         apply (after); this.editor.history.Push ({ undo : () => apply (before), redo : () => apply (after) }); return this.Inspect ();
     }
@@ -523,7 +529,7 @@ export class PackagingWorkspace
     EditPath (id, changes, units = 'display')
     {
         const design = ValidatePackaging (this.Design ()); const path = design.paths.find ((item) => item.id === id); if (!path) { throw new Error ('Choose an existing path.'); }
-        const factor = units === 'mm' ? 1 : this.Factor (); if (changes.points) { path.points = changes.points.map ((point) => point.map ((value) => value * factor)); } if (changes.type !== undefined) { path.type = changes.type; } if (changes.closed !== undefined) { path.closed = changes.closed; } if (changes.process !== undefined) { path.process = changes.process; } if (path.type === 'cut') { delete path.process; } return this.Change (design);
+        const factor = units === 'mm' ? 1 : this.Factor (); if (changes.points) { path.points = changes.points.map ((point) => point.map ((value) => value * factor)); } if (changes.type !== undefined) { path.type = changes.type; } if (changes.closed !== undefined) { path.closed = changes.closed; } if (changes.process !== undefined) { path.process = changes.process; } for (const key of ['fill', 'stroke', 'strokeWidth']) { if (changes[key] !== undefined) { path[key] = changes[key]; } } if (path.type !== 'score') { delete path.process; } return this.Change (design);
     }
     DeletePath (id) { const design = ValidatePackaging (this.Design ()); if (!design.paths.some ((path) => path.id === id)) { throw new Error ('Choose an existing path.'); } design.paths = design.paths.filter ((path) => path.id !== id); if (design.engineering) { design.engineering.dimensions = design.engineering.dimensions.filter (d => d.pathId !== id); } return this.Change (design); }
     SetBoard (thickness, grade = 'Custom', units = 'display') { const design = ValidatePackaging (this.Design ()); if (design.engineering) { return this.UpdateEngineering ({ material : { caliperMm : thickness * (units === 'mm' ? 1 : this.Factor ()), name : grade } }); } design.thickness = thickness * (units === 'mm' ? 1 : this.Factor ()); design.grade = grade; return this.Change (design); }
@@ -562,7 +568,7 @@ export class PackagingWorkspace
     }
     OpenSelected ()
     {
-        this.Editable (); const object = this.editor.selected;
+        this.Editable (); if (this.externalProfile) { const previous = this.dialog; previous?._auto3dPackagingCleanup?.(); previous?.close (); this.dialog = null; this.externalProfile = null; } const object = this.editor.selected;
         if (!object?.packagingProfile) { throw new Error ('Select a generated packaging box or dieline.'); }
         const profile = ValidatePackaging (object.packagingProfile); this.linkedObjectId = object.id;
         if (JSON.stringify (this.Design ()) !== JSON.stringify (profile)) { this.LoadSelected (); }
@@ -590,7 +596,7 @@ export class PackagingWorkspace
         if (this.cadFaceSelect) { this.cadFaceSelect.value = face; }
         this.Draw (); return { face, mirrored : face === 'outside', canonicalCoordinates : true };
     }
-    SetDraftType (type) { this.Editable (); if (!['cut', 'score'].includes (type)) { throw new Error ('Choose cut or score.'); } this.draftType = type; if (this.type) { this.type.value = type; } this.Draw (); return { type }; }
+    SetDraftType (type) { this.Editable (); if (!['cut', 'score', 'artwork'].includes (type)) { throw new Error ('Choose cut or score.'); } this.draftType = type; if (this.type) { this.type.value = type; } this.Draw (); return { type }; }
     SetGridSnap (value, units = 'display') { const mm = value * (units === 'mm' ? 1 : this.Factor ()); if (!Number.isFinite (mm) || mm < 0 || mm > 100000) { throw new Error ('Use a grid snap between 0 and 100000 mm.'); } this.gridSnapMM = mm; if (this.snap) { this.snap.value = String (mm / this.Factor ()); } this.Draw (); return { gridSnapMM : mm }; }
     AddDraftPoint (point, units = 'display')
     {
@@ -626,14 +632,22 @@ export class PackagingWorkspace
     }
     AssignSelected (type)
     {
-        this.Editable (); if (!['cut', 'score'].includes (type)) { throw new Error ('Choose cut or crease.'); }
+        this.Editable (); if (!['cut', 'score', 'artwork'].includes (type)) { throw new Error ('Choose cut or crease.'); }
         const design = ValidatePackaging (this.Design ()); const ids = new Set (this.selectedPaths); if (this.active) { ids.add (this.active); }
         if (!ids.size) { throw new Error ('Select one or more paths.'); }
-        for (const path of design.paths) { if (ids.has (path.id)) { path.type = type; if (type === 'cut') { delete path.process; } else if (this.creaseProcess.kind !== 'crease') { path.process = { ...this.creaseProcess }; } } }
+        for (const path of design.paths) { if (ids.has (path.id)) { path.type = type; if (type !== 'score') { delete path.process; } else if (this.creaseProcess.kind !== 'crease') { path.process = { ...this.creaseProcess }; } } }
         return this.Change (design);
+    }
+    SetArtworkStyle (changes)
+    {
+        this.Editable (); if (!changes || Object.keys (changes).some (key => !['fill', 'stroke', 'strokeWidth'].includes (key))) { throw new Error ('Choose artwork fill, stroke or stroke width.'); }
+        const design = ValidatePackaging (this.Design ()), ids = new Set ([...this.selectedPaths, this.active].filter (Boolean));
+        const paths = design.paths.filter (path => ids.has (path.id) && path.type === 'artwork'); if (!paths.length) { throw new Error ('Select an artwork path first.'); }
+        paths.forEach (path => Object.assign (path, changes)); return this.Change (design);
     }
     async ApplyCAD (mode = 'auto', objectId = null)
     {
+        if (this.externalProfile) { this.Editable (); if (this.draft.length) { throw new Error ('Finish or cancel the current path before applying.'); } return this.externalProfile.apply (); }
         this.Editable (); if (!['auto', 'flat'].includes (mode)) { throw new Error ('Choose auto or flat.'); }
         if (this.draft.length) { throw new Error ('Finish or cancel the current path before applying.'); }
         const editor = this.editor, target = editor.document, account = editor.website.auth.user.id;
@@ -646,7 +660,7 @@ export class PackagingWorkspace
         let parameters = null;
         try {
             const parsed = ValidateFefco (JSON.parse (source.userData._auto3dFefco)); const expected = FefcoProfile ({ ...parsed, thickness : next.thickness });
-            const paths = next.paths.map (path => { const copy = { ...path }; delete copy.process; return copy; });
+            const paths = next.paths.filter (path => path.type !== 'artwork').map (path => { const copy = { ...path }; delete copy.process; return copy; });
             if (JSON.stringify (expected.paths) === JSON.stringify (paths)) { parameters = { ...parsed, thickness : next.thickness }; }
         } catch { /* A custom board has no generated fold rig. */ }
         const flat = mode === 'flat' || source.userData._auto3dPackagingState === 'flat' || !source.userData._auto3dFefco;
@@ -688,17 +702,17 @@ export class PackagingWorkspace
     Open ()
     {
         if (this.dialog?.isConnected) { return { opened : true }; } this.Editable (); this.draft = []; this.active = null; this.selectedPaths.clear (); this.cadTool = 'select'; this.displayFactor = this.Factor ();
-        const dialog = WorkspaceDialog ('Packaging'); this.dialog = dialog; dialog.classList.add ('packaging_dialog');
+        const external = this.externalProfile; const dialog = WorkspaceDialog (external?.title || 'Packaging'); this.dialog = dialog; dialog.classList.add ('packaging_dialog');
         const body = Element ('div', dialog, undefined, 'packaging_body'); const controls = Element ('div', body, undefined, 'packaging_controls'); const layers = Element ('div', controls, undefined, 'packaging_actions'); const tools = Element ('div', controls); this.authoringContainer = tools;
         const field = (title, tag = 'input') => { const label = Element ('label', tools, title); const input = Element (tag, label); input.setAttribute ('aria-label', title); return input; };
         const action = (title, fn, parent = tools) => { const button = Element ('button', parent, title); button.type = 'button'; button.addEventListener ('click', () => this.Run (fn)); return button; };
         this.layerButtons = new Map (); for (const [id, title] of [['drawing', 'Drawing tools'], ['measurement', 'Measurement layer']]) { const button = action (title, () => this.SetControlLayer (id), layers); this.layerButtons.set (id, button); }
-        this.name = field ('Profile name'); this.name.maxLength = 100; this.name.addEventListener ('change', () => this.Run (() => this.SetName (this.name.value)));
+        this.name = field ('Profile name'); this.name.maxLength = 100; this.name.readOnly = Boolean (external); this.name.addEventListener ('change', () => this.Run (() => this.SetName (this.name.value)));
         const toolbar = Element ('div', tools, undefined, 'packaging_actions packaging_toolstrip'); toolbar.setAttribute ('role', 'toolbar'); toolbar.setAttribute ('aria-label', 'CAD tools');
         this.selectToolButton = action ('Select', () => this.SetCADTool ('select'), toolbar); this.penToolButton = action ('Pen', () => this.SetCADTool ('pen'), toolbar);
         this.selectToolButton.insertAdjacentHTML ('afterbegin', '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 3v17l5-5 4 7 3-2-4-7 7-1Z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>');
         this.penToolButton.insertAdjacentHTML ('afterbegin', '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="m4 16 12-12 4 4L8 20H4Z M13 7l4 4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>');
-        this.type = field ('Line type', 'select'); this.type.add (new Option ('Cut · red', 'cut')); this.type.add (new Option ('Crease · blue dashed', 'score')); this.type.value = this.draftType; this.type.addEventListener ('change', () => { this.Run (() => this.SetDraftType (this.type.value)); });
+        this.type = field ('Line type', 'select'); this.type.add (new Option ('Cut · red', 'cut')); if (!external) { this.type.add (new Option ('Crease · blue dashed', 'score')); } this.type.add (new Option ('Artwork', 'artwork')); if (external && this.draftType === 'score') { this.draftType = 'cut'; } this.type.value = this.draftType; this.type.addEventListener ('change', () => { this.Run (() => this.SetDraftType (this.type.value)); });
         toolbar.appendChild (this.type.parentElement);
         const gear = action ('⚙', () => this.OpenCreaseSettings (), toolbar); gear.setAttribute ('aria-label', 'Crease and perforation settings');
         const settings = Element ('div', tools, undefined, 'packaging_line_settings'); this.creaseSettings = settings; settings.hidden = true;
@@ -729,21 +743,23 @@ export class PackagingWorkspace
         action ('Remove last point', () => this.RemoveDraftPoint ()); action ('Cancel current path', () => this.CancelDraft ());
         this.snap = field ('Grid snap'); this.snap.type = 'number'; this.snap.step = 'any'; this.snap.min = '0'; this.snap.value = String (this.gridSnapMM / this.Factor ());
         this.paths = field ('Selected path', 'select'); this.paths.addEventListener ('change', () => { this.SelectPath (this.paths.value); });
-        const assign = field ('Change selected lines to', 'select'); assign.add (new Option ('Choose line type…', '')); assign.add (new Option ('Cut', 'cut')); assign.add (new Option ('Score', 'score')); assign.addEventListener ('change', () => { const type = assign.value; assign.value = ''; if (type) { this.Run (() => this.AssignSelected (type)); } }); action ('Delete path', () => this.DeletePath (this.active));
+        const assign = field ('Change selected lines to', 'select'); assign.add (new Option ('Choose line type…', '')); assign.add (new Option ('Cut', 'cut')); if (!external) { assign.add (new Option ('Score', 'score')); } assign.add (new Option ('Artwork', 'artwork')); assign.addEventListener ('change', () => { const type = assign.value; assign.value = ''; if (type) { this.Run (() => this.AssignSelected (type)); } }); action ('Delete path', () => this.DeletePath (this.active));
+        const paintControls = Element ('div', tools, undefined, 'packaging_actions'); const ink = Element ('input', paintControls); ink.type = 'color'; ink.value = '#123740'; ink.setAttribute ('aria-label', 'Artwork fill color'); action ('Set artwork fill', () => this.SetArtworkStyle ({ fill : ink.value }), paintControls);
         this.points = Element ('details', tools); Element ('summary', this.points, 'Edit selected path points'); this.pointFields = Element ('div', this.points, undefined, 'packaging_vertices');
         this.grade = field ('Board caliper preset', 'select'); for (const grade of Object.keys (BoardCalipers)) { this.grade.add (new Option (grade, grade)); }
         this.grade.addEventListener ('change', () => this.Run (() => this.SetBoard (BoardCalipers[this.grade.value] ?? this.thickness.valueAsNumber * this.Factor (), this.grade.value, 'mm')));
         this.thickness = field ('Board thickness'); this.thickness.type = 'number'; this.thickness.min = '0.0001'; this.thickness.step = 'any'; this.thickness.addEventListener ('change', () => this.Run (() => this.SetBoard (this.thickness.valueAsNumber, 'Custom')));
-        Element ('p', tools, 'Use measured caliper for your board grade. Score paths export as creases; they do not cut or fold the solid.', 'section_hint');
-        action ('Extrude board into scene', async () => { if (this.draft.length) { throw new Error ('Finish or cancel the current path first.'); } const result = await this.Extrude (); dialog.close (); return result; }).classList.add ('workspace_primary');
-        action ('Load selected board profile', () => { this.LoadSelected (); this.Fit (); });
-        action ('Save profile and session…', () => { if (this.draft.length) { throw new Error ('Finish or cancel the current path before saving.'); } dialog.close (); return this.editor.library.SaveDialog (); });
+        if (!external) { Element ('p', tools, 'Use measured caliper for your board grade. Score paths export as creases; they do not cut or fold the solid.', 'section_hint'); }
+        if (!external) { action ('Extrude board into scene', async () => { if (this.draft.length) { throw new Error ('Finish or cancel the current path first.'); } const result = await this.Extrude (); dialog.close (); return result; }).classList.add ('workspace_primary');
+        action ('Load selected board profile', () => { this.LoadSelected (); this.Fit (); }); }
+        if (!external) { action ('Save profile and session…', () => { if (this.draft.length) { throw new Error ('Finish or cancel the current path before saving.'); } dialog.close (); return this.editor.library.SaveDialog (); }); }
         const exports = Element ('div', tools, undefined, 'packaging_actions'); for (const format of ['svg', 'eps', 'dxf']) { action ('Download ' + format.toUpperCase (), () => { if (this.draft.length) { throw new Error ('Finish or cancel the current path before exporting.'); } return this.Download (format); }, exports); }
         action ('Undo edit', () => this.editor.Undo ()); action ('Redo edit', () => this.editor.Redo ());
-        this.engineeringContainer = Element ('div', controls); this.SetControlLayer (this.controlLayer || 'drawing'); LoadPackagingModule ().then (module => { if (!dialog.isConnected) { return; } this.engineeringPanel = new module.EngineeringPanel ({ inspect : () => this.EngineeringInspect (), update : changes => this.UpdateEngineering (changes), factor : () => this.Factor (), blocked : () => this.editor.readOnly || this.editor.busy, run : action => this.Run (action) }, this.engineeringContainer); }).catch (error => this.Message (error.message));
+        this.engineeringContainer = Element ('div', controls); this.SetControlLayer (this.controlLayer || 'drawing'); if (!external) { LoadPackagingModule ().then (module => { if (external || !dialog.isConnected) { return; } this.engineeringPanel = new module.EngineeringPanel ({ inspect : () => this.EngineeringInspect (), update : changes => this.UpdateEngineering (changes), factor : () => this.Factor (), blocked : () => this.editor.readOnly || this.editor.busy, run : action => this.Run (action) }, this.engineeringContainer); }).catch (error => this.Message (error.message)); }
         const drawing = Element ('div', body, undefined, 'packaging_drawing');
-        const applyBar = Element ('div', drawing, undefined, 'packaging_actions packaging_applybar'); const applyMode = Element ('select', applyBar); applyMode.setAttribute ('aria-label', 'CAD apply mode'); applyMode.add (new Option ('Keep box fold state', 'auto')); applyMode.add (new Option ('Flat board', 'flat')); action ('Apply to 3D', () => this.ApplyCAD (applyMode.value), applyBar).classList.add ('workspace_primary');
-        Element ('p', drawing, 'Dimensions and materials update live when linked. Apply commits path edits; custom fold geometry can be applied as a flat board.', 'section_hint'); const top = Element ('div', drawing, undefined, 'packaging_drawing_header'); this.units = Element ('span', top); const faceLabel = Element ('label', top, 'CAD face '); this.cadFaceSelect = Element ('select', faceLabel); this.cadFaceSelect.setAttribute ('aria-label', 'CAD face and dimension basis'); this.cadFaceSelect.add (new Option ('Inside', 'inside')); this.cadFaceSelect.add (new Option ('Outside', 'outside')); this.cadFaceSelect.value = this.cadFace; this.cadFaceSelect.addEventListener ('change', () => this.Run (() => this.SetCADFace (this.cadFaceSelect.value))); action ('Fit drawing', () => this.Fit (), top);
+        const applyBar = Element ('div', drawing, undefined, 'packaging_actions packaging_applybar'); const applyMode = Element ('select', applyBar); applyMode.hidden = Boolean (external); applyMode.setAttribute ('aria-label', 'CAD apply mode'); applyMode.add (new Option ('Keep box fold state', 'auto')); applyMode.add (new Option ('Flat board', 'flat')); action ('Apply to 3D', () => this.ApplyCAD (applyMode.value), applyBar).classList.add ('workspace_primary');
+        Element ('p', drawing, external ? external.description : 'Dimensions and materials update live when linked. Apply commits path edits; custom fold geometry can be applied as a flat board.', 'section_hint'); const top = Element ('div', drawing, undefined, 'packaging_drawing_header'); this.units = Element ('span', top); const faceLabel = Element ('label', top, 'CAD face '); this.cadFaceSelect = Element ('select', faceLabel); this.cadFaceSelect.setAttribute ('aria-label', 'CAD face and dimension basis'); this.cadFaceSelect.add (new Option ('Inside', 'inside')); this.cadFaceSelect.add (new Option ('Outside', 'outside')); this.cadFaceSelect.value = this.cadFace; this.cadFaceSelect.addEventListener ('change', () => this.Run (() => this.SetCADFace (this.cadFaceSelect.value))); action ('Fit drawing', () => this.Fit (), top);
+        if (external) { this.grade.parentElement.hidden = true; this.thickness.parentElement.hidden = true; gear.hidden = true; this.layerButtons.get ('measurement').hidden = true; faceLabel.hidden = true; }
         this.svg = document.createElementNS ('http://www.w3.org/2000/svg', 'svg'); this.svg.classList.add ('packaging_canvas'); this.svg.setAttribute ('role', 'img'); this.svg.setAttribute ('aria-label', 'Packaging point-to-point drawing'); this.svg.setAttribute ('tabindex', '0'); drawing.appendChild (this.svg);
         const coordinate = (event, canonical = true) => { const point = this.svg.createSVGPoint (); point.x = event.clientX; point.y = event.clientY; const converted = point.matrixTransform (this.svg.getScreenCTM ().inverse ()); return [converted.x * (canonical && this.cadFace === 'outside' ? -1 : 1), -converted.y]; };
         this.svg.addEventListener ('click', (event) => this.Run (() => {
@@ -765,7 +781,7 @@ export class PackagingWorkspace
         if (viewer) { previewHandler = camera => { if (priorRender) { priorRender (camera); } if (!dialog.isConnected || preview.hidden || performance.now () - lastPreview < 100) { return; } try { const context = previewCanvas.getContext ('2d'); context.clearRect (0, 0, previewCanvas.width, previewCanvas.height); context.drawImage (viewer.GetCanvas (), 0, 0, previewCanvas.width, previewCanvas.height); lastPreview = performance.now (); } catch { /* Preview is optional; keep the main viewer operational. */ } }; viewer.SetRenderHandler (previewHandler); viewer.Render (); }
         this.status = Element ('p', drawing, 'Ready to draw', 'packaging_status'); this.status.setAttribute ('role', 'status');
         dialog.addEventListener ('cancel', (event) => { if (this.draft.length) { event.preventDefault (); this.CancelDraft (); } });
-        dialog.addEventListener ('close', () => { if (viewer?.onRender === previewHandler) { viewer.SetRenderHandler (priorRender); } this.previewWindow = null; this.previewToggle = null; this.draft = []; this.dialog = null; this.status = null; this.engineeringPanel = null; }); this.snap.addEventListener ('change', () => this.Run (() => this.SetGridSnap (this.snap.valueAsNumber)));
+        const cleanup = () => { if (this.dialog !== dialog) { return; } if (this.externalProfile === external) { this.externalProfile = null; } if (viewer?.onRender === previewHandler) { viewer.SetRenderHandler (priorRender); } this.previewWindow = null; this.previewToggle = null; this.draft = []; this.dialog = null; this.status = null; this.engineeringPanel = null; }; dialog._auto3dPackagingCleanup = cleanup; dialog.addEventListener ('close', cleanup); this.snap.addEventListener ('change', () => this.Run (() => this.SetGridSnap (this.snap.valueAsNumber)));
         hint.title = 'Enter finishes an open path; Shift+Enter closes it. Escape cancels the current draft. Scroll to zoom.'; this.Refresh (); this.Fit (); return { opened : true };
     }
     Refresh ()
@@ -777,7 +793,7 @@ export class PackagingWorkspace
     {
         const factor = this.Factor (); if (factor !== this.displayFactor) { for (const input of [this.x, this.y]) { if (Number.isFinite (input.valueAsNumber)) { input.value = String (Number ((input.valueAsNumber * this.displayFactor / factor).toFixed (6))); } } this.displayFactor = factor; } this.snap.value = String (Number ((this.gridSnapMM / factor).toFixed (6)));
         const design = this.Design (); this.name.value = design.name; this.thickness.value = String (Number ((design.thickness / this.Factor ()).toFixed (6))); this.grade.value = Object.hasOwn (BoardCalipers, design.grade) ? design.grade : 'Custom';
-        this.units.textContent = 'X/Y and thickness in ' + DisplayUnitLabel (this.editor.website.preferences.units) + ' · scroll to zoom · Enter to finish · Shift+Enter to close';
+        this.units.textContent = (this.externalProfile ? 'X/Y in ' : 'X/Y and thickness in ') + DisplayUnitLabel (this.editor.website.preferences.units) + ' · scroll to zoom · Enter to finish · Shift+Enter to close';
         for (const id of this.selectedPaths) { if (!design.paths.some (path => path.id === id)) { this.selectedPaths.delete (id); } } if (!design.paths.some ((path) => path.id === this.active)) { this.active = null; }
         if (this.processFields) { const fields = this.processFields; fields.type.value = this.creaseProcess.kind; fields.cut.value = String (this.creaseProcess.cutMm ?? 3); fields.tie.value = String (this.creaseProcess.tieMm ?? 1); fields.cut.closest ('.packaging_perforation_fields').hidden = !fields.type.value.includes ('perforation'); }
         this.selectToolButton.setAttribute ('aria-pressed', String (this.cadTool === 'select')); this.penToolButton.setAttribute ('aria-pressed', String (this.cadTool === 'pen')); this.svg.style.cursor = this.cadTool === 'pen' ? 'crosshair' : 'default'; this.paths.replaceChildren ();
@@ -796,13 +812,14 @@ export class PackagingWorkspace
         const pattern = make ('pattern', { id : 'packaging_grid', width : grid, height : grid, patternUnits : 'userSpaceOnUse' }, make ('defs', {})); make ('path', { d : 'M' + grid + ' 0H0V' + grid, fill : 'none', stroke : 'var(--ov_border_color)', 'stroke-width' : this.view.width / 1200 }, pattern);
         make ('rect', { x : this.view.x, y : this.view.y, width : this.view.width, height : this.view.height, fill : 'url(#packaging_grid)' });
         make ('path', { d : 'M' + this.view.x + ' 0h' + this.view.width + 'M0 ' + this.view.y + 'v' + this.view.height, stroke : '#888', 'stroke-width' : this.view.width / 700 });
-        for (const path of [...design.paths, ...(this.draft.length ? [{ id : 'draft', type : this.draftType, closed : false, points : this.draft }] : [])]) {
+        for (const path of [...design.paths.filter (path => path.type === 'artwork'), ...design.paths.filter (path => path.type !== 'artwork'), ...(this.draft.length ? [{ id : 'draft', type : this.draftType, closed : false, points : this.draft }] : [])]) {
             const selected = this.selectedPaths.has (path.id) || path.id === this.active; const d = path.points.map ((point, index) => (index ? 'L' : 'M') + faceX (point[0]) + ' ' + -point[1]).join (' ') + (path.closed ? 'Z' : '');
             if (path.id !== 'draft') { make ('path', { d, fill : 'none', stroke : 'transparent', 'stroke-width' : 12, 'vector-effect' : 'non-scaling-stroke', 'data-hit-path' : path.id, 'pointer-events' : 'stroke' }); }
-            make ('path', { d, fill : path.closed && path.type === 'cut' ? '#b8926112' : 'none', stroke : path.type === 'cut' ? '#e34b4b' : '#318cdd', 'stroke-width' : selected ? 3 : 2, 'vector-effect' : 'non-scaling-stroke', 'stroke-dasharray' : path.process?.kind?.includes ('perforation') ? (path.process.cutMm + ' ' + path.process.tieMm) : path.type === 'score' ? '7 5' : 'none', 'data-path' : path.id, 'pointer-events' : 'stroke' });
+            make ('path', { d, fill : path.type === 'artwork' ? path.fill || '#123740' : path.closed && path.type === 'cut' ? '#b8926112' : 'none', stroke : path.type === 'artwork' ? selected ? '#f6b73c' : path.stroke || 'none' : path.type === 'cut' ? '#e34b4b' : '#318cdd', 'stroke-width' : path.type === 'artwork' && !selected ? path.strokeWidth || 0 : selected ? 3 : 2, 'vector-effect' : path.type === 'artwork' && !selected ? 'none' : 'non-scaling-stroke', 'stroke-dasharray' : path.process?.kind?.includes ('perforation') ? (path.process.cutMm + ' ' + path.process.tieMm) : path.type === 'score' ? '7 5' : 'none', 'data-path' : path.id, 'pointer-events' : path.type === 'artwork' ? 'all' : 'stroke' });
             if (selected || path.id === 'draft') { path.points.forEach ((point) => make ('circle', { cx : faceX (point[0]), cy : -point[1], r : this.view.width / 240, fill : path.type === 'cut' ? '#e34b4b' : '#318cdd', 'pointer-events' : 'none' })); }
         }
         const measurements = this.EngineeringInspect ();
+        if (this.externalProfile) { if (this.status) { this.status.textContent = design.paths.length + ' editable paths · ' + (this.externalProfile.status || 'Label cut and artwork layers'); } return; }
         // Angle is the flute-axis direction in sheet coordinates, with SVG Y inverted.
         const angle = measurements.material.fluteDirectionDegrees * Math.PI / 180; const cx = this.view.x + this.view.width * .11, cy = this.view.y + this.view.height * .12; const radius = Math.min (this.view.width, this.view.height) * .055; const dx = (this.cadFace === 'outside' ? -1 : 1) * Math.cos (angle) * radius, dy = -Math.sin (angle) * radius;
         const direction = make ('g', { 'pointer-events' : 'none', 'aria-label' : 'Flute direction ' + measurements.material.fluteDirectionDegrees + ' degrees from sheet X' });
