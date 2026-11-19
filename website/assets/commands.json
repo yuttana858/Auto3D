@@ -7306,7 +7306,7 @@
       "id": "animation.video.export",
       "title": "Export animation video",
       "category": "Animation",
-      "description": "Record the animation range (or start/end seconds) as a video: the timeline is stepped frame by frame (object and camera keyframes, fold actions with their automatic camera framing, embedded clips) and each frame is rendered without editor helpers, then encoded with WebCodecs. format auto prefers MP4 (H.264) and falls back to WebM (VP9/VP8) when the browser cannot encode H.264. Waits for completion and returns the video metadata; the file stays in this browser until animation.video.download. Requires sign-in. Does not change the scene.",
+      "description": "Render the animation range (or start/end seconds) as a video, not a screen recording; no audio is included. The timeline is stepped frame by frame (object and camera keyframes, fold actions with their automatic camera framing, embedded clips) and each frame is rendered without editor helpers, then encoded with WebCodecs. format auto prefers MP4 (H.264) and falls back to WebM (VP9/VP8) when the browser cannot encode H.264. Waits for completion and returns the video metadata; the file stays in this browser until animation.video.download. Requires sign-in. Does not change the scene.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -7795,6 +7795,34 @@
       "example": {
         "name": "Demo",
         "stepSeconds": 2
+      }
+    },
+    {
+      "id": "animation.workflow.record",
+      "title": "Record saved macro to timeline",
+      "category": "Animation",
+      "description": "Run a saved macro through animation.macro.record, then open the Animation panel and Advance Animation timeline. The timeline must be empty and stopped. This creates editable tracks; export video separately with animation.video.export. Existing lighting stays configured in the app.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "stepSeconds": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 30
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "name": "Demo"
       }
     },
     {
@@ -8698,7 +8726,7 @@
       "id": "commands.text",
       "title": "Run typed commands",
       "category": "Commands",
-      "description": "Run supported phrases such as array model 4x4x6, fit, undo, or run macro Name. Semicolons run a sequence through the strict registry. Each action retains authentication, read-only and busy checks; saved macros may partially complete before a runtime failure. Does not accept arbitrary code. Marked non-mutating so read-only viewers can run view phrases; each mutating step is checked and blocked individually.",
+      "description": "Run supported phrases such as array model 4x4x6, fit, undo, run macro Name, or run Name macro and record. Semicolons run a sequence through the strict registry. Each action retains authentication, read-only and busy checks; saved macros may partially complete before a runtime failure. Does not accept arbitrary code. Marked non-mutating so read-only viewers can run view phrases; each mutating step is checked and blocked individually.",
       "mutates": false,
       "inputSchema": {
         "type": "object",

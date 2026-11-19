@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Integrated macro-to-video workflow — Auto3D 0.98.0 candidate
+
+Stacked on PR #170. Animation offers saved macro selection, recording to Advance Animation, and explicit frame-by-frame video rendering. Typed commands and agents can open the same workflow. It preserves the app’s lighting; it is not a screen recording and has no audio. See release-0980.md. Not deployed.
+
 ## Recorded object lifetimes — Auto3D 0.97.0 candidate
 
 Stacked on PR #169. Recorded duplicate and duplicate-at steps reveal real session copies at the end of their step; recorded deletion retains the object and hides it at the step end for reversible scrubbing. Ordinary macro delete remains a true session deletion. Lighting is unchanged. General import/generation, material animation and overlapping steps remain future work. See release-0970.md. Not deployed.

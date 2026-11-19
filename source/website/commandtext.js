@@ -16,6 +16,8 @@ export function ParseCommandText (input)
 {
     if (typeof input !== 'string' || !input.trim () || input.length > 2000) { throw new Error ('Enter a command, up to 2,000 characters.'); }
     const text = input.trim ();
+    const recording = text.match (/^record\s+macro\s+(.+)$/i) || text.match (/^run\s+(.+?)\s+macro\s+and\s+record(?:\s+(?:the\s+)?(?:main\s+)?viewer)?$/i);
+    if (recording) { return { recordMacroName : recording[1].trim () }; }
     const macro = text.match (/^(?:run\s+)?macro\s+(.+)$/i);
     if (macro) { return { macroName : macro[1].trim () }; }
     const phrases = text.split (';').map (part => part.trim ());
@@ -48,6 +50,11 @@ export function ParseCommandText (input)
 export async function ExecuteCommandText (registry, input)
 {
     const parsed = ParseCommandText (input);
+    if (parsed.recordMacroName) {
+        const recording = await registry.Invoke ('animation.workflow.record', { name : parsed.recordMacroName });
+        if (!recording.recorded) { throw new Error (recording.error?.message || 'Recording stopped; completed macro changes remain.'); }
+        return { ok : true, completed : [{ id : 'record', command : 'animation.workflow.record', result : recording }] };
+    }
     let macro = parsed.macro;
     if (parsed.macroName) {
         const saved = await registry.Invoke ('macro.list');

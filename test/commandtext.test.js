@@ -52,6 +52,14 @@ describe ('Typed commands and macros', () => {
         const nested = await registry.RunMacro ({ version : 1, steps : [{ id : 'recursive', command : 'commands.text', arguments : { text : 'run macro layout' } }] });
         assert.equal (nested.ok, false); assert.match (nested.error.message, /Nested macros/); assert.equal (registry.running, null);
     });
+    it ('routes a saved macro recording request through the shared animation workflow', async () => {
+        const { registry, events } = fixture ();
+        registry.commands.get ('animation.workflow.record').handler = async ({ name }) => { events.push (name); return { recorded : true, duration : 3 }; };
+        for (const text of ['run Demo macro and record', 'record macro Demo', 'run Demo macro and record the main viewer']) { const result = await registry.Execute ('commands.text', { text }); assert.equal (result.ok, true, JSON.stringify (result)); assert.equal (result.result.completed[0].command, 'animation.workflow.record'); }
+        assert.deepEqual (events, ['Demo', 'Demo', 'Demo']);
+        registry.commands.get ('animation.workflow.record').handler = async () => { throw new Error ('Start with an empty timeline'); };
+        const failed = await registry.Execute ('commands.text', { text : 'record macro Demo' }); assert.equal (failed.ok, false); assert.match (failed.error.message, /empty timeline/);
+    });
     it ('prevalidates saved macros before mutation', async () => {
         const { registry, events } = fixture ();
         registry.commands.get ('macro.list').handler = () => [{ name : 'Invalid', macro : { version : 1, steps : [{ id : 'fit', command : 'view.fit' }, { id : 'bad', command : 'object.array', arguments : { width : 99, length : 1, height : 1 } }] } }];
