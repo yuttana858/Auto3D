@@ -20,8 +20,11 @@ export function ProductSurfaceProblem (loft, { floorFilletMm = 0, rimFilletMm = 
     }
     if (!loft.walls.some (w => w.kind === 'skirt')) { return 'Turn on the outer skirt wall: the plateau needs it as its outer edge.'; }
     if (rimFilletMm > 0 && !loft.walls.some (w => w.kind === 'skirt' && w.surface.closedU)) { return 'Round the skirt corners to fillet the rims: the skirt top needs one closed wall.'; }
-    const raised = loft.faces.find (f => f.kind !== 'plane');
-    if (raised) { return `${raised.id} is raised ${raised.raisedMm.toFixed (1)} mm (a domed base); fitted floor patches are not built yet.`; }
+    const raised = loft.faces.find (f => f.kind === 'patch-needed');
+    if (raised) {
+        const why = raised.reason ? 'failed: ' + raised.reason : Number.isFinite (raised.maxDistanceMm) ? `is ${raised.maxDistanceMm.toFixed (2)} mm from the review surface (limit ${loft.wallToleranceMm.toFixed (2)} mm)` : 'could not be built';
+        return `${raised.id} is raised ${raised.raisedMm.toFixed (1)} mm (a domed base) and its fitted floor ${why}.`;
+    }
     const depth = loft.walls[0].surface.knotsV.at (-1) - loft.walls[0].surface.knotsV[0];
     if (rimFilletMm > 0) {
         // Rim fillets spread over the plateau: every strip of plateau between two rims (pocket to pocket, pocket to skirt)
@@ -101,7 +104,8 @@ export function ProductSurface (loft, { baseY = 0, direction = '+y', id = 'Tray'
         halves.forEach (([a, b], i) => {
             const seam0 = edge (starts[i], starts[i + 1], column (a, 0), a.knotsV), seamM = edge (middles[i], middles[i + 1], column (b, 0), b.knotsV);
             for (const [sf, half, loop] of [[a, 'a', [[rings[i][0], true], [seamM, true], [rings[i + 1][0], false], [seam0, false]]], [b, 'b', [[rings[i][1], true], [seam0, true], [rings[i + 1][1], false], [seamM, false]]]]) {
-                const { n, at } = normal (sf), sameSense = inward * (n[0] * (seed[0] - at[0]) + n[2] * (seed[1] - at[2])) > 0;
+                // Raised floors face up (the product side is above them); walls face the seed (pockets) or away (skirt).
+                const { n, at } = normal (sf), sameSense = bands[i].up ? n[1] > 0 : inward * (n[0] * (seed[0] - at[0]) + n[2] * (seed[1] - at[2])) > 0;
                 faces.push ({ name : bands[i].name + ' ' + half, kind : 'bspline', surface : worldSurface (sf), sameSense, bounds : [{ outer : true, loop : sameSense ? loop : reverse (loop) }] });
             }
         });
@@ -110,14 +114,16 @@ export function ProductSurface (loft, { baseY = 0, direction = '+y', id = 'Tray'
     const pocketWalls = loft.walls.filter (w => w.kind === 'pocket'), skirtWalls = loft.walls.filter (w => w.kind === 'skirt');
     const rims = [], floors = [];
     for (const wall of pocketWalls) {
-        const bands = [];
+        const bands = [], raised = loft.faces.find (f => f.id === wall.id + ' floor' && f.kind === 'patch');
         let sf = wall.surface, floorY = sf.points[1];
-        if (floorFilletMm > 0) { const blend = EndBlend (sf, wall.seed, floorFilletMm, 'bottom', 1); bands.push ({ name : wall.id + ' floor fillet', surface : blend.surface }); sf = blend.wall; }
+        // A raised floor's band is tangent to the wall already; its cap is the floor plane.
+        if (raised) { bands.push ({ name : wall.id + ' floor', surface : raised.patch.surface, up : true }); floorY = raised.patch.capY; }
+        else if (floorFilletMm > 0) { const blend = EndBlend (sf, wall.seed, floorFilletMm, 'bottom', 1); bands.push ({ name : wall.id + ' floor fillet', surface : blend.surface }); sf = blend.wall; }
         let rim = null;
         if (rimFilletMm > 0) { const blend = EndBlend (sf, wall.seed, rimFilletMm, 'top', -1); sf = blend.wall; rim = { name : wall.id + ' rim fillet', surface : blend.surface }; }
         bands.push ({ name : wall.id, surface : sf }); if (rim) { bands.push (rim); }
         const rings = stack (bands, wall.seed, 1);
-        rims.push (rings.at (-1)); floors.push ({ name : wall.id + ' floor', ring : rings[0], y : floorY });
+        rims.push (rings.at (-1)); floors.push ({ name : wall.id + (raised ? ' floor cap' : ' floor'), ring : rings[0], y : floorY });
     }
     let outer;
     const closedSkirt = skirtWalls.find (w => w.surface.closedU);

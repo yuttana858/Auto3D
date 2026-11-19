@@ -320,3 +320,45 @@ describe ('Molded Pulp smooth surface plan with automatic extra material', funct
         assert.throws (() => PlanSmoothSurface (SixPack (70, 48), draft), /join below the plateau/);
     });
 });
+
+describe ('Molded Pulp raised floors (domed and recessed can bases)', function () {
+    this.timeout (300000);
+    const cans = async id => {
+        const { CreatePrimaryProduct, ProductDesign } = await import ('../../primary-products/src/index.js');
+        const d = ProductDesign (id), can = CreatePrimaryProduct (d), pitch = d.diameterMm + 20, tris = [];
+        for (let i = 0; i < 3; i++) { for (let j = 0; j < 2; j++) { for (const c of can.components) { for (const k of c.indices) { tris.push (c.positions[k * 3] + i * pitch, c.positions[k * 3 + 1], c.positions[k * 3 + 2] + j * pitch); } } } }
+        return Float32Array.from (tris);
+    };
+    it ('fits a floor band from the wall to a flat cap on a domed beverage base, smooth at the wall, the cap and the seam', async () => {
+        const draft = { ...DefaultPulpDraft ('type2'), formDepthMm : 35, detail : 'standard' }, shell = FormShell (await cans ('standard-beverage'), draft, { keepSurfaces : true });
+        const loft = LoftPocketWalls (shell.grid, shell.surfaces.top, { depthMm : shell.metrics.achievedDepthMm, wallToleranceMm : 0.3125, skirtWall : true, skirtCornerMm : 10 });
+        const floors = loft.faces.filter (f => / floor$/.test (f.id));
+        assert.equal (floors.length, 6); assert.ok (floors.every (f => f.kind === 'patch' && f.raisedMm > 9 && f.patch.maxDistanceMm <= 0.3125), JSON.stringify (floors.map (f => [f.kind, f.raisedMm, f.patch?.maxDistanceMm])));
+        const wall = loft.walls[0], { patch } = floors[0], band = patch.surface, h = 1e-6;
+        for (let q = 0; q <= 24; q++) {
+            const u = q / 24, foot = SurfacePoint (band, u, 1), wallFoot = SurfacePoint (wall.surface, u, wall.surface.knotsV[0]);
+            assert.ok (Math.hypot (foot[0] - wallFoot[0], foot[1] - wallFoot[1], foot[2] - wallFoot[2]) < 1e-9, 'shares the wall foot');
+            // Tangent to the wall: the band's derivative into the foot is parallel to the wall's height derivative.
+            const b1 = SurfacePoint (band, u, 1 - h).map ((x, i) => foot[i] - x), w1 = SurfacePoint (wall.surface, u, wall.surface.knotsV[0] + h).map ((x, i) => x - wallFoot[i]);
+            const cross = [b1[1] * w1[2] - b1[2] * w1[1], b1[2] * w1[0] - b1[0] * w1[2], b1[0] * w1[1] - b1[1] * w1[0]];
+            assert.ok (Math.hypot (...cross) < 1e-5 * Math.hypot (...b1) * Math.hypot (...w1), 'tangent to the wall');
+            // Level at the cap ring, so it meets the flat cap tangentially.
+            const ring = SurfacePoint (band, u, 0); assert.ok (Math.abs (ring[1] - patch.capY) < 1e-9); assert.ok (Math.abs (SurfacePoint (band, u, h)[1] - patch.capY) < 1e-6);
+        }
+        // Smooth across the seam: the derivative around the pocket matches on both sides of u = 0.
+        for (const v of [0.2, 0.5, 0.8]) {
+            const a = SurfacePoint (band, h, v).map ((x, i) => (x - SurfacePoint (band, 0, v)[i]) / h), b = SurfacePoint (band, 1, v).map ((x, i) => (x - SurfacePoint (band, 1 - h, v)[i]) / h);
+            assert.ok (Math.hypot (a[0] - b[0], a[1] - b[1], a[2] - b[2]) < 1e-3 * Math.hypot (...a), 'C1 at the seam');
+        }
+        const surface = ProductSurface (loft, { baseY : shell.rect.baseY, floorFilletMm : 0, rimFilletMm : 0 }).faces;
+        assert.equal (surface.filter (f => / floor [ab]$/.test (f.name)).length, 12); assert.equal (surface.filter (f => / floor cap$/.test (f.name)).length, 6);
+    });
+    it ('plans the rounded smooth surface for real beverage and food cans', async () => {
+        const { PlanSmoothSurface } = await import ('../src/plan.js');
+        for (const id of ['standard-beverage', 'food-can']) {
+            const plan = PlanSmoothSurface (await cans (id), { ...DefaultPulpDraft ('type2'), formDepthMm : 35, detail : 'standard' });
+            const [shell] = plan.smooth; assert.equal (shell.problem, undefined, id); assert.equal (shell.faces, 47, id);
+            assert.equal (SurfaceEdgeUses (shell.surface).filter (u => u.forward + u.reversed === 1).length, 2, id);
+        }
+    });
+});

@@ -232,6 +232,12 @@ On real Primary Products cans (3 × 2, 20 mm gap, Type 2, 35 mm, standard):
 - **Halves.** Closed walls and blends are written as two halves (u in [0, ½] and [½, 1]); OpenCASCADE reports a face that closes on itself as self-intersecting.
 - **Fillets** (`floorFilletMm`, `rimFilletMm`). `EndBlend` splits a wall exactly at r from its floor or top and adds a cubic blend with the wall's U knots. The blend is tangent to the plane (horizontal handles) and to the wall (handles along its height derivative at one constant scale).
 - **Rounded skirt** (`skirtCornerMm` in `LoftPocketWalls`). Each level's skirt outline becomes straight sides (least-squares lines) joined by tangent arcs, and the skirt is lofted as one closed wall. The review distance skips the corner zones, which leave the review's sharp corners on purpose; there each outline fit is held to its own rounded outline.
+- **Raised floors** (`src/nurbs/floor.js`): a domed or recessed can base gets one closed floor band from the wall's foot to a small flat cap, instead of a fillet and a floor plane.
+  - **Wall end:** the band starts on the wall's foot row (shared exactly), and its second row continues the wall's height derivative, so it is tangent to the wall.
+  - **Middle:** each row sits at a fixed fraction of the way from the wall to the cap on every control's ray towards the pocket seed (rows correspond around the pocket), and only its height is fitted to the review. The review is a height over the plan, so along a ray it is a function of the radial distance. Rows are placed outside each ray by the same ratio the wall's foot controls sit outside its foot curve, so the surface itself lands on the rays.
+  - **Cap end:** the last two rows are level at the cap height, tangent to the cap. The cap is as wide as the review stays within half the tolerance of level (2.5 mm on a beverage dome, 23 mm on a food can's recessed panel).
+  - **Seam:** the band is fitted on the wall's periodic controls and every row is clamped the same way, so it is as smooth across the seam as the wall. Fitting the clamped columns independently left a crease there, and the offset halves parted by 0.02 mm, making the thickened STEP invalid on reimport.
+  - **Tolerance:** rows grow until the band is within the wall tolerance of the review (the wall's foot edge is checked with the wall).
 - **Checks before writing** (`ProductSurfaceProblem`): the skirt is on; rim fillets need the rounded (closed) skirt; floors are flat; the fillets fit the depth; and every plateau strip (`PlateauLand`) holds two rim fillets.
 
 Cloud 3D Studio thickens the surface (`cloud3d thicken`, Cloud 3D Studio `docs/pulp-thicken.md`). Results on T1 (Type 2, 35 mm, standard detail):
@@ -241,6 +247,13 @@ Cloud 3D Studio thickens the surface (`cloud3d thicken`, Cloud 3D Studio `docs/p
 | Sharp creases (17 faces) | One valid solid up to 1.8 mm; from 2 mm OCCT splits pocket floors off |
 | Floor fillets only (4 mm) | Same: pockets with the plateau, or the skirt with the plateau, thicken at 3 mm; the full tray does not |
 | Every crease rounded: 4 mm floor and rim fillets, 10 mm skirt corners, 40 mm extra material (47 faces) | One offset, no joins, at 2, 3 and 4 mm. Every sample passes, minimum thickness equals the request, volume within 1% of area × t. The bounded job publishes STEP and manifest at 3 mm |
+
+Real can trays (Primary Products real-world cans, default draft, extra material raised automatically), thickened at 3 mm:
+
+| Tray | Floors | Result |
+| --- | --- | --- |
+| 6 × 355 ml beverage cans (10.2 mm dome) | Bands within 0.26–0.29 mm, 2.5 mm caps | 47 faces; one valid solid; every sample passes; minimum 3.000 mm; volume −0.8% |
+| 6 × 300 × 407 food cans (3.2 mm recessed panel) | Bands within 0.25–0.30 mm, 23 mm caps | 47 faces; one valid solid; minimum 2.996 mm; volume −0.8% |
 
 Design limits:
 - A rim radius must exceed the pulp thickness, because it shrinks by the thickness on the tool side.

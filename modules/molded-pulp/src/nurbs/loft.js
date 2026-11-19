@@ -7,6 +7,7 @@ import { IsoContours, Centroid, PolygonArea, OutlineWindow } from './contours.js
 import { SeamOrder, FitPeriodic, PeriodicPoint, OutlineDeviation } from './periodic.js';
 import { SurfaceDistance } from './measure.js';
 import { OpenKnots, OpenPoint, OpenParams, FitOpen, OutlineCorners, RoundedOutline } from './open.js';
+import { RaisedFloor } from './floor.js';
 
 function Inside (points, x, z)
 {
@@ -122,7 +123,10 @@ export function LoftPocketWalls (grid, H, { depthMm, floorMm = 0, outlineToleran
         return {
             id, kind, seed, areaMm2 : Math.abs (PolygonArea (outlines[0].points)),
             surface : { degreeU : Degree, degreeV : Degree, closedU : !open, knotsU, knotsV : best.knotsV, countU, countV : n, points },
-            outlineControls : m, heightControls : n, maxDistanceMm : best.max, withinTolerance : best.max <= wallToleranceMm
+            outlineControls : m, heightControls : n, maxDistanceMm : best.max, withinTolerance : best.max <= wallToleranceMm,
+            // A closed wall's periodic controls (rows of m (x, z) pairs) and row heights: surfaces built on it (raised floors)
+            // fit in this form and are clamped the same way, so they stay smooth across the seam.
+            periodic : open ? null : { m, controls : best.controls, heights : best.gv }
         };
     };
     for (const pocket of pockets) { walls.push (loft (pocket.outlines, pocket.seed, 'Pocket ' + (pocket.index + 1), 'pocket')); }
@@ -173,7 +177,11 @@ export function LoftPocketWalls (grid, H, { depthMm, floorMm = 0, outlineToleran
         const outline = pockets[index].outlines[0].points; let peak = -Infinity;
         const w = OutlineWindow ([outline], grid, 0);
         for (let j = Math.max (0, w.j0); j <= Math.min (grid.nz - 1, w.j1); j++) { for (let i = Math.max (0, w.i0); i <= Math.min (grid.nx - 1, w.i1); i++) { if (Inside (outline, grid.x0 + i * grid.dx, grid.z0 + j * grid.dz)) { peak = Math.max (peak, H[j * grid.nx + i]); } } }
-        faces.push (peak <= floorMm + wallToleranceMm ? { id : wall.id + ' floor', kind : 'plane', y : v0, outer : [edge (wall, false)], holes : [] } : { id : wall.id + ' floor', kind : 'patch-needed', raisedMm : peak - floorMm, outer : [edge (wall, false)], holes : [] });
+        if (peak <= floorMm + wallToleranceMm) { faces.push ({ id : wall.id + ' floor', kind : 'plane', y : v0, outer : [edge (wall, false)], holes : [] }); continue; }
+        // A raised floor (a domed or recessed can base): a fitted band from the wall's foot to a flat cap (floor.js).
+        const patch = RaisedFloor (wall.surface, wall.seed, grid, H, { toleranceMm : wallToleranceMm, distance, periodic : wall.periodic });
+        faces.push (patch.withinTolerance ? { id : wall.id + ' floor', kind : 'patch', raisedMm : peak - floorMm, patch, outer : [edge (wall, false)], holes : [] }
+            : { id : wall.id + ' floor', kind : 'patch-needed', raisedMm : peak - floorMm, maxDistanceMm : patch.maxDistanceMm, reason : patch.reason, outer : [edge (wall, false)], holes : [] });
     }
     // Plateau: the plane at the form depth inside the skirt's top curves, with a hole at every pocket rim.
     if (skirtWalls.length) { faces.push ({ id : 'Plateau', kind : 'plane', y : v1, outer : skirtWalls.map (w => edge (w, true)), holes : pocketWalls.map (w => edge (w, true)) }); }
