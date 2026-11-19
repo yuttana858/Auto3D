@@ -95,3 +95,7 @@ A model in another known unit now keeps its real size when added to a scene. For
 - `boardappearance-speed.test.js`: the edge grid matches the reference exactly, and a six-can collar board builds in seconds. `test/progresspopup.test.js` covers the progress percentages and failure.
 - `can-collar` also checks that the popup reaches 100% with all five steps done and timed.
 - Both browser tests are in the CI suite.
+- Local results after merging main (0.96.0), commit `ae04fdd`:
+  - Unit tests: 1169 passing. Packaging module: 116 passing. MCP: 73 passing. Lint is clean.
+  - 23 of 25 packaging, board, CAD and Primary Products browser tests pass.
+  - `packaging-auto-pack` and `packaging-auto-styles` fail the same way on unchanged main (the Auto pane no longer has the elements they wait for after the compact Auto Pack controls), so those failures come from main, not this release.
