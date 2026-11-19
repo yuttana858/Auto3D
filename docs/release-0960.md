@@ -2,13 +2,13 @@
 
 Packaging **1.18.0** / Primary Products **0.16.0** / Molded Pulp **0.3.0**.
 
-Based on main `66320103aacccb9e3997c58a9c8312f327250f55` (0.94.0). Version 0.95.0 is reserved by the separate animation workstream in PR #167. This candidate is not deployed. Related product changes are collected in one draft PR to avoid repeated Actions runs.
+Draft PR [#168](https://github.com/yuttana858/Auto3D/pull/168), based on main `66320103aacccb9e3997c58a9c8312f327250f55` (0.94.0). Version 0.95.0 is reserved by the separate animation workstream in PR #167. This candidate is not deployed. Related product changes are collected in one draft PR to avoid repeated Actions runs.
 
 ## Selected products update live
 
 Editing a selected product in the right panel updates that object, preserving its identity, transform, artwork and unrelated advanced material settings. Valid numeric edits settle after a short pause; Enter or blur flushes them immediately. Incomplete numbers remain editable. Edits arriving during a rebuild are coalesced, and the resulting burst has one Undo step. Without a matching selected product, controls configure the next generation. Generate new remains an explicit way to add another object.
 
-Automatic framing and Fit model use the selected object's projected bounds and the current viewport aspect ratio, including the split editor. New products finish their initial fit before generation resolves. Live edits and Undo preserve the current camera and orbit pivot.
+Automatic framing and Fit model use the selected object's projected bounds and the current viewport aspect ratio, including the split editor. New products finish their initial fit before generation resolves. Live edits and Undo preserve the current camera and orbit pivot. The faded ground grid now participates in the refraction buffer, so clear glass can show it rather than appearing opaque against a plain background.
 
 ## Glass bottles and closures
 
@@ -26,4 +26,8 @@ CAD profiles, rendered label images and physical label dimensions survive save/r
 
 New shared commands: `primary.live.configure`, `primary.fit`, `primary.label.cad.open`, `primary.label.cad.inspect`, `primary.label.cad.apply`, and `packaging.artwork.style`. Existing profile/detail commands include the new construction controls; existing label commands include cap-top. Opening label CAD is interactive; applying it is a separate command. The generated browser and MCP catalogs are synchronized.
 
-Validation results and the exact tested commit are recorded in the PR. Local checks cover asynchronous editing, stale selection/account guards, render rollback, camera movement, construction topology, cap materials, CAD layers/vector conversion, label persistence and actual browser interaction. Full release CI remains a separate gate before merge/deployment; skipped draft checks are not passing results.
+Validation results, tested commits and retained failure records are in [the validation record](validation/primary-live-0960.md) and the PR. Local checks cover asynchronous editing, stale selection/account guards, render rollback, camera movement, construction topology, cap materials, CAD layers/vector conversion, label persistence and actual browser interaction. Full release CI remains a separate gate before merge/deployment; skipped draft checks are not passing results.
+
+## Review images
+
+Local Chromium captures: [glass bottle with body and cap labels](assets/primary-products-0960/glass-labels.png) and [cap label in the shared CAD editor](assets/primary-products-0960/cap-label-cad.png).
