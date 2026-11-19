@@ -50,6 +50,13 @@ try {
     await panel.getByLabel ('Collar board', { exact : true }).selectOption ('sbs-24pt');
     const before = (await call ('scene.inspect')).objects.length;
     await panel.getByRole ('button', { name : 'Add can collar', exact : true }).click ();
+    // The progress popup shows each calculation step with real times, a percentage and a bar.
+    const popup = page.getByRole ('dialog', { name : 'Can collar progress', exact : true }); await popup.waitFor ();
+    assert.equal (await popup.getByRole ('progressbar').count (), 1);
+    const finished = await page.waitForFunction (() => { const root = document.querySelector ('.progress_popup'); return root?.dataset.state === 'done' ? { value : root.querySelector ('[role=progressbar]').getAttribute ('aria-valuenow'), done : root.querySelectorAll ('li[data-state="done"]').length, text : root.textContent } : null; });
+    const shown = await finished.jsonValue (); assert.equal (shown.value, '100'); assert.equal (shown.done, 5);
+    assert.match (shown.text, /Sensing can rims.*6 \/ 6 cans.*Building board geometry.*\d+ ms/s);
+    await page.screenshot ({ path : 'work/can-collar/progress.png' }).catch (() => {});
     await page.waitForFunction (() => /Added a 6-can collar/.test (document.querySelector ('[aria-label="Can collar"]')?.textContent || ''));
     const scene = await call ('scene.inspect'); assert.equal (scene.objects.length, before + 1);
     const collar = scene.objects.find (o => o.userData?._auto3dAccessory && JSON.parse (o.userData._auto3dAccessory).kind === 'collar');

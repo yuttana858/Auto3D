@@ -14,7 +14,7 @@ export function DropInPlan (items, { stepSeconds = 0.35, overlap = 0.45, maxSeco
     return { seconds, slots : order.map ((item, i) => ({ item, start : (i * step * (1 - overlap)) / seconds, end : (i * step * (1 - overlap) + step) / seconds })) };
 }
 
-export function DropIn (editor, objects, factor, { data = () => null, easing = 'smooth', clock = {} } = {})
+export function DropIn (editor, objects, factor, { data = () => null, easing = 'smooth', clock = {}, onProgress = null } = {})
 {
     const meshes = objects.filter (object => object.threeObject?.position);
     const reduced = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -38,6 +38,7 @@ export function DropIn (editor, objects, factor, { data = () => null, easing = '
         const tick = () => {
             const progress = Math.min (1, (now () - begin) / (plan.seconds * 1000));
             try { draw (progress); } catch { /* A rebuilt scene ends the drop; pieces are already at their saved placement. */ }
+            onProgress?.(progress);
             if (progress < 1) { request (tick); } else { editor.motionOverride = null; resolve ({ animated : true, seconds : plan.seconds }); }
         };
         request (tick);

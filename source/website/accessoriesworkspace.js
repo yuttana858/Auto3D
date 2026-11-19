@@ -6,7 +6,7 @@ import { DefaultBoardSpecification } from '../../modules/packaging/src/engineeri
 import { AutoPackDefinition } from './autopackfold.js';
 import { DefaultEngineering } from '../../modules/packaging/src/engineering.js';
 import { ValidatePackaging } from '../../modules/packaging/src/profile.js';
-import { LoadPackagingModule, PackagingModel, PackagingUnitMM } from './packagingadapter.js';
+import { LoadPackagingModule, PackagingModel, PackagingUnitMM, CachedPackagingData, PackagingDataKey } from './packagingadapter.js';
 import { MeasureWorldBoundsMm } from './autopackworkspace.js';
 
 const AccessoryKey = '_auto3dAccessory';
@@ -183,7 +183,8 @@ export class AccessoriesWorkspace
 export function AddBoardPiece (module, target, sourceProfile, material, { upright = false, runsAlongX = true, min }, factor, name, source)
 {
     const profile = ValidatePackaging ({ ...sourceProfile, grade : material.name || sourceProfile.grade, ...(material.id ? { engineering : Engineering (sourceProfile, material) } : {}) });
-    const object = target.AddImported (PackagingModel (module.CreateBoard (profile, { textured : true }), target.model.GetUnit ()), name);
+    // The same board data the renderer's presentation uses, so the first render does not build it again.
+    const object = target.AddImported (PackagingModel (CachedPackagingData (PackagingDataKey (profile), () => module.CreateBoard (profile, { textured : true })), target.model.GetUnit ()), name);
     object.source = source; object.packagingProfile = profile;
     const rotation = new THREE.Quaternion ();
     if (upright) { rotation.setFromAxisAngle (new THREE.Vector3 (1, 0, 0), Math.PI / 2); }

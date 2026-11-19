@@ -150,10 +150,21 @@ export function ApplyPackagingPresentation (root, data, unit, materials = [], fo
         geometry.computeBoundingSphere (); geometry.computeBoundingBox (); shared?.set (cacheKey, geometry); item.geometry.dispose (); item.geometry = geometry; item.userData.auto3dBoardAppearance = mesh.presentationOnly === true || mesh.visualOnly === true;
     });
 }
+// Board geometry by profile, kept across renders: rebuilding a board's presentation mesh on every render was
+// the slow part of drawing collars and other many-edge dielines. A small LRU bounds the memory it holds.
+const PresentationData = new Map (), PresentationDataLimit = 8;
+export function PackagingDataKey (profile, parameters = null, flat = false, localRig = false) { return JSON.stringify ([profile, parameters, flat, localRig]); }
+export function CachedPackagingData (key, build)
+{
+    if (PresentationData.has (key)) { const data = PresentationData.get (key); PresentationData.delete (key); PresentationData.set (key, data); return data; }
+    const data = build (); PresentationData.set (key, data);
+    while (PresentationData.size > PresentationDataLimit) { PresentationData.delete (PresentationData.keys ().next ().value); }
+    return data;
+}
 export async function PreparePackagingPresentations (objects, materials, unit)
 {
     if (!objects.some (object => object.packagingProfile)) { return; }
-    const module = await LoadPackagingModule (); const cache = new Map (), geometryCache = new WeakMap ();
+    const module = await LoadPackagingModule (); const geometryCache = new WeakMap ();
     for (const object of objects) {
         if (!object.packagingProfile || !object.threeObject) { continue; }
         const profile = object.packagingProfile, parameters = object.userData?._auto3dFefco ? JSON.parse (object.userData._auto3dFefco) : null;
@@ -166,8 +177,8 @@ export async function PreparePackagingPresentations (objects, materials, unit)
             ApplyPackagingPresentation (object.threeObject, data, unit, materials, false, geometryCache);
             continue;
         }
-        const key = JSON.stringify ([profile, parameters, flat, localRig]);
-        let data = cache.get (key); if (!data) { data = parameters ? flat ? localRig ? module.CreateFefcoFoldRig (parameters, profile) : module.UnfoldFefco (parameters, profile) : module.CreateFefcoBox (parameters, profile) : module.CreateBoard (profile, { textured : true }); cache.set (key, data); }
+        const key = PackagingDataKey (profile, parameters, flat, localRig);
+        const data = CachedPackagingData (key, () => parameters ? flat ? localRig ? module.CreateFefcoFoldRig (parameters, profile) : module.UnfoldFefco (parameters, profile) : module.CreateFefcoBox (parameters, profile) : module.CreateBoard (profile, { textured : true }));
         ApplyPackagingPresentation (object.threeObject, data, unit, materials, false, geometryCache);
     }
 }

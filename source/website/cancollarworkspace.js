@@ -1,4 +1,5 @@
 import { DropIn } from './dropin.js';
+import { ProgressRecord, ShowProgressPopup, NextFrame } from './progresspopup.js';
 import { SenseCanRim, CanRadiusInSlab, CreateCanCollarPlan, CollarBoards, CollarStandards, DefaultCollarOptions, MaxCollarCans, CollarNeckClearanceMm } from '../../modules/packaging/src/cancollar.js';
 import { LoadPackagingModule, PackagingUnitMM } from './packagingadapter.js';
 import { AddBoardPiece, AccessoryData } from './accessoriesworkspace.js';
@@ -24,7 +25,8 @@ export class CanCollarWorkspace
         return { ...options, board, automaticTuck : !Object.hasOwn (input, 'tuckMm'), explicitFit : ['tuckMm', 'reliefMm', 'tabs', 'notchWidthMm'].some (key => Object.hasOwn (input, key) && input[key] !== DefaultCollarOptions[key]) };
     }
     // The selected cans, each with its sensed rim in world mm.
-    Cans ()
+    // The selected cans (checked), without sensing them yet.
+    Selection ()
     {
         const editor = this.editor, document = editor.document, primary = editor.selected;
         if (!primary || !document.objects.includes (primary)) { throw new Error ('Select a group or array of cans for the collar.'); }
@@ -38,23 +40,35 @@ export class CanCollarWorkspace
         if (objects.length > MaxCollarCans) { throw new Error ('A can collar holds up to ' + MaxCollarCans + ' cans.'); }
         if (objects.some (object => object.animationAsset || object.keyframes?.length || object.hiddenParts?.length)) { throw new Error ('The collar needs complete static can models. Remove animation or hidden parts first.'); }
         const factor = PackagingUnitMM[document.model.GetUnit ()]; if (!factor) { throw new Error ('This scene has no units. Set the model units (Auto Pack: Refresh bounds) before adding a collar.'); }
-        const cans = objects.map (object => {
-            document.ApplyTransform (object);
-            const points = []; let count = 0;
-            document.CompactModel ([object]).EnumerateTriangleVertices ((...vertices) => {
-                for (const p of vertices) { if (++count > MaxPointsPerCan * 3) { throw new Error ('Simplify ' + object.name + ' below ' + (MaxPointsPerCan).toLocaleString () + ' triangles before adding a collar.'); } points.push (p.x * factor, p.y * factor, p.z * factor); }
-            });
-            try {
-                const rim = SenseCanRim (points), triangles = [], low = rim.rimBottomMm - Math.max (...CollarBoards.map (b => b.caliperMm)) - 1 - CollarNeckClearanceMm;
-                for (let i = 0; i < points.length; i += 9) { if (Math.min (points[i + 1], points[i + 4], points[i + 7]) <= rim.rimBottomMm && Math.max (points[i + 1], points[i + 4], points[i + 7]) >= low) { triangles.push (...points.slice (i, i + 9)); } }
-                return { object, rim, triangles };
-            }
-            catch (error) { throw new Error (object.name + ': ' + error.message); }
+        return { document, factor, objects };
+    }
+    // One can's rim, from its surface in world mm, and the triangles near the collar slab.
+    SenseCan (document, object, factor)
+    {
+        document.ApplyTransform (object);
+        const points = []; let count = 0;
+        document.CompactModel ([object]).EnumerateTriangleVertices ((...vertices) => {
+            for (const p of vertices) { if (++count > MaxPointsPerCan * 3) { throw new Error ('Simplify ' + object.name + ' below ' + (MaxPointsPerCan).toLocaleString () + ' triangles before adding a collar.'); } points.push (p.x * factor, p.y * factor, p.z * factor); }
         });
+        try {
+            const rim = SenseCanRim (points), triangles = [], low = rim.rimBottomMm - Math.max (...CollarBoards.map (b => b.caliperMm)) - 1 - CollarNeckClearanceMm;
+            for (let i = 0; i < points.length; i += 9) { if (Math.min (points[i + 1], points[i + 4], points[i + 7]) <= rim.rimBottomMm && Math.max (points[i + 1], points[i + 4], points[i + 7]) >= low) { triangles.push (...points.slice (i, i + 9)); } }
+            return { object, rim, triangles, vertices : count };
+        }
+        catch (error) { throw new Error (object.name + ': ' + error.message); }
+    }
+    Combine ({ document, factor }, cans)
+    {
         const rims = cans.map (can => can.rim.rimRadiusMm), bottoms = cans.map (can => can.rim.rimBottomMm);
         if (Math.max (...rims) - Math.min (...rims) > 0.5) { throw new Error ('The cans have different rim sizes. A collar holds cans of one size.'); }
         if (Math.max (...bottoms) - Math.min (...bottoms) > 1) { throw new Error ('The cans stand at different heights. Set them on the same floor first.'); }
         return { document, factor, cans, rimRadiusMm : Math.max (...rims), rimBottomMm : Math.min (...bottoms) };
+    }
+    // The selected cans, each with its sensed rim in world mm.
+    Cans ()
+    {
+        const selection = this.Selection ();
+        return this.Combine (selection, selection.objects.map (object => this.SenseCan (selection.document, object, selection.factor)));
     }
     // Universal design for these cans: a named standard, or for 'auto' the standard whose rim range fits.
     Design (c, options)
@@ -104,8 +118,30 @@ export class CanCollarWorkspace
     async Add (input = {})
     {
         this.packaging.Editable (); const editor = this.editor; if (editor.busy) { throw new Error ('Wait for the current operation to finish.'); }
-        const options = this.Options (input), c = this.Cans (), plan = this.Plan (c, options), target = c.document;
+        const options = this.Options (input), selection = this.Selection (), target = selection.document;
         if (target.objects.length + 1 > 1000) { throw new Error ('Session is near the 1000 object limit.'); }
+        // Every step reports to the progress popup and yields so it can paint; weights follow measured step times.
+        const record = new ProgressRecord ('Can collar', [
+            { id : 'sense', label : 'Sensing can rims', weight : 6 },
+            { id : 'plan', label : 'Planning collar and tabs', weight : 2 },
+            { id : 'board', label : 'Building board geometry', weight : 50 },
+            { id : 'scene', label : 'Placing in the scene', weight : 24 },
+            { id : 'drop', label : 'Lowering onto the cans', weight : 18 }
+        ]);
+        this.lastProgress = record; const popup = ShowProgressPopup (record);
+        editor.busy = true; editor.RefreshButtons?.();
+        let c, plan;
+        try {
+            const sensed = [], n = selection.objects.length; record.Step ('sense', { detail : '0 / ' + n + ' cans' }); await NextFrame ();
+            for (const object of selection.objects) {
+                const can = this.SenseCan (target, object, selection.factor); sensed.push (can);
+                record.Step ('sense', { detail : sensed.length + ' / ' + n + ' cans · rim Ø ' + (2 * can.rim.rimRadiusMm).toFixed (1) + ' mm', fraction : sensed.length / n }); await NextFrame ();
+            }
+            c = this.Combine (selection, sensed);
+            record.Step ('plan', { detail : 'neck clearance through the board' }); await NextFrame ();
+            plan = this.Plan (c, options);
+            record.Step ('plan', { detail : (plan.standard ? plan.standard.name + ' universal' : 'custom fit') + ' · ' + plan.tabs + ' tabs per can', fraction : 1 });
+        } catch (error) { record.Fail (error.message); editor.busy = false; editor.RefreshButtons?.(); throw error; }
         const owner = editor.website.auth?.user?.id, cans = c.cans.map (can => can.object), primary = cans.includes (editor.selected) ? editor.selected : cans[0];
         const unchanged = () => { if (editor.document !== target || editor.website.auth?.user?.id !== owner || editor.website.accountReady === false || editor.readOnly || cans.some (can => !target.objects.includes (can))) { throw new Error ('The session changed while adding the collar.'); } };
         // The collar joins the cans' group (or a new one), so it moves and selects with them.
@@ -114,18 +150,18 @@ export class CanCollarWorkspace
         const before = new Map (cans.map (can => [can, { ...(can.userData || {}) }]));
         const material = { name : options.board.name, caliperMm : options.board.caliperMm };
         const index = target.objects.length; let collar = null, dropIn = { animated : false };
-        editor.busy = true; editor.RefreshButtons?.();
         try {
+            record.Step ('board', { detail : plan.points + ' dieline points · ' + c.cans.length + ' tabbed holes' }); await NextFrame ();
             const module = await LoadPackagingModule (); unchanged ();
             // Keep a small axial gap below the rim; the full board slab and tab chords clear each neck.
             const min = [plan.worldMinMm[0], plan.topMm - plan.thicknessMm, plan.worldMinMm[1]];
             collar = AddBoardPiece (module, target, plan.profile, material, { upright : false, runsAlongX : true, min }, c.factor, plan.profile.name, 'Accessory · can collar');
             collar.userData = { ...group, [AccessoryKey] : JSON.stringify ({ version : 1, kind : 'collar', canIds : cans.map (can => can.id), design : plan.standard?.id || 'custom', boardId : options.board.id, boardName : options.board.name, thicknessMm : plan.thicknessMm, rimRadiusMm : plan.rimRadiusMm, holeRadiusMm : plan.holeRadiusMm, reliefRadiusMm : plan.reliefRadiusMm, tuckMm : plan.tuckMm, tabs : plan.tabs }) };
             cans.forEach (can => { can.userData = { ...can.userData, ...group }; });
-            unchanged ();
+            unchanged (); record.Step ('scene', { detail : 'rendering the collar with the cans' }); await NextFrame ();
             // Hidden through the rebuild, then lowered onto the cans like the other accessories.
             editor.motionOverride = () => { if (collar.threeObject) { collar.threeObject.visible = false; } };
-            try { editor.selected = primary; await editor.Render?.(); editor.busy = true; unchanged (); dropIn = await DropIn (editor, [collar], c.factor, { data : AccessoryData, easing : editor.website.preferences?.motionEasing || 'smooth' }); }
+            try { editor.selected = primary; await editor.Render?.(); editor.busy = true; unchanged (); record.Step ('drop', { detail : 'tabs tuck under the rims' }); dropIn = await DropIn (editor, [collar], c.factor, { data : AccessoryData, easing : editor.website.preferences?.motionEasing || 'smooth', onProgress : fraction => record.Step ('drop', { detail : 'tabs tuck under the rims', fraction }) }); }
             finally { editor.motionOverride = null; if (collar.threeObject) { collar.threeObject.visible = collar.visible !== false; collar.threeObject.position?.fromArray?.(collar.position); } }
             unchanged ();
             const after = new Map (cans.map (can => [can, { ...can.userData }]));
@@ -136,12 +172,14 @@ export class CanCollarWorkspace
             };
             editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); editor.MarkDirty?.();
         } catch (error) {
+            record.Fail (error.message);
             if (collar) { target.Remove (collar); } before.forEach ((data, can) => { can.userData = { ...data }; });
             if (editor.document === target) { editor.selected = primary; try { await editor.Render?.(); } catch { /* Keep the original failure. */ } }
             throw error;
         } finally { editor.busy = false; editor.RefreshButtons?.(); editor.website.packagingPanel?.Refresh?.(); }
         const { profile, ...summary } = plan;
-        return { objectId : collar.id, canIds : cans.map (can => can.id), units : 'mm', board : options.board.name, collar : { ...summary, profile : profile.name }, dropIn,
-            message : 'Added a ' + cans.length + '-can collar (' + Number (plan.sizeMm.length.toFixed (1)) + ' × ' + Number (plan.sizeMm.width.toFixed (1)) + ' mm, ' + options.board.name + ') with ' + plan.tabs + ' tabs per can and ' + Number (plan.tuckMm.toFixed (3)) + ' mm tuck below the rims. Flat fit clears the necks; tab bending during application is not simulated. Undo removes it.' };
+        const message = 'Added a ' + cans.length + '-can collar (' + Number (plan.sizeMm.length.toFixed (1)) + ' × ' + Number (plan.sizeMm.width.toFixed (1)) + ' mm, ' + options.board.name + ') with ' + plan.tabs + ' tabs per can and ' + Number (plan.tuckMm.toFixed (3)) + ' mm tuck below the rims. Flat fit clears the necks; tab bending during application is not simulated. Undo removes it.';
+        record.Done (message); void popup;
+        return { objectId : collar.id, canIds : cans.map (can => can.id), units : 'mm', board : options.board.name, collar : { ...summary, profile : profile.name }, dropIn, progress : record.Inspect (), message };
     }
 }

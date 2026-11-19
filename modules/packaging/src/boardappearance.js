@@ -12,9 +12,35 @@ export function BoardAppearanceMesh (mesh, profile, polygon = null)
     // A die-cut shoulder deforms both liner faces. Bound the deformation to
     // less than half the caliper so even maximum compression retains an edge.
     const radius = Math.min (t * .49, Math.min (t * .9, Math.min (width, height) * .03) * settings.cutCompression);
+    // Edge distances only matter near the edges: the pin is flat beyond ~6 calipers (1 − e^-36) and cut
+    // compression acts within `radius`. A uniform grid of edges answers each query from nearby cells only,
+    // giving the same field as testing every edge (dielines with many holes have thousands of edges).
+    const reach = Math.max (6 * t, radius, 1e-6), cell = Math.max (reach, Math.max (width, height) / 256), columns = Math.max (1, Math.ceil (width / cell) + 1), grid = new Map ();
+    const cellOf = (x, z) => [Math.floor ((x - minX) / cell), Math.floor ((z - minZ) / cell)];
+    edges.forEach ((edge, index) => {
+        edge.index = index; const [x0, z0] = cellOf (Math.min (edge.a[0], edge.b[0]), Math.min (edge.a[2], edge.b[2])), [x1, z1] = cellOf (Math.max (edge.a[0], edge.b[0]), Math.max (edge.a[2], edge.b[2]));
+        for (let i = x0; i <= x1; i++) { for (let j = z0; j <= z1; j++) { const key = j * columns + i; if (!grid.has (key)) { grid.set (key, []); } grid.get (key).push (edge); } }
+    });
+    const span = Math.ceil (reach / cell);
+    const neighbourhoods = new Map ();
+    const near = (x, z) => {
+        const [cx, cz] = cellOf (x, z), key = cz * columns + cx; let found = neighbourhoods.get (key);
+        if (!found) {
+            const set = new Set ();
+            for (let i = cx - span; i <= cx + span; i++) { for (let j = cz - span; j <= cz + span; j++) { if (i < 0 || j < 0 || i >= columns) { continue; } for (const edge of grid.get (j * columns + i) || []) { set.add (edge); } } }
+            found = [...set]; neighbourhoods.set (key, found);
+        }
+        return found;
+    };
+    const distances = (x, z) => {
+        let all = Infinity, cut = Infinity;
+        for (const edge of near (x, z)) { const d = distance (x, z, edge.a, edge.b); if (d < all) { all = d; } if (!edge.score && d < cut) { cut = d; } }
+        return { all, cut };
+    };
+    const centres = new Map (boundaries.map (boundary => [boundary.points, boundary.points.reduce ((sum, point) => [sum[0] + point[0] / boundary.points.length, sum[1] + point[2] / boundary.points.length], [0, 0])]));
     const field = (x, z, side) => {
         const u = Math.max (0, Math.min (1, (x - minX) / (width || 1))), v = Math.max (0, Math.min (1, (z - minZ) / (height || 1)));
-        const all = Math.min (...edges.map (edge => distance (x, z, edge.a, edge.b))); const cut = Math.min (...edges.filter (edge => !edge.score).map (edge => distance (x, z, edge.a, edge.b)));
+        const { all, cut } = distances (x, z);
         const pin = Math.pow (1 - Math.exp (-Math.pow (all / Math.max (t, 1e-6), 2)), 2);
         const variation = 1 + .14 * Math.sin ((x * Math.cos (angle) + z * Math.sin (angle)) / 53);
         const bow = amplitude * Math.pow (Math.sin (Math.PI * u) * Math.sin (Math.PI * v), 2) * pin * variation;
@@ -28,8 +54,8 @@ export function BoardAppearanceMesh (mesh, profile, polygon = null)
         weights.forEach ((weight, i) => { const point = mesh.vertices[triangle.vertices[i]], texture = mesh.uvs[triangle.uvs[i]], n = mesh.normals[triangle.normals[i]]; p.forEach ((_, k) => { p[k] += point[k] * weight; }); uv.forEach ((_, k) => { uv[k] += texture[k] * weight; }); normal.addScaledVector (new Vector3 (...n), weight); });
         const side = p[1] > t / 2; const originalY = p[1]; const blend = originalY / t; p[1] += field (p[0], p[2], false) * (1 - blend) + field (p[0], p[2], true) * blend;
         if (Math.abs (normal.y) > .9) { const e = Math.max (1e-5, t * .0001); const dx = (field (p[0] + e, p[2], side) - field (p[0] - e, p[2], side)) / (2 * e), dz = (field (p[0], p[2] + e, side) - field (p[0], p[2] - e, side)) / (2 * e); normal.set (-dx, 1, -dz).multiplyScalar (side ? 1 : -1);
-            const nearest = edges.filter (edge => !edge.score && distance (p[0], p[2], edge.a, edge.b) < e);
-            if (radius > 0 && nearest.length) { const inward = new Vector3 (); for (const edge of nearest) { const centre = edge.points.reduce ((sum, point) => [sum[0] + point[0] / edge.points.length, sum[1] + point[2] / edge.points.length], [0, 0]); const direction = new Vector3 (edge.b[0] - edge.a[0], 0, edge.b[2] - edge.a[2]).normalize (); const n = new Vector3 (-direction.z, 0, direction.x); if (n.dot (new Vector3 (centre[0] - edge.a[0], 0, centre[1] - edge.a[2])) < 0) { n.negate (); } if (edge.hole) { n.negate (); } inward.add (n); } inward.normalize (); normal.set (-inward.x * 100, 1, -inward.z * 100).multiplyScalar (side ? 1 : -1); } }
+            const nearest = near (p[0], p[2]).filter (edge => !edge.score && distance (p[0], p[2], edge.a, edge.b) < e).sort ((a, b) => a.index - b.index);
+            if (radius > 0 && nearest.length) { const inward = new Vector3 (); for (const edge of nearest) { const centre = centres.get (edge.points); const direction = new Vector3 (edge.b[0] - edge.a[0], 0, edge.b[2] - edge.a[2]).normalize (); const n = new Vector3 (-direction.z, 0, direction.x); if (n.dot (new Vector3 (centre[0] - edge.a[0], 0, centre[1] - edge.a[2])) < 0) { n.negate (); } if (edge.hole) { n.negate (); } inward.add (n); } inward.normalize (); normal.set (-inward.x * 100, 1, -inward.z * 100).multiplyScalar (side ? 1 : -1); } }
         const index = result.vertices.length; result.vertices.push (p); result.normals.push (normal.normalize ().toArray ()); result.uvs.push (uv); return index;
     };
     for (const triangle of mesh.triangles) {

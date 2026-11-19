@@ -1,0 +1,21 @@
+/* Shared progress popup over the main viewer (can collar and other multi-step modelling operations). */
+.progress_popup { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 30; width: min(380px, calc(100% - 32px)); box-sizing: border-box; padding: 12px 14px; border: 1px solid var(--ov_border_color); border-radius: 10px; background: var(--ov_dialog_background_color, var(--ov_background_color)); color: var(--ov_dialog_foreground_color, var(--ov_foreground_color)); box-shadow: 0 8px 28px rgba(0, 0, 0, .18); font-size: var(--workspace-help-font-size, 13px); pointer-events: auto; }
+.progress_popup_head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+.progress_popup_percent { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ov_button_color); }
+.progress_popup_bar { height: 6px; border-radius: 3px; background: var(--ov_border_color); overflow: hidden; }
+.progress_popup_bar > div { height: 100%; width: 0; background: var(--ov_button_color); transition: width .15s ease-out; }
+.progress_popup[data-state="failed"] .progress_popup_bar > div { background: #d44; }
+.progress_popup_steps { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 4px; }
+.progress_popup_steps li { display: grid; grid-template-columns: 14px 1fr auto; column-gap: 8px; row-gap: 0; align-items: baseline; margin: 0; padding: 0; line-height: 1.35; opacity: .55; }
+.progress_popup_steps li > span { margin: 0; padding: 0; }
+.progress_popup_steps li[data-state="active"], .progress_popup_steps li[data-state="done"], .progress_popup_steps li[data-state="failed"] { opacity: 1; }
+.progress_popup_steps li > .progress_popup_label { min-width: 0; }
+.progress_popup_steps li > .progress_popup_detail { grid-column: 2; font-size: var(--workspace-meta-font-size, 12px); opacity: .75; }
+.progress_popup_steps li > .progress_popup_detail:empty { display: none; }
+.progress_popup_steps li > .progress_popup_time { grid-column: 3; grid-row: 1; font-variant-numeric: tabular-nums; font-size: var(--workspace-meta-font-size, 12px); opacity: .8; }
+.progress_popup_mark::before { content: '○'; }
+.progress_popup_steps li[data-state="active"] .progress_popup_mark::before { content: '●'; color: var(--ov_button_color); }
+.progress_popup_steps li[data-state="done"] .progress_popup_mark::before { content: '✓'; color: #2a9d5c; }
+.progress_popup_steps li[data-state="failed"] .progress_popup_mark::before { content: '✕'; color: #d44; }
+.progress_popup_message { margin: 8px 0 0; font-size: var(--workspace-meta-font-size, 12px); }
+.progress_popup_message:empty { display: none; }
