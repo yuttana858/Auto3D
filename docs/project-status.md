@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Private alternative-reader proof transport — Auto3D 0.90.1 (2026-11-18)
+
+Packaging 1.16.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0 unchanged. Adds a short-lived operator-only read capability so a retained failed Parasolid can go directly from private R2 to an isolated Modal proof. No retries, retention or model-publication changes. Based on main 0.90.0; PR/CI/deployment pending. See [release-0901.md](release-0901.md).
+
 ## Auto Pack assembly sequence, motion easing, Assign facing — Auto3D 0.90.0 / Packaging 1.16.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0 (2026-11-18)
 
 Candidate on `claude/dazzling-faraday-rhti3h`, not deployed. Auto Pack plays the real packing order (lift, erect with lid open 90°, pads, partitions, products one at a time with acceleration for large counts, top pad, close) as one Undo step; Accessories pads and partitions drop in; automatic modelling motion ramps in and out with the new Motion easing preference (Smooth default, Strong, Linear); Assign facing joins the Model spec preview buttons. New commands: `packaging.auto.sequence.inspect`, `preferences.motion_easing`, `object.facing.*` (394 commands). See docs/release-0900.md.
