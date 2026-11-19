@@ -1,4 +1,5 @@
 import { ArrayRevealTiming } from './arrayreveal.js';
+import { MotionEasings } from '../../modules/packaging/src/easing.js';
 
 // Build native transform and visibility tracks for existing copies; nothing is created or removed.
 export function ScheduleArrayReveal (editor, { objectIds, time = editor.timeline.time, duration = 4, dropHeight = 1 } = {})
@@ -8,9 +9,10 @@ export function ScheduleArrayReveal (editor, { objectIds, time = editor.timeline
     if (!Array.isArray (objectIds) || !objectIds.length || objectIds.length > 999 || new Set (objectIds).size !== objectIds.length || !Number.isFinite (time) || time < 0 || !Number.isFinite (duration) || duration < 1 || duration > 15 || time + duration > 3600 || !Number.isFinite (dropHeight) || dropHeight <= 0 || dropHeight > 1000000) { throw new Error ('Choose 1–999 objects, a 1–15 second duration and a positive drop distance.'); }
     const objects = objectIds.map (id => document.objects.find (item => item.id === id));
     if (objects.some (item => !item || !item.threeObject || item.visible === false || item.keyframes?.length || item.visibilityKeys?.length || item.userData?._auto3dFoldPreview !== undefined || editor.packaging?.presentation?.records?.get (item.id)?.preview?.visible || timeline.actions.some (action => action.objectId === item.id))) { throw new Error ('Use visible objects without existing motion, visibility or fold tracks.'); }
+    const motionEasing = editor.website.preferences?.motionEasing || 'smooth'; if (!MotionEasings.includes (motionEasing)) { throw new Error ('Choose a supported motion easing.'); }
     const before = timeline.Serialize (), positions = objects.map (item => [...item.position]), tracks = objects.map ((object, index) => {
         const timing = ArrayRevealTiming (index, objects.length), begin = time + duration * timing.start, end = begin + duration * timing.duration;
-        const top = [...object.position]; top[1] += dropHeight; const frame = (at, position) => ({ id : crypto.randomUUID (), time : at, interpolation : 'smooth', position : [...position], rotation : [...object.rotation], scale : [...object.scale] });
+        const top = [...object.position]; top[1] += dropHeight; const frame = (at, position) => ({ id : crypto.randomUUID (), time : at, interpolation : motionEasing === 'linear' ? 'linear' : 'smooth', motionEasing, position : [...position], rotation : [...object.rotation], scale : [...object.scale] });
         return { motion : [frame (0, top), frame (begin, top), frame (end, object.position)], visibility : [{ id : crypto.randomUUID (), time : 0, visible : false }, { id : crypto.randomUUID (), time : begin, visible : true }] };
     });
     const apply = forward => {

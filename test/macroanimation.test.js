@@ -4,6 +4,8 @@ import { RecordMacroAnimation } from '../source/website/macroanimation.js';
 import { SessionTimeline } from '../source/website/sessiontimeline.js';
 import { TimelineFoldSample } from '../source/website/timelineactions.js';
 import { TimelineClipSample } from '../source/website/timelineclips.js';
+import { SceneHistory } from '../source/website/scenedocument.js';
+import { CreateAgentCommands } from '../source/website/agentcommands.js';
 
 describe ('Macro animation recording', () => {
     function fixture () {
@@ -29,6 +31,14 @@ describe ('Macro animation recording', () => {
         const { editor, registry, object } = fixture (); const lighting = { ambient : 0.4, environment : 'studio' }; editor.website.lightingPanel = { Capture : () => structuredClone (lighting) };
         const macro = { version : 1, steps : [{ id : 'move', command : 'object.transform', arguments : { x : 4 }, animation : { duration : 1, pauseAfter : 2 } }, { id : 'camera', command : 'camera.fov', arguments : { fov : 60 }, animation : { duration : 3 } }] };
         const result = await RecordMacroAnimation (editor, registry, macro); assert.equal (result.duration, 6); assert.deepEqual (object.keyframes.map (key => key.time), [0, 1, 3, 6]); assert.equal (editor.timeline.ObjectStateAt (object, 2).position[0], 4); assert.deepEqual (editor.website.lightingPanel.Capture (), lighting); assert.equal (result.completed[1].start, 3);
+    });
+    it ('records a named shared-library macro with its saved timing metadata', async () => {
+        const { editor, object } = fixture (); editor.website.sessionEditor = editor; const names = [];
+        const macro = { version : 1, steps : [{ id : 'move', command : 'object.transform', arguments : { objectId : object.id, position : [4, 0, 0] }, animation : { duration : 0.5, pauseAfter : 1 } }] };
+        editor.website.macroLibrary = { Find : async name => { names.push (name); return { name, macro, location : 'shared' }; } };
+        const registry = CreateAgentCommands (editor.website); registry.commands.get ('object.transform').handler = ({ position }) => { object.position = position; return { id : object.id }; };
+        const result = await registry.Execute ('animation.macro.record', { name : 'Shared timed move' });
+        assert.equal (result.ok, true, JSON.stringify (result)); assert.equal (result.result.recorded, true); assert.equal (result.result.duration, 1.5); assert.deepEqual (names, ['Shared timed move']); assert.deepEqual (object.keyframes.map (key => key.time), [0, 0.5, 1.5]);
     });
     it ('validates timing before executing the macro', async () => {
         const { editor, registry, object } = fixture (); const macro = { version : 1, steps : [{ id : 'move', command : 'object.transform', arguments : { x : 4 }, animation : { duration : -1 } }] };
@@ -66,5 +76,28 @@ describe ('Macro animation recording', () => {
     it ('does not overwrite an authored timeline and removes partial recording after a step fails', async () => {
         const { editor, registry, object } = fixture (); const macro = { version : 1, steps : [{ id : 'move', command : 'object.transform', arguments : { x : 4 } }, { id : 'bad', command : 'camera.fov', arguments : { fov : 45 } }] }; object.keyframes.push ({ time : 0 }); await assert.rejects (RecordMacroAnimation (editor, registry, macro), /empty/); object.keyframes = [];
         registry.commands.get ('camera.fov').handler = () => { throw new Error ('Camera failed'); }; const result = await RecordMacroAnimation (editor, registry, macro); assert.equal (result.recorded, false); assert.equal (result.failedStep, 'bad'); assert.equal (object.position[0], 4); assert.equal (object.keyframes.length, 0); assert.equal (editor.timeline.cameraKeyframes.length, 0);
+    });
+    it ('makes a recording one Undo step that reverses the keyframes and the macro changes', async () => {
+        const { editor, registry, object } = fixture (); editor.history = new SceneHistory ();
+        registry.commands.get ('object.transform').handler = ({ x }) => { const before = object.position; object.position = [x, 0, 0]; const after = object.position; editor.history.Push ({ undo : () => { object.position = before; }, redo : () => { object.position = after; } }); return { id : object.id }; };
+        const result = await RecordMacroAnimation (editor, registry, { version : 1, steps : [{ id : 'a', command : 'object.transform', arguments : { x : 4 } }, { id : 'b', command : 'object.transform', arguments : { x : 6 } }] }, 1);
+        editor.timeline.Seek = () => {}; // Viewer posing is covered by the browser test; this checks the history entry.
+        assert.equal (result.recorded, true); assert.equal (editor.history.undo.length, 1); assert.equal (editor.history.undo[0].macroRecording, true);
+        await editor.history.Undo (); assert.deepEqual (object.position, [0, 0, 0]); assert.equal (object.keyframes.length, 0); assert.equal (editor.timeline.cameraKeyframes.length, 0);
+        await editor.history.Redo (); assert.deepEqual (object.position, [6, 0, 0]); assert.deepEqual (object.keyframes.map (k => k.time), [0, 1, 2]);
+    });
+    it ('keeps timed visibility and holds together with scene changes in one Undo entry', async () => {
+        const { editor, registry, object } = fixture (); editor.history = new SceneHistory (); object.visible = true;
+        registry.commands.get ('object.transform').handler = ({ x }) => { const before = [...object.position], after = [x, 0, 0]; object.position = after; editor.history.Push ({ undo : () => { object.position = before; }, redo : () => { object.position = after; } }); return { id : object.id }; };
+        registry.commands.get ('object.visibility').handler = ({ visible }) => { const before = object.visible; object.visible = visible; editor.history.Push ({ undo : () => { object.visible = before; }, redo : () => { object.visible = visible; } }); return { id : object.id }; };
+        const macro = { version : 1, steps : [{ id : 'move', command : 'object.transform', arguments : { x : 4 }, animation : { duration : 1, pauseAfter : 2 } }, { id : 'hide', command : 'object.visibility', arguments : { visible : false }, animation : { duration : 0.5, pauseAfter : 0.5 } }] };
+        const result = await RecordMacroAnimation (editor, registry, macro);
+        assert.equal (result.recorded, true); assert.equal (result.duration, 4); assert.equal (editor.history.undo.length, 1);
+        assert.deepEqual (object.keyframes.map (key => key.time), [0, 1, 3, 3.5, 4]);
+        assert.deepEqual (object.visibilityKeys.map (key => [key.time, key.visible]), [[0, true], [3.5, false]]);
+        editor.timeline.Seek = () => {};
+        await editor.history.Undo (); assert.deepEqual (object.position, [0, 0, 0]); assert.equal (object.visible, true); assert.deepEqual (object.visibilityKeys, []); assert.deepEqual (object.keyframes, []);
+        await editor.history.Redo (); assert.deepEqual (object.position, [4, 0, 0]); assert.equal (object.visible, false);
+        assert.deepEqual (object.keyframes.map (key => key.time), [0, 1, 3, 3.5, 4]); assert.deepEqual (object.visibilityKeys.map (key => [key.time, key.visible]), [[0, true], [3.5, false]]);
     });
 });

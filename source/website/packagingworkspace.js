@@ -2,6 +2,7 @@ import { AssertAutoPackPlacement, AutoPackMotionGuard, AutoPackTopState, GuardAu
 import { AutoPackWorkspace } from './autopackworkspace.js';
 import { AutoPalletWorkspace } from './autopalletworkspace.js';
 import { AccessoriesWorkspace } from './accessoriesworkspace.js';
+import { CanCollarWorkspace } from './cancollarworkspace.js';
 import { AccountBoardDatabase } from './boarddatabase.js';
 import { ValidateBoardAppearance } from '../../modules/packaging/src/appearancesettings.js';
 import { FoldPresentation, BaseFoldPose } from './foldpresentation.js';
@@ -15,6 +16,8 @@ import { FefcoDimensions, ResolveFefcoDimensions } from '../../modules/packaging
 import { Sphere } from 'three';
 import { LoadPackagingModule, PackagingModel, FefcoSurfaces, ApplyFefcoFoldPose, BoardAppearanceMaterialChanges, PreparePackagingPresentations, ApplyPackagingPresentation } from './packagingadapter.js';
 import { FoldMotionProgress, FoldCameraFrame, CameraBottomInset, VisibleBounds } from './foldcamera.js';
+import { EaseMotion } from '../../modules/packaging/src/easing.js';
+import { FilletPolygon, CircleOutline, ReliefHoleOutline } from '../../modules/packaging/src/cadshapes.js';
 import { ApplyCameraState } from './sessiontimeline.js';
 
 
@@ -24,9 +27,9 @@ function Element (tag, parent, text, className)
 }
 export class PackagingWorkspace
 {
-    constructor (editor) { this.editor = editor; this.autoPack = new AutoPackWorkspace (this); this.autoPallet = new AutoPalletWorkspace (this); this.accessories = new AccessoriesWorkspace (this); this.presentation = new FoldPresentation (editor); this.dialog = null; this.refreshing = false; this.draft = []; this.active = null; this.selectedPaths = new Set (); this.cadTool = 'select'; this.cadFace = 'inside'; this.creaseProcess = { kind : 'crease' }; this.linkedObjectId = null; this.draftType = 'cut'; this.gridSnapMM = 5; this.displayFactor = 1; this.view = { x : -20, y : -220, width : 340, height : 240 }; }
+    constructor (editor) { this.editor = editor; this.autoPack = new AutoPackWorkspace (this); this.autoPallet = new AutoPalletWorkspace (this); this.accessories = new AccessoriesWorkspace (this); this.canCollar = new CanCollarWorkspace (this); this.presentation = new FoldPresentation (editor); this.dialog = null; this.refreshing = false; this.draft = []; this.active = null; this.selectedPaths = new Set (); this.cadTool = 'select'; this.cadFace = 'inside'; this.creaseProcess = { kind : 'crease' }; this.linkedObjectId = null; this.draftType = 'cut'; this.gridSnapMM = 5; this.displayFactor = 1; this.view = { x : -20, y : -220, width : 340, height : 240 }; }
     Design () { return this.editor.document.packaging || NewPackagingDesign (); }
-    PanelHost () { return { autoInspect : options => this.autoPack.Inspect (options || null), autoPack : options => this.autoPack.Generate (options || {}), autoStyles : () => this.autoPack.Styles (), autoStyle : code => this.autoPack.SetStyle (code), autoRefresh : options => this.autoPack.RefreshBounds (options || {}), autoTop : () => AutoPackTopState (this.editor.selected), toggleTop : () => this.ToggleTop (), palletInspect : options => this.autoPallet.Inspect (options), accessoriesInspect : options => this.accessories.Inspect (options), accessoryBoards : () => this.accessories.Boards (), addPads : options => this.accessories.AddPads (options), addPartitions : options => this.accessories.AddPartitions (options), autoPallet : options => this.autoPallet.Generate (options), boards : () => this.BoardInspect (), generationBoard : () => this.generationBoard?.id || null, generationBasis : () => this.generationBasis || 'inside', setGenerationBasis : basis => this.SetGenerationBasis (basis), convertGenerationBasis : changes => this.ConvertGenerationBasis (changes), selectBoard : (id, target) => this.SelectBoard (id, target), boardEditor : () => this.OpenBoardDatabase (), appearance : () => this.AppearanceInspect (), updateAppearance : changes => this.UpdateAppearance (changes), dimensions : () => this.DimensionsInspect (), updateBoardDirection : degrees => this.UpdateBoardDirection (degrees), dimensionMode : basis => this.DimensionMode (basis), updateDimensions : changes => this.UpdateDimensions (changes), dimensionsBlocked : () => this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false || this.editor.busy && !this.dimensionUpdating, inspect : () => this.FefcoInspect (), configure : changes => this.ConfigureFefco (changes), generate : changes => this.GenerateFefco (changes), preset : (code, changes) => this.GeneratePreset (code, changes), designer : () => this.OpenSelected (), measurements : () => { this.OpenSelected (); return this.OpenMeasurements (); }, unfold : () => this.UnfoldSelected (), scrub : (progress, commit) => this.SetFoldScrub (progress, commit), scrubInspect : () => this.FoldScrubInspect (), animate : () => this.AnimateFold (), toggleFold : () => this.ToggleFold (), playbackBlocked : () => this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false, animation : () => this.AnimationInspect (), playback : () => this.FoldInspect (), control : action => this.FoldControl (action), canAnimate : () => Boolean (this.editor.selected?.userData?._auto3dFefco), factor : () => this.Factor (), run : action => this.editor.Run (action), blocked : () => this.editor.busy || this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false, canUnfold : () => this.CanUnfold () }; }
+    PanelHost () { return { autoInspect : options => this.autoPack.Inspect (options || null), autoPack : options => this.autoPack.Generate (options || {}), autoStyles : () => this.autoPack.Styles (), autoStyle : code => this.autoPack.SetStyle (code), autoRefresh : options => this.autoPack.RefreshBounds (options || {}), autoTop : () => AutoPackTopState (this.editor.selected), toggleTop : () => this.ToggleTop (), palletInspect : options => this.autoPallet.Inspect (options), accessoriesInspect : options => this.accessories.Inspect (options), accessoryBoards : () => this.accessories.Boards (), addPads : options => this.accessories.AddPads (options), addPartitions : options => this.accessories.AddPartitions (options), collarInspect : options => this.canCollar.Inspect (options || {}), addCollar : options => this.canCollar.Add (options || {}), autoPallet : options => this.autoPallet.Generate (options), boards : () => this.BoardInspect (), generationBoard : () => this.generationBoard?.id || null, generationBasis : () => this.generationBasis || 'inside', setGenerationBasis : basis => this.SetGenerationBasis (basis), convertGenerationBasis : changes => this.ConvertGenerationBasis (changes), selectBoard : (id, target) => this.SelectBoard (id, target), boardEditor : () => this.OpenBoardDatabase (), appearance : () => this.AppearanceInspect (), updateAppearance : changes => this.UpdateAppearance (changes), dimensions : () => this.DimensionsInspect (), updateBoardDirection : degrees => this.UpdateBoardDirection (degrees), dimensionMode : basis => this.DimensionMode (basis), updateDimensions : changes => this.UpdateDimensions (changes), dimensionsBlocked : () => this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false || this.editor.busy && !this.dimensionUpdating, inspect : () => this.FefcoInspect (), configure : changes => this.ConfigureFefco (changes), generate : changes => this.GenerateFefco (changes), preset : (code, changes) => this.GeneratePreset (code, changes), designer : () => this.OpenSelected (), measurements : () => { this.OpenSelected (); return this.OpenMeasurements (); }, unfold : () => this.UnfoldSelected (), scrub : (progress, commit) => this.SetFoldScrub (progress, commit), scrubInspect : () => this.FoldScrubInspect (), animate : () => this.AnimateFold (), toggleFold : () => this.ToggleFold (), playbackBlocked : () => this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false, animation : () => this.AnimationInspect (), playback : () => this.FoldInspect (), control : action => this.FoldControl (action), canAnimate : () => Boolean (this.editor.selected?.userData?._auto3dFefco), factor : () => this.Factor (), run : action => this.editor.Run (action), blocked : () => this.editor.busy || this.editor.readOnly || !this.editor.website.auth?.user || this.editor.website.accountReady === false, canUnfold : () => this.CanUnfold () }; }
     AppearanceInspect ()
     {
         const object = this.editor.selected; const profile = object?.packagingProfile;
@@ -180,7 +183,8 @@ export class PackagingWorkspace
         const target = open === null ? !state.open : open; if (target === state.open) { return { started : false, objectId : source.id, open : state.open }; }
         return this.AnimateFold (source.id, duration, { top : target ? 'open' : 'close' });
     }
-    async AnimateFold (objectId = null, duration = 6, { top = null } = {})
+    // sequence: an Auto Pack PackSequencePlayback that drives the fold and moves the products, pads and partitions with it.
+    async AnimateFold (objectId = null, duration = 6, { top = null, sequence = null } = {})
     {
         this.Editable (); if (!Number.isFinite (duration) || duration < 1 || duration > 30) { throw new Error ('Animation duration must be 1–30 seconds.'); }
         const editor = this.editor; const target = editor.document; const source = objectId ? target.objects.find (item => item.id === objectId) : editor.selected;
@@ -195,6 +199,9 @@ export class PackagingWorkspace
         if (top) { rig.topRoute = true; Object.assign (plan, top === 'open' ? { from : 0, to : 1, action : 'open top', targetState : 'folded', targetClosure : 'open', stages : ['closed box', 'opening top', 'open top'] } : { from : 1, to : 0, action : 'close top', targetState : 'folded', targetClosure : 'closed', stages : ['open top', 'closing top', 'closed box'] }); }
         // An Auto Pack carton unfolds from its packed pose; an open top follows its open route down.
         else if (rig.hostAutoPack && plan.action === 'unfold' && manualPose === null) { plan.from = 1; }
+        // Folding a packed carton up from flat replays its assembly sequence with the products and pieces it saved.
+        if (!sequence && !top && rig.hostAutoPack && plan.action === 'fold' && manualPose === null && plan.from === 0) { try { sequence = this.autoPack?.ReplaySequence (source) || null; } catch { sequence = null; } }
+        const ownsOverride = Boolean (sequence) && !editor.motionOverride; if (ownsOverride) { sequence.Frame (0); editor.motionOverride = () => sequence.Frame (); }
         // Audit while the original is still in the scene. Keep saving/editing
         // blocked during this preparation, and recheck account/scene on yields.
         let clearance; this.foldOperation = { source, action : plan.action, stage : 'checking surfaces' }; editor.UpdateSelectionBox?.(); editor.website.viewer?.Render (); editor.busy = true; editor.RefreshButtons?.();
@@ -204,7 +211,7 @@ export class PackagingWorkspace
         const surfaces = FefcoSurfaces (target.CompactModel ([source], true)); const unit = target.model.GetUnit ();
         const before = target.packaging; const previous = editor.selected; const index = target.objects.indexOf (source); const account = editor.website.auth.user.id; const cameraBefore = editor.website.viewer?.GetCamera?.().Clone (); let preview; let final;
         editor.website.viewer?.navigation?.StopCameraMovement ();
-        const restore = async () => { if (preview) { target.Remove (preview); } if (final) { target.Remove (final); } if (!target.objects.includes (source)) { target.Restore (source, index); } target.packaging = before; if (editor.document === target) { editor.selected = previous; await editor.Render (); if (cameraBefore) { editor.website.viewer.SetCamera (cameraBefore.Clone ()); } } };
+        const restore = async () => { sequence?.Reset (); if (preview) { target.Remove (preview); } if (final) { target.Remove (final); } if (!target.objects.includes (source)) { target.Restore (source, index); } target.packaging = before; if (editor.document === target) { editor.selected = previous; await editor.Render (); if (cameraBefore) { editor.website.viewer.SetCamera (cameraBefore.Clone ()); } } };
         const assign = (object, state, data = parameters) => { object.id = source.id; object.keyframes = (source.keyframes || []).map (frame => ({ ...frame, position : [...frame.position], rotation : [...frame.rotation], scale : [...frame.scale] })); object.packagingProfile = profile; object.userData = { ...source.userData, _auto3dFefco : JSON.stringify (data), _auto3dPackagingState : state }; delete object.userData._auto3dFoldPreview; object.position = [...source.position]; object.rotation = [...source.rotation]; object.visible = source.visible; object.castShadow = source.castShadow !== false; object.receiveShadow = source.receiveShadow !== false; target.ApplyTransform (object); };
         const autoFit = editor.timeline?.foldAutoFit !== false && !editor.timeline?.cameraKeyframes?.length;
         const operation = { source, action : plan.action, stage : plan.stages[0], clearance, cameraAutoFit : autoFit }; this.foldOperation = operation;
@@ -219,16 +226,18 @@ export class PackagingWorkspace
             operation.player = new module.FoldPlayback (progress => {
                 autoPackGuard ();
                 if (editor.document !== target || editor.website.auth.user?.id !== account || editor.website.accountReady === false || editor.readOnly) { throw new Error ('The workspace or account changed during folding.'); }
-                const motion = FoldMotionProgress (progress, autoFit); const pose = PackagingFoldPose (module, rig, plan.from + (plan.to - plan.from) * motion); operation.stage = plan.action === 'unfold' ? ({ 'closing top' : 'opening top', 'closing base' : 'opening base', 'erecting walls' : 'unwrapping walls' }[pose.stage] || pose.stage) : plan.action === 'close top' && pose.stage === 'opening top' ? 'closing top' : pose.stage;
+                // Ramp in/out of the whole fold (each panel also eases within its phase); a pack sequence drives the fold itself.
+                const motion = sequence ? sequence.Fold (progress) : EaseMotion (FoldMotionProgress (progress, autoFit), editor.website.preferences?.motionEasing || 'smooth'); const pose = PackagingFoldPose (module, rig, plan.from + (plan.to - plan.from) * motion); operation.stage = plan.action === 'unfold' ? ({ 'closing top' : 'opening top', 'closing base' : 'opening base', 'erecting walls' : 'unwrapping walls' }[pose.stage] || pose.stage) : plan.action === 'close top' && pose.stage === 'opening top' ? 'closing top' : pose.stage; if (sequence) { operation.stage = sequence.Stage (); operation.sequence = sequence.Inspect (); }
                 if (preview.threeObject) {
-                    ApplyFefcoFoldPose (preview.threeObject, rig, pose, unit);
-                    if (operation.cameraAutoFit && cameraBefore) { const viewer = editor.website.viewer; const bounds = VisibleBounds (preview.threeObject); const sphere = bounds.getBoundingSphere (new Sphere ()); const size = viewer.GetImageSize (); viewer.SetCamera (FoldCameraFrame (cameraBefore, sphere, 0, progress, size.width / size.height, CameraBottomInset (viewer, editor.status), bounds)); }
+                    ApplyFefcoFoldPose (preview.threeObject, rig, pose, unit); sequence?.Frame (progress);
+                    if (operation.cameraAutoFit && cameraBefore) { const viewer = editor.website.viewer; const bounds = VisibleBounds (preview.threeObject); if (sequence) { bounds.union (sequence.Bounds ()); } const sphere = bounds.getBoundingSphere (new Sphere ()); const size = viewer.GetImageSize (); viewer.SetCamera (FoldCameraFrame (cameraBefore, sphere, 0, progress, size.width / size.height, CameraBottomInset (viewer, editor.status), bounds)); }
                     else if (!operation.cameraManual && editor.timeline?.cameraKeyframes?.length) { const timeline = editor.timeline; ApplyCameraState (editor.website.viewer, timeline.CameraStateAt (timeline.rangeStart + progress * (timeline.rangeEnd - timeline.rangeStart))); }
                     else { editor.website.viewer.Render (); }
                 } else { editor.website.viewer?.Render (); } editor.Status ('Folding · ' + operation.stage + ' · ' + Math.round (progress * 100) + '%'); editor.website.packagingPanel?.fefcoPanel?.RefreshPlayback (); editor.website.packagingPanel?.workspace?.autoPanel?.RefreshPlayback ();
             }, duration);
             // Playback controls remain accessible while ordinary editing/saving is blocked.
             operation.completion = operation.player.Start ().then (async result => {
+                if (sequence) { sequence.Reset (); }
                 if (!result.completed) { await restore (); this.lastFold = { state : 'cancelled', progress : 0, objectId : source.id }; editor.Status ('Folding cancelled · original object restored'); return; }
                 autoPackGuard ();
                 const next = { ...parameters, closure : plan.targetClosure }; const data = PackagingFoldFrame (module, rig, next, profile, plan.targetState === 'flat'); final = target.AddImported (PackagingModel (data, unit, surfaces), source.name.replace (/ · (Dieline|Folded|Open|Closed)$/, '') + (plan.targetState === 'flat' ? ' · Dieline' : plan.targetClosure === 'open' ? ' · Open' : ' · Closed')); assign (final, plan.targetState, data.parameters); final.source = 'FEFCO ' + parameters.code + ' ' + plan.targetState;
@@ -238,9 +247,9 @@ export class PackagingWorkspace
                 if (editor.document !== target || editor.website.auth?.user?.id !== account || editor.website.accountReady === false || editor.readOnly) { throw new Error ('The workspace or account changed while completing folding.'); } autoPackGuard ();
                 const apply = async forward => { target.Remove (forward ? source : final); target.Restore (forward ? final : source, index); target.packaging = forward ? profile : before; editor.selected = forward ? final : previous; await editor.Render (true); this.Refresh (); editor.website.packagingPanel?.Refresh (); };
                 editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); this.lastFold = { state : 'completed', progress : 1, stage : plan.stages.at (-1), action : plan.action, objectId : final.id }; editor.Status ('Folding complete · ' + plan.stages.at (-1) + ' · Undo available');
-            }).catch (async error => { try { await restore (); } catch { /* Retain the playback error. */ } this.lastFold = { state : 'failed', progress : 0, error : error.message }; editor.website.errorLogs?.Record ('error', 'packaging-fold', error.message); editor.Status (error.message); }).finally (() => { removeCameraListeners (); this.foldOperation = null; editor.UpdateSelectionBox?.(); editor.busy = false; editor.RefreshButtons?.(); this.Refresh (); editor.website.packagingPanel?.Refresh (); });
+            }).catch (async error => { try { await restore (); } catch { /* Retain the playback error. */ } this.lastFold = { state : 'failed', progress : 0, error : error.message }; editor.website.errorLogs?.Record ('error', 'packaging-fold', error.message); editor.Status (error.message); }).finally (() => { removeCameraListeners (); if (ownsOverride && editor.motionOverride) { editor.motionOverride = null; sequence.Reset (); } this.foldOperation = null; editor.UpdateSelectionBox?.(); editor.busy = false; editor.RefreshButtons?.(); this.Refresh (); editor.website.packagingPanel?.Refresh (); });
             editor.website.packagingPanel?.fefcoPanel?.RefreshPlayback (); editor.website.packagingPanel?.workspace?.autoPanel?.RefreshPlayback (); return { started : true, objectId : source.id, duration, action : plan.action, stages : plan.stages, clearance };
-        } catch (error) { removeCameraListeners (); try { await restore (); } finally { this.foldOperation = null; editor.busy = false; editor.RefreshButtons?.(); } throw error; }
+        } catch (error) { removeCameraListeners (); if (ownsOverride) { editor.motionOverride = null; } try { await restore (); } finally { this.foldOperation = null; editor.busy = false; editor.RefreshButtons?.(); } throw error; }
     }
     // The finished object replaces the animated preview; ease the camera to frame it closely.
     // Completion is reported only after this settles, so a following inspect or capture sees the final view.
@@ -457,6 +466,60 @@ export class PackagingWorkspace
     {
         const factor = units === 'mm' ? 1 : this.Factor (); const design = ValidatePackaging (this.Design ()); const path = { id : crypto.randomUUID (), type, closed, points : points.map ((point) => point.map ((value) => value * factor)) }; if (type === 'score' && this.creaseProcess.kind !== 'crease') { path.process = { ...this.creaseProcess }; } design.paths.push (path); if (design.engineering) { design.engineering.dimensions.push (...DefaultEngineering ({ ...design, paths : [path] }).dimensions); } const result = this.Change (design); this.active = path.id; this.Refresh (); return { pathId : path.id, design : result };
     }
+    // Rounds the corners of closed paths (the selected ones by default) with tangent arcs. One Undo step.
+    RoundCorners ({ ids = null, radius, corners = null, units = 'display' } = {})
+    {
+        const factor = units === 'mm' ? 1 : this.Factor (), r = radius * factor; if (!Number.isFinite (r) || r <= 0) { throw new Error ('Corner radius must be greater than zero.'); }
+        const design = ValidatePackaging (this.Design ()), chosen = ids || [...this.selectedPaths].concat (this.active && !this.selectedPaths.size ? [this.active] : []);
+        if (!chosen.length) { throw new Error ('Select a closed outline to round its corners.'); }
+        if (corners !== null && chosen.length !== 1) { throw new Error ('Choose corner indices for one path at a time.'); }
+        let rounded = 0;
+        for (const id of chosen) {
+            const path = design.paths.find (item => item.id === id); if (!path) { throw new Error ('Choose an existing path.'); }
+            if (!path.closed) { throw new Error ('Round corners works on closed outlines. Close the path first.'); }
+            const oldPoints = path.points, result = FilletPolygon (oldPoints, r, { corners }); path.points = result.points; rounded += result.rounded;
+            if (!result.rounded || !design.engineering) { continue; }
+            let rebuildAuto = false;
+            const dimensions = design.engineering.dimensions.map (dimension => {
+                if (dimension.pathId !== id) { return dimension; }
+                const a = oldPoints[dimension.start], b = oldPoints[dimension.end];
+                const at = p => result.points.findIndex (q => Math.hypot (p[0] - q[0], p[1] - q[1]) < 1e-7);
+                let start = at (a), end = at (b);
+                if (start < 0 || end < 0) {
+                    if (dimension.mode !== 'auto') { throw new Error ('Rounding removes a constrained measurement endpoint. Switch that measurement to Auto before rounding.'); }
+                    const adjacent = (dimension.start + 1) % oldPoints.length === dimension.end || (dimension.end + 1) % oldPoints.length === dimension.start;
+                    if (adjacent) {
+                        const dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot (dx, dy);
+                        const candidates = result.points.map ((p, i) => ({ i, along : ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / length, off : Math.abs ((p[0] - a[0]) * dy - (p[1] - a[1]) * dx) / length })).filter (p => p.off < 1e-7 && p.along >= -1e-7 && p.along <= length + 1e-7).sort ((p, q) => p.along - q.along);
+                        start = candidates[0]?.i ?? -1; end = candidates.at (-1)?.i ?? -1;
+                    }
+                    if (start < 0 || end < 0 || start === end) { rebuildAuto = true; return null; }
+                }
+                return { ...dimension, start, end };
+            }).filter (Boolean);
+            // A removed custom Auto reference has no unambiguous successor. Rebuild that path's
+            // Auto layer from its new boundary, retaining valid constraints and all other paths.
+            if (rebuildAuto) {
+                const keep = dimensions.filter (d => d.pathId !== id || d.mode !== 'auto');
+                const generated = DefaultEngineering ({ ...design, paths : [path] }).dimensions.slice (0, 100 - keep.length).map (d => ({ ...d, id : 'rounded-' + crypto.randomUUID () }));
+                design.engineering.dimensions = [...keep, ...generated];
+            } else { design.engineering.dimensions = dimensions; }
+        }
+        if (!rounded) { throw new Error ('No corners to round: every corner is already smooth.'); }
+        const design2 = this.Change (design); this.Message ('Rounded ' + rounded + (rounded === 1 ? ' corner' : ' corners')); return { pathIds : chosen, rounded, radiusMm : r, design : design2 };
+    }
+    AddCircle ({ center, radius, type = 'cut', units = 'display' } = {})
+    {
+        const factor = units === 'mm' ? 1 : this.Factor ();
+        const result = this.AddPath (CircleOutline (center.map (v => v * factor), radius * factor), type, true, 'mm'); this.Message ('Circle added'); return { ...result, radiusMm : radius * factor };
+    }
+    // A round hole split into flexible tabs by radial relief slits (can collars, clip-in holes). One Undo step.
+    AddReliefHole ({ center, holeRadius, reliefRadius, tabs = 16, notchWidth = 1.2, units = 'display' } = {})
+    {
+        const factor = units === 'mm' ? 1 : this.Factor ();
+        const points = ReliefHoleOutline ({ center : center.map (v => v * factor), holeRadius : holeRadius * factor, reliefRadius : reliefRadius * factor, tabs, notchWidthMm : notchWidth * factor, rotation : Math.PI / tabs });
+        const result = this.AddPath (points, 'cut', true, 'mm'); this.Message ('Relief hole added · ' + tabs + ' tabs'); return { ...result, tabs, holeRadiusMm : holeRadius * factor, reliefRadiusMm : reliefRadius * factor };
+    }
     EditPath (id, changes, units = 'display')
     {
         const design = ValidatePackaging (this.Design ()); const path = design.paths.find ((item) => item.id === id); if (!path) { throw new Error ('Choose an existing path.'); }
@@ -654,6 +717,14 @@ export class PackagingWorkspace
         const hint = Element ('p', tools, 'Select arrow: click a line; Ctrl/Cmd-click adds or removes lines. Pen: click points, then finish or close the path.', 'section_hint');
         this.x = field ('Point X'); this.y = field ('Point Y'); for (const input of [this.x, this.y]) { input.type = 'number'; input.step = 'any'; input.value = '0'; }
         action ('Add point', () => this.AddDraftPoint ([this.x.valueAsNumber, this.y.valueAsNumber]));
+        const shapes = Element ('details', tools, undefined, 'packaging_shape_tools'); Element ('summary', shapes, 'Shape tools: round corners, circle, relief hole');
+        const shapeField = (title, value) => { const label = Element ('label', shapes, title); const input = Element ('input', label); input.type = 'number'; input.step = 'any'; input.min = '0'; input.value = value; input.setAttribute ('aria-label', title); return input; };
+        Element ('p', shapes, 'Round corners rounds every corner of the selected closed outlines. Circle and relief hole are centred on Point X / Y above. Sizes are in display units.', 'section_hint');
+        this.shapeRadius = shapeField ('Radius', '10'); this.reliefRadius = shapeField ('Relief radius', '13'); this.reliefTabs = shapeField ('Tabs', '16'); this.reliefTabs.step = '1'; this.reliefTabs.min = '4'; this.reliefTabs.max = '48';
+        const shapeActions = Element ('div', shapes, undefined, 'packaging_actions');
+        action ('Round selected corners', () => this.RoundCorners ({ radius : this.shapeRadius.valueAsNumber }), shapeActions);
+        action ('Add circle', () => this.AddCircle ({ center : [this.x.valueAsNumber, this.y.valueAsNumber], radius : this.shapeRadius.valueAsNumber, type : this.draftType }), shapeActions);
+        action ('Add relief hole', () => this.AddReliefHole ({ center : [this.x.valueAsNumber, this.y.valueAsNumber], holeRadius : this.shapeRadius.valueAsNumber, reliefRadius : this.reliefRadius.valueAsNumber, tabs : this.reliefTabs.valueAsNumber, notchWidth : 1.2 / this.Factor () }), shapeActions);
         const finish = Element ('div', tools, undefined, 'packaging_actions'); action ('Finish open path', () => this.Finish (false), finish); action ('Close outline', () => this.Finish (true), finish);
         action ('Remove last point', () => this.RemoveDraftPoint ()); action ('Cancel current path', () => this.CancelDraft ());
         this.snap = field ('Grid snap'); this.snap.type = 'number'; this.snap.step = 'any'; this.snap.min = '0'; this.snap.value = String (this.gridSnapMM / this.Factor ());

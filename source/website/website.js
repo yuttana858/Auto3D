@@ -6,6 +6,8 @@ import { RenderingPanel } from './renderingpanel.js';
 import { CameraPanel } from './camerapanel.js';
 import { ModelExtensions, SupportedFormatsText } from './importformats.js';
 import { CadConversionsFor } from './cadconversion.js';
+import { CadFileType } from './cadfiletype.js';
+import { CadMessages } from './cadconversioncontract.js';
 import { GetFileExtension, TransformFileHostUrls } from '../engine/io/fileutils.js';
 import { InputFilesFromFileObjects, InputFilesFromUrls } from '../engine/import/importerfiles.js';
 import { ImportErrorCode, ImportSettings } from '../engine/import/importer.js';
@@ -374,6 +376,8 @@ export class Website
             this.measureTool.Click (mouseCoordinates);
             return;
         }
+        // Assign facing consumes clicks on the model's bounds; other clicks still orbit and select normally.
+        if (this.sessionEditor.facing?.active && this.sessionEditor.facing.Click (mouseCoordinates, modifiers)) { return; }
 
         const meshUserData = this.viewer.GetMeshUserDataUnderMouse (IntersectionMode.MeshAndLine, mouseCoordinates);
         const additive = Boolean (modifiers.ctrlKey || modifiers.metaKey);
@@ -523,12 +527,13 @@ export class Website
         const selected = Array.from (files);
         const session = selected.find ((file) => file.name.toLowerCase ().endsWith ('.auto3d'));
         if (session) { await this.sessionEditor.Run (() => this.sessionEditor.OpenArchiveFile (session)); return; }
-        const parasolid = selected.find (file => /\.(x_t|x_b)$/i.test (file.name));
+        const parasolid = selected.find (file => CadFileType (file.name)?.format === 'parasolid');
         if (parasolid) {
             const conversion = CadConversionsFor (this);
             const replacing = !!this.sessionEditor.replaceTarget; this.sessionEditor.replaceTarget = null;
+            if (conversion.AutomaticActive ()) { await conversion.Open (null, CadMessages.import_busy); return; }
             if (selected.length > 1) { conversion.ClearFile (); await conversion.Open (null, 'Multiple source files were selected. Choose one CAD file below; the other selected models have not been imported or uploaded.'); }
-            else { await conversion.Open (parasolid, replacing ? 'Converted CAD is added as a new scene object with Add to current session.' : ''); } return;
+            else { try { await conversion.Open (parasolid, replacing ? 'The converted model will be added as a new scene object automatically.' : ''); } catch (error) { this.sessionEditor.Status (error.message); } } return;
         }
 
         const candidates = selected.filter ((file) => MultiModelExtensions.has (GetFileExtension (file.name).toLowerCase ()));

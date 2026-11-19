@@ -1,5 +1,6 @@
 import { ValidateTimelineActions } from './timelineactions.js';
 import { ValidateTimelineClips } from './timelineclips.js';
+import { ValidateMacroAnimation } from './macroshape.js';
 
 // Deliberately narrow: commands that create, delete or alter materials cannot yet be
 // represented by native transform/camera tracks and are rejected before execution.
@@ -13,8 +14,7 @@ export async function RecordMacroAnimation (editor, registry, macro, stepSeconds
     if (!Number.isFinite (stepSeconds) || stepSeconds < 0.1 || stepSeconds > 30) { throw new Error ('Use 0.1–30 seconds per step.'); }
     let total = 0;
     const timings = macro.steps.map (step => {
-        const animation = step?.animation ?? {};
-        if (!animation || typeof animation !== 'object' || Array.isArray (animation) || Object.keys (animation).some (key => !['duration', 'pauseAfter'].includes (key))) { throw new Error ('Animation timing supports duration and pauseAfter only.'); }
+        const animation = ValidateMacroAnimation (step?.animation === undefined ? {} : step.animation);
         if (ProceduralSteps.has (step.command) && step.arguments?.time !== undefined) { throw new Error ('Recorded procedural steps use their sequence position; remove the time argument.'); }
         const duration = animation.duration ?? (ProceduralSteps.has (step.command) ? step.arguments?.duration ?? (FoldSteps.has (step.command) ? 6 : stepSeconds) : stepSeconds), pauseAfter = animation.pauseAfter ?? 0;
         if (!Number.isFinite (duration) || duration < 0.1 || duration > 30 || !Number.isFinite (pauseAfter) || pauseAfter < 0 || pauseAfter > 30) { throw new Error ('Use 0.1–30 seconds for duration and 0–30 seconds for pause.'); }
@@ -61,7 +61,9 @@ export async function RecordMacroAnimation (editor, registry, macro, stepSeconds
         const after = timeline.Serialize (), saved = objects.map (item => ({ keyframes : structuredClone (item.keyframes), visibilityKeys : structuredClone (item.visibilityKeys || []) }));
         const apply = forward => { if (editor.document !== document || !objects.every (item => document.objects.includes (item))) { throw new Error ('The recorded scene is no longer available.'); } if (!forward) { for (const action of after.embeddedClips) { const player = objects.find (item => item.id === action.objectId)?.player; if (player) { player.Choose (action.baseClip, action.baseTime, false); } } } for (let i = 0; i < objects.length; i++) { objects[i].keyframes = forward ? structuredClone (saved[i].keyframes) : []; objects[i].visibilityKeys = forward ? structuredClone (saved[i].visibilityKeys) : []; } timeline.Load (forward ? after : before); timeline.Seek (timeline.time); editor.MarkDirty (); editor.AnimationUI (); };
         if (timeline.actions.length || timeline.embeddedClips.length) { timeline.Seek (end); }
-        editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); editor.MarkDirty (); editor.AnimationUI ();
+        // One Undo step: fold the macro's own history entry (its scene changes) into the recording entry.
+        const run = registry.lastRun, steps = run?.history === editor.history && run.entry && editor.history.undo.at (-1) === run.entry ? editor.history.undo.pop () : null;
+        editor.history.Push ({ macroRecording : true, undo : async () => { apply (false); if (steps) { await steps.undo (); } }, redo : async () => { if (steps) { await steps.redo (); } apply (true); } }); editor.MarkDirty (); editor.AnimationUI ();
         return { recorded : true, duration : end, steps : result.completed.length, objects : objects.length, completed : result.completed.map (({ id, command }, index) => ({ id, command, ...timings[index] })) };
     } catch (error) { if (started && valid ()) { clear (); } throw error; }
 }
