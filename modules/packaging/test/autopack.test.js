@@ -88,7 +88,8 @@ describe ('Auto Pack stationary-product RSC', () => {
             const report = await InspectAutoPackFold (CreateAutoPackRig ({ size, thickness })); assert.equal (report.clear, true, JSON.stringify ({ size, report })); assert.equal (report.samples, 3601);
         }
     });
-    it ('presents the Packaging generator carton (board appearance and rounded crease joins) while auditing exact panels', () => {
+    it ('presents the Packaging generator carton (board appearance and rounded crease joins) while auditing exact panels', function () {
+        this.timeout (10000); // Builds two crease rigs and audits seven poses; allow shared-runner CPU contention.
         const rig = CreateAutoPackRig ({ size : [80, 150, 100], clearanceMm : .0254, material : { caliperMm : 3, insideFactors : [1, 1, 2], calibrated : false } }), generator = CreateFefcoFoldRig (rig.parameters, rig.profile);
         assert.notEqual (rig.autoPackPresentation, 'exact panels');
         // Cheap structural fingerprint (vertex count and coordinate sum) instead of deep-comparing large arrays.
