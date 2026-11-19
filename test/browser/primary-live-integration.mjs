@@ -61,14 +61,14 @@ try {
                         const context = canvas.getContext ('2d'); context.drawImage (image, 0, 0, 32, 32);
                         pixels = { center : [...context.getImageData (16, 16, 1, 1).data], corner : [...context.getImageData (0, 0, 1, 1).data] };
                     }
-                    return { name : material.name, type : material.type, color : material.color?.getHexString (), attenuationColor : material.attenuationColor?.getHexString (), transmission : material.transmission, ior : material.ior, thickness : material.thickness, metalness : material.metalness, roughness : material.roughness, pixels };
+                    return { name : material.name, type : material.type, color : material.color?.getHexString (), attenuationColor : material.attenuationColor?.getHexString (), transmission : material.transmission, ior : material.ior, thickness : material.thickness, opacity : material.opacity, transparent : material.transparent, attenuationDistance : material.attenuationDistance, hasEnvironment : Boolean (material.envMap), metalness : material.metalness, roughness : material.roughness, pixels };
                 });
                 meshes.push ({ name : mesh.name, materialIndices : [...(mesh.userData.originalMaterials || [])], min : low, max : high, vertices : position.count, hash, axisY : [...axisY].sort ((a, b) => a - b), materials });
             });
             const projected = [];
             if (probe.viewer && meshes.length) { for (const x of [min[0], max[0]]) { for (const y of [min[1], max[1]]) { for (const z of [min[2], max[2]]) { projected.push (probe.root.position.clone ().set (x, y, z).project (probe.viewer.camera).toArray ()); } } } }
             const pivot = probe.viewer?.navigation?.orbitCenter;
-            return { meshes, min, max, projected, renders : probe.renders, pivot : pivot ? [pivot.x, pivot.y, pivot.z] : null };
+            return { meshes, min, max, projected, sceneEnvironment : Boolean (probe.viewer?.scene.environment), renders : probe.renders, pivot : pivot ? [pivot.x, pivot.y, pivot.z] : null };
         };
     });
     const rendered = () => page.evaluate (() => window.primaryLiveProbe.snapshot ());
@@ -153,6 +153,10 @@ try {
         await right.getByRole ('button', { name : zone === 'front' ? 'Design front label in CAD' : 'Design cap top in CAD', exact : true }).click ();
         const dialog = page.getByRole ('dialog', { name : 'Label CAD · ' + zone, exact : true }); await dialog.waitFor ();
         assert.equal (await dialog.locator ('.packaging_canvas').count (), 1, 'uses the actual shared Packaging CAD editor');
+        assert.equal (await dialog.getByLabel ('Board caliper preset', { exact : true }).isVisible (), false, 'label CAD hides board-only controls under actual app CSS');
+        assert.equal (await dialog.getByLabel ('Board thickness', { exact : true }).isVisible (), false);
+        const swatch = await dialog.getByLabel ('Artwork fill color', { exact : true }).boundingBox (), fillButton = await dialog.getByRole ('button', { name : 'Set artwork fill', exact : true }).boundingBox ();
+        assert.ok (swatch.width >= 40 && swatch.width <= 64 && fillButton.width >= 120, 'CAD paint row keeps its swatch compact and action readable');
         const opened = await call ('primary.label.cad.inspect'); assert.equal (opened.zone, zone); assert.equal (opened.objectId, objectId);
         await call ('packaging.path.select', { id : 'label-paper' });
         await setColor (dialog.getByLabel ('Artwork fill color', { exact : true }), '#19a7c3'); await dialog.getByRole ('button', { name : 'Set artwork fill', exact : true }).click ();
@@ -195,7 +199,24 @@ try {
     const restoredCAD = await call ('primary.label.cad.inspect'); assert.deepEqual (restoredCAD.profile, cadProfiles.get ('cap-top')); assert.equal (restoredCAD.conversion.kind, 'saved-cad');
     await page.getByRole ('button', { name : 'Close Label CAD · cap-top', exact : true }).click ();
     await call ('primary.fit'); await fitVisible ('restored product fit'); await page.screenshot ({ path : 'work/primary-live-integration/restored-labels.png', timeout : 120000 });
-    assert.deepEqual (errors, []); console.log ('Actual-app Primary Products live editing, glass/caps, camera fit, vector CAD labels and archive round trip passed.');
+    // Review normal clear glass under a real studio environment, not only the heavy amber stress case.
+    await call ('primary.profile.update', { material : 'glass', color : '#f2fff6', glassPreset : 'standard', optics : { color : '#f2fff6', opacity : .02, ior : 1.52, tintDistanceMm : 100 } });
+    await call ('primary.callouts.set', { visible : false });
+    await call ('lighting.restore', { mode : 'hdri', environment : 'studio_small_09', brightness : 1, background : false });
+    await call ('view.background', { preset : 'light' }); await call ('view.guides', { horizon : true, grid : true });
+    const camera = await call ('camera.current.inspect');
+    await call ('object.transform', { objectId, rotation : [0, camera.azimuth, 0] }); // The bottle front is +Z; aim it toward the viewer.
+    await call ('primary.fit'); await fitVisible ('front-facing clear glass in studio');
+    const clear = await until ('studio environment reaches the actual glass shader', async () => {
+        const scene = await rendered (), glass = scene.meshes.find (mesh => mesh.name === 'body').materials[0];
+        return scene.sceneEnvironment || glass.hasEnvironment ? { scene, glass } : false;
+    });
+    near (clear.glass.transmission, .98, 'clear glass transmission'); near (clear.glass.ior, 1.52, 'glass refraction'); near (clear.glass.thickness, 2, 'standard optical wall');
+    await writeFile ('work/primary-live-integration/clear-glass-shader.json', JSON.stringify ({ material : clear.glass, sceneEnvironment : clear.scene.sceneEnvironment, lighting : await call ('lighting.inspect') }, null, 2));
+    await call ('selection.clear');
+    await page.screenshot ({ path : 'work/primary-live-integration/clear-glass-studio.png', timeout : 120000 });
+    await page.locator ('#main_viewer').screenshot ({ path : 'work/primary-live-integration/clear-glass-studio-viewport.png', timeout : 120000 });
+    assert.deepEqual (errors, []); console.log ('Actual-app Primary Products live editing, glass/caps, camera fit, vector CAD labels, archive round trip and clear-glass studio review passed.');
 } catch (error) {
     if (page && !page.isClosed ()) {
         await writeFile ('work/primary-live-integration/failure.txt', error.stack + '\n' + await page.locator ('body').innerText ()).catch (() => {});
