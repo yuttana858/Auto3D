@@ -165,3 +165,9 @@ Use the regular **Run macro**, then play the timeline for that explicit schedule
 ```
 
 Run using `animation.macro.record` or **Run and record animation**. The copy is created immediately and appears at the end of the first step; it is hidden at the end of the second. Durations determine when visibility changes, not a fade. The recorded delete keeps the model in the session. One Undo reverses a successful run. Completed copies can remain if a later step fails.
+
+## Record a saved macro and render a video
+
+Open Animation, choose a saved macro under **Record a macro**, and select **Run and record**. The macro changes the session and creates editable tracks in the same Advance Animation timeline. It requires an empty, stopped timeline, paused embedded clips and a supported macro; a failed step can leave earlier changes in the session. Use **Stop after current step** to cancel. Review and adjust the tracks, then use **Export video** and **Download video**.
+
+The command bar accepts `run Demo macro and record` and `record macro Demo` for a saved macro named Demo. Agents can call `animation.workflow.record` with `name`, inspect and edit the timeline with existing animation commands, then call `animation.video.export` and `animation.video.download`. Export renders the chosen timeline range frame by frame at viewport, 720p, 1080p or 4K when supported by the browser and hardware. It uses the app’s lighting and does not capture the screen, interface, audio or unsupported macro actions. Export is a separate explicit action.

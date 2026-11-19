@@ -20,9 +20,10 @@ export class AnimationPanel
         this.website = website; this.video = new VideoExport (website); this.options = { size : '1080p', fps : 30, format : 'auto' };
         this.panel = document.createElement ('section'); this.panel.id = 'animation_module_panel'; this.panel.className = 'animation_module_panel'; this.panel.hidden = true; this.panel.setAttribute ('aria-label', 'Animation');
         website.parameters.rightContainerDiv.appendChild (this.panel);
-        website.modulePanels.Register ('animation', { title : 'Animation', body : this.panel, animated : true, onOpen : () => this.Refresh (), onMode : () => this.Refresh () });
+        website.modulePanels.Register ('animation', { title : 'Animation', body : this.panel, animated : true, onOpen : () => { this.Refresh (); this.RefreshMacros (); }, onMode : () => this.Refresh () });
         this.Build ();
         this.video.Subscribe (() => this.RefreshVideo ());
+        website.auth?.Subscribe (() => { this.macroGeneration = (this.macroGeneration || 0) + 1; this.macroLoading = false; this.macroChoice.replaceChildren (new Option ('Choose a saved macro', '')); this.macroStatus.textContent = ''; this.Refresh (); });
     }
     get editor () { return this.website.sessionEditor; }
     get timeline () { return this.editor.timeline; }
@@ -45,7 +46,17 @@ export class AnimationPanel
 
     Build ()
     {
-        Element ('p', 'animation_help', 'Animate objects, the camera and box folds on one timeline, then export it as a video.', this.panel);
+        Element ('p', 'animation_help', 'Record a macro to the shared timeline, refine it in Advance Animation, then render a video.', this.panel);
+        const macro = this.Section ('Record a macro', 'Runs the macro and creates editable tracks. Start with an empty, stopped timeline and paused embedded clips. Completed changes remain if a step fails.');
+        this.macroChoice = this.Select (macro, 'Saved macro', [['', 'Choose a saved macro']]);
+        this.macroChoice.addEventListener ('change', () => this.Refresh ());
+        this.macroHint = Element ('p', 'animation_help', '', macro);
+        this.macroStatus = Element ('p', 'animation_summary', '', macro); this.macroStatus.setAttribute ('role', 'status');
+        const macroButtons = Element ('div', 'animation_buttons', undefined, macro);
+        this.macroRecord = this.Button (macroButtons, 'Run and record', async () => { const name = this.macroChoice.value; if (!name) { throw new Error ('Choose a saved macro.'); } this.macroRecording = true; this.Refresh (); this.macroStatus.textContent = 'Running macro and recording tracks…'; try { const response = await this.website.commands.Execute ('animation.workflow.record', { name }); if (!response.ok) { throw new Error (response.error.message); } this.macroStatus.textContent = 'Recorded ' + Seconds (response.result.duration) + '. Review the timeline, then render the video.'; } finally { this.macroRecording = false; } }, 'animation_primary', this.macroStatus);
+        this.macroReload = this.Button (macroButtons, 'Refresh macros', () => this.RefreshMacros (), null, this.macroStatus);
+        this.macroEdit = this.Button (macroButtons, 'Edit macros', () => this.website.commands.Execute ('ui.commands'), null, this.macroStatus);
+        this.macroCancel = this.Button (macroButtons, 'Stop after current step', async () => { const response = await this.website.commands.Execute ('macro.cancel'); this.macroStatus.textContent = response.ok && response.result.requested ? 'Stopping after the current step…' : 'Recording has not started or has already stopped.'; }, null, this.macroStatus);
         const play = this.Section ('Playback');
         const transport = Element ('div', 'animation_buttons', undefined, play);
         this.play = this.Button (transport, 'Play', () => this.timeline.Toggle ());
@@ -106,7 +117,7 @@ export class AnimationPanel
         const arrayGrid = Element ('div', 'animation_grid', undefined, array); this.arrayDuration = this.Number (arrayGrid, 'Reveal duration (s)', 1, 15, .1); this.arrayDuration.value = '4'; this.arrayHeight = this.Number (arrayGrid, 'Drop distance (model units)', .000001, 1000000, .1); this.arrayHeight.value = '1';
         const arrayButtons = Element ('div', 'animation_buttons', undefined, array); this.arraySchedule = this.Button (arrayButtons, 'Schedule reveal', () => { const selected = this.ArrayTargets (); if (!this.arrayDuration.value.trim () || !this.arrayHeight.value.trim ()) { throw new Error ('Enter a duration and drop distance.'); } ScheduleArrayReveal (this.editor, { objectIds : selected.map (item => item.id), time : this.timeline.time, duration : Number (this.arrayDuration.value), dropHeight : Number (this.arrayHeight.value) }); this.arrayStatus.textContent = 'Array reveal scheduled.'; }, null, this.arrayStatus);
 
-        const video = this.Section ('Export video', 'Records the range frame by frame, so no frame is dropped. The video stays in this browser until you download it.');
+        const video = this.Section ('Export video', 'Renders the timeline frame by frame using the current app lighting. This is not a screen recording; the video has no audio and stays in this browser until downloaded.');
         const videoGrid = Element ('div', 'animation_grid', undefined, video);
         this.size = this.Select (videoGrid, 'Video size', Object.keys (VideoSizes).map (key => [key, SizeLabels[key]]));
         this.fps = this.Select (videoGrid, 'Frame rate', VideoFrameRates.map (fps => [fps, fps + ' fps']));
@@ -126,6 +137,23 @@ export class AnimationPanel
 
     ArrayTargets () { const objects = this.editor.SelectedObjects?.() || []; return this.arrayKeepActive.checked ? objects.filter (item => item !== this.editor.selected) : objects; }
 
+    async RefreshMacros ()
+    {
+        const owner = this.website.auth?.user?.id, generation = this.macroGeneration = (this.macroGeneration || 0) + 1;
+        if (!owner) { this.macroChoice.replaceChildren (new Option ('Sign in to load macros', '')); this.Refresh (); return; }
+        const previous = this.macroChoice.value; this.macroLoading = true; this.Refresh ();
+        const availability = await this.website.commands.Execute ('macro.library.inspect');
+        if (generation !== this.macroGeneration || this.website.auth?.user?.id !== owner) { return; }
+        const response = await this.website.commands.Execute ('macro.list');
+        if (generation !== this.macroGeneration || this.website.auth?.user?.id !== owner) { return; }
+        this.macroLoading = false; this.macroChoice.replaceChildren (new Option ('Choose a saved macro', ''));
+        if (!response.ok) { this.macroStatus.textContent = response.error.message; this.Refresh (); return; }
+        for (const item of response.result) { this.macroChoice.add (new Option (item.name + (item.location === 'browser' ? ' · this browser' : ''), item.name)); }
+        if ([...this.macroChoice.options].some (option => option.value === previous)) { this.macroChoice.value = previous; }
+        if (!this.macroRecording) { this.macroStatus.textContent = !availability.ok ? availability.error.message : !availability.result.available ? 'Shared macro library unavailable. Browser-only macros are still listed.' : !response.result.length ? 'No saved macros. Use Edit macros to create one.' : ''; }
+        this.Refresh ();
+    }
+
     async ExportVideo () { const result = await this.video.Export ({ ...this.options }); this.status.textContent = ''; return result; }
 
     RefreshTime ()
@@ -137,6 +165,9 @@ export class AnimationPanel
     {
         if (!this.Visible ()) { return; }
         const t = this.timeline, editor = this.editor, locked = this.Locked (), hasObjects = editor.document.objects.length > 0;
+        const hasTracks = t.cameraKeyframes.length || t.actions.length || t.embeddedClips.length || editor.document.objects.some (item => item.keyframes?.length || item.visibilityKeys?.length), clipPlaying = editor.document.objects.some (item => item.player?.state?.playing);
+        this.macroChoice.disabled = locked || editor.busy || this.macroRecording || this.macroLoading; this.macroRecord.disabled = locked || editor.busy || this.macroRecording || this.macroLoading || !hasObjects || editor.document.objects.length > 100 || !this.macroChoice.value || t.playing || hasTracks || clipPlaying; this.macroEdit.disabled = this.macroRecording; this.macroReload.disabled = this.macroRecording || this.macroLoading; this.macroCancel.hidden = !this.macroRecording;
+        this.macroHint.textContent = this.macroRecording ? 'Recording in progress.' : locked ? 'Use an editable session.' : editor.busy ? 'Wait for the current operation.' : !hasObjects ? 'Add a model first.' : editor.document.objects.length > 100 ? 'Recording supports up to 100 objects.' : t.playing ? 'Pause the timeline first.' : hasTracks ? 'Use an empty timeline; existing tracks will not be overwritten.' : clipPlaying ? 'Pause embedded clips first.' : this.macroLoading ? 'Loading saved macros…' : !this.macroChoice.value ? 'Choose a saved macro.' : 'Ready to record into the timeline.';
         if (this.visibilityObjectId !== (editor.selected?.id || null)) { this.visibilityObjectId = editor.selected?.id || null; this.lifeStart.value = '0'; this.lifeEnd.value = ''; this.visibilityStatus.textContent = ''; }
         const clipPlayer = editor.selected?.player, clipId = editor.selected?.id || null;
         if (clipId !== this.clipObjectId || clipPlayer !== this.clipPlayer) { this.clipObjectId = clipId; this.clipPlayer = clipPlayer; this.clipChoice.replaceChildren (); clipPlayer?.clips.forEach ((clip, index) => this.clipChoice.add (new Option (clip.name || 'Clip ' + (index + 1), String (index)))); if (clipPlayer) { this.clipChoice.value = String (clipPlayer.state.clip); this.clipDuration.value = String (Number (clipPlayer.clips[clipPlayer.state.clip].duration.toFixed (3))); } else { this.clipDuration.value = ''; } this.clipSpeed.value = '1'; this.clipLoop.checked = false; this.clipStatus.textContent = ''; }

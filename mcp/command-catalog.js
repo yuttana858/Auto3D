@@ -277,6 +277,7 @@ export const CommandIds = Object.freeze ([
     'animation.keyframe.object',
     'animation.keyframe.camera',
     'animation.macro.record',
+    'animation.workflow.record',
     'macro.design.edit',
     'macro.cancel',
     'macro.list',

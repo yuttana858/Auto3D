@@ -59,7 +59,7 @@ export class CommandBar
             if (!result.ok || !result.result.ok) { throw new Error (result.error?.message || result.result.error?.message || 'Command could not complete.'); }
             const completed = result.result.completed; const last = completed.at (-1);
             const entry = this.Record ('user', 'command', text, true);
-            this.status.textContent = last?.command === 'object.array' ? 'Array created · ' + last.result.total + ' objects' : 'Completed · ' + completed.length + (completed.length === 1 ? ' command' : ' commands');
+            this.status.textContent = last?.command === 'object.array' ? 'Array created · ' + last.result.total + ' objects' : last?.command === 'animation.workflow.record' ? 'Macro recorded to the animation timeline · ' + last.result.duration.toFixed (2) + ' s' : 'Completed · ' + completed.length + (completed.length === 1 ? ' command' : ' commands');
             return { accepted : true, kind : 'command', ok : true, id : entry.id };
         } catch (error) {
             // Text that is not a command is a message for a connected agent.
