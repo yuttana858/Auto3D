@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Shared macro library — Auto3D 0.92.0 (2026-11-19)
+
+Packaging 1.16.1 / Primary Products 0.15.0 / Molded Pulp 0.3.0 unchanged. Based on main after #163 (0.91.1). Macros are saved to one shared library in the account database: every signed-in account sees and runs every macro; only the account that saved it or an administrator can replace or delete it. Browser-only macros stay listed until moved with `macro.library.upload_browser`; saves never fall back to browser storage. Requires migration `20261119120000_shared_macro_library` before deploy. See [release-0920.md](release-0920.md).
+
 ## Private alternative-reader proof transport — Auto3D 0.91.1 live (2026-11-18)
 
 Packaging 1.16.1 / Primary Products 0.15.0 / Molded Pulp 0.3.0 unchanged. PR #163; runtime `4a769df484ad7b2b74bbc97057b1a8b00aacd0f6`. CI 44427952565 and deployment 44429356940 passed, including source-capability workerd tests, normal validation and browser smoke, served version/bundle and authentication boundaries. The read-only bridge lets an operator evaluate a retained failed Parasolid directly inside Modal without changing retries, expiry or publication.
