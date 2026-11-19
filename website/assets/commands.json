@@ -7770,7 +7770,7 @@
       "id": "animation.macro.record",
       "title": "Run macro and record animation",
       "category": "Animation",
-      "description": "Run a saved or supplied macro and record object transforms, visibility, camera views, fold actions and embedded clips in sequence. Set step.animation.duration and pauseAfter in seconds; procedural steps default to their command duration. For animation.action.add and animation.clip.add omit time: the sequence determines their start. Requires an empty stopped timeline and 1–100 existing objects. Unsupported commands, including creation, deletion and materials, are rejected before execution. Completed macro steps remain if a later step fails. The recorded timeline is one undo step.",
+      "description": "Run a saved or supplied macro and record object transforms, visibility, camera views, array creation, fold actions and embedded clips in sequence. Set step.animation.duration and pauseAfter in seconds; procedural steps default to their command duration. For animation.action.add and animation.clip.add omit time: the sequence determines their start. Requires an empty stopped timeline and at most 100 total objects. Arrays create copies immediately, hide them until their timeline reveal and do not record automatic camera fitting. Other creation, deletion and materials are rejected before execution. Completed macro steps remain if a later step fails. The recorded timeline is one undo step.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
