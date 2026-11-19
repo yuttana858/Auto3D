@@ -1,14 +1,18 @@
 # Auto3D development log and handoff
 
-## Universal 12 oz collar, white top, board artwork and import unit fix — Auto3D 0.95.0 / Packaging 1.18.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0 (2026-11-19)
+## Universal 12 oz collar, white top, board artwork, fast collars with progress, import unit fix — Auto3D 0.97.0 / Packaging 1.19.0 / Primary Products 0.16.0 / Molded Pulp 0.3.0 (2026-11-19)
 
 Candidate on `claude/dazzling-faraday-rhti3h`, not deployed.
 - Collars for 12 oz cans use one universal design (`12oz-202`: 16 tabs 4.5 mm tall, tips Ø 55, reliefs Ø 64, 1 mm slits), chosen automatically when the rims fit.
 - Paperboard collars have a white top.
 - Flat boards take artwork in the CAD Print section, and it updates the 3D board in one Undo step.
+- Adding a collar is about 20× faster (45.7 s → 2.0 s on the sandbox software renderer). Board appearance uses an edge grid with identical output, and board presentation data is cached across renders. A progress popup shows each step with its measured time, a percentage and a bar.
 - Fix: a GLB added to a scene in another unit keeps its real size (it used to look invisible in millimetre product scenes).
 
-See docs/release-0950.md.
+Based on main after 0.96.0 (#168); 0.95.0 is reserved by #167. See docs/release-0970.md.
+## Live primary products and CAD labels — Auto3D 0.96.0 candidate
+
+Packaging 1.18.0 / Primary Products 0.16.0 / Molded Pulp 0.3.0. Draft PR #168, based on deployed main 6632010; the separate animation PR #167 reserves 0.95.0. Selected products update from the right panel without generating another object. New bottles default to glass with hollow wall/base presets, independent cap geometry/material/color controls and front/back/wrap/cap-top labels in the shared CAD editor. Viewer fit uses projected selected bounds and live updates preserve navigation. See [release-0960.md](release-0960.md) for behavior, limits and agent commands. One draft batch; not deployed. Final validation: 1,158 app/module tests, 73 MCP tests and 13 focused browser checks passed, including a pixel comparison proving clear glass refracts the grid while opaque material blocks it. The full 100-check browser release gate remains pending; see [validation](validation/primary-live-0960.md).
 
 ## Integrated animation and can-collar release — Auto3D 0.94.0 candidate
 

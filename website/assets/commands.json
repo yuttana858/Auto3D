@@ -2185,7 +2185,8 @@
             "type": "string",
             "enum": [
               "cut",
-              "score"
+              "score",
+              "artwork"
             ]
           }
         },
@@ -2196,6 +2197,36 @@
       },
       "example": {
         "type": "score"
+      }
+    },
+    {
+      "id": "packaging.artwork.style",
+      "title": "Style selected CAD artwork",
+      "category": "Packaging",
+      "description": "Set solid fill, stroke and stroke width in millimeters for selected artwork-layer paths. One Undo step; cut and crease paths remain unchanged.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fill": {
+            "type": "string",
+            "pattern": "^(none|#[a-fA-F0-9]{6})$"
+          },
+          "stroke": {
+            "type": "string",
+            "pattern": "^(none|#[a-fA-F0-9]{6})$"
+          },
+          "strokeWidth": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "fill": "#123740"
       }
     },
     {
@@ -2435,7 +2466,8 @@
             "type": "string",
             "enum": [
               "cut",
-              "score"
+              "score",
+              "artwork"
             ]
           }
         },
@@ -2561,7 +2593,8 @@
             "type": "string",
             "enum": [
               "cut",
-              "score"
+              "score",
+              "artwork"
             ]
           },
           "closed": {
@@ -2661,7 +2694,8 @@
             "type": "string",
             "enum": [
               "cut",
-              "score"
+              "score",
+              "artwork"
             ]
           },
           "closed": {
@@ -2738,7 +2772,8 @@
             "type": "string",
             "enum": [
               "cut",
-              "score"
+              "score",
+              "artwork"
             ]
           },
           "closed": {
@@ -3099,7 +3134,8 @@
             "type": "string",
             "enum": [
               "cut",
-              "score"
+              "score",
+              "artwork"
             ]
           },
           "units": {
@@ -9394,7 +9430,7 @@
       "id": "primary.inspect",
       "title": "Inspect product draft",
       "category": "Primary Products",
-      "description": "Read canonical-mm draft dimensions and whether opaque generation is available. Includes imported local label descriptors; Generate or Apply renders them.",
+      "description": "Read canonical-mm product controls, selected live target, update status and local label descriptors.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -9497,7 +9533,7 @@
       "id": "primary.designs.generate",
       "title": "Generate product design",
       "category": "Primary Products",
-      "description": "Select a catalog design and generate it as one undoable session object, the same action as clicking its design card. Opaque materials only.",
+      "description": "Select a catalog design and generate it as one undoable session object, the same action as clicking its design card. Bottles default to glass.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -9776,7 +9812,8 @@
             "enum": [
               "front",
               "wrap",
-              "back"
+              "back",
+              "cap-top"
             ]
           }
         },
@@ -9798,6 +9835,38 @@
       "inputSchema": {
         "type": "object",
         "properties": {
+          "glassPreset": {
+            "type": "string",
+            "enum": [
+              "lightweight",
+              "standard",
+              "heavy",
+              "custom"
+            ]
+          },
+          "baseMm": {
+            "type": "number",
+            "minimum": 0.001,
+            "maximum": 25
+          },
+          "capWallMm": {
+            "type": "number",
+            "minimum": 0.05,
+            "maximum": 5
+          },
+          "capMaterial": {
+            "type": "string",
+            "enum": [
+              "pp",
+              "hdpe",
+              "aluminum",
+              "steel"
+            ]
+          },
+          "capColor": {
+            "type": "string",
+            "pattern": "^#[a-fA-F0-9]{6}$"
+          },
           "wallMm": {
             "type": "number",
             "minimum": 0.001,
@@ -10064,6 +10133,46 @@
       "inputSchema": {
         "type": "object",
         "properties": {
+          "glassPreset": {
+            "type": "string",
+            "enum": [
+              "lightweight",
+              "standard",
+              "heavy",
+              "custom"
+            ]
+          },
+          "baseMm": {
+            "type": "number",
+            "minimum": 0.001,
+            "maximum": 25
+          },
+          "capWallMm": {
+            "type": "number",
+            "minimum": 0.05,
+            "maximum": 5
+          },
+          "capMaterial": {
+            "type": "string",
+            "enum": [
+              "pp",
+              "hdpe",
+              "aluminum",
+              "steel"
+            ]
+          },
+          "capColor": {
+            "type": "string",
+            "pattern": "^#[a-fA-F0-9]{6}$"
+          },
+          "closure": {
+            "type": "string",
+            "enum": [
+              "ribbed",
+              "smooth",
+              "fliptop"
+            ]
+          },
           "objectId": {
             "type": "string",
             "maxLength": 4096
@@ -10246,6 +10355,461 @@
       }
     },
     {
+      "id": "primary.live.configure",
+      "title": "Update selected product from its panel",
+      "category": "Primary Products",
+      "description": "Validate and apply product controls live to a matching selected generated product, preserving identity, placement, edited surfaces, labels and camera. Rapid edits are serialized and coalesced with Undo. Without a matching selection, changes remain a draft. Optional objectId refuses stale selection.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "family": {
+            "type": "string",
+            "enum": [
+              "bottle",
+              "can",
+              "pouch",
+              "clamshell"
+            ]
+          },
+          "bottleSection": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "shape": {
+                "type": "string",
+                "enum": [
+                  "round",
+                  "oval",
+                  "rectangle"
+                ]
+              },
+              "depthMm": {
+                "type": "number",
+                "minimum": 10,
+                "maximum": 500
+              },
+              "cornerRadiusMm": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 250
+              }
+            },
+            "required": [
+              "shape"
+            ]
+          },
+          "pouchShape": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "style": {
+                    "type": "string",
+                    "enum": [
+                      "pillow",
+                      "standup",
+                      "flatbottom"
+                    ]
+                  },
+                  "gussetMm": {
+                    "type": "number",
+                    "minimum": 3,
+                    "maximum": 200
+                  },
+                  "zipper": {
+                    "type": "boolean"
+                  },
+                  "spout": {
+                    "anyOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "position": {
+                            "type": "string",
+                            "enum": [
+                              "center",
+                              "corner"
+                            ]
+                          },
+                          "diameterMm": {
+                            "type": "number",
+                            "minimum": 5,
+                            "maximum": 40
+                          }
+                        },
+                        "required": [
+                          "position"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "style"
+                ]
+              }
+            ]
+          },
+          "bottleShape": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "neckDiameterMm": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 1000
+              },
+              "shoulderHeightMm": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 1000
+              },
+              "neckHeightMm": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 1000
+              },
+              "capHeightMm": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 1000
+              }
+            },
+            "required": [
+              "neckDiameterMm",
+              "shoulderHeightMm",
+              "neckHeightMm",
+              "capHeightMm"
+            ]
+          },
+          "heightMm": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 1000
+          },
+          "diameterMm": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 500
+          },
+          "widthMm": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 500
+          },
+          "depthMm": {
+            "type": "number",
+            "minimum": 2,
+            "maximum": 200
+          },
+          "material": {
+            "type": "string",
+            "enum": [
+              "frostedGlass",
+              "amberGlass",
+              "naturalHDPE",
+              "frostedPP",
+              "pearlPlastic",
+              "clearFilm",
+              "paperboard",
+              "moldedFiber",
+              "kraftFilm",
+              "satinFilm",
+              "lacquer",
+              "softTouch",
+              "plastic",
+              "hdpe",
+              "pp",
+              "petOpaque",
+              "glass",
+              "petClear",
+              "aluminum",
+              "steel",
+              "coatedMetal",
+              "brushedMetal",
+              "matteFilm",
+              "glossFilm",
+              "foil"
+            ]
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[a-fA-F0-9]{6}$"
+          },
+          "roughness": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "labelZone": {
+            "type": "string",
+            "enum": [
+              "front",
+              "wrap",
+              "back",
+              "cap-top"
+            ]
+          },
+          "details": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "glassPreset": {
+                    "type": "string",
+                    "enum": [
+                      "lightweight",
+                      "standard",
+                      "heavy",
+                      "custom"
+                    ]
+                  },
+                  "baseMm": {
+                    "type": "number",
+                    "minimum": 0.001,
+                    "maximum": 25
+                  },
+                  "capWallMm": {
+                    "type": "number",
+                    "minimum": 0.05,
+                    "maximum": 5
+                  },
+                  "capMaterial": {
+                    "type": "string",
+                    "enum": [
+                      "pp",
+                      "hdpe",
+                      "aluminum",
+                      "steel"
+                    ]
+                  },
+                  "capColor": {
+                    "type": "string",
+                    "pattern": "^#[a-fA-F0-9]{6}$"
+                  },
+                  "wallMm": {
+                    "type": "number",
+                    "minimum": 0.001,
+                    "maximum": 10
+                  },
+                  "textureStrength": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "textureScaleMm": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
+                  "shoulder": {
+                    "type": "string",
+                    "enum": [
+                      "rounded",
+                      "sloped"
+                    ]
+                  },
+                  "closure": {
+                    "type": "string",
+                    "enum": [
+                      "ribbed",
+                      "smooth",
+                      "fliptop"
+                    ]
+                  },
+                  "canStyle": {
+                    "type": "string",
+                    "enum": [
+                      "beverage",
+                      "food",
+                      "tin"
+                    ]
+                  },
+                  "shellStyle": {
+                    "type": "string",
+                    "enum": [
+                      "retail",
+                      "food"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "optics": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "color": {
+                    "type": "string",
+                    "pattern": "^#[a-fA-F0-9]{6}$"
+                  },
+                  "opacity": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "ior": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 2.5
+                  },
+                  "tintDistanceMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 1000
+                  }
+                }
+              }
+            ]
+          },
+          "contents": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "liquid",
+                      "oil",
+                      "syrup",
+                      "lotion"
+                    ]
+                  },
+                  "fillPercent": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "color": {
+                    "type": "string",
+                    "pattern": "^#[a-fA-F0-9]{6}$"
+                  },
+                  "opacity": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "viscosity": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 1000000
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              }
+            ]
+          },
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "heightMm": 230,
+        "details": {
+          "capMaterial": "aluminum",
+          "capColor": "#d2b477"
+        }
+      }
+    },
+    {
+      "id": "primary.fit",
+      "title": "Fit selected product in viewer",
+      "category": "Primary Products",
+      "description": "Fit the selected generated product to the actual full or split viewport while retaining the viewing direction. Completes camera movement before returning.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "primary.label.cad.open",
+      "title": "Design product label in CAD",
+      "category": "Primary Products",
+      "description": "Open the existing CAD editor for the active or requested label zone. Existing SVG paths become editable vectors; text and raster sources use a disclosed bounded color trace. The model stays unchanged until Apply. New bottle cap-top labels have a circular cut outline.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zone": {
+            "type": "string",
+            "enum": [
+              "front",
+              "back",
+              "wrap",
+              "cap-top"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "zone": "cap-top"
+      }
+    },
+    {
+      "id": "primary.label.cad.inspect",
+      "title": "Inspect linked label CAD",
+      "category": "Primary Products",
+      "description": "Read the active product label CAD paths, canonical-mm sheet, target and conversion detail.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "primary.label.cad.apply",
+      "title": "Apply CAD label to product",
+      "category": "Primary Products",
+      "description": "Render and apply the edited vector cut/artwork layers to their product surface with Undo. Preserves physical placement and label finish; refuses stale product, account or session.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
       "id": "primary.generate",
       "title": "Generate product",
       "category": "Primary Products",
@@ -10333,7 +10897,7 @@
       "id": "primary.artwork.text",
       "title": "Create editable text label",
       "category": "Primary Products",
-      "description": "Create or replace the active label zone with editable text and a portable PNG preview. Retains text authoring in the product definition. Applies immediately in the profile editor; otherwise use primary.artwork.apply. Does not touch CAD layers.",
+      "description": "Create or replace the active label zone with editable text and a portable PNG preview. Retains text authoring in the product definition. Applies immediately to the loaded selected product. Open primary.label.cad.open to convert it into editable CAD artwork paths.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -10388,7 +10952,7 @@
       "id": "primary.artwork.svg",
       "title": "Import vector label source",
       "category": "Primary Products",
-      "description": "Import self-contained SVG paths/text with a viewBox, retaining sanitized vector source and a PNG material preview. Rejects scripts, external resources and unsupported styling. Applies immediately in the profile editor; otherwise use primary.artwork.apply. CAD integration remains separate.",
+      "description": "Import self-contained SVG paths/text with a viewBox, retaining sanitized vector source and a PNG material preview. Rejects scripts, external resources and unsupported styling. Applies immediately to the loaded selected product. Open primary.label.cad.open to edit compatible paths in CAD.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -10431,7 +10995,7 @@
       "id": "primary.artwork.open",
       "title": "Import label image",
       "category": "Primary Products",
-      "description": "Open an interactive local PNG/JPEG/WebP/SVG picker. In the profile editor imports apply immediately. Returns opened, not imported; source bytes stay local until an explicit save.",
+      "description": "Open an interactive local PNG/JPEG/WebP/SVG picker. Imports apply immediately to the loaded selected product. Returns opened, not imported; source bytes stay local until an explicit save.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -10445,7 +11009,7 @@
       "id": "primary.artwork.mapping",
       "title": "Set physical label size",
       "category": "Primary Products",
-      "description": "Set label size, position and paper/film/foil finish; validates physical fit before mutation. Applies immediately in the profile editor; otherwise Generate or Apply commits the draft.",
+      "description": "Set label size, position and paper/film/foil finish; validates physical fit before mutation. Applies immediately to the loaded selected product; without a selection it remains a draft.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -10455,7 +11019,8 @@
             "enum": [
               "front",
               "back",
-              "wrap"
+              "wrap",
+              "cap-top"
             ]
           },
           "widthMm": {
@@ -10505,7 +11070,7 @@
       "id": "primary.artwork.remove",
       "title": "Remove label image",
       "category": "Primary Products",
-      "description": "Remove a draft label and its unused local source. Applies immediately in the profile editor; otherwise Generate or Apply commits the draft.",
+      "description": "Remove a draft label and its unused local source. Applies immediately to the loaded selected product; without a selection it remains a draft.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -10515,7 +11080,8 @@
             "enum": [
               "front",
               "back",
-              "wrap"
+              "wrap",
+              "cap-top"
             ]
           }
         },

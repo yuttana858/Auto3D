@@ -74,6 +74,11 @@ popup-fonts
 preferences-recovery
 preview-context-lifecycle
 primary-contents
+primary-label-cad
+primary-label-cad-ui
+primary-label-vectors
+primary-live-integration
+primary-live-panel
 primary-materials
 primary-products
 primary-profile

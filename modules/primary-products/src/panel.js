@@ -1,4 +1,6 @@
 import { ProductDetailPanel } from './detailpanel.js';
+import { BindLiveNumber, RefreshLiveInput } from './liveinput.js';
+import { BottleCap } from './bottleconstruction.js';
 import { LabelFinishes } from './surfaces.js';
 import { ProductCategories, ListProductDesigns, ProductDesign } from './catalog.js';
 import { GetArtworkZones } from './zones.js';
@@ -73,7 +75,7 @@ export class PrimaryProductsPanel
 {
     constructor (host, parent)
     {
-        this.host = host; this.root = Element ('div', 'pp_workspace', undefined, parent);
+        this.host = host; this.liveFields = []; this.root = Element ('div', 'pp_workspace', undefined, parent);
         for (const type of ['keydown', 'keyup']) { this.root.addEventListener (type, event => { if (event.target.closest?.('input, select, textarea, button, [contenteditable]')) { event.stopPropagation (); } }); }
         const top = Element ('div', 'pp_intro', undefined, this.root); Element ('span', 'pp_kicker', 'PRIMARY PRODUCT DESIGNS', top); Element ('span', 'pp_version', 'v' + PrimaryProductsVersion, top);
         this.layout = Element ('div', 'pp_layout', undefined, this.root);
@@ -100,14 +102,15 @@ export class PrimaryProductsPanel
         note.setAttribute ('aria-hidden', 'true');
         this.stage = Element ('section', 'pp_stage', undefined, this.layout); this.stage.setAttribute ('aria-label', 'Product profile reference');
         this.profileName = Element ('span', 'pp_profile_name', '', this.stage); this.drawing = Element ('div', 'pp_drawing', undefined, this.stage);
-        this.size = Element ('div', 'pp_size', '', this.stage); const editModel = Element ('button', 'pp_edit_model', 'Edit model', this.stage); editModel.type = 'button'; editModel.addEventListener ('click', () => this.Action (() => this.host.openProfile ()));
+        this.size = Element ('div', 'pp_size', '', this.stage); const previewActions = Element ('div', 'pp_preview_actions', undefined, this.stage); const editModel = Element ('button', 'pp_edit_model', 'Edit model', previewActions); editModel.type = 'button'; editModel.addEventListener ('click', () => this.Action (() => this.host.openProfile ()));
+        this.fit = Element ('button', 'pp_edit_model', 'Fit model', previewActions); this.fit.type = 'button'; this.fit.hidden = !host.fitSelected; this.fit.addEventListener ('click', () => this.Action (() => host.fitSelected ()));
         const controls = Element ('div', 'pp_controls', undefined, this.layout);
         const dimensions = Element ('section', 'pp_section', undefined, controls); Element ('h3', '', 'Dimensions · W × L × H', dimensions); const row = Element ('div', 'pp_dimension_row', undefined, dimensions); this.inputs = new Map ();
         for (const [key, label] of [['widthMm', 'Width'], ['lengthMm', 'Length'], ['heightMm', 'Height']]) {
             const field = Element ('label', 'pp_field', label, row); const wrap = Element ('span', 'pp_input_wrap', undefined, field); const input = Element ('input', '', undefined, wrap); input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', 'Product ' + label.toLowerCase ()); const unit = Element ('span', 'pp_unit', '', wrap);
             this.BindDimension (input, key); this.inputs.set (key, [{ input, unit }]);
         }
-        Element ('p', 'pp_draft_note', 'Press Enter to resize the selected generated product live; Tab updates only the draft.', dimensions);
+        this.liveNote = Element ('p', 'pp_draft_note', 'Valid changes update the selected product automatically.', dimensions);
         const calloutLabel = Element ('label', 'pp_toggle', undefined, dimensions); this.callouts = Element ('input', '', undefined, calloutLabel); this.callouts.type = 'checkbox'; this.callouts.setAttribute ('aria-label', 'Show W × L × H on model'); Element ('span', '', 'Show W × L × H on model', calloutLabel);
         this.callouts.addEventListener ('change', () => { if (this.host.setCallouts) { this.Action (() => this.host.setCallouts (this.callouts.checked)); } });
         this.detailsPanel = new ProductDetailPanel (host, controls, action => this.Action (action));
@@ -117,11 +120,11 @@ export class PrimaryProductsPanel
         this.sectionSelect.addEventListener ('change', () => { const draft = this.host.inspect (), shape = this.sectionSelect.value; this.Change ({ bottleSection : shape === 'round' ? null : { shape, depthMm : draft.bottleSection?.depthMm ?? Math.round (draft.diameterMm * .6 * 100) / 100 } }); });
         this.cornerLabel = Element ('label', 'pp_field', 'Corner radius', this.shapeSection); const cornerWrap = Element ('span', 'pp_input_wrap', undefined, this.cornerLabel); this.cornerInput = Element ('input', '', undefined, cornerWrap); this.cornerUnit = Element ('span', 'pp_unit', '', cornerWrap);
         this.cornerInput.type = 'number'; this.cornerInput.step = 'any'; this.cornerInput.setAttribute ('aria-label', 'Corner radius');
-        this.cornerInput.addEventListener ('change', () => { const draft = this.host.inspect (); if (draft.bottleSection?.shape === 'rectangle') { this.Change ({ bottleSection : { ...draft.bottleSection, cornerRadiusMm : this.cornerInput.valueAsNumber * this.Factor () } }); } });
+        this.BindNumber (this.cornerInput, value => { const draft = this.host.inspect (); if (draft.bottleSection?.shape === 'rectangle') { return this.Change ({ bottleSection : { ...draft.bottleSection, cornerRadiusMm : value * this.Factor () } }); } });
         for (const [key, title] of [['neckDiameterMm', 'Neck diameter'], ['shoulderHeightMm', 'Shoulder height'], ['neckHeightMm', 'Neck height'], ['capHeightMm', 'Cap height']]) {
             const label = Element ('label', 'pp_field', title, this.shapeSection), wrap = Element ('span', 'pp_input_wrap', undefined, label), input = Element ('input', '', undefined, wrap), unit = Element ('span', 'pp_unit', '', wrap);
             input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', title); this.shapeInputs.set (key, { input, unit });
-            input.addEventListener ('change', () => { const draft = this.host.inspect (); this.Change ({ bottleShape : { ...BottleShape (draft), [key] : input.valueAsNumber*this.Factor () } }); });
+            this.BindNumber (input, value => { const draft = this.host.inspect (); return this.Change ({ bottleShape : { ...BottleShape (draft), [key] : value*this.Factor () } }); });
         }
         this.pouchSection = Element ('section', 'pp_section', undefined, controls); Element ('h3', '', 'Pouch style', this.pouchSection);
         const styleLabel = Element ('label', 'pp_field', 'Construction', this.pouchSection); this.pouchStyle = Element ('select', '', undefined, styleLabel); this.pouchStyle.setAttribute ('aria-label', 'Pouch construction');
@@ -129,7 +132,7 @@ export class PrimaryProductsPanel
         this.pouchStyle.addEventListener ('change', () => this.ChangePouch ({ style : this.pouchStyle.value, gussetMm : undefined }));
         this.gussetLabel = Element ('label', 'pp_field', 'Gusset height', this.pouchSection); const gussetWrap = Element ('span', 'pp_input_wrap', undefined, this.gussetLabel); this.gussetInput = Element ('input', '', undefined, gussetWrap); this.gussetUnit = Element ('span', 'pp_unit', '', gussetWrap);
         this.gussetInput.type = 'number'; this.gussetInput.step = 'any'; this.gussetInput.setAttribute ('aria-label', 'Gusset height');
-        this.gussetInput.addEventListener ('change', () => { if (this.host.inspect ().pouchShape?.style === 'standup') { this.ChangePouch ({ gussetMm : this.gussetInput.valueAsNumber * this.Factor () }); } });
+        this.BindNumber (this.gussetInput, value => { if (this.host.inspect ().pouchShape?.style === 'standup') { return this.ChangePouch ({ gussetMm : value * this.Factor () }); } });
         const zipperLabel = Element ('label', 'pp_toggle', undefined, this.pouchSection); this.zipper = Element ('input', '', undefined, zipperLabel); this.zipper.type = 'checkbox'; this.zipper.setAttribute ('aria-label', 'Reclosable zipper'); Element ('span', '', 'Reclosable zipper', zipperLabel);
         this.zipper.addEventListener ('change', () => this.ChangePouch ({ zipper : this.zipper.checked || undefined }));
         this.spoutLabel = Element ('label', 'pp_field', 'Spout', this.pouchSection); this.spoutSelect = Element ('select', '', undefined, this.spoutLabel); this.spoutSelect.setAttribute ('aria-label', 'Pouch spout');
@@ -137,7 +140,7 @@ export class PrimaryProductsPanel
         this.spoutSelect.addEventListener ('change', () => { const current = this.host.inspect ().pouchShape?.spout; this.ChangePouch ({ spout : this.spoutSelect.value === 'none' ? undefined : { position : this.spoutSelect.value, ...(current ? { diameterMm : current.diameterMm } : {}) } }); });
         this.spoutSizeLabel = Element ('label', 'pp_field', 'Spout diameter', this.pouchSection); const spoutWrap = Element ('span', 'pp_input_wrap', undefined, this.spoutSizeLabel); this.spoutInput = Element ('input', '', undefined, spoutWrap); this.spoutUnit = Element ('span', 'pp_unit', '', spoutWrap);
         this.spoutInput.type = 'number'; this.spoutInput.step = 'any'; this.spoutInput.setAttribute ('aria-label', 'Spout diameter');
-        this.spoutInput.addEventListener ('change', () => { const spout = this.host.inspect ().pouchShape?.spout; if (spout) { this.ChangePouch ({ spout : { position : spout.position, diameterMm : this.spoutInput.valueAsNumber * this.Factor () } }); } });
+        this.BindNumber (this.spoutInput, value => { const spout = this.host.inspect ().pouchShape?.spout; if (spout) { return this.ChangePouch ({ spout : { position : spout.position, diameterMm : value * this.Factor () } }); } });
         Element ('p', 'pp_draft_note', 'Stand-up pouches open into a bottom gusset as deep as L; flat-bottom pouches stand on a W × L box base. Zippers sit below the top seal. Height H includes any spout and cap.', this.pouchSection);
         Element ('p', 'pp_draft_note', 'Overall height includes the cap. The straight body uses the remaining height. Shape edits preserve label size; artwork must still fit.', this.shapeSection);
         const surfaces = Element ('section', 'pp_section', undefined, controls); Element ('h3', '', 'Surface', surfaces);
@@ -147,9 +150,16 @@ export class PrimaryProductsPanel
         const finish = Element ('div', 'pp_surface_row', undefined, surfaces);
         const roughLabel = Element ('label', 'pp_field', 'Roughness', finish); this.roughness = Element ('input', '', undefined, roughLabel); this.roughness.type = 'range'; this.roughness.min = '0'; this.roughness.max = '1'; this.roughness.step = '.01'; this.roughness.setAttribute ('aria-label', 'Product roughness'); this.roughness.addEventListener ('input', () => this.Change ({ roughness : this.roughness.valueAsNumber }));
         const advanced = Element ('button', 'pp_art_import', 'Advanced material editor', surfaces); Element ('p', 'pp_draft_note', 'Select a generated product to edit its materials and label artwork.', surfaces); advanced.type = 'button'; advanced.addEventListener ('click', () => this.Action (() => host.openMaterials ()));
+        this.labelCAD = Element ('section', 'pp_section', undefined, controls); Element ('h3', '', 'Label design', this.labelCAD);
+        this.labelCADButtons = new Map ();
+        for (const [zone, title] of [['front', 'Front label'], ['wrap', 'Wrap label'], ['back', 'Back label'], ['cap-top', 'Cap top']]) {
+            const button = Element ('button', 'pp_art_import', 'Design ' + title.toLowerCase () + ' in CAD', this.labelCAD); button.type = 'button'; button.addEventListener ('click', () => this.Action (() => host.openLabelCAD (zone))); this.labelCADButtons.set (zone, button);
+        }
+        Element ('p', 'pp_draft_note', 'Edit the label outline and artwork in CAD, then apply it to this product.', this.labelCAD);
         const artwork = Element ('section', 'pp_workspace pp_section pp_artwork_editor'); this.artworkRoot = artwork; artwork.setAttribute ('aria-label', 'Product label artwork');
         for (const type of ['keydown', 'keyup']) { artwork.addEventListener (type, event => event.stopPropagation ()); } Element ('h3', '', 'Label art', artwork); const zones = Element ('div', 'pp_zone_buttons', undefined, artwork); this.zones = new Map ();
-        for (const [zone, label] of [['front', 'Front label'], ['wrap', 'Wrap label'], ['back', 'Back label']]) { const button = Element ('button', '', label, zones); button.type = 'button'; button.addEventListener ('click', () => this.Change ({ labelZone : zone })); this.zones.set (zone, button); }
+        for (const [zone, label] of [['front', 'Front label'], ['wrap', 'Wrap label'], ['back', 'Back label'], ['cap-top', 'Cap top']]) { const button = Element ('button', '', label, zones); button.type = 'button'; button.addEventListener ('click', () => this.Change ({ labelZone : zone })); this.zones.set (zone, button); }
+        this.artCAD = Element ('button', 'pp_art_import', 'Open label in CAD', artwork); this.artCAD.type = 'button'; this.artCAD.addEventListener ('click', () => this.Action (() => host.openLabelCAD (this.host.inspect ().labelZone)));
         this.artImage = Element ('img', 'pp_art_image', undefined, artwork); this.artImage.alt = 'Imported label artwork'; this.artImage.hidden = true;
         this.artName = Element ('p', 'pp_draft_note', 'Import PNG/JPEG/WebP (4 MiB) or self-contained SVG (64 KiB).', artwork);
         const importButton = Element ('button', 'pp_art_import', 'Import label image', artwork); importButton.type = 'button'; importButton.addEventListener ('click', () => this.Action (() => host.artworkOpen ()));
@@ -163,7 +173,7 @@ export class PrimaryProductsPanel
         }
         const textButton = Element ('button', 'pp_art_import', 'Create / update text label', textBox); textButton.type = 'button'; textButton.addEventListener ('click', () => this.Action (() => host.artworkText (Object.fromEntries ([...this.textFields].map (([key, input]) => [key, key === 'fontSize' ? input.valueAsNumber : input.value])))));
         this.artDimensions = Element ('div', 'pp_art_dimensions', undefined, artwork); this.artInputs = new Map ();
-        for (const [key, label] of [['widthMm', 'Label width'], ['heightMm', 'Label height'], ['offsetXmm', 'Label horizontal offset'], ['offsetYmm', 'Label vertical offset']]) { const field = Element ('label', 'pp_field', label, this.artDimensions), input = Element ('input', '', undefined, field); input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', label); input.addEventListener ('change', () => { const current = this.host.inspect ().artwork.find (a => a.zone === this.host.inspect ().labelZone); if (current) { this.Action (() => host.artworkMapping ({ zone : current.zone, widthMm : current.widthMm, heightMm : current.heightMm, [key] : input.valueAsNumber * this.Factor () })); } }); this.artInputs.set (key, input); }
+        for (const [key, label] of [['widthMm', 'Label width'], ['heightMm', 'Label height'], ['offsetXmm', 'Label horizontal offset'], ['offsetYmm', 'Label vertical offset']]) { const field = Element ('label', 'pp_field', label, this.artDimensions), input = Element ('input', '', undefined, field); input.type = 'number'; input.step = 'any'; input.setAttribute ('aria-label', label); this.BindNumber (input, value => { const current = this.host.inspect ().artwork.find (a => a.zone === this.host.inspect ().labelZone); if (current) { return this.Action (() => host.artworkMapping ({ zone : current.zone, widthMm : current.widthMm, heightMm : current.heightMm, [key] : value * this.Factor () })); } }); this.artInputs.set (key, input); }
         const finishLabel = Element ('label', 'pp_field', 'Label finish', artwork); this.labelFinish = Element ('select', '', undefined, finishLabel); this.labelFinish.setAttribute ('aria-label', 'Label finish');
         for (const [value, preset] of Object.entries (LabelFinishes)) { Element ('option', '', preset.name, this.labelFinish).value = value; }
         this.labelFinish.addEventListener ('change', () => this.Action (() => host.artworkMapping ({ zone : this.host.inspect ().labelZone, finish : this.labelFinish.value })));
@@ -174,7 +184,7 @@ export class PrimaryProductsPanel
         const footer = Element ('div', 'pp_footer', undefined, controls); this.add = Element ('button', 'pp_add', 'Generate', footer); this.add.type = 'button'; this.add.addEventListener ('click', () => this.Action (() => host.generate ()));
         this.load = Element ('button', 'pp_reset', 'Load selected product', footer); this.load.type = 'button'; this.load.addEventListener ('click', () => this.Action (() => host.loadSelected ()));
         this.apply = Element ('button', 'pp_reset', 'Apply to selected product', footer); this.apply.type = 'button'; this.apply.addEventListener ('click', () => this.Action (() => host.update ()));
-        Element ('p', 'pp_draft_note', 'Presentation models with editable physical surfaces. Generate or Apply to update the model. Applying rebuilds component surfaces from this draft.', footer);
+        Element ('p', 'pp_draft_note', 'Generate creates a new product. Selecting a product enables automatic updates to its dimensions and surfaces.', footer);
         const reset = Element ('button', 'pp_reset', 'Reset draft', footer); reset.type = 'button'; reset.addEventListener ('click', () => { try { host.reset (); this.Refresh (); } catch (error) { this.status.textContent = error.message; } }); this.reset = reset;
         this.availability = Element ('p', 'pp_draft_note', '', controls); this.availability.setAttribute ('role', 'status');
         this.status = Element ('p', 'pp_status', '', controls); this.status.setAttribute ('role', 'status'); this.Refresh ();
@@ -193,38 +203,42 @@ export class PrimaryProductsPanel
     }
     async Action (action)
     {
-        try { const result = await action (); this.status.textContent = result?.message || 'Product action completed.'; this.drawerStatus.textContent = result?.message || ''; }
-        catch (error) { this.status.textContent = error.message; this.drawerStatus.textContent = error.message; }
+        try { const result = await action (); this.status.textContent = result?.message || ''; this.drawerStatus.textContent = result?.message || ''; return result ?? true; }
+        catch (error) { this.status.textContent = error.message; this.drawerStatus.textContent = error.message; return false; }
         finally { this.artStatus.textContent = this.status.textContent; this.Refresh (); }
     }
     ReportError (message) { this.status.textContent = message; this.artStatus.textContent = message; }
-    // Enter applies the dimension and rebuilds the selected generated product; Tab or blur only updates the draft.
+    Dispose () { for (const field of this.liveFields) { field.cancel (); } this.detailsPanel.Dispose (); }
+    Context () { const d = this.host.inspect (); return JSON.stringify ([d.liveObjectId || null, d.family, d.labelZone, this.host.units ()]); }
+    Blocked () { return this.host.liveBlocked ? this.host.liveBlocked () : this.host.blocked (); }
+    BindNumber (input, change)
+    {
+        const field = BindLiveNumber (input, change, { context : () => this.Context (), report : message => this.ReportError (message) }); this.liveFields.push (field); return field;
+    }
     BindDimension (input, key)
     {
-        input.addEventListener ('keydown', event => { if (event.key !== 'Enter') { return; } event.preventDefault (); event.stopPropagation (); this.enterInput = input; this.SetDimension (key, input.valueAsNumber * this.Factor (), true); });
-        input.addEventListener ('change', () => { if (this.enterInput === input) { this.enterInput = null; return; } this.SetDimension (key, input.valueAsNumber * this.Factor (), false); });
-        input.addEventListener ('blur', () => { if (this.enterInput === input) { this.enterInput = null; } });
+        this.BindNumber (input, value => this.SetDimension (key, value * this.Factor ()));
     }
-    SetDimension (key, mm, live)
+    SetDimension (key, mm)
     {
-        if (live && this.host.setDimensions) { return this.Action (() => this.host.setDimensions ({ [key] : mm })); }
-        try { this.Change (DimensionChanges (this.host.inspect (), { [key] : mm })); } catch (error) { this.status.textContent = error.message; this.Refresh (); }
+        try { return this.Change (DimensionChanges (this.host.inspect (), { [key] : mm })); } catch (error) { this.ReportError (error.message); return false; }
     }
     Factor () { return this.host.units () === 'standard' ? 25.4 : 1; }
     Change (changes)
     {
-        try { this.host.configure (changes); this.status.textContent = ''; this.Refresh (); }
-        catch (error) { this.status.textContent = error.message; this.Refresh (); }
+        return this.Action (() => this.host.liveConfigure ? this.host.liveConfigure (changes) : this.host.configure (changes));
     }
     SetDisabled ()
     {
-        const draft = this.host.inspect (), disabled = this.host.blocked ();
+        const draft = this.host.inspect (), disabled = this.Blocked ();
         for (const input of [...this.root.querySelectorAll ('input, select, textarea, button'), ...(this.artworkRoot?.querySelectorAll ('input, select, textarea, button') || [])]) { input.disabled = disabled; }
         if (this.drawerClose) { this.drawerClose.disabled = false; }
-        this.add.disabled = disabled || !draft.generationAvailable; this.apply.disabled = disabled || !draft.generationAvailable;
-        this.add.textContent = draft.generating ? 'Generating…' : 'Generate';
+        this.add.disabled = this.host.blocked () || !draft.generationAvailable; this.apply.disabled = this.host.blocked () || !draft.generationAvailable; this.apply.hidden = Boolean (draft.liveObjectId);
+        this.add.textContent = draft.generating && !draft.liveUpdating ? 'Generating…' : draft.liveObjectId ? 'Generate new' : 'Generate';
         this.add.title = draft.unavailableReason || 'Generate a product in the session.';
-        this.availability.textContent = draft.unavailableReason || '';
+        this.fit.disabled = disabled || !draft.liveObjectId;
+        this.availability.textContent = draft.liveUpdating ? 'Updating selected product…' : draft.unavailableReason || '';
+        this.liveNote.textContent = draft.liveObjectId ? 'Editing selected product. Valid changes update the 3D model automatically.' : 'Set up a new product, then Generate. Select a generated product to edit it live.';
         this.detailsPanel?.Refresh ();
         if (this.labelFinish) { this.labelFinish.disabled = disabled || !draft.artwork?.some (a => a.zone === draft.labelZone); }
     }
@@ -234,17 +248,19 @@ export class PrimaryProductsPanel
         const current = this.host.inspect ().pouchShape || { style : 'pillow' }, next = { ...current, ...patch };
         for (const key of Object.keys (next)) { if (next[key] === undefined) { delete next[key]; } }
         if (next.style !== 'standup') { delete next.gussetMm; } if (next.style === 'pillow') { delete next.spout; }
-        this.Change ({ pouchShape : next });
+        return this.Change ({ pouchShape : next });
     }
     Refresh ()
     {
-        const draft = this.host.inspect (), factor = this.Factor (), unit = factor === 1 ? 'mm' : 'in', disabled = this.host.blocked ();
+        const draft = this.host.inspect (), factor = this.Factor (), unit = factor === 1 ? 'mm' : 'in', disabled = this.Blocked ();
+        const context = this.Context (), changed = this.fieldContext !== undefined && this.fieldContext !== context;
+        if (changed) { for (const field of this.liveFields) { field.reset (); } } this.fieldContext = context;
         for (const [family, button] of this.cards) { button.setAttribute ('aria-pressed', String (draft.family === family)); button.disabled = disabled; }
         const size = ProductSize (draft), round = !['pouch', 'clamshell'].includes (draft.family);
         for (const key of ['widthMm', 'lengthMm', 'heightMm']) {
             const limits = key === 'heightMm' ? [20, 1000] : key === 'lengthMm' && !round ? [2, 200] : [10, 500];
             for (const { input, unit : suffix } of [...this.inputs.get (key), this.drawerInputs?.get (key)].filter (Boolean)) {
-                if (document.activeElement !== input) { input.value = String (Math.round (size[key] / factor * 1000) / 1000); }
+                RefreshLiveInput (input, Math.round (size[key] / factor * 1000) / 1000, changed);
                 input.disabled = disabled; input.min = String (limits[0] / factor); input.max = String (limits[1] / factor); suffix.textContent = unit;
                 input.title = round && !draft.bottleSection && key !== 'heightMm' ? 'Width and length share the round product diameter.' : '';
             }
@@ -254,17 +270,17 @@ export class PrimaryProductsPanel
         if (draft.family === 'pouch') {
             const shape = draft.pouchShape, style = shape?.style || 'pillow';
             this.pouchStyle.value = style; this.pouchStyle.disabled = disabled; this.gussetLabel.hidden = style !== 'standup'; this.gussetUnit.textContent = unit; this.gussetInput.disabled = disabled;
-            if (style === 'standup') { this.gussetInput.min = String (3 / factor); this.gussetInput.max = String (PouchGussetLimit (draft) / factor); if (document.activeElement !== this.gussetInput) { this.gussetInput.value = String (Number ((shape.gussetMm / factor).toFixed (6))); } }
+            if (style === 'standup') { this.gussetInput.min = String (3 / factor); this.gussetInput.max = String (PouchGussetLimit (draft) / factor); RefreshLiveInput (this.gussetInput, Number ((shape.gussetMm / factor).toFixed (6)), changed); }
             this.zipper.checked = Boolean (shape?.zipper); this.zipper.disabled = disabled;
             this.spoutLabel.hidden = style === 'pillow'; this.spoutSelect.value = shape?.spout?.position || 'none'; this.spoutSelect.disabled = disabled;
             this.spoutSizeLabel.hidden = !shape?.spout; this.spoutUnit.textContent = unit; this.spoutInput.disabled = disabled;
-            if (shape?.spout) { this.spoutInput.min = String (5 / factor); this.spoutInput.max = String (PouchSpoutLimit (draft) / factor); if (document.activeElement !== this.spoutInput) { this.spoutInput.value = String (Number ((shape.spout.diameterMm / factor).toFixed (6))); } }
+            if (shape?.spout) { this.spoutInput.min = String (5 / factor); this.spoutInput.max = String (PouchSpoutLimit (draft) / factor); RefreshLiveInput (this.spoutInput, Number ((shape.spout.diameterMm / factor).toFixed (6)), changed); }
         }
         if (draft.family === 'bottle') {
             this.sectionSelect.value = draft.bottleSection?.shape || 'round'; this.sectionSelect.disabled = disabled; this.cornerLabel.hidden = draft.bottleSection?.shape !== 'rectangle'; this.cornerUnit.textContent = unit;
-            if (draft.bottleSection?.shape === 'rectangle' && document.activeElement !== this.cornerInput) { this.cornerInput.value = String (Number ((draft.bottleSection.cornerRadiusMm / factor).toFixed (6))); }
+            if (draft.bottleSection?.shape === 'rectangle') { RefreshLiveInput (this.cornerInput, Number ((draft.bottleSection.cornerRadiusMm / factor).toFixed (6)), changed); }
         }
-        if (draft.family === 'bottle') { const shape = BottleShape (draft); for (const [key, { input, unit : suffix }] of this.shapeInputs) { input.value = String (Number ((shape[key]/factor).toFixed (6))); input.min = String (.5/factor); input.max = String (1000/factor); suffix.textContent = unit; } }
+        if (draft.family === 'bottle') { const shape = BottleShape (draft); for (const [key, { input, unit : suffix }] of this.shapeInputs) { RefreshLiveInput (input, Number ((shape[key]/factor).toFixed (6)), changed); input.min = String (.5/factor); input.max = String (1000/factor); suffix.textContent = unit; } }
         this.material.replaceChildren ();
         for (const item of ListProductMaterials (draft.family)) { const option = Element ('option', '', item.name, this.material); option.value = item.id; option.disabled = !item.available; }
         this.material.value = draft.material; this.material.disabled = disabled; this.color.value = draft.color; this.color.disabled = disabled; this.roughness.value = String (draft.roughness); this.roughness.disabled = disabled; this.reset.disabled = disabled;
@@ -278,8 +294,12 @@ export class PrimaryProductsPanel
         this.artName.textContent = art ? art.name + ' · label size in ' + unit : 'Import PNG/JPEG/WebP (4 MiB) or self-contained SVG (64 KiB).';
         this.detailsPanel?.Refresh (); this.labelFinish.disabled = !art || disabled; this.labelFinish.value = art?.finish || 'paperMatte';
         this.artDimensions.hidden = !art; this.artRemove.hidden = !art;
-        if (art) { for (const [key, input] of this.artInputs) { input.value = String (Math.round ((art[key] || 0) / factor * 1000) / 1000); } }
-        for (const [zone, button] of this.zones) { button.hidden = ['pouch', 'clamshell'].includes (draft.family) && zone === 'wrap'; button.textContent = draft.family === 'clamshell' ? (zone === 'front' ? 'Top label' : 'Bottom label') : { front : 'Front label', back : 'Back label', wrap : 'Wrap label' }[zone]; button.setAttribute ('aria-pressed', String (draft.labelZone === zone)); button.disabled = disabled; }
+        if (art) { for (const [key, input] of this.artInputs) { RefreshLiveInput (input, Math.round ((art[key] || 0) / factor * 1000) / 1000, changed); } }
+        const zoneDraft = Object.fromEntries ([...Object.keys (DefaultProductDraft (draft.family)), 'bottleShape', 'bottleSection', 'pouchShape', 'details', 'contents', 'optics'].filter (key => draft[key] !== undefined).map (key => [key, draft[key]]));
+        const availableZones = GetArtworkZones (zoneDraft), zoneNames = Object.fromEntries (availableZones.map (zone => [zone.id, zone.name || { front : draft.family === 'clamshell' ? 'Top label' : 'Front label', back : draft.family === 'clamshell' ? 'Bottom label' : 'Back label', wrap : 'Wrap label', 'cap-top' : 'Cap top' }[zone.id]]));
+        for (const [zone, button] of this.zones) { button.hidden = !zoneNames[zone]; button.textContent = zoneNames[zone] || zone; button.setAttribute ('aria-pressed', String (draft.labelZone === zone)); button.disabled = disabled; }
+        this.labelCAD.hidden = !this.host.openLabelCAD; this.artCAD.hidden = !this.host.openLabelCAD;
+        for (const [zone, button] of this.labelCADButtons) { button.hidden = !zoneNames[zone]; button.textContent = 'Design ' + (zoneNames[zone] || zone).toLowerCase () + ' in CAD'; button.disabled = disabled; }
         this.Drawer (draft.catalogOpen === true); this.drawerTitle.textContent = ProductCategories[draft.catalogCategory] || 'Designs';
         const catalogKey = draft.catalogCategory + ':' + unit; if (catalogKey !== this.catalogKey) { this.catalogKey = catalogKey; this.drawerGrid.replaceChildren (); for (const design of ListProductDesigns (draft.catalogCategory)) { const button = Element ('button', 'pp_design_card', undefined, this.drawerGrid); button.type='button'; button.innerHTML=DesignPreview(design); Element('strong', '', design.name, button); const size = ProductSize (ProductDesign (design.id)); Element ('small', 'pp_design_size', [size.widthMm, size.lengthMm, size.heightMm].map (v => Number ((v/factor).toFixed (2))).join (' × ') + ' ' + unit, button); button.title=design.description + ' · ' + design.dimensionsAre; button.setAttribute ('aria-label', 'Generate ' + design.name); button.addEventListener('click', ()=>this.Action(()=>this.host.generateDesign ? this.host.generateDesign(design.id) : this.host.selectDesign(design.id))); } }
         this.profileName.textContent = ProductName (draft);
@@ -296,9 +316,8 @@ export class PrimaryProductsPanel
         const bottle = draft.family === 'bottle', pouch = ['pouch', 'clamshell'].includes (draft.family); const width = Math.max (70, Math.min (160, (draft.diameterMm || draft.widthMm) / draft.heightMm * 280)), x = 120 - width / 2;
         const shape = bottle ? BottleShape (draft) : null, sy = value => 305-value/draft.heightMm*250, neckWidth = bottle ? width*shape.neckDiameterMm/draft.diameterMm : 0, capBottom = bottle ? sy (draft.heightMm-shape.capHeightMm) : 0, neckBottom = bottle ? sy (draft.heightMm-shape.capHeightMm-shape.neckHeightMm) : 0, bodyTop = bottle ? sy (draft.heightMm-shape.capHeightMm-shape.neckHeightMm-shape.shoulderHeightMm) : 0;
         const body = draft.family === 'clamshell' ? `M${x} 75H${x+width}V305H${x}Z` : pouch ? PouchSvg (draft, x, 55, width, 250).body : bottle ? `M${120-neckWidth/2} ${capBottom}H${120+neckWidth/2}V${neckBottom}L${x+width} ${bodyTop}V305H${x}V${bodyTop}L${120-neckWidth/2} ${neckBottom}Z` : `M${x} 90Q120 78 ${x + width} 90V294Q120 307 ${x} 294Z`;
-        const zoneDraft = DefaultProductDraft (draft.family); for (const key of Object.keys (zoneDraft)) { zoneDraft[key] = draft[key]; } if (draft.bottleShape) { zoneDraft.bottleShape = draft.bottleShape; } if (draft.bottleSection) { zoneDraft.bottleSection = draft.bottleSection; } if (draft.pouchShape) { zoneDraft.pouchShape = draft.pouchShape; }
-        const zone = GetArtworkZones (zoneDraft).find (z => z.id === draft.labelZone), artHeight = art?.heightMm || zone.heightMm*.7, labelY = sy (zone.bottomMm+(zone.heightMm+artHeight)/2), labelHeight = artHeight/draft.heightMm*250;
+        const zone = availableZones.find (z => z.id === draft.labelZone) || availableZones[0], artHeight = art?.heightMm || zone.heightMm*.7, labelY = sy ((zone.bottomMm || 0)+(zone.heightMm+artHeight)/2), labelHeight = artHeight/draft.heightMm*250;
         const labelX = draft.labelZone === 'wrap' ? x + 1 : 120 - width * .32, labelW = draft.labelZone === 'wrap' ? width - 2 : width * .64;
-        this.drawing.innerHTML = `<svg viewBox="0 0 240 350" role="img" aria-label="${draft.family === 'clamshell' ? 'Clamshell' : pouch ? 'Pouch' : bottle ? 'Bottle' : 'Can'} profile reference"><ellipse cx="120" cy="319" rx="75" ry="9" fill="currentColor" opacity=".07"/><path d="${body}" fill="${draft.color}" fill-opacity="${draft.material === 'glass' ? '.3' : '1'}" stroke="currentColor" stroke-opacity=".23" stroke-width="1.5"/>${pouch ? (p => `<g stroke="currentColor"><path d="${p.details}" stroke-opacity=".3" fill="none"/>${p.zipper}</g>${p.spout}`) (PouchSvg (draft, x, 55, width, 250)) : bottle ? `<rect x="${120-neckWidth*.54}" y="55" width="${neckWidth*1.08}" height="${capBottom-55}" fill="#859497"/>` : `<ellipse cx="120" cy="90" rx="${width / 2}" ry="6" fill="#cbd3d4" stroke="#7a898b"/><ellipse cx="120" cy="91" rx="12" ry="3" fill="#859497"/>`}${preview ? `<image href="${preview}" x="${labelX}" y="${labelY}" width="${labelW}" height="${labelHeight}" preserveAspectRatio="xMidYMid meet"/>` : `<rect x="${labelX}" y="${labelY}" width="${labelW}" height="${labelHeight}" fill="none" stroke="#458b9b" stroke-dasharray="4 4"/>`}<g class="pp_callout" fill="currentColor" stroke="currentColor" stroke-width=".8">${Bracket (x, 336, x + width, 336, 'W ' + Format (size.widthMm / factor) + ' ' + unit, 'below', 11)}${Bracket (x + width + 10, bottle || pouch ? 55 : 84, x + width + 10, 305, 'H ' + Format (size.heightMm / factor), 'right', 11)}<text x="${x + width + 4}" y="322" stroke="none" font-size="11">L ${Format (size.lengthMm / factor)}</text></g></svg>`;
+        this.drawing.innerHTML = `<svg viewBox="0 0 240 350" role="img" aria-label="${draft.family === 'clamshell' ? 'Clamshell' : pouch ? 'Pouch' : bottle ? 'Bottle' : 'Can'} profile reference"><ellipse cx="120" cy="319" rx="75" ry="9" fill="currentColor" opacity=".07"/><path d="${body}" fill="${draft.color}" fill-opacity="${draft.material === 'glass' ? '.3' : '1'}" stroke="currentColor" stroke-opacity=".23" stroke-width="1.5"/>${pouch ? (p => `<g stroke="currentColor"><path d="${p.details}" stroke-opacity=".3" fill="none"/>${p.zipper}</g>${p.spout}`) (PouchSvg (draft, x, 55, width, 250)) : bottle ? `<rect x="${120-neckWidth*.54}" y="55" width="${neckWidth*1.08}" height="${capBottom-55}" fill="${BottleCap (draft).color}"/>` : `<ellipse cx="120" cy="90" rx="${width / 2}" ry="6" fill="#cbd3d4" stroke="#7a898b"/><ellipse cx="120" cy="91" rx="12" ry="3" fill="#859497"/>`}${preview ? `<image href="${preview}" x="${labelX}" y="${labelY}" width="${labelW}" height="${labelHeight}" preserveAspectRatio="xMidYMid meet"/>` : `<rect x="${labelX}" y="${labelY}" width="${labelW}" height="${labelHeight}" fill="none" stroke="#458b9b" stroke-dasharray="4 4"/>`}<g class="pp_callout" fill="currentColor" stroke="currentColor" stroke-width=".8">${Bracket (x, 336, x + width, 336, 'W ' + Format (size.widthMm / factor) + ' ' + unit, 'below', 11)}${Bracket (x + width + 10, bottle || pouch ? 55 : 84, x + width + 10, 305, 'H ' + Format (size.heightMm / factor), 'right', 11)}<text x="${x + width + 4}" y="322" stroke="none" font-size="11">L ${Format (size.lengthMm / factor)}</text></g></svg>`;
     }
 }

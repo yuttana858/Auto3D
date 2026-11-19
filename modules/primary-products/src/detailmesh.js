@@ -29,8 +29,28 @@ export function AddInnerWall (mesh, wall)
     for (let i = 0; i < indices.length; i += 3) { mesh.indices.push (count + indices[i], count + indices[i + 2], count + indices[i + 1]); }
     return mesh;
 }
-export function CapMesh (id, radius, low, high, style = 'ribbed')
+export function CapMesh (id, radius, low, high, style = 'ribbed', wallMm = null)
 {
+    if (wallMm !== null) {
+        const bevel = Math.min ((high - low) * .12, radius * .06), inner = radius - wallMm;
+        const profile = [[0, high - wallMm], [inner - bevel * .25, high - wallMm], [inner, high - wallMm - bevel * .25], [inner, low], [radius - bevel * .3, low], [radius, low + bevel * .3], [radius, low + bevel], [radius, high - bevel]];
+        for (let i = 1; i <= 4; i++) { const angle = i / 4 * Math.PI / 2; profile.push ([radius - bevel + bevel * Math.cos (angle), high - bevel + bevel * Math.sin (angle)]); }
+        profile.push ([0, high]);
+        const mesh = Revolve (id, 'closure', profile, 128);
+        if (style === 'ribbed') {
+            for (let i = 0; i < mesh.positions.length; i += 3) {
+                const y = mesh.positions[i + 1], r = Math.hypot (mesh.positions[i], mesh.positions[i + 2]);
+                if (Math.abs (r - radius) < 1e-8 && y >= low + bevel && y <= high - bevel) {
+                    const a = Math.atan2 (mesh.positions[i + 2], mesh.positions[i]), factor = 1 - Math.min (.014, wallMm / radius * .18) * (1 - Math.cos (a * 32));
+                    mesh.positions[i] *= factor; mesh.positions[i + 2] *= factor;
+                }
+            }
+        }
+        for (let i = 0; i < mesh.positions.length; i += 3) {
+            if (Math.abs (mesh.positions[i + 1] - high) < 1e-8) { mesh.uvs[i / 3 * 2] = .5 + mesh.positions[i] / (2 * (radius - bevel)); mesh.uvs[i / 3 * 2 + 1] = .5 - mesh.positions[i + 2] / (2 * (radius - bevel)); }
+        }
+        return SmoothMesh (RecalculateNormals (mesh));
+    }
     const bevel = Math.min ((high - low) * .12, radius * .06), profile = [[0, low], [radius * .94, low], [radius, low + bevel], [radius, high - bevel], [radius * .94, high], [0, high]];
     const mesh = Revolve (id, 'closure', profile, 128);
     if (style === 'ribbed') { for (let i = 0; i < mesh.positions.length; i += 3) { const a = Math.atan2 (mesh.positions[i + 2], mesh.positions[i]), f = .987 + .013 * Math.cos (a * 32); mesh.positions[i] *= f; mesh.positions[i + 2] *= f; } }

@@ -44,7 +44,7 @@ export function CreateBoard (input, { textured = false, guides = false } = {})
         const score = { name : 'SCORE · fold hinges', vertices : [], normals : [], uvs : [], triangles : [], lines : [] };
         materials.push ({ role : 'cut', name : 'CUT · red', color : [221, 63, 63], roughness : 1 }, { role : 'score', name : 'SCORE · blue', color : [38, 125, 222], roughness : 1 });
         const add = (mesh, a, b, material) => { const offset = mesh.vertices.length; mesh.vertices.push ([a[0], thickness + 0.02, -a[1]], [b[0], thickness + 0.02, -b[1]]); mesh.lines.push ({ vertices : [offset, offset + 1], material }); };
-        for (const path of profile.paths) {
+        for (const path of profile.paths.filter (path => path.type !== 'artwork')) {
             const points = path.closed ? [...path.points, path.points[0]] : path.points;
             for (let index = 1; index < points.length; index++) {
                 const a = points[index - 1]; const b = points[index];

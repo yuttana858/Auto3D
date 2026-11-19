@@ -55,7 +55,12 @@ function Element (tag, className, parent, text)
 // The popup for a ProgressRecord. It closes itself a moment after the record finishes.
 export function ShowProgressPopup (record, { host = null, closeAfterMs = 2600 } = {})
 {
-    if (typeof document === 'undefined') { return { Close () {} }; }
+    // The popup only reports; without a usable page (tests, workers) the operation runs without it.
+    if (typeof document === 'undefined' || typeof document.createElement !== 'function' || typeof document.getElementById !== 'function') { return { Close () {} }; }
+    try { return Popup (record, host, closeAfterMs); } catch { return { Close () {} }; }
+}
+function Popup (record, host, closeAfterMs)
+{
     const parent = host || document.getElementById ('main_viewer') || document.body;
     const root = Element ('section', 'progress_popup', parent); root.setAttribute ('role', 'dialog'); root.setAttribute ('aria-label', record.title + ' progress');
     const head = Element ('div', 'progress_popup_head', root); Element ('strong', null, head, record.title); const percent = Element ('span', 'progress_popup_percent', head, '0%');

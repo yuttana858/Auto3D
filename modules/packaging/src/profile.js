@@ -25,7 +25,7 @@ export function ValidatePackaging (data)
     if (!data || data.version !== 1 || !Array.isArray (data.paths) || data.paths.length > 100 || typeof data.name !== 'string' || typeof data.grade !== 'string' || !Number.isFinite (data.thickness) || data.thickness <= 0 || data.thickness > 100) { throw new Error ('Invalid packaging design or board thickness (0–100 mm).'); }
     const result = { version : 1, name : data.name.slice (0, 100), grade : data.grade.slice (0, 100), thickness : data.thickness, paths : [] }; const ids = new Set (); let count = 0;
     for (const path of data.paths) {
-        if (!path || typeof path.id !== 'string' || !path.id || path.id.length > 100 || ids.has (path.id) || !['cut', 'score'].includes (path.type) || typeof path.closed !== 'boolean' || !Array.isArray (path.points)) { throw new Error ('Invalid packaging path.'); }
+        if (!path || typeof path.id !== 'string' || !path.id || path.id.length > 100 || ids.has (path.id) || !['cut', 'score', 'artwork'].includes (path.type) || typeof path.closed !== 'boolean' || !Array.isArray (path.points)) { throw new Error ('Invalid packaging path.'); }
         ids.add (path.id); const points = path.points.map ((point) => {
             if (!Array.isArray (point) || point.length !== 2 || !point.every ((value) => Number.isFinite (value) && Math.abs (value) <= 100000)) { throw new Error ('Use finite X/Y points within ±100000 mm.'); } return [...point];
         });
@@ -33,6 +33,12 @@ export function ValidatePackaging (data)
         count += points.length;
         if (count > 2000 || points.length < (path.closed ? 3 : 2) || points.some ((point, index) => index > 0 && same (point, points[index - 1]))) { throw new Error ('A path needs distinct points: 2 for a line, 3 for a closed outline; maximum 2000 points per design.'); }
         const normalized = { id : path.id, type : path.type, closed : path.closed, points };
+        if (path.type === 'artwork') {
+            const fill = path.fill ?? (path.closed ? '#123740' : 'none'), stroke = path.stroke ?? (path.closed ? 'none' : '#123740'), strokeWidth = path.strokeWidth ?? .2;
+            const paint = value => value === 'none' || typeof value === 'string' && /^#[a-fA-F0-9]{6}$/.test (value);
+            if (!paint (fill) || !paint (stroke) || !Number.isFinite (strokeWidth) || strokeWidth < 0 || strokeWidth > 100) { throw new Error ('Artwork paths need solid hex colors and a stroke width of 0–100 mm.'); }
+            Object.assign (normalized, { fill, stroke, strokeWidth });
+        }
         if (path.process !== undefined) {
             const process = path.process;
             if (path.type !== 'score' || !process || typeof process !== 'object' || Array.isArray (process) || Object.keys (process).some (key => !['kind', 'cutMm', 'tieMm'].includes (key)) || !['crease', 'reverse-crease', 'perforation', 'crease-perforation'].includes (process.kind)) { throw new Error ('Invalid crease/perforation specification.'); }
@@ -83,7 +89,7 @@ export function ExportPackagingSVG (data)
 {
     const design = ValidatePackaging (data); if (!design.paths.length) { throw new Error ('Draw a path before exporting.'); } const box = PackagingBounds (design); const width = Math.max (box.maxX - box.minX, 0.2); const height = Math.max (box.maxY - box.minY, 0.2);
     const layerOf = path => path.process?.kind && path.process.kind !== 'crease' ? path.process.kind.replaceAll ('-', '_') : path.type;
-    const layers = [...new Set (['cut', 'score', ...design.paths.map (layerOf)])].map ((type) => '<g id="' + type.toUpperCase () + '" fill="none" stroke="' + (type === 'cut' ? '#e34b4b' : type.includes ('perforation') ? '#39a96b' : '#318cdd') + '" stroke-width="0.2"' + (type === 'score' ? ' stroke-dasharray="3 2"' : '') + '>' + design.paths.filter ((path) => layerOf (path) === type).map ((path) => '<path' + (path.process ? ' data-process="' + path.process.kind + '"' + (path.process.cutMm !== undefined ? ' data-cut-mm="' + path.process.cutMm + '" data-tie-mm="' + path.process.tieMm + '" stroke-dasharray="' + path.process.cutMm + ' ' + path.process.tieMm + '"' : '') : '') + ' d="' + path.points.map ((point, index) => (index ? 'L' : 'M') + point.map (format).join (' ')).join (' ') + (path.closed ? ' Z' : '') + '"/>').join ('') + '</g>').join ('');
+    const layers = [...new Set (['cut', 'score', ...design.paths.map (layerOf)])].map ((type) => '<g id="' + type.toUpperCase () + '" fill="none" stroke="' + (type === 'cut' ? '#e34b4b' : type.includes ('perforation') ? '#39a96b' : '#318cdd') + '" stroke-width="0.2"' + (type === 'score' ? ' stroke-dasharray="3 2"' : '') + '>' + design.paths.filter ((path) => layerOf (path) === type).map ((path) => '<path' + (path.type === 'artwork' ? ' fill="' + path.fill + '" stroke="' + path.stroke + '" stroke-width="' + format (path.strokeWidth) + '"' : '') + (path.process ? ' data-process="' + path.process.kind + '"' + (path.process.cutMm !== undefined ? ' data-cut-mm="' + path.process.cutMm + '" data-tie-mm="' + path.process.tieMm + '" stroke-dasharray="' + path.process.cutMm + ' ' + path.process.tieMm + '"' : '') : '') + ' d="' + path.points.map ((point, index) => (index ? 'L' : 'M') + point.map (format).join (' ')).join (' ') + (path.closed ? ' Z' : '') + '"/>').join ('') + '</g>').join ('');
     return '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="' + format (width) + 'mm" height="' + format (height) + 'mm" viewBox="' + [box.minX, -box.maxY, width, height].map (format).join (' ') + '"><g transform="scale(1,-1)">' + layers + '</g></svg>\n';
 }
 export function ExportPackagingDXF (data)
@@ -93,7 +99,7 @@ export function ExportPackagingDXF (data)
     pair (0, 'SECTION'); pair (2, 'HEADER'); pair (9, '$ACADVER'); pair (1, 'AC1015'); pair (9, '$INSUNITS'); pair (70, 4); pair (9, '$MEASUREMENT'); pair (70, 1); pair (0, 'ENDSEC'); pair (0, 'SECTION'); pair (2, 'TABLES'); pair (0, 'TABLE'); pair (2, 'LAYER'); const layerOf = path => path.process?.kind && path.process.kind !== 'crease' ? path.process.kind.replaceAll ('-', '_').toUpperCase () : path.type.toUpperCase (); const layers = [...new Set (['CUT', 'SCORE', ...design.paths.map (layerOf)])]; pair (70, layers.length);
     for (const layer of layers) { pair (0, 'LAYER'); pair (2, layer); pair (70, 0); pair (62, layer === 'CUT' ? 1 : layer.includes ('PERFORATION') ? 3 : 5); pair (6, 'CONTINUOUS'); }
     pair (0, 'ENDTAB'); pair (0, 'ENDSEC'); pair (0, 'SECTION'); pair (2, 'ENTITIES');
-    for (const path of design.paths) { if (path.process?.cutMm !== undefined) { pair (999, 'PERFORATION cut=' + path.process.cutMm + 'mm tie=' + path.process.tieMm + 'mm'); } pair (0, 'LWPOLYLINE'); pair (100, 'AcDbEntity'); pair (8, layerOf (path)); pair (100, 'AcDbPolyline'); pair (90, path.points.length); pair (70, path.closed ? 1 : 0); for (const point of path.points) { pair (10, format (point[0])); pair (20, format (point[1])); } }
+    for (const path of design.paths) { if (path.process?.cutMm !== undefined) { pair (999, 'PERFORATION cut=' + path.process.cutMm + 'mm tie=' + path.process.tieMm + 'mm'); } pair (0, 'LWPOLYLINE'); pair (100, 'AcDbEntity'); pair (8, layerOf (path)); if (path.type === 'artwork') { const color = path.stroke !== 'none' ? path.stroke : path.fill; if (color !== 'none') { pair (420, parseInt (color.slice (1), 16)); } } pair (100, 'AcDbPolyline'); pair (90, path.points.length); pair (70, path.closed ? 1 : 0); for (const point of path.points) { pair (10, format (point[0])); pair (20, format (point[1])); } }
     pair (0, 'ENDSEC'); pair (0, 'EOF'); return pairs.join ('\r\n') + '\r\n';
 }
 
@@ -112,7 +118,12 @@ export function ExportPackagingEPS (data)
         output.push ('%%BeginAuto3DProcess: ' + layer, layer === 'CUT' ? '0.89 0.29 0.29 setrgbcolor' : layer.includes ('PERFORATION') ? '0.22 0.66 0.42 setrgbcolor' : '0.19 0.55 0.87 setrgbcolor');
         for (const path of paths) {
             output.push (path.process?.cutMm !== undefined ? '[' + format (path.process.cutMm) + ' ' + format (path.process.tieMm) + '] 0 setdash' : path.type === 'score' ? '[3 2] 0 setdash' : '[] 0 setdash', 'newpath');
-            path.points.forEach ((point, i) => output.push (format (point[0]) + ' ' + format (point[1]) + (i ? ' lineto' : ' moveto'))); if (path.closed) { output.push ('closepath'); } output.push ('stroke');
+            path.points.forEach ((point, i) => output.push (format (point[0]) + ' ' + format (point[1]) + (i ? ' lineto' : ' moveto'))); if (path.closed) { output.push ('closepath'); }
+            if (path.type === 'artwork') {
+                const rgb = color => color.slice (1).match (/.{2}/g).map (value => format (parseInt (value, 16) / 255)).join (' ') + ' setrgbcolor';
+                if (path.fill !== 'none') { output.push ('gsave', rgb (path.fill), 'fill', 'grestore'); }
+                if (path.stroke !== 'none' && path.strokeWidth > 0) { output.push (rgb (path.stroke), format (path.strokeWidth) + ' setlinewidth', 'stroke'); } else { output.push ('newpath'); }
+            } else { output.push ('stroke'); }
         }
         output.push ('%%EndAuto3DProcess');
     }

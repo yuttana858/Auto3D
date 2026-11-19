@@ -1,6 +1,6 @@
-# Auto3D 0.95.0 — Universal 12 oz collar, white top and board artwork
+# Auto3D 0.97.0 — Universal 12 oz collar, white top, board artwork and fast collars with progress
 
-Packaging **1.18.0**, Primary Products 0.15.0, Molded Pulp 0.3.0. Based on main after 0.94.0 (PR #162). Not deployed.
+Packaging **1.19.0**, Primary Products 0.16.0, Molded Pulp 0.3.0. Based on main after 0.96.0 (#168); 0.95.0 is reserved by the animation PR #167. Not deployed.
 
 ## Universal 12 oz can collar
 
@@ -49,6 +49,25 @@ How it works:
 - **Guide lines.** Applying CAD to an accessory no longer adds red and blue guide lines to its model.
 - **Not yet printed.** Folded generator boxes keep the print in their profile but do not show it yet.
 
+## Fast can collars with a progress popup
+
+Adding a six-can collar took about 10 s on a desktop and 45.7 s on the sandbox software renderer. The planning itself (rim sensing and the collar plan) takes about 0.1 s. Almost all the time was the board appearance pass (panel bow and cut-edge compression), and it ran twice:
+
+- **Every edge for every sample.** It measured the distance to every dieline edge (about 700 on a six-can collar) from each of about 500,000 sample points, five times per point. It now keeps the edges in a uniform grid and checks only nearby cells. The output is identical: the edge effects are flat beyond about 6 calipers, and a module test compares every vertex and normal against the old implementation.
+- **Rebuilt on every render.** Board presentation data was rebuilt each time the scene rendered. It is now cached across renders (`CachedPackagingData`, the last 8 boards), and adding an accessory seeds the cache, so the first render reuses it.
+
+Result: the six-can collar board builds in about 0.45 s instead of 28.8 s in Node. The whole Add takes about 2.0 s in the sandbox (45.7 s before).
+
+**Progress popup.** While the collar is added, a popup over the viewer shows each step with its real detail and measured time, plus the overall percentage and a progress bar:
+
+1. Sensing can rims (per can, with the rim diameter)
+2. Planning collar and tabs
+3. Building board geometry
+4. Placing in the scene
+5. Lowering onto the cans (frame by frame)
+
+The percentage is the weighted share of completed work; the weights follow the measured step times. The popup closes itself shortly after it finishes. Agents get the same record as `progress` in the `packaging.accessories.collar` result. The popup is a shared component (`source/website/progresspopup.js`) for other multi-step operations.
+
 ## Fix: imported models keep their real size
 
 A model in another known unit now keeps its real size when added to a scene. For example, a GLB (metres) opened or dropped into a millimetre scene made by Primary Products used to appear 1000× too small, as a dot, so it looked as if it had not been added. It is now scaled to the scene unit (Undo and Update model included). Models with unknown units (STL, OBJ) are unchanged.
@@ -73,4 +92,6 @@ A model in another known unit now keeps its real size when added to a scene. For
   - moving the artwork, one Undo step, board top switch and Undo
   - the 12 oz CAD hole
 - New browser test `import-units`: a metre GLB in a millimetre scene keeps its size.
+- `boardappearance-speed.test.js`: the edge grid matches the reference exactly, and a six-can collar board builds in seconds. `test/progresspopup.test.js` covers the progress percentages and failure.
+- `can-collar` also checks that the popup reaches 100% with all five steps done and timed.
 - Both browser tests are in the CI suite.
