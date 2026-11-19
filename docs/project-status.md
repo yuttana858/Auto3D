@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Can collar and CAD shape tools — Auto3D 0.93.0 / Packaging 1.17.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0 (2026-11-19)
+
+Candidate on `claude/dazzling-faraday-rhti3h`, not deployed. The Accessories tab adds a Can collar for a selected group or array of upright cans (for example a 3 × 2 six-pack). The rim is sensed from the geometry, each can gets a tabbed relief hole tucked under its rim, the corners are rounded, and the collar is a grouped CAD board profile added in one Undo step. The CAD designer adds Shape tools (round corners, circle, relief hole). New commands: `packaging.accessories.collar(.inspect)` and `packaging.path.round_corners/circle/relief_hole`. See docs/release-0930.md.
+
 ## Macro step timing — Auto3D 0.93.0 candidate
 
 Stacked on PR #160. Recorded macros support per-step durations and pauses; timing is editable in the macro builder and available to agents. Lighting remains under the app’s existing lighting settings. Overlapping steps, automatic creation/deletion, and procedural recording remain open; see release-macro-timing.md. Not deployed.

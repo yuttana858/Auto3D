@@ -21,6 +21,7 @@ board-panel-visibility
 board-toggle-stability
 cad-apply
 cad-conversion
+can-collar
 capture
 command-bar
 command-design
