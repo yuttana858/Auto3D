@@ -100,7 +100,10 @@ export class CommandRegistry
             for (const step of macro.steps) {
                 if (token.cancelled) { return { ok : false, cancelled : true, completed }; }
                 try {
-                    const result = await this.Invoke (step.command, Resolve (step.arguments || {}, results));
+                    const args = Resolve (step.arguments || {}, results);
+                    Validate (args, this.commands.get (step.command).inputSchema);
+                    const invoke = () => this.Invoke (step.command, args);
+                    const result = observer?.invoke ? await observer.invoke (step, args, invoke, completed.length) : await invoke ();
                     results[step.id] = result; completed.push ({ id : step.id, command : step.command, result }); if (observer?.step) { await observer.step (step, result, completed.length); }
                 } catch (error) { this.context?.website?.errorLogs?.Record ('error', 'macro', step.command + ': ' + error.message); return { ok : false, failedStep : step.id, error : { code : 'STEP_FAILED', message : error.message }, completed }; }
             }

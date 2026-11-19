@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { CommandRegistry } from '../source/website/commandregistry.js';
 import { RecordMacroAnimation } from '../source/website/macroanimation.js';
 import { SessionTimeline } from '../source/website/sessiontimeline.js';
+import { TimelineFoldSample } from '../source/website/timelineactions.js';
+import { TimelineClipSample } from '../source/website/timelineclips.js';
 
 describe ('Macro animation recording', () => {
     function fixture () {
@@ -32,6 +34,28 @@ describe ('Macro animation recording', () => {
         const { editor, registry, object } = fixture (); const macro = { version : 1, steps : [{ id : 'move', command : 'object.transform', arguments : { x : 4 }, animation : { duration : -1 } }] };
         await assert.rejects (RecordMacroAnimation (editor, registry, macro), /duration/); assert.equal (object.position[0], 0);
         macro.steps[0].animation = { overlap : 1 }; await assert.rejects (RecordMacroAnimation (editor, registry, macro), /timing supports/); assert.equal (object.position[0], 0);
+    });
+    it ('records fold and embedded clip steps at their sequence positions with undo and redo', async () => {
+        const { editor, registry, object } = fixture (); object.userData = { _auto3dFefco : '{}' }; editor.selected = object;
+        let prepared = 0; editor.packaging = { presentation : { Prepare : async () => { prepared++; } } };
+        const choices = []; object.player = { state : { playing : false, clip : 0, time : 0.25 }, clips : [{ duration : 5 }], Choose : (...args) => choices.push (args) };
+        editor.timeline.Seek = time => { editor.timeline.time = time; };
+        const schema = properties => ({ type : 'object', properties, required : [], additionalProperties : false });
+        registry.Register ({ id : 'packaging.fefco.animate', inputSchema : schema ({ objectId : { type : 'string' }, duration : { type : 'number' } }), mutates : true }, () => { throw new Error ('Must schedule, not start playback'); });
+        registry.Register ({ id : 'animation.clip.add', inputSchema : schema ({ objectId : { type : 'string' }, clip : { type : 'number' }, duration : { type : 'number' }, speed : { type : 'number' } }), mutates : true }, () => { throw new Error ('Must not use separate history'); });
+        const macro = { version : 1, steps : [{ id : 'fold', command : 'packaging.fefco.animate', arguments : { objectId : 'box', duration : 4 }, animation : { pauseAfter : 1 } }, { id : 'clip', command : 'animation.clip.add', arguments : { objectId : 'box', clip : 0, duration : 3, speed : 2 } }] };
+        const result = await RecordMacroAnimation (editor, registry, macro); assert.equal (result.recorded, true); assert.equal (result.duration, 8); assert.equal (prepared, 1);
+        assert.equal (editor.timeline.actions[0].time, 0); assert.equal (editor.timeline.actions[0].duration, 4); assert.equal (editor.timeline.embeddedClips[0].time, 5); assert.equal (editor.timeline.embeddedClips[0].duration, 3);
+        assert.ok (TimelineFoldSample (editor.timeline.actions, 'box', 2).pose < 1); assert.equal (TimelineClipSample (editor.timeline.embeddedClips, 'box', 6, object.player.clips).time, 2);
+        editor.undo.undo (); assert.equal (editor.timeline.actions.length, 0); assert.equal (editor.timeline.embeddedClips.length, 0); assert.deepEqual (choices[0], [0, 0.25, false]); editor.undo.redo (); assert.equal (editor.timeline.actions.length, 1); assert.equal (editor.timeline.embeddedClips.length, 1);
+    });
+    it ('rejects explicit procedural start times and cleans a partial procedural recording after failure', async () => {
+        const { editor, registry, object } = fixture (); object.userData = { _auto3dFefco : '{}' }; editor.selected = object; editor.packaging = { presentation : { Prepare : async () => {} } };
+        const schema = { type : 'object', properties : { time : { type : 'number' }, duration : { type : 'number' } }, required : [], additionalProperties : false };
+        registry.Register ({ id : 'animation.action.add', inputSchema : schema, mutates : true }, () => { throw new Error ('Must not execute'); });
+        const macro = { version : 1, steps : [{ id : 'fold', command : 'animation.action.add', arguments : { time : 4 } }] }; await assert.rejects (RecordMacroAnimation (editor, registry, macro), /remove the time/);
+        macro.steps[0].arguments = { duration : 2 }; macro.steps.push ({ id : 'bad', command : 'camera.fov', arguments : { fov : 45 } }); registry.commands.get ('camera.fov').handler = () => { throw new Error ('Camera failed'); };
+        const result = await RecordMacroAnimation (editor, registry, macro); assert.equal (result.recorded, false); assert.equal (editor.timeline.actions.length, 0); assert.equal (object.keyframes.length, 0);
     });
     it ('rejects unsupported operations before executing any step', async () => {
         const { editor, registry, object } = fixture (); await assert.rejects (RecordMacroAnimation (editor, registry, { version : 1, steps : [{ id : 'move', command : 'object.transform', arguments : { x : 4 } }, { id : 'remove', command : 'object.delete', arguments : {} }] }), /Cannot record/); assert.equal (object.position[0], 0); assert.equal (object.keyframes.length, 0);

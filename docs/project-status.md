@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Procedural macro recording — Auto3D 0.94.0 candidate
+
+Stacked on PR #162. Supported recorded macros schedule generated-box fold/unfold actions and paused imported clips at the sequential step time. The macro builder accepts integer fields and explains procedural timing. The app’s lighting remains unchanged. Automatic creation/deletion, material changes, procedural arrays and overlapping steps remain future work. See release-0940.md. Not deployed.
+
 ## Macro step timing — Auto3D 0.93.0 candidate
 
 Stacked on PR #160. Recorded macros support per-step durations and pauses; timing is editable in the macro builder and available to agents. Lighting remains under the app’s existing lighting settings. Overlapping steps, automatic creation/deletion, and procedural recording remain open; see release-0930.md. Not deployed.

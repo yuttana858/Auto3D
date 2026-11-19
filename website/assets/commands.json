@@ -6627,7 +6627,6 @@
       "example": {
         "objectId": "object-1",
         "clip": 0,
-        "time": 1,
         "duration": 3,
         "speed": 1,
         "loop": false
@@ -6706,7 +6705,6 @@
         "additionalProperties": false
       },
       "example": {
-        "time": 1,
         "duration": 6,
         "direction": "toggle"
       }
@@ -7302,7 +7300,7 @@
       "id": "animation.macro.record",
       "title": "Run macro and record animation",
       "category": "Animation",
-      "description": "Run a saved or supplied macro and record object transforms, visibility and camera views as sequential keyframes. Set step.animation.duration and pauseAfter in seconds, or use stepSeconds as the default duration. Requires an empty stopped timeline and 1–100 existing objects. Unsupported commands, including creation, deletion, materials and procedural animation, are rejected before execution. Completed macro steps remain if a later step fails. The recorded timeline is one undo step.",
+      "description": "Run a saved or supplied macro and record object transforms, visibility, camera views, fold actions and embedded clips in sequence. Set step.animation.duration and pauseAfter in seconds; procedural steps default to their command duration. For animation.action.add and animation.clip.add omit time: the sequence determines their start. Requires an empty stopped timeline and 1–100 existing objects. Unsupported commands, including creation, deletion and materials, are rejected before execution. Completed macro steps remain if a later step fails. The recorded timeline is one undo step.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
