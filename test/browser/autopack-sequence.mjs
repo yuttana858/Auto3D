@@ -27,19 +27,31 @@ try {
     const undoBefore = (await call ('scene.inspect')).objects.length;
     // Drive the playback's monotonic clock explicitly. Real requestAnimationFrame callbacks still
     // render each sampled state, but a slow software-rendered frame cannot skip a short stage.
-    await page.evaluate (() => {
+    await page.evaluate (count => {
         const descriptor = Object.getOwnPropertyDescriptor (performance, 'now'), start = performance.now ();
-        window.autoPackTestClock = { elapsed : 0, restore : () => { if (descriptor) { Object.defineProperty (performance, 'now', descriptor); } else { delete performance.now; } } };
+        const prototype = OV.Engine.ViewerMainModel.prototype, original = prototype.SetMainObject; let root = null;
+        // Observe the actual scene without bypassing the API's playback busy guard or changing rendering.
+        prototype.SetMainObject = function (...args) {
+            const result = original.apply (this, args), candidate = args[0];
+            if (candidate?.children?.length > count && candidate.children.some (child => child.name.startsWith ('Auto Pack'))) { root = candidate; }
+            return result;
+        };
+        window.autoPackTestClock = {
+            elapsed : 0,
+            snapshot : () => root?.children.map (child => {
+                let visible = true; for (let ancestor = child; ancestor; ancestor = ancestor.parent) { visible = visible && ancestor.visible; }
+                const meshes = []; child.traverse (mesh => { const id = mesh.userData.originalMeshInstance?.GetId (); if (id) { meshes.push (id.GetKey ()); } });
+                return { name : child.name, visible, meshes : meshes.sort () };
+            }),
+            restore : () => { prototype.SetMainObject = original; if (descriptor) { Object.defineProperty (performance, 'now', descriptor); } else { delete performance.now; } }
+        };
         Object.defineProperty (performance, 'now', { configurable : true, value : () => start + window.autoPackTestClock.elapsed });
-    });
+    }, before.objects.length);
     const order = ['lift', 'erect', 'bottom', 'sides', 'partitions', 'products', 'top', 'close'], seen = [];
-    let sequence;
+    let sequence, generated, duringPartitions, completedGeometry;
     try {
-        await call ('packaging.auto.generate', { duration : 20, pads : ['bottom', 'top', 'front', 'back'], partitions : true });
+        generated = await call ('packaging.auto.generate', { duration : 20, pads : ['bottom', 'top', 'front', 'back'], partitions : true });
         sequence = await call ('packaging.auto.sequence.inspect'); assert.deepEqual (sequence.stages.map (stage => stage.name), order); assert.equal (sequence.order.length, 6);
-        const contents = (await call ('scene.inspect')).objects.map (object => ({ id : object.id, data : JSON.parse (object.userData?._auto3dAccessory || 'null') })).filter (item => item.data);
-        const partitions = contents.filter (item => item.data.kind === 'partition'), tops = contents.filter (item => item.data.position === 'top');
-        assert.ok (partitions.length > 0); assert.equal (tops.length, 1);
         for (const stage of sequence.stages) {
             const progress = (stage.start + stage.end) / 2;
             await page.evaluate (elapsed => { window.autoPackTestClock.elapsed = elapsed; }, progress * 20000);
@@ -49,10 +61,7 @@ try {
             }, progress);
             const sampled = await call ('packaging.auto.sequence.inspect'); assert.equal (sampled.stage, stage.name); seen.push (sampled.stage);
             if (['bottom', 'sides', 'partitions', 'products', 'top'].includes (stage.name)) { assert.ok (Math.abs (sampled.fold - .76) < 1e-9, 'lid must remain open during ' + stage.name); }
-            if (stage.name === 'partitions') {
-                for (const piece of partitions) { assert.equal ((await call ('animation.visibility.inspect', { objectId : piece.id })).renderedVisible, true, 'partition is rendered while lowering'); }
-                assert.equal ((await call ('animation.visibility.inspect', { objectId : tops[0].id })).renderedVisible, false, 'top pad must wait until products are placed');
-            }
+            if (stage.name === 'partitions') { duringPartitions = await page.evaluate (() => window.autoPackTestClock.snapshot ()); }
         }
         assert.deepEqual (seen, order);
         await page.evaluate (() => { window.autoPackTestClock.elapsed = 20001; });
@@ -61,9 +70,25 @@ try {
             return result.ok && ['completed', 'failed'].includes (result.result.state);
         });
         const playback = await call ('packaging.fefco.playback.inspect'); assert.equal (playback.state, 'completed', playback.error);
+        completedGeometry = await page.evaluate (() => window.autoPackTestClock.snapshot ());
     } finally { await page.evaluate (() => { window.autoPackTestClock.restore (); delete window.autoPackTestClock; }); }
     const packed = await call ('scene.inspect'); assert.ok (packed.objects.length > undoBefore); const carton = packed.objects.find (o => o.userData?._auto3dAutoPack);
     assert.equal (carton.userData._auto3dPackagingState, 'folded');
+    assert.ok (Array.isArray (duringPartitions), 'observed the scene during partition lowering');
+    assert.ok (Array.isArray (completedGeometry), 'observed the completed scene');
+    assert.deepEqual (completedGeometry.map (child => child.name), packed.objects.map (object => object.name), 'the observed root is the final session scene');
+    const contents = packed.objects.map ((object, index) => ({ object, index, data : JSON.parse (object.userData?._auto3dAccessory || 'null') })).filter (item => item.data);
+    assert.deepEqual (contents.map (item => item.object.id).sort (), [...generated.contents.pieces].sort ());
+    const partitions = contents.filter (item => item.data.kind === 'partition'), tops = contents.filter (item => item.data.position === 'top');
+    assert.ok (partitions.length > 0); assert.equal (tops.length, 1);
+    const sampledPiece = item => {
+        const final = completedGeometry[item.index]; assert.ok (final.meshes.length > 0);
+        const matches = duringPartitions.filter (child => JSON.stringify (child.meshes) === JSON.stringify (final.meshes));
+        assert.equal (matches.length, 1, 'piece geometry retains a unique identity through the final scene rebuild');
+        assert.equal (matches[0].name, item.object.name); return matches[0];
+    };
+    for (const piece of partitions) { assert.equal (sampledPiece (piece).visible, true, 'partition is rendered while lowering'); }
+    assert.equal (sampledPiece (tops[0]).visible, false, 'top pad must wait until products are placed');
     // One Undo removes the carton and contents and restores the products.
     await call ('history.undo'); const restored = await call ('scene.inspect');
     assert.deepEqual (restored.objects.map (o => [o.id, o.position]), before.objects.map (o => [o.id, o.position]));
