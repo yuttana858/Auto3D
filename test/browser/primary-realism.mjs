@@ -48,7 +48,7 @@ try {
         await page.waitForTimeout (400); await page.screenshot ({ path : 'work/primary-realism-review/' + id + '.png' });
     }
     await call ('primary.details.set', { closure : 'fliptop', textureStrength : .8 }); await call ('primary.update');
-    const panel = page.getByRole ('region', { name : 'Primary Products', exact : true }); assert.equal (await panel.getByRole ('combobox', { name : 'Closure style', exact : true }).inputValue (), 'fliptop');
+    const panel = page.getByRole ('region', { name : 'Primary Products', exact : true }); assert.equal (await panel.getByRole ('combobox', { name : 'Cap style', exact : true }).inputValue (), 'fliptop');
     const invalid = await page.evaluate (() => Auto3D.execute ('primary.details.set', { wallMm : 999 })); assert.equal (invalid.ok, false);
     assert.deepEqual (errors, []); console.log ('Realistic products, frosted/translucent textures, label finishes/offsets, scaling, Undo and mobile controls passed.');
 } finally { await browser.close (); }
