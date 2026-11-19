@@ -19,6 +19,23 @@ try {
         await dialog.locator ('.macro_step').nth (1).getByRole ('button', { name : 'Move up' }).click (); await dialog.getByText ('1. Move (0, 0, 0)', { exact : true }).waitFor ();
         await dialog.getByRole ('button', { name : 'Save macro on this device' }).click (); await dialog.getByText ('Macro saved on this device.', { exact : true }).waitFor ();
         await dialog.getByLabel ('Search commands', { exact : true }).fill ('nonsense-no-match'); await dialog.getByText ('No commands match your search.', { exact : true }).waitFor ();
+        if (width === 1440) {
+            // A fold step starts an animation and returns; the next step must wait for it instead of failing as busy. One Undo reverses the run.
+            const run = await page.evaluate (() => Auto3D.runMacro ({ version : 1, steps : [
+                { id : 'box', command : 'packaging.fefco.preset', arguments : { code : '0201', length : 300, width : 200, height : 150, closure : 'closed' } },
+                { id : 'flat', command : 'packaging.fefco.toggle', arguments : {} },
+                { id : 'fit', command : 'view.fit', arguments : {} },
+                { id : 'state', command : 'packaging.fefco.playback.inspect', arguments : {} }
+            ] }));
+            assert.equal (run.ok, true, JSON.stringify (run)); assert.equal (run.completed.length, 4); assert.equal (run.completed[1].result.started, true);
+            assert.equal (run.completed[3].result.state, 'completed', JSON.stringify (run.completed[3].result));
+            const before = await page.evaluate (() => Auto3D.execute ('scene.inspect').then (r => r.result.objects.length)); assert.equal (before, 1);
+            assert.equal ((await page.evaluate (() => Auto3D.execute ('history.undo'))).ok, true);
+            assert.equal (await page.evaluate (() => Auto3D.execute ('scene.inspect').then (r => r.result.objects.length)), 0);
+            const tab = await page.evaluate (() => Auto3D.runMacro ({ version : 1, steps : [{ id : 'tab', command : 'session.tabs.new', arguments : {} }, { id : 'fit', command : 'view.fit', arguments : {} }] }));
+            assert.equal (tab.ok, false); assert.match (tab.error.message, /last step/);
+            console.log ('Macro steps wait for folding playback; one Undo reverses the run.');
+        }
         assert.deepEqual (errors, []); await page.close (); console.log ('Visual macro editing, search and hidden code passed at ' + width + 'px.');
     }
 } finally { await browser.close (); }

@@ -31,6 +31,10 @@ try {
     const cube = objects[0]; await call ('object.select', { objectId : cube.id });
     await call ('packaging.tab', { tab : 'auto' });
     const auto = page.getByRole ('region', { name : 'Packaging Generative', exact : true }).getByRole ('tabpanel', { name : 'Auto', exact : true }); await auto.waitFor ();
+    const explanation = auto.locator ('details.packaging_auto_explanation'); const contents = auto.locator ('details.packaging_auto_contents');
+    assert.equal (await explanation.evaluate (el => el.open), false); assert.equal (await contents.evaluate (el => el.open), false); assert.equal (await auto.getByLabel ('Top pad', { exact : true }).isVisible (), false);
+    await auto.getByText ('How Auto Pack works', { exact : true }).click (); assert.equal (await explanation.evaluate (el => el.open), true); assert.equal (await auto.getByText (/Clearance: 0.001/).isVisible (), true);
+    assert.equal ((await call ('packaging.auto.contents_panel', { open : true })).open, true); assert.equal (await auto.getByLabel ('Top pad', { exact : true }).isVisible (), true); assert.equal ((await call ('packaging.auto.explanation', { open : false })).open, false); assert.equal ((await call ('packaging.auto.contents_panel', { open : false })).open, false);
     const blocked = await call ('packaging.auto.inspect'); assert.equal (blocked.available, false); assert.equal (blocked.unitsUnknown, true); assert.match (blocked.reason, /Refresh bounds/);
     assert.equal (await auto.getByRole ('combobox', { name : 'Model units', exact : true }).isVisible (), true);
     await auto.getByRole ('combobox', { name : 'Model units', exact : true }).selectOption ('in');

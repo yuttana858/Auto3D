@@ -87,7 +87,13 @@
 .packaging_workspace .packaging_manual[hidden], .packaging_workspace .packaging_auto_pack[hidden], .packaging_auto_pack [hidden] { display: none; }
 .packaging_auto_pack p:empty { display: none; }
 
-.packaging_auto_contents { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--packaging-border, var(--ov_border_color, #aaa)); border-radius: 6px; padding: 10px; }
+.packaging_auto_explanation summary { cursor: pointer; font-size: var(--packaging-menu-font); }
+.packaging_auto_explanation summary:focus-visible { outline: 2px solid #458b9b; outline-offset: 2px; }
+.packaging_auto_explanation p { margin-top: 8px; }
+.packaging_auto_contents { border: 1px solid var(--packaging-border, var(--ov_border_color, #aaa)); border-radius: 6px; padding: 10px; }
+.packaging_auto_contents summary { cursor: pointer; font-size: var(--packaging-menu-font); font-weight: 600; }
+.packaging_auto_contents summary:focus-visible { outline: 2px solid #458b9b; outline-offset: 2px; }
+.packaging_auto_contents > :not(summary) { margin-top: 8px; }
 .packaging_auto_contents select { min-width: 0; flex: 1 1 80px; font: inherit; color: inherit; background: transparent; border: 1px solid var(--packaging-border, var(--ov_border_color, #aaa)); border-radius: 5px; padding: 4px 6px; }
 .packaging_auto_contents select option, .packaging_accessories select option { color: #111; }
 .packaging_accessories { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
@@ -118,5 +124,5 @@
 .packaging_auto_pallet button:focus-visible, .packaging_auto_pallet select:focus-visible, .packaging_auto_pallet input:focus-visible { outline: 2px solid #458b9b; outline-offset: 2px; }
 .packaging_auto_pallet p:empty { display: none; }
 .packaging_auto_playback { display: flex; flex-direction: column; gap: 8px; }
-.packaging_auto_playback progress { width: 100%; }
+.packaging_auto_playback input[type="range"] { width: 100%; margin: 0; }
 .packaging_auto_playback_buttons { display: flex; flex-wrap: wrap; gap: 6px; }

@@ -1,6 +1,6 @@
-# Auto3D 0.90.1 — private alternative-reader proof transport
+# Auto3D 0.91.1 — private alternative-reader proof transport
 
-App 0.90.1; Packaging 1.16.0, Primary Products 0.15.0 and Molded Pulp 0.3.0 are unchanged. Based on main `9b97a2e` (0.90.0), preserving its packing sequence, motion easing and Assign facing work. PR pending.
+App 0.91.1; Packaging 1.16.1, Primary Products 0.15.0 and Molded Pulp 0.3.0 are unchanged. Based on main `037ff04` (0.91.0), preserving its packing sequence, motion easing, Assign facing, macro recording and pairing work. PR #163.
 
 The trusted conversion controller can issue a 15-minute, read-only source capability for one retained failed text-Parasolid job. Its HMAC binds the origin, job, owner, source hash/length/units and original expiry. Each read rechecks the account, retained failed state and immutable R2 metadata, then streams directly to the private Modal proof. The capability cannot claim a job, change attempts/retention, upload artifacts or publish a model. Rotation, expiry, account disablement and source/ownership changes revoke access. No new browser action or MCP command is introduced.
 

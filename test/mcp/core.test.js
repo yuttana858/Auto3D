@@ -62,7 +62,7 @@ describe ('MCP registration and isolation boundary', () => {
         assert.ok (PilotConfig (env)); assert.throws (() => PilotConfig ({ ...env, SUPABASE_URL : env.AUTO3D_MCP_PRODUCTION_SUPABASE_URL }));
         assert.throws (() => PilotConfig ({ ...env, AUTO3D_MCP_PILOT_ACCOUNTS : '' }));
     });
-    it ('routes results to one account/window/tab and refuses stale tabs, replay and revocation', async () => {
+    it ('routes results to one account/window, follows its active tab, and refuses replay and revocation', async () => {
         const state = State (), broker = new BrokerCore (state), socket = Socket ();
         await broker.registrations.Create (registration ());
         await broker.Attach ({ accountId : owner, sessionFingerprint : 'a'.repeat (64), expiresAt : Date.now () + 60000 }, socket);
@@ -75,7 +75,10 @@ describe ('MCP registration and isolation boundary', () => {
         await assert.rejects (broker.Dispatch ({ ...input, requestId : 'write-denied', command : 'auth.sign_out' }), /Write permission/);
         await assert.rejects (broker.List (other));
         await broker.Message (socket, JSON.stringify ({ type : 'sessions', instanceId : 'window-a', sessions : [{ id : 'tab-a', name : 'Box', active : false }, { id : 'tab-b', name : 'Other', active : true }] }));
-        await assert.rejects (broker.Dispatch ({ ...input, requestId : 'request-b' }), /session/);
+        // Switching tabs in the paired window moves the pairing to the window's active tab.
+        let routed = null; const previous = socket.onSend; socket.onSend = message => { if (message.type === 'request') { routed = message.sessionId; } previous (message); };
+        assert.equal ((await broker.Dispatch ({ ...input, requestId : 'request-b' })).result, 'box'); assert.equal (routed, 'tab-b');
+        assert.equal ((await state.storage.get ('pair:grant-a')).sessionId, 'tab-b');
         await broker.Revoke ({ accountId : owner, id : 'grant-a' }); await assert.rejects (broker.Pair ({ accountId : owner, grantId : 'grant-a', connectionId, sessionId : 'tab-b', expiresAt : Date.now () + 60000 }));
     });
     it ('rejects pending results on revoke and enforces screenshot permission at the broker', async () => {
@@ -127,13 +130,16 @@ describe ('MCP registration and isolation boundary', () => {
         assert.equal ((await state.storage.get ('pair:grant-b')).connectionId, issued.connectionId);
         assert.equal (JSON.stringify (socket.data).includes (renewed.windowCode), false);
     });
-    it ('disconnects an idle pairing after one hour without revoking the agent registration', async () => {
+    it ('keeps a pairing for 24 hours, then ends it without revoking the agent registration', async () => {
         let now = Date.now (); const state = State (), broker = new BrokerCore (state, { now : () => now }), socket = Socket ();
-        await broker.registrations.Create ({ ...registration (), expiresAt : now + 7200000 });
+        await broker.registrations.Create ({ ...registration (), expiresAt : now + 7 * 86400000 });
         await broker.Attach ({ accountId : owner, sessionFingerprint : 'a'.repeat (64), expiresAt : now + 60000 }, socket);
         await broker.Message (socket, JSON.stringify ({ type : 'hello', instanceId : 'idle-window', windowLabel : 'Review', allowSelect : true, sessions : [{ id : 'tab-a', name : 'Box', active : true }] }));
-        await broker.Pair ({ accountId : owner, grantId : 'grant-a', connectionId : socket.data.connectionId, sessionId : 'tab-a', expiresAt : now + 7200000 });
-        now += 3600000; await broker.Cleanup (); assert.equal (await state.storage.get ('pair:grant-a'), undefined);
+        await broker.Pair ({ accountId : owner, grantId : 'grant-a', connectionId : socket.data.connectionId, sessionId : 'tab-a', expiresAt : now + 7 * 86400000 });
+        // An hour idle no longer ends the pairing; its lifetime is capped at 24 hours from pairing.
+        now += 3600000; await broker.Cleanup (); assert.ok (await state.storage.get ('pair:grant-a'));
+        assert.ok ((await state.storage.get ('pair:grant-a')).expiresAt <= now - 3600000 + 86400000);
+        now += 86400000 - 3600000; await broker.Cleanup (); assert.equal (await state.storage.get ('pair:grant-a'), undefined);
         assert.ok (await broker.registrations.Assert ({ accountId : owner, id : 'grant-a' }));
     });
     it ('enforces remote allowlists and strict string argument constraints', async () => {

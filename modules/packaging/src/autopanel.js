@@ -1,4 +1,5 @@
 import { AutoPalletPanel } from './palletpanel.js';
+import { BoardFlutes, DefaultBoardDatabase } from './boarddatabase.js';
 
 function Element (tag, parent, text, className)
 {
@@ -16,16 +17,20 @@ export class AutoPackPanel
         // Styles are the Packaging generator's catalog, so new generator styles appear here automatically.
         const style = Element ('div', this.root, undefined, 'packaging_accessory_options');
         this.style = this.Select (style, 'Box style', false); this.style.addEventListener ('change', () => { try { this.host.autoStyle?.(this.style.value); } catch (error) { this.status.textContent = error.message; } this.Refresh (); });
+        const boardChoice = Element ('div', this.root, undefined, 'packaging_accessory_options');
+        this.flute = this.Select (boardChoice, 'Flute', false); this.boardGrade = this.Select (boardChoice, 'Board grade', false);
+        this.flute.addEventListener ('change', () => { const record = this.BoardRecords ().find (item => item.flute === this.flute.value); if (record) { this.SelectBoard (record.id); } });
+        this.boardGrade.addEventListener ('change', () => this.SelectBoard (this.boardGrade.value));
+        this.boardThickness = Element ('p', this.root, '', 'section_hint'); this.boardThickness.setAttribute ('aria-live', 'polite');
         this.objectName = Element ('strong', this.root);
-        this.product = this.Size ('Selected object · bounding box');
-        this.inside = this.Size ('Inside size');
-        this.score = this.Size ('Score size');
-        this.board = Element ('p', this.root, '', 'section_hint');
-        Element ('p', this.root, 'Clearance: 0.001″ (0.0254 mm) on each face. The inside size adds clearance on both sides of each dimension and one board thickness along the longer side for the internal glue tab. It is generated like Generate with the inside basis: the selected board record and its allowance factors convert the inside size to score dimensions, and the carton keeps that CAD measurement layer.', 'section_hint');
-        Element ('p', this.root, 'The blank starts below the product. A bottom flap stays underneath as the carton folds around it.', 'section_hint');
+        this.inside = this.Size ('Inside Dimensions');
+        this.explanation = Element ('details', this.root, undefined, 'packaging_auto_explanation');
+        Element ('summary', this.explanation, 'How Auto Pack works');
+        Element ('p', this.explanation, 'Clearance: 0.001″ (0.0254 mm) on each face. The inside size adds clearance on both sides of each dimension and one board thickness along the longer side for the internal glue tab. It is generated like Generate with the inside basis: the selected board record and its allowance factors convert the inside size to score dimensions, and the carton keeps that CAD measurement layer.', 'section_hint');
+        Element ('p', this.explanation, 'The blank starts below the product. A bottom flap stays underneath as the carton folds around it.', 'section_hint');
         // Packed contents: nested partitions between the products and pads around them, fitted with them.
-        const contents = Element ('section', this.root, undefined, 'packaging_auto_contents'); contents.setAttribute ('aria-label', 'Packed contents'); Element ('h4', contents, 'Packed contents');
-        Element ('p', contents, 'Partitions nest between the products: the layout is read from the products, gaps too narrow for the board are opened, and one interlocking set goes in each layer. Pads wrap the products and partitions. The carton is fitted around everything and folds with the contents in place.', 'section_hint');
+        const contents = Element ('details', this.root, undefined, 'packaging_auto_contents'); this.contentsSection = contents; Element ('summary', contents, 'Pads and Partitions');
+        Element ('p', this.explanation, 'Partitions nest between the products: the layout is read from the products, gaps too narrow for the board are opened, and one interlocking set goes in each layer. Pads wrap the products and partitions. The carton is fitted around everything and folds with the contents in place.', 'section_hint');
         const choices = Element ('div', contents, undefined, 'packaging_accessory_options');
         this.partitions = this.Check (choices, 'Partitions between products');
         this.pads = new Map (['top', 'bottom', 'front', 'back'].map (position => [position, this.Check (choices, position[0].toUpperCase () + position.slice (1) + ' pad')]));
@@ -40,10 +45,10 @@ export class AutoPackPanel
         this.create = Element ('button', this.root, 'Auto Pack', 'packaging_auto_create'); this.create.type = 'button'; this.create.addEventListener ('click', () => this.Create ());
         this.playback = Element ('section', this.root, undefined, 'packaging_auto_playback'); this.playback.setAttribute ('aria-label', 'Auto Pack folding');
         this.playbackStatus = Element ('p', this.playback, '', 'section_hint'); this.playbackStatus.setAttribute ('role', 'status');
-        this.progress = Element ('progress', this.playback); this.progress.max = 1; this.progress.setAttribute ('aria-label', 'Auto Pack folding progress');
-        const buttons = Element ('div', this.playback, undefined, 'packaging_auto_playback_buttons');
-        this.pause = Element ('button', buttons, 'Pause folding'); this.pause.type = 'button'; this.pause.addEventListener ('click', () => this.Control (this.host.playback?.().state === 'paused' ? 'resume' : 'pause'));
-        this.cancel = Element ('button', buttons, 'Cancel folding'); this.cancel.type = 'button'; this.cancel.addEventListener ('click', () => this.Control ('cancel'));
+        this.progress = Element ('input', this.playback); this.progress.type = 'range'; this.progress.min = '0'; this.progress.max = '1'; this.progress.step = '0.001'; this.progress.setAttribute ('aria-label', 'Auto Pack fold timeline');
+        this.scrubQueue = Promise.resolve (); this.scrubbing = false;
+        const scrub = commit => { const value = Number (this.progress.value); this.scrubbing = !commit; this.scrubQueue = this.scrubQueue.catch (() => {}).then (() => this.host.scrub (value, commit)).catch (error => { this.status.textContent = error.message; }).finally (() => { if (commit) { this.RefreshPlayback (); } }); };
+        this.progress.addEventListener ('input', () => scrub (false)); this.progress.addEventListener ('change', () => scrub (true));
         this.fold = Element ('button', this.root, 'Fold carton'); this.fold.type = 'button'; this.fold.addEventListener ('click', () => this.ToggleFold ());
         // Open top: the packed carton's top flaps swing 120° open (and back), for loading or showing the product.
         this.top = Element ('button', this.root, 'Open top'); this.top.type = 'button'; this.top.hidden = true; this.top.addEventListener ('click', () => this.ToggleTop ());
@@ -51,6 +56,25 @@ export class AutoPackPanel
         this.status = Element ('p', this.root, '', 'section_hint'); this.status.setAttribute ('role', 'status'); this.status.setAttribute ('aria-live', 'polite');
         this.Refresh ();
         this.palletPanel = new AutoPalletPanel (host, this.root);
+    }
+    BoardRecords () { const records = this.host.boards?.().records; return records?.length ? records : DefaultBoardDatabase (); }
+    async SelectBoard (id)
+    {
+        if (this.boardSelecting || this.host.blocked ()) { this.Refresh (); return; }
+        this.boardSelecting = true; this.flute.disabled = true; this.boardGrade.disabled = true;
+        try { if (this.host.selectBoard) { await this.host.selectBoard (id, 'generation'); } else { const record = this.BoardRecords ().find (item => item.id === id); if (!record) { throw new Error ('Choose an available board.'); } this.localGenerationBoardId = id; await this.host.configure ({ thickness : record.caliperMm }); } this.status.textContent = ''; }
+        catch (error) { this.status.textContent = error.message; }
+        finally { this.boardSelecting = false; this.Refresh (); }
+    }
+    SetExplanation (open)
+    {
+        if (typeof open !== 'boolean') { throw new Error ('Choose whether the Auto Pack explanation is open.'); }
+        this.explanation.open = open; return { open : this.explanation.open };
+    }
+    SetContentsOpen (open)
+    {
+        if (typeof open !== 'boolean') { throw new Error ('Choose whether Pads and Partitions is open.'); }
+        this.contentsSection.open = open; return { open : this.contentsSection.open };
     }
     Check (parent, title)
     {
@@ -63,7 +87,7 @@ export class AutoPackPanel
     }
     Fill (select, items, fallback)
     {
-        const keys = items.map (item => item.value).join ('|');
+        const keys = JSON.stringify (items.map (item => [item.value, item.label]));
         if (select.dataset.keys !== keys) { const current = select.value; select.replaceChildren (...items.map (item => { const option = document.createElement ('option'); option.value = item.value; option.textContent = item.label; return option; })); select.dataset.keys = keys; select.value = items.some (item => item.value === current) ? current : fallback; }
     }
     ContentOptions ()
@@ -96,12 +120,17 @@ export class AutoPackPanel
         if (styles.length) { this.style.value = styles.find (s => s.selected)?.code || this.style.value; }
         this.unitsRow.hidden = !data.unitsUnknown; this.refresh.textContent = data.unitsUnknown ? 'Assign units and refresh bounds' : 'Refresh bounds';
         this.objectName.textContent = data.objectName || 'No product selected';
-        for (const [row, size] of [[this.product, data.productMm], [this.inside, data.insideMm], [this.score, data.scoreMm]]) {
-            for (const [key, field] of row.fields) { field.textContent = Number.isFinite (size?.[key]) ? Number ((size[key] / factor).toFixed (6)) + ' ' + unit : '—'; }
-        }
-        this.inside.section.hidden = !data.insideMm; this.score.section.hidden = !data.scoreMm;
-        this.board.textContent = Number.isFinite (data.thicknessMm) ? 'Board caliper: ' + (data.boardName ? data.boardName + ' · ' : '') + Number ((data.thicknessMm / factor).toFixed (6)) + ' ' + unit : '';
-        this.reason.textContent = data.reason || '';
+        const records = this.BoardRecords (), preferred = this.host.generationBoard?.() || this.localGenerationBoardId, currentThickness = this.host.inspect?.().thickness;
+        const active = records.find (record => record.id === preferred) || (!preferred ? records.find (record => record.caliperMm === currentThickness) : null);
+        this.Fill (this.flute, BoardFlutes.filter (flute => records.some (record => record.flute === flute)).map (flute => ({ value : flute, label : flute + ' flute' })), active?.flute || '');
+        if (active) { this.flute.value = active.flute; }
+        const choices = records.filter (record => record.flute === this.flute.value); this.Fill (this.boardGrade, choices.map (record => ({ value : record.id, label : record.name })), active?.id || '');
+        if (active && active.flute === this.flute.value) { this.boardGrade.value = active.id; } else { this.boardGrade.value = ''; }
+        this.flute.disabled = this.boardSelecting || this.pending || this.host.blocked () || !records.length; this.boardGrade.disabled = this.flute.disabled || !choices.length;
+        const thickness = active?.caliperMm ?? currentThickness; this.boardThickness.textContent = Number.isFinite (thickness) ? 'Board thickness: ' + Number ((thickness / factor).toFixed (6)) + ' ' + unit : 'Board thickness: unavailable';
+        for (const [key, field] of this.inside.fields) { field.textContent = Number.isFinite (data.insideMm?.[key]) ? Number ((data.insideMm[key] / factor).toFixed (6)) + ' ' + unit : '—'; }
+        this.inside.section.hidden = !data.insideMm;
+        this.reason.textContent = data.fitted || /^Select one visible product,/.test (data.reason || '') ? '' : (data.reason || '');
         if (this.contents) {
             const c = data.contents, mm = value => Number ((value / factor).toFixed (unit === 'in' ? 3 : 1)) + ' ' + unit;
             this.contents.textContent = !c ? '' : c.reason ? c.reason : [c.partitions && c.partitions.layout.columns + ' × ' + c.partitions.layout.rows + ' × ' + c.partitions.layout.layers + ' products (columns × rows × layers) · ' + c.partitions.strips + ' partition strips' + (c.partitions.moves ? ' · gaps opened by ' + mm (c.partitions.growthMm.length) + ' × ' + mm (c.partitions.growthMm.width) : ' · gaps already fit'), c.pads.length && c.pads.length + ' pads', c.board + ' (' + mm (c.thicknessMm) + ')', 'carton inside ' + ['width', 'length', 'height'].map (k => mm (c.insideMm[k])).join (' × ')].filter (Boolean).join (' · ');
@@ -114,10 +143,11 @@ export class AutoPackPanel
     RefreshPlayback ()
     {
         const state = this.host.playback?.() || { state : 'idle', progress : 0 };
-        this.playback.hidden = state.state === 'idle'; this.progress.value = Number.isFinite (state.progress) ? state.progress : 0;
-        this.playbackStatus.textContent = [state.state, state.stage, Math.round (this.progress.value * 100) + '%'].filter (Boolean).join (' · ');
-        const controllable = ['playing', 'paused'].includes (state.state) && !this.host.playbackBlocked?.() && Boolean (this.host.control);
-        this.pause.textContent = state.state === 'paused' ? 'Resume folding' : 'Pause folding'; this.pause.disabled = !controllable; this.cancel.disabled = !controllable;
+        const scrub = this.host.scrubInspect?.(); const active = ['playing', 'paused', 'preparing', 'finishing', 'cancelling', 'restoring'].includes (state.state);
+        this.playback.hidden = !scrub?.available && state.state === 'idle';
+        if (!this.scrubbing && document.activeElement !== this.progress) { this.progress.value = String (active ? state.progress || 0 : scrub?.progress ?? 0); }
+        this.progress.disabled = active || this.pending || this.host.blocked () || !this.host.scrub || !scrub?.available;
+        this.playbackStatus.textContent = active ? state.state + ' · ' + (state.stage || 'folding') + ' · ' + Math.round ((state.progress || 0) * 100) + '%' : 'Fold position · ' + Math.round ((scrub?.progress ?? 0) * 100) + '%';
         const canFold = Boolean (this.host.canAnimate?.() && this.host.toggleFold); this.fold.hidden = !canFold;
         this.fold.textContent = this.host.animation?.()?.action === 'unfold' ? 'Unfold carton' : 'Fold carton';
         this.fold.disabled = this.pending || this.host.blocked () || !canFold;
@@ -156,7 +186,7 @@ export class AutoPackPanel
         this.pending = true; this.status.textContent = 'Checking fit and preparing Auto Pack…'; this.Refresh ();
         try {
             const action = async () => {
-                try { const result = await this.host.autoPack (this.ContentOptions () || {}); this.status.textContent = result?.message || 'Auto Pack complete.'; return result; }
+                try { const result = await this.host.autoPack (this.ContentOptions () || {}); this.status.textContent = ''; return result; }
                 catch (error) { this.status.textContent = error.message; throw error; }
             };
             await (this.host.run ? this.host.run (action) : action ());

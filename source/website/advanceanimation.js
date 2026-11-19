@@ -12,16 +12,14 @@ export function ShowAdvanceAnimation (editor, visible)
     editor.website.layouter.Resize ();
 }
 
-export function CreateTimelineTracks (editor, parent)
+export function CreateTimelineTracks (editor, parent, slots = {})
 {
     const timeline = editor.timeline;
-    const cameraLabel = Element ('label', 'fold_camera_option', undefined, parent);
-    const autoFit = Element ('input', null, undefined, cameraLabel); autoFit.type = 'checkbox'; autoFit.checked = timeline.foldAutoFit !== false; autoFit.disabled = editor.readOnly || editor.busy;
-    autoFit.setAttribute ('aria-label', 'Auto-fit folding camera'); cameraLabel.appendChild (document.createTextNode ('Auto-fit fold / unfold · Camera keyframes take priority'));
-    autoFit.addEventListener ('change', () => editor.Run (() => editor.packaging.SetFoldCameraAutoFit (autoFit.checked)));
-    const ranges = Element ('div', 'timeline_ranges', undefined, parent);
-    for (const [key, label] of [['rangeStart', 'Beginning'], ['rangeEnd', 'End']]) {
-        const field = Element ('label', null, label + ' (s)', ranges); const input = Element ('input', null, undefined, field);
+    // In and Out fields sit in the toolbar's Timing group, Auto-fit in its Camera group, when the toolbar provides them.
+    const ranges = slots.ranges || Element ('div', 'timeline_ranges', undefined, parent);
+    for (const [key, label, short] of [['rangeStart', 'Beginning', 'In'], ['rangeEnd', 'End', 'Out']]) {
+        const field = Element ('label', 'timeline_field', undefined, ranges); Element ('span', null, short, field); const input = Element ('input', null, undefined, field);
+        field.title = label + ' of the played range (s)';
         input.type = 'number'; input.min = '0'; input.max = String (timeline.duration); input.step = '0.01'; input.value = String (timeline[key]); input.disabled = editor.readOnly;
         input.setAttribute ('aria-label', label + ' of animation');
         input.addEventListener ('change', () => {
@@ -31,9 +29,18 @@ export function CreateTimelineTracks (editor, parent)
         });
         input.dataset.range = key;
     }
+    const cameraLabel = Element ('label', 'timeline_field timeline_check fold_camera_option', undefined, slots.camera || parent);
+    const autoFit = Element ('input', null, undefined, cameraLabel); autoFit.type = 'checkbox'; autoFit.checked = timeline.foldAutoFit !== false; autoFit.disabled = editor.readOnly || editor.busy;
+    autoFit.setAttribute ('aria-label', 'Auto-fit folding camera'); Element ('span', null, 'Auto-fit fold', cameraLabel);
+    cameraLabel.title = 'Frame the box while it folds or unfolds. Camera keyframes take priority.';
+    autoFit.addEventListener ('change', () => editor.Run (() => editor.packaging.SetFoldCameraAutoFit (autoFit.checked)));
+    if (slots.camera) { slots.camera.prepend (cameraLabel); }
     const tracks = Element ('div', 'advance_animation_tracks', undefined, parent);
+    const state = editor.animationTrackState ||= { open : false, objects : new Set (), groups : { object : true, camera : true, action : true } };
+    state.groups ||= { object : true, camera : true, action : true };
     for (const [type, label] of [['object', 'Scene state'], ['camera', 'Camera positioning'], ['action', 'Actions']]) {
-        const row = Element ('div', 'advance_animation_track', undefined, tracks); Element ('strong', null, label, row);
+        const group = Element ('details', 'animation_scene_track', undefined, tracks); group.open = state.groups[type] !== false; Element ('summary', null, label, group); group.addEventListener ('toggle', () => { if (group.isConnected) { state.groups[type] = group.open; } });
+        const row = Element ('div', 'advance_animation_track', undefined, group); Element ('strong', null, label, row);
         const rail = Element ('div', 'advance_animation_rail', undefined, row);
         const interval = Element ('div', 'animation_interval', undefined, rail);
         interval.setAttribute ('aria-hidden', 'true');
@@ -70,6 +77,20 @@ export function CreateTimelineTracks (editor, parent)
                 editor.UpdatePlayheads (); editor.MarkDirty ();
             });
         }
+    }
+    // Keep one expandable track per object while retaining the existing scene and camera tracks.
+    const objects = Element ('details', 'animation_object_tracks', undefined, parent); objects.open = state.open;
+    Element ('summary', null, 'Object tracks (' + editor.document.objects.length + ')', objects);
+    objects.addEventListener ('toggle', () => { if (objects.isConnected) { state.open = objects.open; } });
+    for (const object of editor.document.objects) {
+        const group = Element ('details', 'animation_object_track', undefined, objects); group.open = state.objects.has (object.id);
+        Element ('summary', null, object.name + ' · ' + (object.keyframes?.length || 0) + ' keyframes', group);
+        group.addEventListener ('toggle', () => { if (!group.isConnected) { return; } if (group.open) { state.objects.add (object.id); } else { state.objects.delete (object.id); } });
+        const row = Element ('div', 'advance_animation_track', undefined, group); Element ('strong', null, object.name, row);
+        const rail = Element ('div', 'advance_animation_rail', undefined, row);
+        const playhead = Element ('input', 'animation_playhead', undefined, rail); playhead.type = 'range'; playhead.min = '0'; playhead.max = String (timeline.duration); playhead.step = '0.01'; playhead.value = String (timeline.time); playhead.setAttribute ('aria-label', 'Object ' + object.name + ' playhead');
+        playhead.addEventListener ('input', () => { timeline.Stop (); timeline.Seek (Number (playhead.value)); }); playhead.addEventListener ('change', () => editor.MarkDirty ());
+        for (const keyframe of object.keyframes || []) { const marker = Element ('button', 'animation_key_marker', '◆', rail); marker.style.left = 100 * keyframe.time / timeline.duration + '%'; marker.title = object.name + ' at ' + keyframe.time.toFixed (2) + ' s'; marker.setAttribute ('aria-label', marker.title); marker.addEventListener ('click', () => { timeline.Stop (); timeline.Seek (keyframe.time); }); }
     }
     UpdatePlayheads (editor);
 }
