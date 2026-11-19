@@ -362,3 +362,27 @@ describe ('Molded Pulp raised floors (domed and recessed can bases)', function (
         }
     });
 });
+
+describe ('Molded Pulp smooth display mesh', function () {
+    this.timeout (300000);
+    it ('shows a formed tray from its smooth surface: watertight, and the review mesh at Draft', async () => {
+        const { CreatePrimaryProduct, ProductDesign } = await import ('../../primary-products/src/index.js');
+        const d = ProductDesign ('standard-beverage'), can = CreatePrimaryProduct (d), tris = [];
+        for (let i = 0; i < 3; i++) { for (let j = 0; j < 2; j++) { for (const c of can.components) { for (const k of c.indices) { tris.push (c.positions[k * 3] + i * 86.2, c.positions[k * 3 + 1], c.positions[k * 3 + 2] + j * 86.2); } } } }
+        const draft = { ...DefaultPulpDraft ('type2'), formDepthMm : 35, detail : 'standard' }, shell = FormShell (Float32Array.from (tris), draft, { smoothDisplay : true }), c = shell.component;
+        assert.equal (shell.metrics.display, 'smooth'); assert.equal (c.display, 'smooth'); assert.equal (c.triangleCount, c.indices.length / 3);
+        // Watertight: every edge of the welded mesh is shared by exactly two triangles.
+        const key = i => [0, 1, 2].map (k => Math.round (c.positions[i * 3 + k] * 1e4)).join (','), ids = new Map (), weld = [];
+        for (let i = 0; i < c.positions.length / 3; i++) { const k = key (i); if (!ids.has (k)) { ids.set (k, ids.size); } weld.push (ids.get (k)); }
+        const edges = new Map (); for (let t = 0; t < c.indices.length; t += 3) { for (let e = 0; e < 3; e++) { const a = weld[c.indices[t + e]], b = weld[c.indices[t + (e + 1) % 3]], k = a < b ? a + '/' + b : b + '/' + a; edges.set (k, (edges.get (k) || 0) + 1); } }
+        assert.ok ([...edges.values ()].every (n => n === 2), 'closed');
+        let volume = 0; for (let t = 0; t < c.indices.length; t += 3) { const [a, b, e] = [0, 1, 2].map (k => [0, 1, 2].map (x => c.positions[c.indices[t + k] * 3 + x])); volume += (a[0] * (b[1] * e[2] - e[1] * b[2]) - b[0] * (a[1] * e[2] - e[1] * a[2]) + e[0] * (a[1] * b[2] - b[1] * a[2])) / 6; }
+        assert.ok (Math.abs (volume / 1000 - shell.metrics.volumeCm3) < 0.05 * shell.metrics.volumeCm3, volume / 1000 + ' vs ' + shell.metrics.volumeCm3);
+        const coarse = FormShell (Float32Array.from (tris), { ...draft, detail : 'draft' }, { smoothDisplay : true });
+        assert.equal (coarse.metrics.display, 'review'); assert.equal (coarse.component.display, undefined);
+        const { Triangulate } = await import ('../src/nurbs/display.js');
+        const square = [[0, 0], [10, 0], [10, 10], [0, 10]], hole = [[3, 3], [3, 7], [7, 7], [7, 3]], triangles = Triangulate (square, [hole]);
+        let area = 0; for (const [a, b, e] of triangles) { const p = [...square, ...hole]; area += ((p[b][0] - p[a][0]) * (p[e][1] - p[a][1]) - (p[b][1] - p[a][1]) * (p[e][0] - p[a][0])) / 2; }
+        assert.ok (Math.abs (area - 84) < 1e-9, 'square minus the hole: ' + area);
+    });
+});

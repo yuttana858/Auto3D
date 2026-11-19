@@ -5,10 +5,10 @@ import { PlanPulp, PlanSmoothSurface } from './plan.js';
 
 export function HandlePulpJob (message, post = () => {})
 {
-    const { id, stage, triangles, draft, detail, loftCheck = false, smoothSurface = false } = message;
+    const { id, stage, triangles, draft, detail, loftCheck = false, smoothSurface = false, smoothDisplay = false } = message;
     const onProgress = (phase, value) => post ({ id, progress : value, phase });
     // smoothSurface: a tray with its smooth product surface for STEP output (extra material raised when needed).
-    const plan = smoothSurface ? PlanSmoothSurface (triangles, draft, { detail, onProgress }) : PlanPulp (stage, triangles, draft, { detail, loftCheck, onProgress });
+    const plan = smoothSurface ? PlanSmoothSurface (triangles, draft, { detail, onProgress }) : PlanPulp (stage, triangles, draft, { detail, loftCheck, smoothDisplay, onProgress });
     const transfer = [];
     for (const component of plan.components) { for (const key of ['positions', 'normals', 'uvs', 'indices']) { transfer.push (component[key].buffer); } }
     for (const shell of plan.nurbs?.shells || []) { for (const face of [shell.top, shell.bottom]) { transfer.push (face.points.buffer, face.knotsU.buffer, face.knotsV.buffer); } }

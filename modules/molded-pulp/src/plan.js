@@ -10,6 +10,7 @@ import { ClamshellShells, ToLocal, ComponentToWorld } from './orient.js';
 import { NurbsShell } from './nurbs/shell.js';
 import { LoftPocketWalls } from './nurbs/loft.js';
 import { ProductSurface, ProductSurfaceProblem, PlateauLand } from './nurbs/surface.js';
+import { SmoothShellMesh } from './nurbs/display.js';
 
 const kb = 'MP knowledge base · mp-des-dfm-rules-by-process-type';
 const r1 = v => Math.round (v * 10) / 10;
@@ -73,11 +74,16 @@ export function FormShell (triangles, draft, options = {})
     // Phase 2 check (on request): smooth lofted walls built from this shell's review field, reported without geometry.
     const loft = options.loftCheck ? LoftSummary (LoftPocketWalls (grid, top, { depthMm : achieved, wallToleranceMm : 0.25 * PulpTypes[draft.pulpType].toleranceMm, skirtWall : draft.skirtWall === true }), options.shellName || 'Tray') : null;
     const smooth = options.smoothSurface ? SmoothShell (grid, top, achieved, rect.baseY, draft, options) : null;
+    // Smooth display (Standard detail or finer): the tray shown from its smooth product surface instead of the review
+    // mesh, whose walls saw-tooth between grid cells. Rims fall back to sharp when the plateau is too narrow for them, and
+    // the review mesh stays when no smooth surface can be built (merged pockets, for example).
+    const smoothMesh = options.smoothDisplay && detail !== 'draft' ? SmoothDisplay (grid, top, achieved, draft, origin, options, component) : null;
     const volume = ShellVolume (surfaces, grid);
     const metrics = { lengthMm : r1 (rect.lengthMm), widthMm : r1 (rect.widthMm), thicknessMm : draft.thicknessMm, formDepthMm : r1 (depth), achievedDepthMm : r1 (achieved), overallHeightMm : r1 (achieved + draft.thicknessMm), footprintLengthMm : r1 (bounds.size[0]), footprintWidthMm : r1 (bounds.size[2]), productHeightMm : r1 (bounds.size[1]), pocketCount : pockets.pocketCount, productIslands : islands.count, narrowestProductMm : islands.narrowestMm === null ? null : r1 (islands.narrowestMm), minRibMm : pockets.minRibMm === null ? null : r1 (pockets.minRibMm), detail, cellMm : Math.round (grid.cell * 1000) / 1000, gridNodes : grid.nx * grid.nz, triangles : component.triangleCount, fullGridTriangles : component.gridTriangles, volumeCm3 : r1 (volume / 1000), estimatedMassG : r1 (volume / 1000 * PulpTypes[draft.pulpType].densityGcm3), ribCount : features.ribs.length, lugCount : features.lugs.length, nestingPitchMm : features.nesting?.pitchMm ?? null, nestingRatio : features.nesting?.ratio ?? null };
     const checks = [...PulpChecks (draft, bounds, rect, metrics), ...features.warnings.map (w => ({ id : w.id, severity : w.severity || 'warning', message : w.message, basis : 'MP knowledge base · mp-des-structural-features' }))];
     progress ('done', 1);
-    return { bounds, rect, origin, grid, metrics, checks, nurbs, loft, smooth, features : { ribs : features.ribs, lugs : features.lugs, rib : features.rib, nesting : features.nesting, hinge : features.hinge, trace : features.trace }, component, ...(options.keepSurfaces ? { surfaces, field } : {}) };
+    if (smoothMesh?.component) { metrics.display = 'smooth'; metrics.triangles = smoothMesh.component.triangleCount; } else if (options.smoothDisplay) { metrics.display = 'review'; metrics.smoothDisplayReason = smoothMesh?.reason || 'Draft detail shows the review mesh.'; }
+    return { bounds, rect, origin, grid, metrics, checks, nurbs, loft, smooth, features : { ribs : features.ribs, lugs : features.lugs, rib : features.rib, nesting : features.nesting, hinge : features.hinge, trace : features.trace }, component : smoothMesh?.component || component, ...(options.keepSurfaces ? { surfaces, field } : {}) };
 }
 
 // Living hinge bead: a solid half-cylinder of radius ~ wall thickness along the longer flange edge (KB: hinge axis in the
@@ -175,6 +181,18 @@ function SmoothShell (grid, top, depthMm, baseY, draft, options)
     if (problem) { return { id, problem, land, radii }; }
     const surface = ProductSurface (loft, { baseY, direction : options.direction || '+y', id, ...radii });
     return { id, surface, land, radii, faces : surface.faces.length, maxDistanceMm : loft.maxDistanceMm };
+}
+
+function SmoothDisplay (grid, top, depthMm, draft, origin, options, review)
+{
+    const radii = SmoothSurfaceRadii (draft), tolerance = 0.25 * PulpTypes[draft.pulpType].toleranceMm;
+    const loft = LoftPocketWalls (grid, top, { depthMm, wallToleranceMm : tolerance, skirtWall : true, skirtCornerMm : radii.skirtCornerMm });
+    for (const attempt of [radii, { ...radii, rimFilletMm : 0 }]) {
+        if (ProductSurfaceProblem (loft, attempt)) { continue; }
+        const surface = ProductSurface (loft, { baseY : 0, direction : '+y', id : options.shellName || 'Tray', ...attempt });
+        return { component : SmoothShellMesh (surface, { thicknessMm : draft.thicknessMm, origin : [origin[0], 0, origin[2]], id : review.id }), radii : attempt };
+    }
+    return { reason : ProductSurfaceProblem (loft, radii) };
 }
 
 // Plan a tray and its smooth product surface for STEP output. When a plateau strip between a pocket and the skirt is too

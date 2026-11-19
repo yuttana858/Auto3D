@@ -14,7 +14,7 @@ export class PulpJobs
     constructor (url) { this.url = url; this.worker = null; this.pending = null; this.seq = 0; }
     Run (module, message, onProgress)
     {
-        if (typeof Worker !== 'function' || !this.url) { return Promise.resolve (message.smoothSurface ? module.PlanSmoothSurface (message.triangles, message.draft, { detail : message.detail, onProgress }) : module.PlanPulp (message.stage, message.triangles, message.draft, { detail : message.detail, loftCheck : message.loftCheck === true, onProgress })); }
+        if (typeof Worker !== 'function' || !this.url) { return Promise.resolve (message.smoothSurface ? module.PlanSmoothSurface (message.triangles, message.draft, { detail : message.detail, onProgress }) : module.PlanPulp (message.stage, message.triangles, message.draft, { detail : message.detail, loftCheck : message.loftCheck === true, smoothDisplay : message.smoothDisplay === true, onProgress })); }
         this.Cancel (); const id = ++this.seq, worker = this.worker ||= new Worker (this.url ());
         return new Promise ((resolve, reject) => {
             this.pending = { id, reject };
@@ -145,7 +145,8 @@ export class MoldedPulpWorkspace
         this.refining = { detail, progress : 0, phase : 'starting' }; panel.Refresh ();
         try {
             const module = await this.load (), triangles = SessionTrianglesMm (target, this.Products (ids));
-            const plan = await this.jobs.Run (module, { stage, triangles, draft, detail }, (phase, progress) => { if (token === this.token) { this.refining = { detail, phase, progress }; panel.Refresh (); } });
+            // The refined tray is shown from its smooth NURBS surface (the review mesh stays when one cannot be built).
+            const plan = await this.jobs.Run (module, { stage, triangles, draft, detail, smoothDisplay : stage === 'tray' }, (phase, progress) => { if (token === this.token) { this.refining = { detail, phase, progress }; panel.Refresh (); } });
             const preview = commit.record.after;
             if (token !== this.token || this.active || editor.document !== target || !target.objects.includes (preview) || editor.history.undo.at (-1) !== commit.entry) { return null; }
             this.active = true;
@@ -275,7 +276,7 @@ export class MoldedPulpWorkspace
             const definition = ValidatePulpDefinition (JSON.parse (object.userData[MoldedPulpDataKey]));
             if (!definition.productIds.length) { throw new Error ('This pulp object was formed over more than ' + MaxStoredProducts + ' products. Select them and form again to export.'); }
             const triangles = SessionTrianglesMm (editor.document, this.Products (definition.productIds)), draft = definition.draft;
-            const plan = definition.stage === 'sheet' ? module.PlanSheet (triangles, draft) : await this.jobs.Run (module, { stage : 'tray', triangles, draft, detail : draft.detail });
+            const plan = definition.stage === 'sheet' ? module.PlanSheet (triangles, draft) : await this.jobs.Run (module, { stage : 'tray', triangles, draft, detail : draft.detail, smoothDisplay : true });
             output = { object, plan, stage : definition.stage, draft };
         }
         if (this.refining) { throw new Error ('Wait for the detailed shape to finish refining before exporting.'); }
