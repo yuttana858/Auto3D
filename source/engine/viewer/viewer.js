@@ -394,7 +394,11 @@ export class Viewer
         }
         const dark = this.groundGridSettings.dark;
         const grid = new THREE.GridHelper (extent * 4, 40, dark ? 0x607080 : 0x879099, dark ? 0x30363c : 0xc3c7cb);
-        grid.material.transparent = true;
+        // Keep the blended grid in the opaque pass so transmissive glass can sample it.
+        grid.material.transparent = false;
+        grid.material.blending = THREE.CustomBlending; grid.material.blendEquation = THREE.AddEquation;
+        grid.material.blendSrc = THREE.SrcAlphaFactor; grid.material.blendDst = THREE.OneMinusSrcAlphaFactor;
+        grid.material.blendSrcAlpha = THREE.OneFactor; grid.material.blendDstAlpha = THREE.OneMinusSrcAlphaFactor;
         grid.material.opacity = 0.65;
         grid.material.depthWrite = false;
         grid.position.set ((bounds.min.x + bounds.max.x) / 2, (bounds.min.y + bounds.max.y) / 2, (bounds.min.z + bounds.max.z) / 2);
