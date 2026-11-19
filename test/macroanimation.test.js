@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { CommandRegistry } from '../source/website/commandregistry.js';
 import { RecordMacroAnimation } from '../source/website/macroanimation.js';
 import { SessionTimeline } from '../source/website/sessiontimeline.js';
+import { SceneHistory } from '../source/website/scenedocument.js';
 
 describe ('Macro animation recording', () => {
     function fixture () {
@@ -42,5 +43,14 @@ describe ('Macro animation recording', () => {
     it ('does not overwrite an authored timeline and removes partial recording after a step fails', async () => {
         const { editor, registry, object } = fixture (); const macro = { version : 1, steps : [{ id : 'move', command : 'object.transform', arguments : { x : 4 } }, { id : 'bad', command : 'camera.fov', arguments : { fov : 45 } }] }; object.keyframes.push ({ time : 0 }); await assert.rejects (RecordMacroAnimation (editor, registry, macro), /empty/); object.keyframes = [];
         registry.commands.get ('camera.fov').handler = () => { throw new Error ('Camera failed'); }; const result = await RecordMacroAnimation (editor, registry, macro); assert.equal (result.recorded, false); assert.equal (result.failedStep, 'bad'); assert.equal (object.position[0], 4); assert.equal (object.keyframes.length, 0); assert.equal (editor.timeline.cameraKeyframes.length, 0);
+    });
+    it ('makes a recording one Undo step that reverses the keyframes and the macro changes', async () => {
+        const { editor, registry, object } = fixture (); editor.history = new SceneHistory ();
+        registry.commands.get ('object.transform').handler = ({ x }) => { const before = object.position; object.position = [x, 0, 0]; const after = object.position; editor.history.Push ({ undo : () => { object.position = before; }, redo : () => { object.position = after; } }); return { id : object.id }; };
+        const result = await RecordMacroAnimation (editor, registry, { version : 1, steps : [{ id : 'a', command : 'object.transform', arguments : { x : 4 } }, { id : 'b', command : 'object.transform', arguments : { x : 6 } }] }, 1);
+        editor.timeline.Seek = () => {}; // Viewer posing is covered by the browser test; this checks the history entry.
+        assert.equal (result.recorded, true); assert.equal (editor.history.undo.length, 1); assert.equal (editor.history.undo[0].macroRecording, true);
+        await editor.history.Undo (); assert.deepEqual (object.position, [0, 0, 0]); assert.equal (object.keyframes.length, 0); assert.equal (editor.timeline.cameraKeyframes.length, 0);
+        await editor.history.Redo (); assert.deepEqual (object.position, [6, 0, 0]); assert.deepEqual (object.keyframes.map (k => k.time), [0, 1, 2]);
     });
 });

@@ -34,7 +34,9 @@ export async function RecordMacroAnimation (editor, registry, macro, stepSeconds
         const end = total; timeline.SetRange (0, end); timeline.time = end;
         const after = timeline.Serialize (), saved = objects.map (item => ({ keyframes : structuredClone (item.keyframes), visibilityKeys : structuredClone (item.visibilityKeys || []) }));
         const apply = forward => { if (editor.document !== document || !objects.every (item => document.objects.includes (item))) { throw new Error ('The recorded scene is no longer available.'); } for (let i = 0; i < objects.length; i++) { objects[i].keyframes = forward ? structuredClone (saved[i].keyframes) : []; objects[i].visibilityKeys = forward ? structuredClone (saved[i].visibilityKeys) : []; } timeline.Load (forward ? after : before); timeline.Seek (timeline.time); editor.MarkDirty (); editor.AnimationUI (); };
-        editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); editor.MarkDirty (); editor.AnimationUI ();
+        // One Undo step: fold the macro's own history entry (its scene changes) into the recording entry.
+        const run = registry.lastRun, steps = run?.history === editor.history && run.entry && editor.history.undo.at (-1) === run.entry ? editor.history.undo.pop () : null;
+        editor.history.Push ({ macroRecording : true, undo : async () => { apply (false); if (steps) { await steps.undo (); } }, redo : async () => { if (steps) { await steps.redo (); } apply (true); } }); editor.MarkDirty (); editor.AnimationUI ();
         return { recorded : true, duration : end, steps : result.completed.length, objects : objects.length, completed : result.completed.map (({ id, command }, index) => ({ id, command, ...timings[index] })) };
     } catch (error) { if (started && valid ()) { clear (); } throw error; }
 }

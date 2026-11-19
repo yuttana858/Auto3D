@@ -5,7 +5,7 @@
       "id": "conversion.open",
       "title": "Open CAD converter",
       "category": "Conversion",
-      "description": "Open the interactive private CAD conversion dialog. Selecting a source does not upload it. Supports a subset of Parasolid and single-file STEP.",
+      "description": "Open the interactive private CAD conversion dialog. Choosing a file starts conversion and automatically adds the GLB to the originating session. Parasolid requires actual coordinate units first. Supports a subset of Parasolid and single-file STEP.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -159,9 +159,9 @@
     },
     {
       "id": "conversion.submit",
-      "title": "Convert staged CAD privately",
+      "title": "Convert and import staged CAD",
       "category": "Conversion",
-      "description": "Explicitly upload the file selected in Convert CAD to private cloud processing. Parasolid requires actual source units. STEP uses embedded units. The result is never automatically inserted into a session.",
+      "description": "Start private conversion of the selected file. Parasolid requires actual source units; STEP uses embedded units. Automatically add the GLB to the originating account/session when ready, with one Undo step. Returns queued status; poll conversion.inspect for automatic state/result. Set autoImport false to retain a manual Add workflow. Account/session changes pause automatic insertion.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -189,6 +189,9 @@
               "standard",
               "fine"
             ]
+          },
+          "autoImport": {
+            "type": "boolean"
           }
         },
         "required": [],
@@ -196,7 +199,8 @@
       },
       "example": {
         "sourceUnit": "mm",
-        "quality": "standard"
+        "quality": "standard",
+        "autoImport": true
       }
     },
     {
@@ -228,7 +232,7 @@
       "id": "conversion.retry",
       "title": "Retry CAD conversion",
       "category": "Conversion",
-      "description": "Retry a transiently failed owned job within its deadline and two-attempt limit.",
+      "description": "Retry a transiently failed owned job within its deadline and two-attempt limit, then automatically add the ready GLB to the originating session. Poll conversion.inspect for automatic state/result.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -373,7 +377,7 @@
       "id": "conversion.sample",
       "title": "Convert public calibration box",
       "category": "Conversion",
-      "description": "Explicitly run the private cloud pipeline on the bundled public 40 × 30 × 20 mm STEP calibration box. Consumes a normal conversion slot; contains no customer CAD.",
+      "description": "Run the private cloud pipeline on the bundled public 40 × 30 × 20 mm STEP calibration box and automatically add its GLB to this session. Consumes a normal conversion slot; contains no customer CAD.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -415,7 +419,7 @@
       "id": "agent.access.connect",
       "title": "Connect this browser window",
       "category": "Account",
-      "description": "Same as Live Control. Share this window with this account's approved MCP agents, including read, write and screenshot access. Agents select it with auto3d.sessions.select. Returns a short-lived single-use code for auto3d.sessions.pair_code; allowSelect false requires that code. Legacy screenshots argument is accepted but no longer changes access.",
+      "description": "Same as Live Control. Live Control stays on in this browser tab for 24 hours: the window keeps its identity across reloads and reconnects by itself, so paired agents resume without a new code until Disconnect, sign-out or expiry. Share this window with this account's approved MCP agents, including read, write and screenshot access. Agents select it with auto3d.sessions.select. Returns a short-lived single-use code for auto3d.sessions.pair_code; allowSelect false requires that code. Legacy screenshots argument is accepted but no longer changes access.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -438,7 +442,7 @@
       "id": "agent.access.disconnect",
       "title": "Disconnect this browser window",
       "category": "Account",
-      "description": "End this browser window agent connection. Does not revoke independent OAuth registrations.",
+      "description": "End this browser window agent connection and its 24-hour Live Control, so existing agent pairings stop and the next Live Control starts a new window identity. Does not revoke independent OAuth registrations.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -3093,7 +3097,7 @@
       "id": "packaging.auto.generate",
       "title": "Auto Pack selected product",
       "category": "Packaging",
-      "description": "Create a flat carton of the chosen generator box style (packaging.auto.style, default 0201 RSC) beneath the selected product, or around a selected group or array as one product, and start checked bottom-anchored folding around it. Optional packed contents: partitions true nests interlocking slotted partitions between the products (layout read from the products; gaps narrower than the board plus 0.5 mm per face are opened by moving whole columns/rows apart; one set per layer, length strips slotted from the top and width strips from the bottom), and pads places bottom/top/front/back pads around them, in the board from boardId and grade. The carton is fitted around products and contents together. Requires known scene units. Existing fold controls inspect, pause, resume or cancel playback; cancel retains the flat carton. Undo removes the carton, then Undo again removes the contents and restores product positions.",
+      "description": "Create a flat carton of the chosen generator box style (packaging.auto.style, default 0201 RSC) beneath the selected product, or around a selected group or array as one product, and play the assembly sequence: products lift above the blank (spreading into partition cells), the carton erects with its bottom closed and lid open 90°, the bottom pad, side pads and partition layers lower in, products drop in one at a time back to front (faster for large counts), the top pad lowers on, and the lid closes, all eased per preferences.motion_easing. Default duration 14 s. Optional packed contents: partitions true nests interlocking slotted partitions between the products (layout read from the products; gaps narrower than the board plus 0.5 mm per face are opened by moving whole columns/rows apart; one set per layer, length strips slotted from the top and width strips from the bottom), and pads places bottom/top/front/back pads around them, in the board from boardId and grade. The carton is fitted around products and contents together. Requires known scene units. Existing fold controls inspect, pause, resume or cancel playback; cancel retains the flat carton and places the contents and products in their packed positions. When the sequence completes, one Undo removes the carton and contents and restores product positions; packaging.auto.sequence.inspect reports the stages.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -3140,13 +3144,27 @@
         "additionalProperties": false
       },
       "example": {
-        "duration": 8,
+        "duration": 14,
         "pads": [
           "bottom",
           "top"
         ],
         "partitions": true
       }
+    },
+    {
+      "id": "packaging.auto.sequence.inspect",
+      "title": "Inspect Auto Pack sequence",
+      "category": "Packaging",
+      "description": "Read the latest Auto Pack assembly sequence: stage names and spans, the current stage and progress, carton fold progress, product drop order and entry height (mm). Null before the first Auto Pack in this session.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
     },
     {
       "id": "packaging.pallet.plan",
@@ -3532,6 +3550,145 @@
       "example": {
         "module": "ai"
       }
+    },
+    {
+      "id": "object.facing.open",
+      "title": "Start Assign facing",
+      "category": "Objects",
+      "description": "Show the selected (or given) model footprint as a glowing blue ground rectangle with a blue Front arrow and a green Up arrow, the same as the Model spec Assign facing button. While active, clicking a face of the model bounds assigns it (Front mode, or Up mode / Shift+click). Does not change the scene by itself.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "object.facing.assign",
+      "title": "Assign front or up",
+      "category": "Objects",
+      "description": "Turn the model so the given side becomes the Front (toward the default camera) or the Up side, using the smallest rotation, about its bounds centre, then set it on the floor. Sides are named by the world axis they currently face (as the bounding-box faces show). Provide exactly one of front or up. Saves the model local front/up in userData._auto3dFacing. One Undo step. Requires object.facing.open.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "front": {
+            "type": "string",
+            "enum": [
+              "+x",
+              "-x",
+              "+y",
+              "-y",
+              "+z",
+              "-z"
+            ]
+          },
+          "up": {
+            "type": "string",
+            "enum": [
+              "+x",
+              "-x",
+              "+y",
+              "-y",
+              "+z",
+              "-z"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "front": "+x"
+      }
+    },
+    {
+      "id": "object.facing.turn",
+      "title": "Turn model about up",
+      "category": "Objects",
+      "description": "While Assign facing is active, turn the model about world up by 90, -90 or 180 degrees (changing which side faces front), then set it on the floor. One Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "degrees": {
+            "type": "number",
+            "enum": [
+              90,
+              -90,
+              180
+            ]
+          }
+        },
+        "required": [
+          "degrees"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "degrees": 90
+      }
+    },
+    {
+      "id": "object.facing.mode",
+      "title": "Choose Front or Up picking",
+      "category": "Objects",
+      "description": "Choose whether a clicked face becomes the Front or the Up side while Assign facing is active.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "front",
+              "up"
+            ]
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "mode": "up"
+      }
+    },
+    {
+      "id": "object.facing.inspect",
+      "title": "Inspect Assign facing",
+      "category": "Objects",
+      "description": "Read whether Assign facing is active, the model, picking mode, hovered face, world front/up axes and the saved local front/up of the model.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "object.facing.close",
+      "title": "Finish Assign facing",
+      "category": "Objects",
+      "description": "Hide the footprint and arrows, the same as Done or Escape.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
     },
     {
       "id": "ui.model_spec.inspect",
@@ -5089,6 +5246,33 @@
       },
       "example": {
         "units": "metric"
+      }
+    },
+    {
+      "id": "preferences.motion_easing",
+      "title": "Set motion easing",
+      "category": "Preferences",
+      "description": "Ramp in/out for automatic modelling motion: folds and unfolds, Auto Pack sequences, pad and partition drop-ins and array reveals (not the landing page or AI previews). Smooth (default) eases in and out, Strong uses longer ramps, Linear keeps constant speed. Saved with the account.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "easing": {
+            "type": "string",
+            "enum": [
+              "linear",
+              "smooth",
+              "strong"
+            ]
+          }
+        },
+        "required": [
+          "easing"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "easing": "smooth"
       }
     },
     {
@@ -7378,7 +7562,7 @@
       "id": "macro.cancel",
       "title": "Cancel running macro",
       "category": "Macros",
-      "description": "Request cancellation of the running macro or typed command sequence. Stops before the next step; completed steps are not undone.",
+      "description": "Request cancellation of the running macro or typed command sequence. Stops before the next step, including while a step waits for its playback; completed steps stay applied and one history.undo reverses them.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -7392,7 +7576,21 @@
       "id": "macro.list",
       "title": "List saved macros",
       "category": "Macros",
-      "description": "Return macros stored in this browser.",
+      "description": "Return the shared macro library: every macro saved by any account, with savedBy, mine, canEdit (owner or administrator), revision and location \"shared\". Macros saved earlier only in this browser are included with location \"browser\" until moved with macro.library.upload_browser.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "macro.library.inspect",
+      "title": "Inspect shared macro library",
+      "category": "Macros",
+      "description": "Return whether the shared library is reachable, whether this account is an administrator, and how many shared and browser-only macros exist.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -7406,7 +7604,7 @@
       "id": "macro.save",
       "title": "Save macro",
       "category": "Macros",
-      "description": "Save a named version 1 macro locally. Definition is a JSON string; matching names are replaced.",
+      "description": "Save a named version 1 macro to the shared library, where every account can see and run it. Definition is a JSON string. A matching name (case-insensitive) is replaced only if this account saved it or is an administrator; pass the listed revision to refuse replacing a newer save. The macro is checked first (unique step IDs, known commands, session tab changes only as the last step). warnings list arguments that name account- or scene-specific records another account cannot replay. Never falls back to browser storage.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -7418,6 +7616,10 @@
           "definition": {
             "type": "string",
             "maxLength": 262144
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F-]{36}$"
           }
         },
         "required": [
@@ -7430,6 +7632,66 @@
         "name": "Fit and inspect",
         "definition": "{\"version\":1,\"steps\":[{\"id\":\"fit\",\"command\":\"view.fit\",\"arguments\":{}}]}"
       }
+    },
+    {
+      "id": "macro.delete",
+      "title": "Delete saved macro",
+      "category": "Macros",
+      "description": "Delete a macro by name (case-insensitive). A shared macro can be deleted only by the account that saved it or an administrator; a browser-only macro is removed from this browser.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "name": "Fit and inspect"
+      }
+    },
+    {
+      "id": "macro.export",
+      "title": "Export saved macro",
+      "category": "Macros",
+      "description": "Return a saved macro (shared or browser-only) as a portable JSON definition for macro.save, with replay warnings.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "name": "Fit and inspect"
+      }
+    },
+    {
+      "id": "macro.library.upload_browser",
+      "title": "Move browser macros to the shared library",
+      "category": "Macros",
+      "description": "Explicit user action: copy macros saved earlier only in this browser to the shared library, where every account can see them. Names already in the library are skipped, never overwritten; uploaded macros are removed from browser storage.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
     },
     {
       "id": "ui.materials",

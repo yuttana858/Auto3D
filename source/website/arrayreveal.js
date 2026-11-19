@@ -1,3 +1,4 @@
+import { EaseMotion } from '../../modules/packaging/src/easing.js';
 import { Box3, Sphere } from 'three';
 import { FoldCameraFrame, CameraBottomInset } from './foldcamera.js';
 import { ApplyCameraState } from './sessiontimeline.js';
@@ -33,11 +34,11 @@ export function ArrayRevealTiming (index, count)
     if (!Number.isInteger (index) || !Number.isInteger (count) || index < 0 || index >= count || count < 1) { throw new Error ('Invalid array reveal index.'); }
     const fraction = count === 1 ? 0 : index / (count - 1); return { start : 0.08 + 0.8 * Math.pow (fraction, 0.45), duration : 0.16 - 0.10 * fraction };
 }
-export function ArrayRevealSample (index, count, progress)
+export function ArrayRevealSample (index, count, progress, easing = 'smooth')
 {
     if (!Number.isFinite (progress)) { throw new Error ('Invalid array reveal sample.'); }
     const { start, duration } = ArrayRevealTiming (index, count); const u = Math.max (0, Math.min (1, (progress - start) / duration));
-    const fall = u * u * (3 - 2 * u);
+    const fall = EaseMotion (u, easing);
     return { visible : progress >= start, offset : 1 - Math.max (0, Math.min (1, fall)), settled : u === 1, start };
 }
 
@@ -64,7 +65,7 @@ export async function RevealArray (editor, source, added, dropHeight, operation)
             operation.check (); if (operation.cancelled) { throw new Error ('Array creation canceled.'); }
             let settled = 0;
             records.forEach ((record, index) => {
-                const sample = ArrayRevealSample (index, records.length, progress);
+                const sample = ArrayRevealSample (index, records.length, progress, editor.website.preferences?.motionEasing || 'smooth');
                 if (!record.settled) {
                     record.mesh.visible = sample.visible; record.mesh.matrixAutoUpdate = false; record.mesh.matrix.copy (record.matrix); record.mesh.matrix.elements[13] += sample.offset * dropHeight; record.mesh.updateMatrixWorld (true);
                     if (sample.settled) { record.settled = true; record.mesh.matrix.copy (record.matrix); record.mesh.matrixAutoUpdate = record.autoUpdate; record.mesh.updateMatrixWorld (true); }

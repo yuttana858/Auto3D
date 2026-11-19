@@ -1,3 +1,4 @@
+import { MotionEasings, DefaultMotionEasing } from '../../modules/packaging/src/easing.js';
 import { OpenErrorLog } from './errorlogpanel.js';
 import { AgentAccessFor } from './agentaccess.js';
 import { RGBAColor, RGBColor } from '../engine/model/color.js';
@@ -8,7 +9,7 @@ import { Unit } from '../engine/model/unit.js';
 import { OpenCommandPanel } from './commandpanel.js';
 import { OpenModalConnection } from './modalconnection.js';
 
-export const AppVersion = '0.93.0';
+export const AppVersion = '0.94.0';
 
 export function AppBuildInfo ()
 {
@@ -30,7 +31,7 @@ export function AccountPreferenceState (preferences = {})
     if (Number.isFinite (view.edgeThreshold) && view.edgeThreshold >= 0 && view.edgeThreshold <= 180) { settings.edgeSettings.edgeThreshold = view.edgeThreshold; }
     for (const key of ['navigationMode', 'projectionMode']) { if ([1, 2].includes (view[key])) { camera[key] = view[key]; } }
     settings.AlignBackgroundWithTheme ();
-    return { settings, camera, units : preferences?.units === 'standard' ? 'standard' : 'metric', viewportQuality : ['auto', 'fast', 'quality'].includes (preferences?.viewportQuality) ? preferences.viewportQuality : 'auto' };
+    return { settings, camera, units : preferences?.units === 'standard' ? 'standard' : 'metric', viewportQuality : ['auto', 'fast', 'quality'].includes (preferences?.viewportQuality) ? preferences.viewportQuality : 'auto', motionEasing : MotionEasings.includes (preferences?.motionEasing) ? preferences.motionEasing : DefaultMotionEasing };
 }
 
 export function UnitFactor (sourceUnit, system)
@@ -77,7 +78,7 @@ export class Preferences
     {
         this.website = website;
         this.units = 'metric';
-        this.viewportQuality = 'auto';
+        this.viewportQuality = 'auto'; this.motionEasing = DefaultMotionEasing;
         this.accountId = null; this.applying = false; this.pendingSave = Promise.resolve (); this.loadGeneration = 0; this.loading = null;
         website.sidebar.detailsPanel.unitSystem = this.units;
         const badge = document.createElement ('span'); badge.className = 'version_badge'; badge.textContent = 'v' + AppVersion; badge.title = 'Build ' + AppBuildInfo ().build;
@@ -122,7 +123,12 @@ export class Preferences
         units.addEventListener ('change', () => {
             this.SetUnits (units.value).catch ((error) => { syncStatus.textContent = error.message; });
         }); unitLabel.appendChild (units);
-        displayControls.append (appearance, unitLabel, qualityLabel); display.append (displayControls, qualityNote);
+        // Ramp in/out for automatic modelling motion (folds, Auto Pack, drops, arrays).
+        const easingLabel = document.createElement ('label'); easingLabel.textContent = 'Motion easing';
+        const easing = document.createElement ('select'); easing.setAttribute ('aria-label', 'Motion easing');
+        easing.add (new Option ('Smooth — ease in and out', 'smooth')); easing.add (new Option ('Strong — longer ramps', 'strong')); easing.add (new Option ('Linear — constant speed', 'linear')); easing.value = this.motionEasing;
+        easing.addEventListener ('change', () => { this.SetMotionEasing (easing.value).catch (error => { syncStatus.textContent = error.message; }); }); easingLabel.appendChild (easing);
+        displayControls.append (appearance, unitLabel, qualityLabel, easingLabel); display.append (displayControls, qualityNote);
         const ai = section ('AI connections');
         const aiContent = document.createElement ('div'); aiContent.className = 'preferences_section_content';
         const aiNote = document.createElement ('p'); aiNote.className = 'section_hint'; aiNote.textContent = 'Connect your own Meshy account to use your credits.';
@@ -158,6 +164,11 @@ export class Preferences
         grid.append (display, ai, tools, aboutSection, adminArea); dialog.appendChild (form);
     }
 
+    async SetMotionEasing (easing)
+    {
+        if (!MotionEasings.includes (easing)) { throw new Error ('Choose motion easing: ' + MotionEasings.join (', ') + '.'); }
+        this.motionEasing = easing; await this.SaveAccount (); return { easing };
+    }
     async SetViewportQuality (mode)
     {
         if (!['auto', 'fast', 'quality'].includes (mode)) { throw new Error ('Invalid viewport quality.'); }
@@ -195,7 +206,7 @@ export class Preferences
                 const state = AccountPreferenceState (data?.preferences); this.applying = true; this.website.viewer.BeginRenderBatch?.();
                 try {
                     this.units = state.units; this.website.sidebar.detailsPanel.unitSystem = this.units;
-                    this.viewportQuality = state.viewportQuality; this.website.viewer.SetViewportQuality?.(state.viewportQuality);
+                    this.viewportQuality = state.viewportQuality; this.website.viewer.SetViewportQuality?.(state.viewportQuality); this.motionEasing = state.motionEasing;
                     const settings = this.website.settings; const camera = this.website.cameraSettings;
                     Object.assign (settings, state.settings); Object.assign (camera, state.camera);
                     this.website.SwitchTheme (settings.themeId, false);
@@ -220,7 +231,7 @@ export class Preferences
     SaveAccount ()
     {
         if (this.applying || !this.accountId || this.website.auth.user?.id !== this.accountId) { return Promise.resolve (); }
-        const owner = this.accountId; const generation = this.loadGeneration; const preferences = { units : this.units, theme : this.website.settings.themeId, view : this.ViewPreferences (), viewportQuality : this.viewportQuality || 'auto' };
+        const owner = this.accountId; const generation = this.loadGeneration; const preferences = { units : this.units, theme : this.website.settings.themeId, view : this.ViewPreferences (), viewportQuality : this.viewportQuality || 'auto', motionEasing : this.motionEasing || DefaultMotionEasing };
         this.pendingSave = this.pendingSave.catch (() => {}).then (async () => {
             if (this.website.auth.user?.id !== owner || generation !== this.loadGeneration) { return; }
             if (this.syncStatus?.isConnected) { this.syncStatus.textContent = 'Saving account preferences…'; }

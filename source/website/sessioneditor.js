@@ -6,6 +6,7 @@ import { Theme } from './settings.js';
 import { PreparePackagingPresentations } from './packagingadapter.js';
 import { SceneGroups } from './scenegroups.js';
 import { FloatingPanel } from './floatingpanel.js';
+import { FacingTool } from './facingtool.js';
 import { CommandBar } from './commandbar.js';
 import { ProcessingFeedback } from './processingfeedback.js';
 import { ArrayPlacement, ArrayCellSize, ArrayObjectBounds } from './arraylayout.js';
@@ -92,7 +93,7 @@ export class SessionEditor
             this.selectionBox.material.transparent = true;
             this.selectionBox.material.opacity = 1;
         }
-        viewer.scene.add (this.selectionBox);
+        viewer.scene.add (this.selectionBox); this.facing = new FacingTool (this);
         this.controls = new TransformControls (viewer.camera, viewer.renderer.domElement); this.controls.setSize (0.8); this.helper = this.controls.getHelper (); viewer.scene.add (this.helper);
         viewer.renderer.domElement.addEventListener ('pointerdown', event => { this.shiftDragRequested = event.shiftKey && this.mode === 'translate'; }, true);
         viewer.navigation.onOrbitStart = () => this.OrbitSelected (false);
@@ -589,6 +590,7 @@ export class SessionEditor
             this.document.objects.forEach ((object) => { object.threeObject.visible = object.visible; });
             await PreparePackagingPresentations (this.document.objects, this.document.model.materials, this.document.model.GetUnit ());
             if (beforeDisplay) { beforeDisplay (); }
+            this.motionOverride?.(); // A running sequence (Auto Pack) keeps its in-flight placement across rebuilds.
             this.website.navigator.Clear ();
             this.website.SetUIState (2);
             this.website.OnModelLoaded ({ model : this.document.model, mainFile : this.document.name, usedFiles : this.document.objects.map ((object) => object.source), missingFiles : [] }, root, fit);
@@ -645,6 +647,7 @@ export class SessionEditor
     SelectedObjects () { return this.document.objects.filter ((object) => this.selectedIds?.has (object.id)); }
     Select (object, fromNavigator = false, additive = false, single = false)
     {
+        if (this.facing?.active && this.facing.object !== object) { this.facing.Stop (); }
         this.selected = object && this.document.objects.includes (object) ? object : null;
         if (!this.selectedIds) { this.selectedIds = new Set (); }
         if (!additive) { this.selectedIds.clear (); }
@@ -947,12 +950,14 @@ export class SessionEditor
         const element = Element ('div', 'scene_model_preview');
         const title = Element ('div', 'scene_model_preview_title', undefined, element); Element ('strong', null, 'Model preview', title); Element ('span', null, 'Drag X/Y · Shift+drag Z', title);
         const canvas = Element ('canvas', 'scene_model_preview_canvas', undefined, element); canvas.width = 300; canvas.height = 190; canvas.setAttribute ('aria-label', 'Interactive model preview'); canvas.setAttribute ('role', 'img');
-        // Actions attached to the preview window; Assign facing will join them once placement is built.
+        // Actions attached to the preview window.
         const actions = Element ('div', 'scene_model_preview_actions', undefined, element); actions.setAttribute ('role', 'toolbar'); actions.setAttribute ('aria-label', 'Selected model actions');
         const rotate = Element ('button', null, 'Rotate', actions); rotate.type = 'button'; rotate.title = 'Turn the preview continuously'; rotate.setAttribute ('aria-pressed', 'false');
         rotate.addEventListener ('click', () => this.SetPreviewRotation (!this.modelPreview?.rotating));
         const update = Element ('button', null, 'Update', actions); update.type = 'button'; update.title = 'Reload this model from a file'; update.disabled = this.readOnly;
         update.addEventListener ('click', () => this.Run (() => this.UpdateModel (object)));
+        const facing = Element ('button', null, 'Assign facing', actions); facing.type = 'button'; facing.title = 'Show the footprint with Front and Up arrows and choose which side is the front and which is up'; facing.disabled = this.readOnly;
+        facing.addEventListener ('click', () => this.Run (() => this.facing.active ? this.facing.Stop () : this.facing.Start (object)));
         const remove = Element ('button', 'scene_model_preview_delete', '×', actions); remove.type = 'button'; remove.title = 'Delete this model (Undo restores it)'; remove.setAttribute ('aria-label', 'Delete selected model'); remove.disabled = this.readOnly;
         remove.addEventListener ('click', () => this.Run (() => this.Delete ()));
         panel.contentDiv.insertBefore (element, panel.contentDiv.firstChild);
@@ -1045,7 +1050,7 @@ export class SessionEditor
     }
 
     ShowAdvanceAnimation (visible) { ShowAdvanceAnimation (this, visible); }
-    CreateTimelineTracks (parent) { CreateTimelineTracks (this, parent); }
+    CreateTimelineTracks (parent, slots) { CreateTimelineTracks (this, parent, slots); }
     UpdatePlayheads () { UpdatePlayheads (this); }
 
     AnimationUI ()
@@ -1064,43 +1069,50 @@ export class SessionEditor
         const open = Element ('button', 'advance_animation_button', 'Advance animation', this.animationPanel);
         open.setAttribute ('aria-expanded', String (!this.advancePanel.hidden)); open.setAttribute ('aria-controls', this.advancePanel.id);
         open.addEventListener ('click', () => this.ShowAdvanceAnimation (this.advancePanel.hidden));
-        const close = Element ('button', 'advance_animation_close', 'Close', this.advancePanel); close.setAttribute ('aria-label', 'Close Advance animation');
-        close.addEventListener ('click', () => this.ShowAdvanceAnimation (false));
         const native = Element ('div', 'native_timeline', undefined, this.advancePanel);
-        const nativeHeader = Element ('div', 'timeline_header', undefined, native);
-        Element ('strong', null, 'Advance animation', nativeHeader);
-        const cameraNow = CaptureCameraState (this.website.viewer);
-        Element ('span', 'timeline_camera_readout', 'Cam ' + cameraNow.azimuth.toFixed (1) + '° az · ' + cameraNow.elevation.toFixed (1) + '° el', nativeHeader);
+        // One toolbar line: transport · timing · keyframes · camera · close. Names stay stable for agents and tests.
+        const toolbar = Element ('div', 'timeline_toolbar', undefined, native); toolbar.setAttribute ('role', 'toolbar'); toolbar.setAttribute ('aria-label', 'Advance animation controls');
+        const group = (label) => { const item = Element ('div', 'timeline_group', undefined, toolbar); item.setAttribute ('role', 'group'); item.setAttribute ('aria-label', label); return item; };
+        const tool = (parent, glyph, name, title) => { const button = Element ('button', 'timeline_tool', glyph, parent); button.type = 'button'; button.setAttribute ('aria-label', name); button.title = title || name; return button; };
+        const field = (parent, text, className) => { const label = Element ('label', 'timeline_field' + (className ? ' ' + className : ''), undefined, parent); Element ('span', null, text, label); return label; };
 
-        const cameraSettings = Element ('button', 'timeline_camera_settings', 'Camera settings', nativeHeader);
-        cameraSettings.addEventListener ('click', () => this.website.cameraPanel.Open ());
+        const transport = group ('Playback');
+        const play = tool (transport, timeline.playing ? '❚❚' : '▶', timeline.playing ? 'Pause' : 'Play'); play.classList.add ('timeline_play');
+        const showPlaying = (playing) => { play.textContent = playing ? '❚❚' : '▶'; play.setAttribute ('aria-label', playing ? 'Pause' : 'Play'); play.title = playing ? 'Pause' : 'Play'; };
+        play.addEventListener ('click', () => { timeline.Toggle (); showPlaying (timeline.playing); });
+        const reset = tool (transport, '↺', 'Reset', 'Reset to the beginning'); reset.addEventListener ('click', () => { timeline.Reset (); this.MarkDirty (); this.AnimationUI (); });
+        const timeText = Element ('span', 'timeline_time_text', timeline.time.toFixed (2) + ' / ' + timeline.duration.toFixed (2) + ' s', transport);
 
-        const settings = Element ('div', 'timeline_settings', undefined, native);
-        const durationLabel = Element ('label', null, 'Duration', settings); const duration = Element ('input', null, undefined, durationLabel); duration.type = 'number'; duration.min = '0.1'; duration.max = '3600'; duration.step = '0.1'; duration.value = String (timeline.duration); duration.setAttribute ('aria-label', 'Timeline duration in seconds');
+        const timing = group ('Timing');
+        const durationLabel = field (timing, 'Length'); const duration = Element ('input', null, undefined, durationLabel); duration.type = 'number'; duration.min = '0.1'; duration.max = '3600'; duration.step = '0.1'; duration.value = String (timeline.duration); duration.setAttribute ('aria-label', 'Timeline duration in seconds');
         duration.disabled = this.readOnly;
         duration.addEventListener ('change', () => { timeline.SetDuration (Number (duration.value)); this.MarkDirty (); this.AnimationUI (); });
-        const tweenLabel = Element ('label', null, 'Tween', settings); const tween = Element ('select', null, undefined, tweenLabel); tween.setAttribute ('aria-label', 'Keyframe interpolation'); [['smooth', 'Smooth'], ['linear', 'Linear'], ['step', 'Step']].forEach (([value, label]) => tween.add (new Option (label, value))); tween.value = timeline.interpolation;
+        const ranges = Element ('div', 'timeline_ranges', undefined, timing);
+        const tweenLabel = field (timing, 'Tween'); const tween = Element ('select', null, undefined, tweenLabel); tween.setAttribute ('aria-label', 'Keyframe interpolation'); [['smooth', 'Smooth'], ['linear', 'Linear'], ['step', 'Step']].forEach (([value, label]) => tween.add (new Option (label, value))); tween.value = timeline.interpolation;
         tween.disabled = this.readOnly;
         tween.addEventListener ('change', () => { timeline.interpolation = tween.value; this.MarkDirty (); });
-        const loopLabel = Element ('label', 'timeline_loop_label', undefined, settings); const loop = Element ('input', null, undefined, loopLabel); loop.type = 'checkbox'; loop.checked = timeline.loop; loop.disabled = this.readOnly; loopLabel.appendChild (document.createTextNode (' Loop')); loop.addEventListener ('change', () => { timeline.loop = loop.checked; this.MarkDirty (); });
+        const loopLabel = field (timing, 'Loop', 'timeline_check'); const loop = Element ('input', null, undefined, loopLabel); loopLabel.prepend (loop); loop.type = 'checkbox'; loop.checked = timeline.loop; loop.disabled = this.readOnly; loop.addEventListener ('change', () => { timeline.loop = loop.checked; this.MarkDirty (); });
 
-        const capture = Element ('div', 'mode_buttons timeline_capture_buttons', undefined, native);
-        const addObject = Element ('button', null, 'Keyframe scene state', capture); addObject.disabled = this.readOnly || !this.document.objects.length; addObject.title = 'Save every scene object position, rotation and scale at the current time.';
+        const capture = group ('Add keyframe');
+        const addObject = tool (capture, '+ Scene', 'Keyframe scene state', 'Keyframe every object position, rotation and scale at the current time'); addObject.disabled = this.readOnly || !this.document.objects.length;
         addObject.addEventListener ('click', () => { timeline.CaptureScene (); this.MarkDirty (); this.AnimationUI (); });
-        const addAction = Element ('button', null, 'Action', capture); addAction.disabled = this.readOnly || this.busy || !this.selected?.userData?._auto3dFefco; addAction.addEventListener ('click', () => this.Run (() => this.packaging.OpenTimelineAction ()));
-        const addCamera = Element ('button', null, 'Keyframe camera', capture); addCamera.disabled = this.readOnly; addCamera.title = 'Save viewer eye, target, up vector, FOV, azimuth and elevation at the current time.';
+        const addCamera = tool (capture, '+ Camera', 'Keyframe camera', 'Keyframe the viewer eye, target, up vector, FOV, azimuth and elevation at the current time'); addCamera.disabled = this.readOnly;
         addCamera.addEventListener ('click', () => { timeline.CaptureCamera (); this.MarkDirty (); this.AnimationUI (); });
+        const addAction = tool (capture, '+ Fold', 'Action', 'Add a fold / unfold action for the selected box'); addAction.disabled = this.readOnly || this.busy || !this.selected?.userData?._auto3dFefco; addAction.addEventListener ('click', () => this.Run (() => this.packaging.OpenTimelineAction ()));
 
-        const controls = Element ('div', 'mode_buttons timeline_transport', undefined, native);
-        const play = Element ('button', null, timeline.playing ? 'Pause' : 'Play', controls); play.addEventListener ('click', () => { timeline.Toggle (); play.textContent = timeline.playing ? 'Pause' : 'Play'; });
-        const reset = Element ('button', null, 'Reset', controls); reset.addEventListener ('click', () => { timeline.Reset (); this.MarkDirty (); this.AnimationUI (); });
-        const timeText = Element ('span', 'timeline_time_text', timeline.time.toFixed (2) + ' / ' + timeline.duration.toFixed (2) + ' s', controls);
+        const camera = group ('Camera');
+        const cameraNow = CaptureCameraState (this.website.viewer);
+        Element ('span', 'timeline_camera_readout', cameraNow.azimuth.toFixed (0) + '° az · ' + cameraNow.elevation.toFixed (0) + '° el', camera).title = 'Current camera azimuth ' + cameraNow.azimuth.toFixed (1) + '° and elevation ' + cameraNow.elevation.toFixed (1) + '°';
+        const cameraSettings = tool (camera, 'Camera…', 'Camera settings'); cameraSettings.classList.add ('timeline_camera_settings');
+        cameraSettings.addEventListener ('click', () => this.website.cameraPanel.Open ());
+        const close = tool (toolbar, '×', 'Close Advance animation'); close.classList.add ('advance_animation_close');
+        close.addEventListener ('click', () => this.ShowAdvanceAnimation (false));
 
-        this.CreateTimelineTracks (native);
+        this.CreateTimelineTracks (native, { ranges, camera });
         const scrub = Element ('input', 'timeline_scrub', undefined, native); scrub.type = 'range'; scrub.min = '0'; scrub.max = String (timeline.duration); scrub.step = '0.01'; scrub.value = String (timeline.time); scrub.setAttribute ('aria-label', 'Auto3D keyframe timeline');
         scrub.addEventListener ('input', () => { timeline.Seek (Number (scrub.value)); timeText.textContent = timeline.time.toFixed (2) + ' / ' + timeline.duration.toFixed (2) + ' s'; this.MarkDirty (); });
         timeline.onTime = (time) => { this.UpdatePlayheads (); if (document.activeElement !== scrub) { scrub.value = String (time); } timeText.textContent = time.toFixed (2) + ' / ' + timeline.duration.toFixed (2) + ' s'; };
-        timeline.onPlaybackChanged = (playing) => { play.textContent = playing ? 'Pause' : 'Play'; this.MarkDirty (); };
+        timeline.onPlaybackChanged = (playing) => { showPlaying (playing); this.MarkDirty (); };
 
         const keys = Element ('div', 'timeline_keyframes', undefined, native);
         const entries = timeline.cameraKeyframes.map ((keyframe) => ({ type : 'camera', keyframe, object : null, label : 'Camera' }));

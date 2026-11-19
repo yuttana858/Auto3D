@@ -6,6 +6,8 @@ import { FefcoProfile, ValidateFefco } from '../modules/packaging/src/fefco.js';
 const ToolIds = new Set (CommandIds);
 const LongCommands = /^(?:render\.(?:now|queue\.start)|ai\.|library\.|material\.(?:textures?\.|surface\.|relief|uv\.generate)|packaging\.(?:export|download|extrude|apply|fefco\.(?:generate|animate|toggle|unfold))|polygon\.|session\.(?:model\.|recovery\.restore|tabs\.new)|primary\.(?:generate|update)|commands\.text$)/;
 const RequestRetentionMs = 3600000, RateWindowMs = 60000, RateLimit = 120;
+// A pairing lasts 24 hours from pairing (capped by the registration) and survives inactivity, reloads and tab switches in its window.
+export const PairLifetimeMs = 24 * 60 * 60 * 1000, PairIdleMs = PairLifetimeMs;
 const WindowCodeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function CreateWindowCode ()
 {
@@ -89,7 +91,7 @@ export class BrokerCore
         if (!target || !Number.isFinite (expiresAt) || expiresAt <= this.now ()) { throw AgentError ('session_unavailable', 'Session unavailable.'); }
         // Selecting without the one-time code is an explicit per-window opt-in.
         if (target.data.allowSelect !== true) { throw AgentError ('invalid_code', 'This window requires its one-time code. Use auto3d.sessions.pair_code with the code shown in Agent access.'); }
-        await this.state.storage.put ('pair:' + grantId, { connectionId, instanceId : target.data.instanceId, sessionFingerprint : target.data.sessionFingerprint, sessionId, expiresAt : Math.min (expiresAt, registration.expiresAt), lastActivity : this.now (), revision : crypto.randomUUID () });
+        await this.state.storage.put ('pair:' + grantId, { connectionId, instanceId : target.data.instanceId, sessionFingerprint : target.data.sessionFingerprint, sessionId, expiresAt : Math.min (expiresAt, registration.expiresAt, this.now () + PairLifetimeMs), lastActivity : this.now (), revision : crypto.randomUUID () });
         await this.registrations.Assert ({ accountId, id : grantId });
         this.Notify (accountId);
     }
@@ -103,7 +105,7 @@ export class BrokerCore
             const key = 'used-window-code:' + codeHash, used = await storage.get (key);
             if (used?.expiresAt > this.now ()) { throw AgentError ('invalid_code', 'App window code already used.'); }
             if (used) { await storage.delete (key); }
-            await storage.put ('pair:' + grantId, { connectionId : target.data.connectionId, instanceId : target.data.instanceId, sessionFingerprint : target.data.sessionFingerprint, sessionId : target.data.sessions.find (session => session.active).id, expiresAt : Math.min (expiresAt, registration.expiresAt), lastActivity : this.now (), revision : crypto.randomUUID () });
+            await storage.put ('pair:' + grantId, { connectionId : target.data.connectionId, instanceId : target.data.instanceId, sessionFingerprint : target.data.sessionFingerprint, sessionId : target.data.sessions.find (session => session.active).id, expiresAt : Math.min (expiresAt, registration.expiresAt, this.now () + PairLifetimeMs), lastActivity : this.now (), revision : crypto.randomUUID () });
             await storage.put (key, { expiresAt : target.data.windowCodeExpiresAt });
         });
         await this.registrations.Assert ({ accountId, id : grantId });
@@ -127,7 +129,7 @@ export class BrokerCore
     {
         await this.registrations.Assert ({ accountId, id : grantId });
         const pair = await this.state.storage.get ('pair:' + grantId);
-        if (pair && Number.isFinite (pair.lastActivity) && this.now () - pair.lastActivity >= 3600000) {
+        if (pair && Number.isFinite (pair.lastActivity) && this.now () - pair.lastActivity >= PairIdleMs) {
             await this.state.storage.transaction (async storage => { const current = await storage.get ('pair:' + grantId); if (current?.revision === pair.revision && current.lastActivity === pair.lastActivity) { await storage.delete ('pair:' + grantId); } });
             throw AgentError ('not_paired', 'Agent session disconnected after inactivity. Pair again.');
         }
@@ -137,6 +139,15 @@ export class BrokerCore
         let target = connections.find (({ data }) => data.connectionId === pair.connectionId && active (data));
         // A window that reconnected from the same login session keeps its pairing.
         if (!target && pair.instanceId) { target = connections.find (({ data }) => data.instanceId === pair.instanceId && data.sessionFingerprint === pair.sessionFingerprint && active (data)); }
+        // The pairing belongs to the window: when the user switches tabs, it follows the window's active session tab.
+        if (!target) {
+            const window = connections.find (({ data }) => data.connectionId === pair.connectionId || pair.instanceId && data.instanceId === pair.instanceId && data.sessionFingerprint === pair.sessionFingerprint);
+            const session = window?.data.sessions.find (item => item.active);
+            if (session) {
+                await this.state.storage.transaction (async storage => { const current = await storage.get ('pair:' + grantId); if (current?.revision === pair.revision) { await storage.put ('pair:' + grantId, { ...current, sessionId : session.id, connectionId : window.data.connectionId }); } });
+                pair.sessionId = session.id; target = window;
+            }
+        }
         if (!target) {
             const window = connections.find (({ data }) => data.connectionId === pair.connectionId || pair.instanceId && data.instanceId === pair.instanceId);
             throw AgentError ('session_unavailable', window ? 'The paired tab is no longer active in its window. Ask the user to return to it or pair again.' : 'The paired app window is disconnected. Ask the user to reconnect it in Agent access.');
@@ -336,7 +347,7 @@ export class BrokerCore
         for (const socket of this.state.getWebSockets ()) { if (socket.deserializeAttachment ()?.expiresAt <= this.now ()) { socket.close (1008, 'Connection expired'); this.Close (socket); } }
         const pairs = await this.state.storage.list ({ prefix : 'pair:', limit : 1000 }); let remaining = false;
         for (const [key, pair] of pairs) {
-            if (pair.expiresAt <= this.now () || Number.isFinite (pair.lastActivity) && this.now () - pair.lastActivity >= 3600000) {
+            if (pair.expiresAt <= this.now () || Number.isFinite (pair.lastActivity) && this.now () - pair.lastActivity >= PairIdleMs) {
                 await this.state.storage.transaction (async storage => { const current = await storage.get (key); if (current?.revision === pair.revision && current.lastActivity === pair.lastActivity) { await storage.delete (key); } });
             } else { remaining = true; }
         }

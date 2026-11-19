@@ -15,6 +15,7 @@ import { FefcoDimensions, ResolveFefcoDimensions } from '../../modules/packaging
 import { Sphere } from 'three';
 import { LoadPackagingModule, PackagingModel, FefcoSurfaces, ApplyFefcoFoldPose, BoardAppearanceMaterialChanges, PreparePackagingPresentations, ApplyPackagingPresentation } from './packagingadapter.js';
 import { FoldMotionProgress, FoldCameraFrame, CameraBottomInset, VisibleBounds } from './foldcamera.js';
+import { EaseMotion } from '../../modules/packaging/src/easing.js';
 import { ApplyCameraState } from './sessiontimeline.js';
 
 
@@ -180,7 +181,8 @@ export class PackagingWorkspace
         const target = open === null ? !state.open : open; if (target === state.open) { return { started : false, objectId : source.id, open : state.open }; }
         return this.AnimateFold (source.id, duration, { top : target ? 'open' : 'close' });
     }
-    async AnimateFold (objectId = null, duration = 6, { top = null } = {})
+    // sequence: an Auto Pack PackSequencePlayback that drives the fold and moves the products, pads and partitions with it.
+    async AnimateFold (objectId = null, duration = 6, { top = null, sequence = null } = {})
     {
         this.Editable (); if (!Number.isFinite (duration) || duration < 1 || duration > 30) { throw new Error ('Animation duration must be 1–30 seconds.'); }
         const editor = this.editor; const target = editor.document; const source = objectId ? target.objects.find (item => item.id === objectId) : editor.selected;
@@ -195,6 +197,9 @@ export class PackagingWorkspace
         if (top) { rig.topRoute = true; Object.assign (plan, top === 'open' ? { from : 0, to : 1, action : 'open top', targetState : 'folded', targetClosure : 'open', stages : ['closed box', 'opening top', 'open top'] } : { from : 1, to : 0, action : 'close top', targetState : 'folded', targetClosure : 'closed', stages : ['open top', 'closing top', 'closed box'] }); }
         // An Auto Pack carton unfolds from its packed pose; an open top follows its open route down.
         else if (rig.hostAutoPack && plan.action === 'unfold' && manualPose === null) { plan.from = 1; }
+        // Folding a packed carton up from flat replays its assembly sequence with the products and pieces it saved.
+        if (!sequence && !top && rig.hostAutoPack && plan.action === 'fold' && manualPose === null && plan.from === 0) { try { sequence = this.autoPack?.ReplaySequence (source) || null; } catch { sequence = null; } }
+        const ownsOverride = Boolean (sequence) && !editor.motionOverride; if (ownsOverride) { sequence.Frame (0); editor.motionOverride = () => sequence.Frame (); }
         // Audit while the original is still in the scene. Keep saving/editing
         // blocked during this preparation, and recheck account/scene on yields.
         let clearance; this.foldOperation = { source, action : plan.action, stage : 'checking surfaces' }; editor.UpdateSelectionBox?.(); editor.website.viewer?.Render (); editor.busy = true; editor.RefreshButtons?.();
@@ -204,7 +209,7 @@ export class PackagingWorkspace
         const surfaces = FefcoSurfaces (target.CompactModel ([source], true)); const unit = target.model.GetUnit ();
         const before = target.packaging; const previous = editor.selected; const index = target.objects.indexOf (source); const account = editor.website.auth.user.id; const cameraBefore = editor.website.viewer?.GetCamera?.().Clone (); let preview; let final;
         editor.website.viewer?.navigation?.StopCameraMovement ();
-        const restore = async () => { if (preview) { target.Remove (preview); } if (final) { target.Remove (final); } if (!target.objects.includes (source)) { target.Restore (source, index); } target.packaging = before; if (editor.document === target) { editor.selected = previous; await editor.Render (); if (cameraBefore) { editor.website.viewer.SetCamera (cameraBefore.Clone ()); } } };
+        const restore = async () => { sequence?.Reset (); if (preview) { target.Remove (preview); } if (final) { target.Remove (final); } if (!target.objects.includes (source)) { target.Restore (source, index); } target.packaging = before; if (editor.document === target) { editor.selected = previous; await editor.Render (); if (cameraBefore) { editor.website.viewer.SetCamera (cameraBefore.Clone ()); } } };
         const assign = (object, state, data = parameters) => { object.id = source.id; object.keyframes = (source.keyframes || []).map (frame => ({ ...frame, position : [...frame.position], rotation : [...frame.rotation], scale : [...frame.scale] })); object.packagingProfile = profile; object.userData = { ...source.userData, _auto3dFefco : JSON.stringify (data), _auto3dPackagingState : state }; delete object.userData._auto3dFoldPreview; object.position = [...source.position]; object.rotation = [...source.rotation]; object.visible = source.visible; object.castShadow = source.castShadow !== false; object.receiveShadow = source.receiveShadow !== false; target.ApplyTransform (object); };
         const autoFit = editor.timeline?.foldAutoFit !== false && !editor.timeline?.cameraKeyframes?.length;
         const operation = { source, action : plan.action, stage : plan.stages[0], clearance, cameraAutoFit : autoFit }; this.foldOperation = operation;
@@ -219,16 +224,18 @@ export class PackagingWorkspace
             operation.player = new module.FoldPlayback (progress => {
                 autoPackGuard ();
                 if (editor.document !== target || editor.website.auth.user?.id !== account || editor.website.accountReady === false || editor.readOnly) { throw new Error ('The workspace or account changed during folding.'); }
-                const motion = FoldMotionProgress (progress, autoFit); const pose = PackagingFoldPose (module, rig, plan.from + (plan.to - plan.from) * motion); operation.stage = plan.action === 'unfold' ? ({ 'closing top' : 'opening top', 'closing base' : 'opening base', 'erecting walls' : 'unwrapping walls' }[pose.stage] || pose.stage) : plan.action === 'close top' && pose.stage === 'opening top' ? 'closing top' : pose.stage;
+                // Ramp in/out of the whole fold (each panel also eases within its phase); a pack sequence drives the fold itself.
+                const motion = sequence ? sequence.Fold (progress) : EaseMotion (FoldMotionProgress (progress, autoFit), editor.website.preferences?.motionEasing || 'smooth'); const pose = PackagingFoldPose (module, rig, plan.from + (plan.to - plan.from) * motion); operation.stage = plan.action === 'unfold' ? ({ 'closing top' : 'opening top', 'closing base' : 'opening base', 'erecting walls' : 'unwrapping walls' }[pose.stage] || pose.stage) : plan.action === 'close top' && pose.stage === 'opening top' ? 'closing top' : pose.stage; if (sequence) { operation.stage = sequence.Stage (); operation.sequence = sequence.Inspect (); }
                 if (preview.threeObject) {
-                    ApplyFefcoFoldPose (preview.threeObject, rig, pose, unit);
-                    if (operation.cameraAutoFit && cameraBefore) { const viewer = editor.website.viewer; const bounds = VisibleBounds (preview.threeObject); const sphere = bounds.getBoundingSphere (new Sphere ()); const size = viewer.GetImageSize (); viewer.SetCamera (FoldCameraFrame (cameraBefore, sphere, 0, progress, size.width / size.height, CameraBottomInset (viewer, editor.status), bounds)); }
+                    ApplyFefcoFoldPose (preview.threeObject, rig, pose, unit); sequence?.Frame (progress);
+                    if (operation.cameraAutoFit && cameraBefore) { const viewer = editor.website.viewer; const bounds = VisibleBounds (preview.threeObject); if (sequence) { bounds.union (sequence.Bounds ()); } const sphere = bounds.getBoundingSphere (new Sphere ()); const size = viewer.GetImageSize (); viewer.SetCamera (FoldCameraFrame (cameraBefore, sphere, 0, progress, size.width / size.height, CameraBottomInset (viewer, editor.status), bounds)); }
                     else if (!operation.cameraManual && editor.timeline?.cameraKeyframes?.length) { const timeline = editor.timeline; ApplyCameraState (editor.website.viewer, timeline.CameraStateAt (timeline.rangeStart + progress * (timeline.rangeEnd - timeline.rangeStart))); }
                     else { editor.website.viewer.Render (); }
                 } else { editor.website.viewer?.Render (); } editor.Status ('Folding · ' + operation.stage + ' · ' + Math.round (progress * 100) + '%'); editor.website.packagingPanel?.fefcoPanel?.RefreshPlayback (); editor.website.packagingPanel?.workspace?.autoPanel?.RefreshPlayback ();
             }, duration);
             // Playback controls remain accessible while ordinary editing/saving is blocked.
             operation.completion = operation.player.Start ().then (async result => {
+                if (sequence) { sequence.Reset (); }
                 if (!result.completed) { await restore (); this.lastFold = { state : 'cancelled', progress : 0, objectId : source.id }; editor.Status ('Folding cancelled · original object restored'); return; }
                 autoPackGuard ();
                 const next = { ...parameters, closure : plan.targetClosure }; const data = PackagingFoldFrame (module, rig, next, profile, plan.targetState === 'flat'); final = target.AddImported (PackagingModel (data, unit, surfaces), source.name.replace (/ · (Dieline|Folded|Open|Closed)$/, '') + (plan.targetState === 'flat' ? ' · Dieline' : plan.targetClosure === 'open' ? ' · Open' : ' · Closed')); assign (final, plan.targetState, data.parameters); final.source = 'FEFCO ' + parameters.code + ' ' + plan.targetState;
@@ -238,9 +245,9 @@ export class PackagingWorkspace
                 if (editor.document !== target || editor.website.auth?.user?.id !== account || editor.website.accountReady === false || editor.readOnly) { throw new Error ('The workspace or account changed while completing folding.'); } autoPackGuard ();
                 const apply = async forward => { target.Remove (forward ? source : final); target.Restore (forward ? final : source, index); target.packaging = forward ? profile : before; editor.selected = forward ? final : previous; await editor.Render (true); this.Refresh (); editor.website.packagingPanel?.Refresh (); };
                 editor.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); this.lastFold = { state : 'completed', progress : 1, stage : plan.stages.at (-1), action : plan.action, objectId : final.id }; editor.Status ('Folding complete · ' + plan.stages.at (-1) + ' · Undo available');
-            }).catch (async error => { try { await restore (); } catch { /* Retain the playback error. */ } this.lastFold = { state : 'failed', progress : 0, error : error.message }; editor.website.errorLogs?.Record ('error', 'packaging-fold', error.message); editor.Status (error.message); }).finally (() => { removeCameraListeners (); this.foldOperation = null; editor.UpdateSelectionBox?.(); editor.busy = false; editor.RefreshButtons?.(); this.Refresh (); editor.website.packagingPanel?.Refresh (); });
+            }).catch (async error => { try { await restore (); } catch { /* Retain the playback error. */ } this.lastFold = { state : 'failed', progress : 0, error : error.message }; editor.website.errorLogs?.Record ('error', 'packaging-fold', error.message); editor.Status (error.message); }).finally (() => { removeCameraListeners (); if (ownsOverride && editor.motionOverride) { editor.motionOverride = null; sequence.Reset (); } this.foldOperation = null; editor.UpdateSelectionBox?.(); editor.busy = false; editor.RefreshButtons?.(); this.Refresh (); editor.website.packagingPanel?.Refresh (); });
             editor.website.packagingPanel?.fefcoPanel?.RefreshPlayback (); editor.website.packagingPanel?.workspace?.autoPanel?.RefreshPlayback (); return { started : true, objectId : source.id, duration, action : plan.action, stages : plan.stages, clearance };
-        } catch (error) { removeCameraListeners (); try { await restore (); } finally { this.foldOperation = null; editor.busy = false; editor.RefreshButtons?.(); } throw error; }
+        } catch (error) { removeCameraListeners (); if (ownsOverride) { editor.motionOverride = null; } try { await restore (); } finally { this.foldOperation = null; editor.busy = false; editor.RefreshButtons?.(); } throw error; }
     }
     // The finished object replaces the animated preview; ease the camera to frame it closely.
     // Completion is reported only after this settles, so a following inspect or capture sees the final view.

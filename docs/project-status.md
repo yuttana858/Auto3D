@@ -2,27 +2,41 @@
 
 ## Macro step timing — Auto3D 0.93.0 candidate
 
-Stacked on PR #160. Recorded macros support per-step durations and pauses; timing is editable in the macro builder and available to agents. Lighting remains under the app’s existing lighting settings. Overlapping steps, automatic creation/deletion, and procedural recording remain open; see release-0930.md. Not deployed.
+Stacked on PR #160. Recorded macros support per-step durations and pauses; timing is editable in the macro builder and available to agents. Lighting remains under the app’s existing lighting settings. Overlapping steps, automatic creation/deletion, and procedural recording remain open; see release-macro-timing.md. Not deployed.
 
 ## Array reveal on the shared timeline — Auto3D 0.92.0 candidate
 
-Stacked on PR #159. Existing selected objects can receive staggered reveal motion and visibility tracks; standard macros can create an array and pass copy IDs to the scheduler. The active object can remain in place. UX review clarified selection, timing and hidden-before-reveal behavior. Existing tracks are protected. See release-0920.md. Not deployed.
+Stacked on PR #159. Existing selected objects can receive staggered reveal motion and visibility tracks; standard macros can create an array and pass copy IDs to the scheduler. The active object can remain in place. UX review clarified selection, timing and hidden-before-reveal behavior. Existing tracks are protected. See release-animation-array.md. Not deployed.
 
 ## Embedded clips on the shared timeline — Auto3D 0.91.0 candidate
 
-Stacked on PR #158. Schedules paused embedded clips on the shared timeline with start, duration, speed and looping; seeking, playback and video export sample the same timeline. Adds an Animation panel control, object-track clip spans, agent commands and archive persistence. Unmanaged clips retain their existing independent behavior. Array recording and macro-generated procedural actions remain future work. See release-0910.md. Not deployed.
+Stacked on PR #158. Schedules paused embedded clips on the shared timeline with start, duration, speed and looping; seeking, playback and video export sample the same timeline. Adds an Animation panel control, object-track clip spans, agent commands and archive persistence. Unmanaged clips retain their existing independent behavior. Array recording and macro-generated procedural actions remain future work. See release-animation-clips.md. Not deployed.
 
 ## Object visibility and lifetime timeline — Auto3D 0.90.0 candidate
 
-Stacked on PR #157. Adds discrete, undoable visibility keyframes and lifetime ranges for existing scene objects, a compact Animation panel editor, macro visibility capture, session persistence and agent controls. UI/UX review was performed independently; selected-object context, local feedback, reset on selection change, and marker legends are included. This does not record object creation or permanent deletion. See release-0900.md. Not deployed.
+Stacked on PR #157. Adds discrete, undoable visibility keyframes and lifetime ranges for existing scene objects, a compact Animation panel editor, macro visibility capture, session persistence and agent controls. UI/UX review was performed independently; selected-object context, local feedback, reset on selection change, and marker legends are included. This does not record object creation or permanent deletion. See release-animation-visibility.md. Not deployed.
 
-## Macro animation recording and tracks — Auto3D 0.89.0 candidate
+## Shared macro library — Auto3D 0.92.0 (2026-11-19)
 
-Stacked on PR #156. Adds sequential native transform/camera keyframe recording for a restricted macro subset and collapsible scene, camera, action and per-object tracks. Unsupported commands are rejected before the macro runs; creation, deletion, materials, visibility and procedural animation need further work. See release-0890.md and agent-interface.md. Not deployed.
+Packaging 1.16.1 / Primary Products 0.15.0 / Molded Pulp 0.3.0 unchanged. Based on main after #163 (0.91.1). Macros are saved to one shared library in the account database: every signed-in account sees and runs every macro; only the account that saved it or an administrator can replace or delete it. Browser-only macros stay listed until moved with `macro.library.upload_browser`; saves never fall back to browser storage. Requires migration `20261119120000_shared_macro_library` before deploy. See [release-0920.md](release-0920.md).
 
-## Auto Pack compact help — Auto3D 0.88.1 / Packaging 1.15.1 candidate
+## Private alternative-reader proof transport — Auto3D 0.91.1 live (2026-11-18)
 
-Auto Pack sizing and contents explanations are grouped in a collapsed How Auto Pack works disclosure. Pads and Partitions is a separate collapsed section retaining all existing settings. Agent commands open and close each section. Flute and board-record selection and the actual catalog thickness sit beside the box style; the panel shows Inside Dimensions without duplicate bounding-box or score-size cards. The folding progress bar is a manual fold-pose timeline after playback; pause/cancel buttons and repeated folding descriptions are removed from the Auto panel. Primary Products 0.15.0 and Molded Pulp 0.3.0 are unchanged. See release-0881.md. Not deployed.
+Packaging 1.16.1 / Primary Products 0.15.0 / Molded Pulp 0.3.0 unchanged. PR #163; runtime `4a769df484ad7b2b74bbc97057b1a8b00aacd0f6`. CI 44427952565 and deployment 44429356940 passed, including source-capability workerd tests, normal validation and browser smoke, served version/bundle and authentication boundaries. The read-only bridge lets an operator evaluate a retained failed Parasolid directly inside Modal without changing retries, expiry or publication.
+
+The private CadConvert proof passed the public reference and source-transfer integrity, but failed individual face tessellation on the retained private source. Production fallback remains disabled; no annual SDK was added. The experimental proof is manual-only after its two bounded server evaluations. See [release-0911.md](release-0911.md), [validation](validation/cadconvert-proof-0911.md) and the [native proof record](https://github.com/yuttana858/Cloud-3D-Studio/blob/main/docs/cadconvert-proof.md).
+
+## Integration release in #155 — Auto3D 0.91.0 / Packaging 1.16.1 (2026-11-18)
+
+Primary Products 0.15.0 / Molded Pulp 0.3.0 are preserved; Packaging 1.16.1 is #156's Auto Pack change on top of #161's 1.16.0. Based on main after #161 (0.90.0); renumbered from 0.89.0 and 0.90.0. #156 (Auto Pack compact controls and fold timeline, prepared as 0.88.1) and #157 (macro animation recording and collapsible tracks) are stacked here; a macro recording is one Undo step. Based on main after #154 (0.89.0). Not deployed. Agent pairings last 24 hours, follow the window's active tab and survive reloads (these commits missed the #148 merge). Read-only Supabase tools are auto-approved in `.claude/settings.json`. Macro steps wait for playback, one Undo reverses a run, tab changes are allowed only as the last step, saved macros can be deleted and exported, and saving warns about account-specific IDs. The Advance animation controls are one minimal toolbar line. See [release-0910.md](release-0910.md). Next: store macros in the account.
+
+## Auto Pack assembly sequence, motion easing, Assign facing — Auto3D 0.90.0 / Packaging 1.16.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0 (2026-11-18)
+
+Candidate on `claude/dazzling-faraday-rhti3h`, not deployed. Auto Pack plays the real packing order (lift, erect with lid open 90°, pads, partitions, products one at a time with acceleration for large counts, top pad, close) as one Undo step; Accessories pads and partitions drop in; automatic modelling motion ramps in and out with the new Motion easing preference (Smooth default, Strong, Linear); Assign facing joins the Model spec preview buttons. New commands: `packaging.auto.sequence.inspect`, `preferences.motion_easing`, `object.facing.*` (394 commands). See docs/release-0900.md.
+
+## Automatic CAD import — Auto3D 0.89.0 live (2026-11-18)
+
+Packaging 1.15.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0 remain unchanged. Integrates main `12dea98` / 0.88.0 and its Molded Pulp NURBS output release (#153). Parasolid open/drop detects the format and opens conversion; choosing a source (plus actual Parasolid units) starts conversion and automatically adds its GLB to the originating scene with Undo. STEP opens locally as before. The bounded watcher continues with the dialog closed and pauses on account/document/tab/read-only changes. Native Cloud 3D Studio remains 0.5.0 with the existing private processing/retention contract. PR #154; local 1,049 app/module tests, 73 MCP tests, workerd/build/audit checks and all 91 distinct browser checks passed across the full run and four unchanged isolated reruns. Initial failures remain recorded in [validation/cad-auto-0890.md](validation/cad-auto-0890.md). CI 44380198211 and production deployment 44381827086 (attempt 1) passed. Runtime commit `6bdb3c321cfcf9f97bf29739fdd521969e44cba6`; the served version/bundle, landing/login, credential boundary and live MCP checks all passed. See [release-0890.md](release-0890.md) for final validation/publication evidence and [commercial SDK research](cad-commercial-sdk.md) for future reader choices.
 
 ## Molded Pulp output: STEP and GLB on a NURBS B-rep — Auto3D 0.88.0 / Molded Pulp 0.3.0 (2026-11-18)
 
