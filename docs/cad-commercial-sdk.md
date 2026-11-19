@@ -1,6 +1,12 @@
 # Internally hosted CAD SDK options
 
-Researched 2026-11-18 for Auto3D's private converter. No commercial SDK is installed or licensed, and none has been tested against the failed private Parasolid source. The current native runtime stays unchanged for the 0.89.0 workflow release.
+Researched 2026-11-18 for Auto3D's private converter. No commercial SDK is installed or licensed, and none has been tested against the failed private Parasolid source. The native service remains 0.5.0; Auto3D 0.91.1 adds the private proof transport.
+
+## Current decision
+
+Annual SDK licensing is excluded for the current low-frequency use. The existing paid Modal workspace supplies compute; it does not include a proprietary CAD reader license. No additional workspace, subscription, vendor-hosted upload or SDK purchase was made.
+
+The [private open-source proof](https://github.com/yuttana858/Cloud-3D-Studio/blob/main/docs/cadconvert-proof.md) has now built and tested CadConvert commit `d5d9a1b9948c575fd46b22840971360c67878362`. Its public reference passes, but individual face tessellation fails on the retained private source (`mesh_face_failure`). Therefore it remains an experimental manual tool and is not enabled as an Auto3D fallback. The source was processed only in the existing private server path; original attempts and retention are unchanged. See [0.91.1](release-0911.md).
 
 ## Shortlist
 
@@ -31,4 +37,4 @@ Color/style support and bitmap textures are separate. An SDK may preserve more a
 
 ## Open-source alternative found
 
-[cadconvert](https://github.com/omerbasavul/cadconvert) is an experimental MIT Rust Parasolid-text/STEP-to-mesh engine. It is a possible separately evaluated visualization path, not a verified replacement for the current complete STEP/GLB/STL engineering contract: binary Parasolid and engineering STEP output are not established, and the project's testing notes include recovery of partial data from damaged inputs. It has not been built or tested on the private failing source. Updating the existing reader from 0.3.17 to 0.3.18 also does not establish a fix for that source's parametric face-construction failure. Neither alternative is enabled by this release.
+[cadconvert](https://github.com/omerbasavul/cadconvert) is an experimental MIT Rust Parasolid-text/STEP-to-mesh engine. It is a possible separately evaluated visualization path, not a verified replacement for the current complete STEP/GLB/STL engineering contract: binary Parasolid and engineering STEP output are not established, and the project's testing notes include recovery of partial data from damaged inputs. The bounded private evaluation above now records its actual result. Updating the existing reader from 0.3.17 to 0.3.18 also does not establish a fix for that source's parametric face-construction failure. Neither alternative is enabled by this release.

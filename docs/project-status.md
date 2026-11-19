@@ -4,9 +4,11 @@
 
 Candidate on `claude/dazzling-faraday-rhti3h`, not deployed. The Accessories tab adds a Can collar for a selected group or array of upright cans (for example a 3 × 2 six-pack). The rim is sensed from the geometry, each can gets a tabbed relief hole tucked under its rim, the corners are rounded, and the collar is a grouped CAD board profile added in one Undo step. The CAD designer adds Shape tools (round corners, circle, relief hole). New commands: `packaging.accessories.collar(.inspect)` and `packaging.path.round_corners/circle/relief_hole`. See docs/release-0920.md.
 
-## Private alternative-reader proof transport — Auto3D 0.91.1 (2026-11-18)
+## Private alternative-reader proof transport — Auto3D 0.91.1 live (2026-11-18)
 
-Packaging 1.16.1 / Primary Products 0.15.0 / Molded Pulp 0.3.0 unchanged. Adds a short-lived operator-only read capability so a retained failed Parasolid can go directly from private R2 to an isolated Modal proof. No retries, retention or model-publication changes. Based on main 0.91.0; PR #163, CI/deployment pending. See [release-0911.md](release-0911.md).
+Packaging 1.16.1 / Primary Products 0.15.0 / Molded Pulp 0.3.0 unchanged. PR #163; runtime `4a769df484ad7b2b74bbc97057b1a8b00aacd0f6`. CI 44427952565 and deployment 44429356940 passed, including source-capability workerd tests, normal validation and browser smoke, served version/bundle and authentication boundaries. The read-only bridge lets an operator evaluate a retained failed Parasolid directly inside Modal without changing retries, expiry or publication.
+
+The private CadConvert proof passed the public reference and source-transfer integrity, but failed individual face tessellation on the retained private source. Production fallback remains disabled; no annual SDK was added. The experimental proof is manual-only after its two bounded server evaluations. See [release-0911.md](release-0911.md), [validation](validation/cadconvert-proof-0911.md) and the [native proof record](https://github.com/yuttana858/Cloud-3D-Studio/blob/main/docs/cadconvert-proof.md).
 
 ## Integration release in #155 — Auto3D 0.91.0 / Packaging 1.16.1 (2026-11-18)
 
