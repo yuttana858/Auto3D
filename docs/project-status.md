@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Recorded object lifetimes — Auto3D 0.97.0 candidate
+
+Stacked on PR #169. Recorded duplicate and duplicate-at steps reveal real session copies at the end of their step; recorded deletion retains the object and hides it at the step end for reversible scrubbing. Ordinary macro delete remains a true session deletion. Lighting is unchanged. General import/generation, material animation and overlapping steps remain future work. See release-0970.md. Not deployed.
+
 ## Recorded array creation — Auto3D 0.96.0 candidate
 
 Stacked on PR #167. Macro recording creates arrays and tracks copy visibility and drop motion on the shared timeline. Copies can be referenced by later macro steps; one Undo reverses the whole run. Lighting remains configured in the app. Automatic camera fit is not recorded; general object creation, deletion and material animation remain open. See release-0960.md. Not deployed.

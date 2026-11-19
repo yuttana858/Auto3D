@@ -5,9 +5,9 @@ import { ArrayRevealTiming } from './arrayreveal.js';
 import { ArrayObjectBounds } from './arraylayout.js';
 import { Vector3 } from 'three';
 
-// Deliberately narrow: commands that create, delete or alter materials cannot yet be
-// represented by native transform/camera tracks and are rejected before execution.
-const SupportedSteps = new Set (['object.transform', 'object.visibility', 'selection.transform', 'view.fit', 'view.focus', 'camera.activate', 'camera.fov', 'object.select', 'scene.inspect', 'camera.current.inspect', 'packaging.fefco.animate', 'animation.action.add', 'animation.clip.add', 'object.array']);
+// The supported creation and removal commands are represented by timeline visibility;
+// unsupported creation and material changes are rejected before execution.
+const SupportedSteps = new Set (['object.transform', 'object.visibility', 'object.duplicate', 'object.duplicate_at', 'object.delete', 'selection.transform', 'view.fit', 'view.focus', 'camera.activate', 'camera.fov', 'object.select', 'scene.inspect', 'camera.current.inspect', 'packaging.fefco.animate', 'animation.action.add', 'animation.clip.add', 'object.array']);
 const FoldSteps = new Set (['packaging.fefco.animate', 'animation.action.add']);
 const ProceduralSteps = new Set ([...FoldSteps, 'animation.clip.add']);
 
@@ -26,15 +26,42 @@ export async function RecordMacroAnimation (editor, registry, macro, stepSeconds
     });
     if (total > 3600) { throw new Error ('Macro animation cannot exceed one hour.'); }
     const unsupported = [...new Set (macro.steps.map (step => step?.command).filter (id => !SupportedSteps.has (id)))];
-    if (unsupported.length) { throw new Error ('Cannot record these macro steps yet: ' + unsupported.join (', ') + '. Other object creation, deletion and materials are not supported.'); }
+    if (unsupported.length) { throw new Error ('Cannot record these macro steps yet: ' + unsupported.join (', ') + '. Other object creation and materials are not supported.'); }
     const document = editor.document, timeline = editor.timeline, owner = editor.website.auth?.user?.id;
     if (!owner || editor.website.accountReady === false || editor.readOnly || editor.busy) { throw new Error ('Use an editable signed-in session.'); }
     if (!document.objects.length || document.objects.length > 100) { throw new Error ('Record a session containing 1–100 objects.'); }
     if (document.objects.some (item => item.player?.state?.playing)) { throw new Error ('Pause embedded animation before recording a macro.'); }
     if (timeline.playing || timeline.cameraKeyframes.length || timeline.actions.length || timeline.embeddedClips.length || document.objects.some (item => item.keyframes?.length || item.visibilityKeys?.length)) { throw new Error ('Start with an empty, stopped timeline so existing animation is not overwritten.'); }
-    const objects = [...document.objects], before = timeline.Serialize (), initialVisibility = new Map (), lastVisibility = new Map (); let started = false;
+    const objects = [...document.objects], before = timeline.Serialize (), initialVisibility = new Map (), lastVisibility = new Map (), removed = new Set (); let started = false;
     const valid = () => editor.website.auth?.user?.id === owner && editor.website.accountReady !== false && !editor.readOnly && editor.document === document && document.objects.length === objects.length && objects.every ((object, i) => document.objects[i] === object);
     const procedural = async (step, args, invoke, index) => {
+        if (step.command === 'scene.inspect' && removed.size) { const scene = await invoke (); return { ...scene, objects : scene.objects.map (item => removed.has (item.id) ? { ...item, retainedForTimeline : true, effectiveVisible : false } : item) }; }
+        const target = objects.find (item => item.id === (args.objectId ?? editor.selected?.id));
+        const targetsObject = step.command.startsWith ('object.') || ['selection.transform', 'view.focus', 'packaging.fefco.animate', 'animation.action.add', 'animation.clip.add'].includes (step.command);
+        if (targetsObject && target && (removed.has (target.id) || (target.userData?._auto3dGroup && objects.some (item => item.userData?._auto3dGroup === target.userData._auto3dGroup && removed.has (item.id))))) { throw new Error ('That object or group was removed earlier in this recording.'); }
+        if (step.command === 'object.delete') {
+            if (!valid () || editor.busy || !target) { throw new Error ('Select an available object to remove.'); }
+            const group = target.userData?._auto3dGroup, selected = objects.filter (item => item === target || (group && item.userData?._auto3dGroup === group));
+            for (const object of selected) {
+                const keys = object.visibilityKeys ||= [];
+                if (!keys.length) { keys.push ({ id : crypto.randomUUID (), time : 0, visible : initialVisibility.get (object) }); }
+                keys.push ({ id : crypto.randomUUID (), time : timings[index].end, visible : false }); removed.add (object.id); lastVisibility.set (object, false);
+            }
+            editor.Select (null); return { deletedId : target.id, objectIds : selected.map (object => object.id), retainedForTimeline : true };
+        }
+        if (step.command === 'object.duplicate' || step.command === 'object.duplicate_at') {
+            if (!valid () || editor.busy || !target || target.visible === false) { throw new Error ('Select a visible existing object to duplicate.'); }
+            const group = step.command === 'object.duplicate' && target.userData?._auto3dGroup;
+            const count = group ? objects.filter (item => item.userData?._auto3dGroup === group).length : 1;
+            if (group && objects.some (item => item.userData?._auto3dGroup === group && item.visible === false)) { throw new Error ('Show all objects in the group before recording a duplicate.'); }
+            if (objects.length + count > 100) { throw new Error ('Recording supports up to 100 total scene objects.'); }
+            const old = [...objects], result = await invoke ();
+            if (editor.website.auth?.user?.id !== owner || editor.website.accountReady === false || editor.readOnly || editor.document !== document || !old.every ((item, i) => document.objects[i] === item)) { throw new Error ('The account or scene changed during duplication.'); }
+            const added = document.objects.slice (old.length);
+            if (added.length !== count || (step.command === 'object.duplicate' && added[0]?.id !== result.id) || (step.command === 'object.duplicate_at' && (result.objectIds.length !== count || added.some ((item, i) => item.id !== result.objectIds[i])))) { throw new Error ('Unexpected scene changes during duplication.'); }
+            for (const object of added) { objects.push (object); initialVisibility.set (object, true); lastVisibility.set (object, true); object.visibilityKeys = [{ id : crypto.randomUUID (), time : 0, visible : false }, { id : crypto.randomUUID (), time : timings[index].end, visible : true }]; }
+            return result;
+        }
         if (step.command === 'object.array') {
             if (!valid () || editor.busy) { throw new Error ('The account or scene changed during macro recording.'); }
             const counts = [args.width, args.length, args.height];
@@ -78,7 +105,7 @@ export async function RecordMacroAnimation (editor, registry, macro, stepSeconds
         const action = { id : crypto.randomUUID (), objectId, clip : args.clip, time : timing.start, duration : timing.end - timing.start, speed : args.speed ?? 1, loop : args.loop ?? false, baseClip : first?.baseClip ?? player.state.clip, baseTime : first?.baseTime ?? player.state.time };
         timeline.embeddedClips = ValidateTimelineClips ([...timeline.embeddedClips, action]); return { action : { ...action } };
     };
-    const capture = time => { if (!valid ()) { throw new Error ('The account or scene changed during macro recording.'); } timeline.time = time; timeline.CaptureScene (); for (const object of objects) { const visible = object.visible !== false; if (time === 0) { initialVisibility.set (object, visible); lastVisibility.set (object, visible); } else if (lastVisibility.get (object) !== visible) { const keys = object.visibilityKeys ||= []; if (!keys.length) { keys.push ({ id : crypto.randomUUID (), time : 0, visible : initialVisibility.get (object) }); } keys.push ({ id : crypto.randomUUID (), time, visible }); lastVisibility.set (object, visible); } } timeline.ApplyVisibility (); timeline.CaptureCamera (); };
+    const capture = time => { if (!valid ()) { throw new Error ('The account or scene changed during macro recording.'); } timeline.time = time; timeline.CaptureScene (); for (const object of objects) { if (removed.has (object.id)) { continue; } const visible = object.visible !== false; if (time === 0) { initialVisibility.set (object, visible); lastVisibility.set (object, visible); } else if (lastVisibility.get (object) !== visible) { const keys = object.visibilityKeys ||= []; if (!keys.length) { keys.push ({ id : crypto.randomUUID (), time : 0, visible : initialVisibility.get (object) }); } keys.push ({ id : crypto.randomUUID (), time, visible }); lastVisibility.set (object, visible); } } timeline.ApplyVisibility (); timeline.CaptureCamera (); };
     const clear = () => { for (const action of timeline.embeddedClips) { const player = objects.find (item => item.id === action.objectId)?.player; if (player) { player.Choose (action.baseClip, action.baseTime, false); } } for (const object of objects) { object.keyframes = []; object.visibilityKeys = []; } timeline.cameraKeyframes = []; timeline.actions = []; timeline.Load (before); timeline.ApplyVisibility (); editor.packaging?.presentation?.Apply?.(timeline.time, false); editor.MarkDirty (); editor.AnimationUI (); };
     let result;
     try {
@@ -92,6 +119,7 @@ export async function RecordMacroAnimation (editor, registry, macro, stepSeconds
         // One Undo step: fold the macro's own history entry (its scene changes) into the recording entry.
         const run = registry.lastRun, steps = run?.history === editor.history && run.entry && editor.history.undo.at (-1) === run.entry ? editor.history.undo.pop () : null;
         editor.history.Push ({ macroRecording : true, undo : async () => { apply (false); if (steps) { await steps.undo (); } }, redo : async () => { if (steps) { await steps.redo (); } apply (true); } }); editor.MarkDirty (); editor.AnimationUI ();
-        return { recorded : true, duration : end, steps : result.completed.length, objects : objects.length, warnings : macro.steps.some (step => step.command === 'object.array') ? ['Array copies are created immediately; automatic camera fitting is not recorded.'] : [], completed : result.completed.map (({ id, command, result : stepResult }, index) => ({ id, command, ...timings[index], ...(command === 'object.array' ? { objectIds : [...stepResult.objectIds] } : {}) })) };
+        const warnings = []; if (macro.steps.some (step => step.command === 'object.array')) { warnings.push ('Array copies are created immediately; automatic camera fitting is not recorded.'); } if (removed.size) { warnings.push ('Removed objects remain in the session and are hidden by timeline visibility keys.'); }
+        return { recorded : true, duration : end, steps : result.completed.length, objects : objects.length, warnings, completed : result.completed.map (({ id, command, result : stepResult }, index) => ({ id, command, ...timings[index], ...(['object.array', 'object.duplicate_at', 'object.delete'].includes (command) ? { objectIds : [...stepResult.objectIds] } : command === 'object.duplicate' ? { objectIds : [stepResult.id] } : {}) })) };
     } catch (error) { if (started && valid ()) { clear (); } throw error; }
 }
