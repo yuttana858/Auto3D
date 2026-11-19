@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Can collar and CAD shape tools — Auto3D 0.93.0 / Packaging 1.17.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0 (2026-11-19)
+
+Candidate on `claude/dazzling-faraday-rhti3h`, not deployed. The Accessories tab adds a Can collar for a selected group or array of upright cans (for example a 3 × 2 six-pack). The rim is sensed from the geometry, each can gets a tabbed relief hole tucked under its rim, the corners are rounded, and the collar is a grouped CAD board profile added in one Undo step. The CAD designer adds Shape tools (round corners, circle, relief hole). New commands: `packaging.accessories.collar(.inspect)` and `packaging.path.round_corners/circle/relief_hole`. See docs/release-0930.md.
+
 ## Shared macro library — Auto3D 0.92.0 (2026-11-19)
 
 Packaging 1.16.1 / Primary Products 0.15.0 / Molded Pulp 0.3.0 unchanged. Based on main after #163 (0.91.1). Macros are saved to one shared library in the account database: every signed-in account sees and runs every macro; only the account that saved it or an administrator can replace or delete it. Browser-only macros stay listed until moved with `macro.library.upload_browser`; saves never fall back to browser storage. Requires migration `20261119120000_shared_macro_library` before deploy. See [release-0920.md](release-0920.md).

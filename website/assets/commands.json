@@ -2786,6 +2786,178 @@
       }
     },
     {
+      "id": "packaging.path.round_corners",
+      "title": "Round CAD corners",
+      "category": "Packaging",
+      "description": "Same as Round selected corners in the CAD Shape tools: replace the corners of closed outlines with tangent arcs of the given radius (display units unless units=mm). ids defaults to the selected paths; corners optionally limits one path to the given point indices. A radius too big for a corner shrinks to half its shorter edge. One Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "radius": {
+            "type": "number",
+            "minimum": 0.0001,
+            "maximum": 100000
+          },
+          "ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          },
+          "corners": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2000,
+            "uniqueItems": true,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1999
+            }
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "display",
+              "mm"
+            ]
+          }
+        },
+        "required": [
+          "radius"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "radius": 10,
+        "units": "mm"
+      }
+    },
+    {
+      "id": "packaging.path.circle",
+      "title": "Draw CAD circle",
+      "category": "Packaging",
+      "description": "Same as Add circle in the CAD Shape tools: add a closed circular cut (or score) path at center with radius (display units unless units=mm). One Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "center": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            }
+          },
+          "radius": {
+            "type": "number",
+            "minimum": 0.0001,
+            "maximum": 100000
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "cut",
+              "score"
+            ]
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "display",
+              "mm"
+            ]
+          }
+        },
+        "required": [
+          "center",
+          "radius"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "center": [
+          50,
+          50
+        ],
+        "radius": 20,
+        "units": "mm"
+      }
+    },
+    {
+      "id": "packaging.path.relief_hole",
+      "title": "Draw CAD relief hole",
+      "category": "Packaging",
+      "description": "Same as Add relief hole in the CAD Shape tools: add a round cut hole whose edge is split into tabs by radial V relief slits. holeRadius is the tab tip radius, reliefRadius where the slits end (the tab hinge), tabs 4–48, notchWidth the slit width at the hole edge (default 1.2 mm). Display units unless units=mm. One Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "center": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            }
+          },
+          "holeRadius": {
+            "type": "number",
+            "minimum": 0.0001,
+            "maximum": 100000
+          },
+          "reliefRadius": {
+            "type": "number",
+            "minimum": 0.0001,
+            "maximum": 100000
+          },
+          "tabs": {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 48
+          },
+          "notchWidth": {
+            "type": "number",
+            "minimum": 0.0001,
+            "maximum": 100000
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "display",
+              "mm"
+            ]
+          }
+        },
+        "required": [
+          "center",
+          "holeRadius",
+          "reliefRadius"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "center": [
+          40,
+          40
+        ],
+        "holeRadius": 27.4,
+        "reliefRadius": 31.9,
+        "tabs": 16,
+        "units": "mm"
+      }
+    },
+    {
       "id": "packaging.board",
       "title": "Set board caliper",
       "category": "Packaging",
@@ -3426,10 +3598,125 @@
       }
     },
     {
+      "id": "packaging.accessories.collar.inspect",
+      "title": "Inspect can collar",
+      "category": "Packaging",
+      "description": "Sense the top rims of the selected group or array of upright cans (rim radius, its underside, the neck under it) and plan the can collar for the options, without changing the scene. Same as the Can collar section of the Accessories tab. Returns boards, the sensed rim and the collar size, hole and relief radii and tabs, or why it is unavailable.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "enum": [
+              "sbs-24pt",
+              "cuk-24pt",
+              "cuk-28pt",
+              "kraft-32pt",
+              "molded-fiber"
+            ]
+          },
+          "tuckMm": {
+            "type": "number",
+            "minimum": 0.3,
+            "maximum": 10
+          },
+          "reliefMm": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 20
+          },
+          "marginMm": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "cornerRadiusMm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 500
+          },
+          "tabs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 48
+          },
+          "notchWidthMm": {
+            "type": "number",
+            "minimum": 0.3,
+            "maximum": 5
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "boardId": "cuk-24pt"
+      }
+    },
+    {
+      "id": "packaging.accessories.collar",
+      "title": "Add can collar",
+      "category": "Packaging",
+      "description": "Same as Add can collar in the Accessories tab: add a paperboard collar over the selected group or array of upright cans (1–24, one size, e.g. a 3 × 2 array for a six-pack). Each can gets a round hole split into tabs by relief slits; tab tips reach tuckMm (default 1.5) inside the rim and the collar top meets the rim underside, so the tabs tuck under it; reliefs end reliefMm past the rim (default 3) but keep a 1.5 mm web between holes. Corners are rounded (default follows the corner cans). A CAD board profile grouped with the cans; it lowers onto them. One Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "enum": [
+              "sbs-24pt",
+              "cuk-24pt",
+              "cuk-28pt",
+              "kraft-32pt",
+              "molded-fiber"
+            ]
+          },
+          "tuckMm": {
+            "type": "number",
+            "minimum": 0.3,
+            "maximum": 10
+          },
+          "reliefMm": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 20
+          },
+          "marginMm": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "cornerRadiusMm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 500
+          },
+          "tabs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 48
+          },
+          "notchWidthMm": {
+            "type": "number",
+            "minimum": 0.3,
+            "maximum": 5
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "boardId": "cuk-24pt",
+        "tuckMm": 1.5
+      }
+    },
+    {
       "id": "packaging.tab",
       "title": "Select Packaging tab",
       "category": "Packaging",
-      "description": "Open Packaging, its Auto tab (Auto Pack and Auto pallet) or its Accessories tab (pads and partitions) without generating geometry.",
+      "description": "Open Packaging, its Auto tab (Auto Pack and Auto pallet) or its Accessories tab (pads, partitions and can collars) without generating geometry.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
