@@ -295,5 +295,28 @@ describe ('Molded Pulp fully rounded product surface', function () {
         const r = RoundedOutline (rect, OutlineCorners (rect), 5);
         assert.ok (r.apexes.every ((p, i) => Math.hypot (p[0] - [0, 40, 40, 0][i], p[1] - [0, 0, 20, 20][i]) < 1e-9)); assert.ok (Math.abs (r.reach - 5) < 1e-9);
         const arc = r.points.filter (p => p[0] < 5 && p[1] < 5).map (p => Math.hypot (p[0] - 5, p[1] - 5)); assert.ok (arc.length > 5 && arc.every (d => Math.abs (d - 5) < 1e-9));
+        // Only the corner zones change: a bump in the middle of a side (a stacking lug) is kept as traced.
+        const bumped = rect.map (([x, z]) => [x, z === 0 && x >= 15 && x <= 25 ? -1.5 : z]), kept = RoundedOutline (bumped, OutlineCorners (bumped), 5);
+        assert.equal (kept.points.filter (p => p[1] === -1.5).length, 11);
+        let area = 0; for (let i = 0; i < r.points.length; i++) { const a = r.points[i], b = r.points[(i + 1) % r.points.length]; area += a[0] * b[1] - b[0] * a[1]; }
+        assert.ok (Math.abs (area / 2 - (800 - (4 - Math.PI) * 25)) < 0.5, 'each arc inserted once');
+    });
+});
+
+describe ('Molded Pulp smooth surface plan with automatic extra material', function () {
+    this.timeout (240000);
+    it ('raises the extra material until the rim fillets fit and builds the rounded surface', async () => {
+        const { PlanSmoothSurface, SmoothSurfaceRadii } = await import ('../src/plan.js');
+        const draft = { ...DefaultPulpDraft ('type2'), formDepthMm : 35, detail : 'standard', ribs : 'off', lugs : 'off' };
+        assert.deepEqual (SmoothSurfaceRadii (draft), { floorFilletMm : 4, rimFilletMm : 4, skirtCornerMm : 10 });
+        const plan = PlanSmoothSurface (SixPack (86, 48), draft);
+        // Default 20 mm leaves 3.5 mm of plateau at the edge; 4 mm rims need 8.5 mm.
+        assert.ok (plan.raisedExtraMm > 0, String (plan.raisedExtraMm)); assert.equal (plan.smoothDraft.extraLengthMm, 20 + plan.raisedExtraMm); assert.equal (plan.smoothDraft.extraWidthMm, 20 + plan.raisedExtraMm);
+        assert.equal (draft.extraLengthMm, 20, 'the input draft is not changed');
+        const [shell] = plan.smooth; assert.equal (shell.problem, undefined); assert.equal (shell.faces, 47);
+        assert.ok (shell.land.skirtMm >= 8.5 && shell.land.pocketMm >= 8.5, JSON.stringify (shell.land));
+        assert.equal (SurfaceEdgeUses (shell.surface).filter (u => u.forward + u.reversed === 1).length, 2);
+        // Pockets that join below the plateau cannot be fixed with extra material: the loft's reason is reported.
+        assert.throws (() => PlanSmoothSurface (SixPack (70, 48), draft), /join below the plateau/);
     });
 });

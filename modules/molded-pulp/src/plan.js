@@ -9,6 +9,7 @@ import { ApplyRibs, ApplyLugs } from './features.js';
 import { ClamshellShells, ToLocal, ComponentToWorld } from './orient.js';
 import { NurbsShell } from './nurbs/shell.js';
 import { LoftPocketWalls } from './nurbs/loft.js';
+import { ProductSurface, ProductSurfaceProblem, PlateauLand } from './nurbs/surface.js';
 
 const kb = 'MP knowledge base · mp-des-dfm-rules-by-process-type';
 const r1 = v => Math.round (v * 10) / 10;
@@ -71,11 +72,12 @@ export function FormShell (triangles, draft, options = {})
     const nurbs = NurbsShell (grid, surfaces, { baseY : rect.baseY, direction : options.direction || '+y', id : options.shellName || 'Tray' });
     // Phase 2 check (on request): smooth lofted walls built from this shell's review field, reported without geometry.
     const loft = options.loftCheck ? LoftSummary (LoftPocketWalls (grid, top, { depthMm : achieved, wallToleranceMm : 0.25 * PulpTypes[draft.pulpType].toleranceMm, skirtWall : draft.skirtWall === true }), options.shellName || 'Tray') : null;
+    const smooth = options.smoothSurface ? SmoothShell (grid, top, achieved, rect.baseY, draft, options) : null;
     const volume = ShellVolume (surfaces, grid);
     const metrics = { lengthMm : r1 (rect.lengthMm), widthMm : r1 (rect.widthMm), thicknessMm : draft.thicknessMm, formDepthMm : r1 (depth), achievedDepthMm : r1 (achieved), overallHeightMm : r1 (achieved + draft.thicknessMm), footprintLengthMm : r1 (bounds.size[0]), footprintWidthMm : r1 (bounds.size[2]), productHeightMm : r1 (bounds.size[1]), pocketCount : pockets.pocketCount, productIslands : islands.count, narrowestProductMm : islands.narrowestMm === null ? null : r1 (islands.narrowestMm), minRibMm : pockets.minRibMm === null ? null : r1 (pockets.minRibMm), detail, cellMm : Math.round (grid.cell * 1000) / 1000, gridNodes : grid.nx * grid.nz, triangles : component.triangleCount, fullGridTriangles : component.gridTriangles, volumeCm3 : r1 (volume / 1000), estimatedMassG : r1 (volume / 1000 * PulpTypes[draft.pulpType].densityGcm3), ribCount : features.ribs.length, lugCount : features.lugs.length, nestingPitchMm : features.nesting?.pitchMm ?? null, nestingRatio : features.nesting?.ratio ?? null };
     const checks = [...PulpChecks (draft, bounds, rect, metrics), ...features.warnings.map (w => ({ id : w.id, severity : w.severity || 'warning', message : w.message, basis : 'MP knowledge base · mp-des-structural-features' }))];
     progress ('done', 1);
-    return { bounds, rect, origin, grid, metrics, checks, nurbs, loft, features : { ribs : features.ribs, lugs : features.lugs, rib : features.rib, nesting : features.nesting, hinge : features.hinge, trace : features.trace }, component, ...(options.keepSurfaces ? { surfaces, field } : {}) };
+    return { bounds, rect, origin, grid, metrics, checks, nurbs, loft, smooth, features : { ribs : features.ribs, lugs : features.lugs, rib : features.rib, nesting : features.nesting, hinge : features.hinge, trace : features.trace }, component, ...(options.keepSurfaces ? { surfaces, field } : {}) };
 }
 
 // Living hinge bead: a solid half-cylinder of radius ~ wall thickness along the longer flange edge (KB: hinge axis in the
@@ -114,7 +116,7 @@ export function PlanTray (triangles, draft, options = {})
     const worldRect = SheetRect (world, draft), origin = Origin (worldRect);
     if (mode === 'none') {
         const shell = FormShell (triangles, draft, options);
-        return { apiVersion : 1, units : 'mm', kind : 'tray', clamshell : 'none', draft : { ...draft }, bounds : shell.bounds, rect : shell.rect, origin : shell.origin, metrics : shell.metrics, checks : shell.checks, features : shell.features, components : [shell.component], nurbs : PlanNurbs ([shell.nurbs]), ...(shell.loft ? { loft : [shell.loft] } : {}) };
+        return { apiVersion : 1, units : 'mm', kind : 'tray', clamshell : 'none', draft : { ...draft }, bounds : shell.bounds, rect : shell.rect, origin : shell.origin, metrics : shell.metrics, checks : shell.checks, features : shell.features, components : [shell.component], nurbs : PlanNurbs ([shell.nurbs]), ...(shell.loft ? { loft : [shell.loft] } : {}), ...(shell.smooth ? { smooth : [shell.smooth] } : {}) };
     }
     const axis = { 'top-bottom' : 1, 'side-x' : 0, 'side-z' : 2 }[mode], parting = world.min[axis] + world.size[axis] * draft.partingFraction;
     const shells = [], components = [];
@@ -129,7 +131,7 @@ export function PlanTray (triangles, draft, options = {})
     const metrics = { ...shells[0].shell.metrics, shells : shells.map (({ direction, shell }) => ({ direction, ...shell.metrics })), partingMm : r1 (parting - world.min[axis]), hinge : Boolean (shells[0].shell.features.hinge), triangles : components.reduce ((sum, c) => sum + c.triangleCount, 0), volumeCm3 : r1 (shells.reduce ((s, x) => s + x.shell.metrics.volumeCm3, 0)), estimatedMassG : r1 (shells.reduce ((s, x) => s + x.shell.metrics.estimatedMassG, 0)), pocketCount : shells.reduce ((s, x) => s + x.shell.metrics.pocketCount, 0) };
     const checks = shells.flatMap (({ direction, shell }) => shell.checks.map (c => ({ ...c, message : `Shell ${direction}: ${c.message}` })));
     checks.push ({ id : 'MP-CL1', severity : 'note', message : 'Clamshell flanges meet at the parting plane; a friction fit typically needs 0.2–0.5 mm interference (typical industry value), set in tooling.', basis : 'MP knowledge base · mp-des-structural-features (snap, lock and click features)' });
-    return { apiVersion : 1, units : 'mm', kind : 'tray', clamshell : mode, draft : { ...draft }, bounds : world, rect : worldRect, origin, metrics, checks, features : { shells : shells.map (({ direction, shell }) => ({ direction, ...shell.features })), trace : shells[0].shell.features.trace }, components, nurbs : PlanNurbs (shells.map (({ shell }) => shell.nurbs)), ...(options.loftCheck ? { loft : shells.map (({ shell }) => shell.loft) } : {}) };
+    return { apiVersion : 1, units : 'mm', kind : 'tray', clamshell : mode, draft : { ...draft }, bounds : world, rect : worldRect, origin, metrics, checks, features : { shells : shells.map (({ direction, shell }) => ({ direction, ...shell.features })), trace : shells[0].shell.features.trace }, components, nurbs : PlanNurbs (shells.map (({ shell }) => shell.nurbs)), ...(options.loftCheck ? { loft : shells.map (({ shell }) => shell.loft) } : {}), ...(options.smoothSurface ? { smooth : shells.map (({ shell }) => shell.smooth) } : {}) };
 }
 
 // Flat sheet(s) under the grouped products (one per shell for a clamshell), sized to the exact footprint plus the
@@ -155,6 +157,45 @@ function LoftSummary (result, shell)
 {
     return { shell, ok : result.ok, reason : result.reason, controls : result.controls ?? 0, maxDistanceMm : result.maxDistanceMm ?? null, toleranceMm : result.wallToleranceMm ?? null, merges : result.merges?.length || 0, faces : (result.faces || []).map (f => ({ id : f.id, kind : f.kind, holes : f.holes.length, ...(f.raisedMm !== undefined ? { raisedMm : f.raisedMm } : {}) })), walls : result.walls.map (w => ({ id : w.id, kind : w.kind, outlineControls : w.outlineControls, heightControls : w.heightControls, maxDistanceMm : w.maxDistanceMm, withinTolerance : w.withinTolerance })) };
 }
+// Smooth product-side surface (Phase 2 output) radii from the pulp thickness: rims must exceed the thickness (they shrink
+// by it on the tool side); floors use the same radius; skirt plan corners at least 10 mm.
+export function SmoothSurfaceRadii (draft)
+{
+    const fillet = Math.round ((draft.thicknessMm + 1) * 10) / 10;
+    return { floorFilletMm : fillet, rimFilletMm : fillet, skirtCornerMm : Math.max (10, 2 * fillet + 2) };
+}
+
+// One shell's smooth product surface: { surface } or { problem }, with the plateau strips it was checked against.
+function SmoothShell (grid, top, depthMm, baseY, draft, options)
+{
+    const radii = SmoothSurfaceRadii (draft);
+    const loft = LoftPocketWalls (grid, top, { depthMm, wallToleranceMm : 0.25 * PulpTypes[draft.pulpType].toleranceMm, skirtWall : true, skirtCornerMm : radii.skirtCornerMm });
+    const id = options.shellName || 'Tray', land = loft.ok && loft.walls.length ? PlateauLand (loft) : null;
+    const problem = ProductSurfaceProblem (loft, radii);
+    if (problem) { return { id, problem, land, radii }; }
+    const surface = ProductSurface (loft, { baseY, direction : options.direction || '+y', id, ...radii });
+    return { id, surface, land, radii, faces : surface.faces.length, maxDistanceMm : loft.maxDistanceMm };
+}
+
+// Plan a tray and its smooth product surface for STEP output. When a plateau strip between a pocket and the skirt is too
+// narrow for two rim fillets, the extra material is raised by what that strip lacks (on each side) and the tray formed
+// again, up to three times. Strips between two pockets do not change with extra material: they are reported.
+export function PlanSmoothSurface (triangles, draft, options = {})
+{
+    let current = { ...draft }; const start = { length : draft.extraLengthMm, width : draft.extraWidthMm };
+    for (let attempt = 0; attempt < 4; attempt++) {
+        const plan = PlanTray (triangles, current, { ...options, smoothSurface : true });
+        const failing = plan.smooth.filter (s => s.problem);
+        if (!failing.length) { return { ...plan, smoothDraft : current, raisedExtraMm : current.extraLengthMm - start.length }; }
+        const need = 2 * SmoothSurfaceRadii (current).rimFilletMm + 0.5;
+        const short = failing.map (s => s.land && s.land.pocketMm >= need && s.land.skirtMm < need ? need - s.land.skirtMm : null);
+        if (attempt === 3 || short.some (v => v === null)) { throw new Error (failing.map (s => (plan.smooth.length > 1 ? s.id + ': ' : '') + s.problem).join (' ')); }
+        const raise = 2 * Math.ceil (Math.max (...short) + 0.5);
+        current = { ...current, extraLengthMm : Math.min (1000, current.extraLengthMm + raise), extraWidthMm : Math.min (1000, current.extraWidthMm + raise) };
+    }
+    throw new Error ('The smooth surface could not be built.');
+}
+
 function PlanNurbs (shells) { return { apiVersion : 1, units : 'mm', representation : 'brep', degree : 1, shells }; }
 
 export function PlanPulp (stage, triangles, draft, options = {}) { return stage === 'tray' ? PlanTray (triangles, draft, options) : PlanSheet (triangles, draft); }

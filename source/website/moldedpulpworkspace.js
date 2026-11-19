@@ -14,7 +14,7 @@ export class PulpJobs
     constructor (url) { this.url = url; this.worker = null; this.pending = null; this.seq = 0; }
     Run (module, message, onProgress)
     {
-        if (typeof Worker !== 'function' || !this.url) { return Promise.resolve (module.PlanPulp (message.stage, message.triangles, message.draft, { detail : message.detail, loftCheck : message.loftCheck === true, onProgress })); }
+        if (typeof Worker !== 'function' || !this.url) { return Promise.resolve (message.smoothSurface ? module.PlanSmoothSurface (message.triangles, message.draft, { detail : message.detail, onProgress }) : module.PlanPulp (message.stage, message.triangles, message.draft, { detail : message.detail, loftCheck : message.loftCheck === true, onProgress })); }
         this.Cancel (); const id = ++this.seq, worker = this.worker ||= new Worker (this.url ());
         return new Promise ((resolve, reject) => {
             this.pending = { id, reject };
@@ -241,9 +241,31 @@ export class MoldedPulpWorkspace
     // Output for tooling and customers: STEP (closed B-rep per shell, mm, from the NURBS output) or GLB (the formed shell
     // with its pulp material, metres). Uses the plan behind the pulp object on screen; a pulp object from a saved session
     // is formed again from its saved definition and products first (in the worker, at its saved detail).
+    // Smooth product surface (Phase 2 NURBS output) as an open-shell STEP for thickening into the tool side: the tray is
+    // formed again in the worker at Standard detail or finer with rounded creases (radii from the thickness). When a
+    // plateau strip at the edge is too narrow for the rim fillets, the extra material is raised for this output and the
+    // raise is reported; the tray on screen is unchanged.
+    async ExportSurface ()
+    {
+        const panel = this.panel, editor = this.editor; if (!panel.website.auth?.user || panel.website.accountReady === false) { throw new Error ('Sign in to export molded pulp.'); }
+        if (this.active || this.refining) { throw new Error ('Wait for forming to finish.'); }
+        const object = this.IsPulp (editor.selected) ? editor.selected : this.Current (); if (!object) { throw new Error ('Form or select a molded pulp tray first.'); }
+        const definition = ValidatePulpDefinition (JSON.parse (object.userData[MoldedPulpDataKey]));
+        if (definition.stage !== 'tray') { throw new Error ('Form a tray first: the smooth surface is built from a formed tray.'); }
+        if (!definition.productIds.length) { throw new Error ('This pulp object was formed over more than ' + MaxStoredProducts + ' products. Select them and form again to export.'); }
+        const module = await this.load (), draft = definition.draft;
+        const plan = await this.jobs.Run (module, { stage : 'tray', triangles : SessionTrianglesMm (editor.document, this.Products (definition.productIds)), draft, detail : draft.detail === 'draft' ? 'standard' : draft.detail, smoothSurface : true });
+        const base = (object.name || 'Molded pulp').replace (/[^\w .-]+/g, ' ').replace (/\s+/g, ' ').trim () || 'Molded pulp', surfaces = plan.smooth.map (s => s.surface);
+        const text = module.WriteSurfaceStep (surfaces, { name : base + ' product side' }), filename = base + ' product side.step';
+        editor.Download (text, filename, 'model/step');
+        const radii = plan.smooth[0].radii, raised = plan.raisedExtraMm, faces = surfaces.reduce ((n, s) => n + s.faces.length, 0);
+        const message = `Smooth surface STEP downloaded: ${faces} faces in mm, ${radii.floorFilletMm} mm floor and rim fillets, ${radii.skirtCornerMm} mm skirt corners.` + (raised > 0 ? ` Extra material raised by ${raised} mm (to ${plan.smoothDraft.extraLengthMm} × ${plan.smoothDraft.extraWidthMm} mm) so the rim fillets fit; form the tray again with it to match.` : '');
+        return { format : 'surface-step', filename, bytes : text.length, units : 'mm', shells : surfaces.length, faces, radii, raisedExtraMm : raised, extraLengthMm : plan.smoothDraft.extraLengthMm, extraWidthMm : plan.smoothDraft.extraWidthMm, maxDistanceMm : Math.max (...plan.smooth.map (s => s.maxDistanceMm)), message };
+    }
     async Export (format)
     {
-        if (!['step', 'glb'].includes (format)) { throw new Error ('Choose STEP or GLB.'); }
+        if (format === 'surface-step') { return this.ExportSurface (); }
+        if (!['step', 'glb'].includes (format)) { throw new Error ('Choose STEP, GLB or the smooth surface STEP.'); }
         const panel = this.panel, editor = this.editor; if (!panel.website.auth?.user || panel.website.accountReady === false) { throw new Error ('Sign in to export molded pulp.'); }
         if (this.active) { throw new Error ('Wait for forming to finish.'); }
         const object = this.IsPulp (editor.selected) ? editor.selected : this.Current (); if (!object) { throw new Error ('Form or select a molded pulp sheet or tray first.'); }

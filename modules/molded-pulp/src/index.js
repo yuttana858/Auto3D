@@ -6,7 +6,7 @@ export { FormSurfaces, FormTop, PocketMetrics } from './tray.js';
 export { DetailGrid, SlopeLimit, MinFilterOctagon, OffsetDown } from './field.js';
 export { ShellMesh } from './mesh.js';
 export { AdaptiveShellMesh } from './rtin.js';
-export { PlanSheet, PlanTray, PlanPulp, PulpChecks } from './plan.js';
+export { PlanSheet, PlanTray, PlanPulp, PlanSmoothSurface, SmoothSurfaceRadii, PulpChecks } from './plan.js';
 export { PulpRuleBase, PulpRuleList, PlanFeatures } from './rules.js';
 export { PulpDefinition, ValidatePulpDefinition, MaxStoredProducts } from './definition.js';
 export { NurbsShell, MaxOutputSide } from './nurbs/shell.js';

@@ -144,7 +144,9 @@ export function LoftPocketWalls (grid, H, { depthMm, floorMm = 0, outlineToleran
             // Rounded plan corners: every level's sides become straight lines joined by arcs of skirtCornerMm, and the skirt
             // is one closed wall like a pocket. Points near the sharp review corners are exempt from the review distance.
             const rounded = skirt.map ((o, k) => RoundedOutline (o.points, corners[k], skirtCornerMm));
-            const reach = Math.max (...rounded.map (r => r.reach)) + 1.5, apexes = rounded.flatMap (r => r.apexes);
+            // Beyond the arcs the review skirt still curves a little (its own forming radius), so the exempt zone reaches 3 mm
+            // past the tangent points.
+            const reach = Math.max (...rounded.map (r => r.reach)) + 3, apexes = rounded.flatMap (r => r.apexes);
             const exempt = (x, z) => apexes.some (([ax, az]) => Math.hypot (x - ax, z - az) <= reach);
             walls.push (loft (rounded.map (r => SeamOrder (r.points, centre)), centre, 'Outer skirt', 'skirt', false, 0, exempt));
         } else if (cornered) {

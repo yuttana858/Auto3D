@@ -66,37 +66,50 @@ export function OutlineCorners (points, { spanMm = 3, minDeg = 50, minGap = 10 }
     return corners.sort ((a, b) => a - b);
 }
 
-// A closed outline with sharp corners (indices from OutlineCorners) rebuilt as straight sides joined by arcs of radius r:
-// each side is the least-squares line through its middle 80%, neighbouring lines meet at an apex, and the arc is tangent
-// to both. Returns { points (about every spacingMm), apexes, reach (largest apex-to-tangent-point distance) }.
+// A closed outline with sharp corners (indices from OutlineCorners) rounded locally with arcs of radius r. Near each corner
+// the two sides are taken as straight: least-squares lines through the outline between (tangent length + 0.5 mm) and
+// (tangent length + 15 mm) of arc length from the corner, meeting at an apex. The outline within the arc's reach of the
+// corner is replaced by the tangent arc; everything else (side features such as stacking lugs) is kept as traced.
+// Returns { points (arcs about every spacingMm), apexes, reach (largest apex-to-tangent-point distance) }.
 export function RoundedOutline (points, corners, r, spacingMm = 0.5)
 {
-    const n = points.length, k = corners.length, lines = [];
-    for (let i = 0; i < k; i++) {
-        const from = corners[i], to = corners[(i + 1) % k], side = [];
-        for (let j = from; ; j = (j + 1) % n) { side.push (points[j]); if (j === to) { break; } }
-        const middle = side.slice (Math.floor (side.length * 0.1), Math.ceil (side.length * 0.9));
-        const cx = middle.reduce ((s, p) => s + p[0], 0) / middle.length, cz = middle.reduce ((s, p) => s + p[1], 0) / middle.length;
-        let xx = 0, xz = 0, zz = 0; for (const [x, z] of middle) { xx += (x - cx) ** 2; xz += (x - cx) * (z - cz); zz += (z - cz) ** 2; }
+    const n = points.length, length = [0];
+    for (let i = 1; i <= n; i++) { const a = points[i - 1], b = points[i % n]; length.push (length[i - 1] + Math.hypot (b[0] - a[0], b[1] - a[1])); }
+    const total = length[n], along = (from, to) => ((length[to] - length[from]) % total + total) % total;
+    // Points whose arc distance from the corner (forward when dir is +1, backward when −1) lies in [near, far], in outline
+    // order (sorted by that distance, so a stretch across the outline's first point keeps its order).
+    const stretch = (corner, dir, near, far) => points.map ((p, i) => [dir > 0 ? along (corner, i) : -along (i, corner), p]).filter (([d]) => Math.abs (d) >= near && Math.abs (d) <= far).sort ((x, y) => x[0] - y[0]).map (([, p]) => p);
+    const fit = (pts, dir) => {
+        const cx = pts.reduce ((s, p) => s + p[0], 0) / pts.length, cz = pts.reduce ((s, p) => s + p[1], 0) / pts.length;
+        let xx = 0, xz = 0, zz = 0; for (const [x, z] of pts) { xx += (x - cx) ** 2; xz += (x - cx) * (z - cz); zz += (z - cz) ** 2; }
         const angle = 0.5 * Math.atan2 (2 * xz, xx - zz); let d = [Math.cos (angle), Math.sin (angle)];
-        // Point the direction along the outline (from this side's start corner to its end corner).
-        if ((side.at (-1)[0] - side[0][0]) * d[0] + (side.at (-1)[1] - side[0][1]) * d[1] < 0) { d = [-d[0], -d[1]]; }
-        lines.push ({ c : [cx, cz], d });
-    }
+        // Direction of travel along the outline (pts are in outline order).
+        const first = pts[0], last = pts.at (-1); if ((last[0] - first[0]) * d[0] + (last[1] - first[1]) * d[1] < 0) { d = [-d[0], -d[1]]; }
+        return { c : [cx, cz], d, dir };
+    };
     const meet = (a, b) => { const det = a.d[0] * -b.d[1] + b.d[0] * a.d[1], t = ((b.c[0] - a.c[0]) * -b.d[1] + b.d[0] * (b.c[1] - a.c[1])) / det; return [a.c[0] + t * a.d[0], a.c[1] + t * a.d[1]]; };
-    const apexes = lines.map ((line, i) => meet (lines[(i - 1 + k) % k], line));
-    const out = [], arcs = []; let reach = 0;
-    for (let i = 0; i < k; i++) {
-        const a = lines[(i - 1 + k) % k].d, b = lines[i].d, Q = apexes[i], cross = a[0] * b[1] - a[1] * b[0], turn = Math.atan2 (Math.abs (cross), a[0] * b[0] + a[1] * b[1]);
-        const t = r * Math.tan (turn / 2); reach = Math.max (reach, t);
+    const reachOf = turn => r * Math.tan (turn / 2), apexes = [], arcs = [];
+    let reach = 0;
+    for (const corner of corners) {
+        // The lines start a little beyond the arc; a first guess of a right angle sets how far that is.
+        let t = reachOf (Math.PI / 2), incoming, outgoing;
+        for (let pass = 0; pass < 2; pass++) {
+            incoming = fit (stretch (corner, -1, t + 0.5, t + 15), -1); outgoing = fit (stretch (corner, 1, t + 0.5, t + 15), 1);
+            const a = incoming.d, b = outgoing.d, turn = Math.atan2 (Math.abs (a[0] * b[1] - a[1] * b[0]), a[0] * b[0] + a[1] * b[1]); t = reachOf (turn);
+        }
+        const a = incoming.d, b = outgoing.d, Q = meet (incoming, outgoing), cross = a[0] * b[1] - a[1] * b[0], turn = Math.atan2 (Math.abs (cross), a[0] * b[0] + a[1] * b[1]);
+        reach = Math.max (reach, t); apexes.push (Q);
         const tin = [Q[0] - a[0] * t, Q[1] - a[1] * t], side = Math.sign (cross) || 1, centre = [tin[0] - a[1] * r * side, tin[1] + a[0] * r * side];
         const start = Math.atan2 (tin[1] - centre[1], tin[0] - centre[0]), steps = Math.max (2, Math.ceil (r * turn / spacingMm));
-        arcs.push (Array.from ({ length : steps + 1 }, (_, s) => { const g = start + side * turn * s / steps; return [centre[0] + r * Math.cos (g), centre[1] + r * Math.sin (g)]; }));
+        arcs.push ({ corner, t, points : Array.from ({ length : steps + 1 }, (_, k) => { const g = start + side * turn * k / steps; return [centre[0] + r * Math.cos (g), centre[1] + r * Math.sin (g)]; }) });
     }
-    for (let i = 0; i < k; i++) {
-        const arc = arcs[i], next = arcs[(i + 1) % k][0], end = arc.at (-1), length = Math.hypot (next[0] - end[0], next[1] - end[1]), steps = Math.max (1, Math.ceil (length / spacingMm));
-        out.push (...arc);
-        for (let s = 1; s < steps; s++) { out.push ([end[0] + (next[0] - end[0]) * s / steps, end[1] + (next[1] - end[1]) * s / steps]); }
+    // Walk the outline once: drop points within an arc's reach of its corner (by arc length) and insert each arc once, where
+    // its zone starts (a zone across the outline's first point is inserted at the start).
+    const out = [], replaced = i => arcs.find (arc => Math.min (along (arc.corner, i), along (i, arc.corner)) < arc.t), inserted = new Set ();
+    for (let i = 0; i < n; i++) {
+        const arc = replaced (i);
+        if (!arc) { out.push (points[i]); continue; }
+        if (!inserted.has (arc)) { out.push (...arc.points); inserted.add (arc); }
     }
     return { points : out, apexes, reach };
 }

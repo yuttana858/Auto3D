@@ -43,6 +43,13 @@ try {
     const json = JSON.parse (glb.bytes.subarray (20, 20 + glb.bytes.readUInt32LE (12)).toString ());
     assert.ok (json.materials.some (m => /Molded pulp/.test (m.name)), 'pulp material'); assert.ok (json.meshes.length >= 1);
     const position = json.accessors[json.meshes[0].primitives[0].attributes.POSITION]; assert.ok (Math.max (...position.max.map ((v, a) => v - position.min[a])) < 1, 'metres: the tray is under 1 m');
+    // Smooth product surface (Phase 2 NURBS): the app's cans have domed bases, whose fitted floor patches are not built
+    // yet, so the export refuses with the reason (the success path is covered in the module tests).
+    const surfaceButton = panel.getByRole ('button', { name : 'Export smooth surface (STEP)', exact : true });
+    assert.equal (await surfaceButton.isDisabled (), false, 'available for a formed tray');
+    const refused = await raw ('pulp.export', { format : 'surface-step' });
+    assert.equal (refused.ok, false); assert.match (refused.error.message, /floor is raised [\d.]+ mm \(a domed base\); fitted floor patches are not built yet/);
+    await surfaceButton.click (); await page.waitForFunction (() => /domed base/.test (document.querySelector ('.mp_status')?.textContent || ''));
 
     // Phase 2 check: smooth walls with the outer skirt off (default), then on. The tray stays unchanged either way.
     const skirt = panel.getByRole ('checkbox', { name : 'Outer skirt wall (experimental)', exact : true }); assert.equal (await skirt.isChecked (), false);
@@ -67,5 +74,5 @@ try {
     assert.equal (((await readFile (await again.path ())).toString ('utf8').match (/MANIFOLD_SOLID_BREP\(/g) || []).length, 1);
     assert.equal ((await raw ('pulp.export', { format : 'iges' })).ok, false, 'only step and glb');
     assert.deepEqual (errors, []);
-    console.log ('Molded Pulp output passed: STEP (1 solid, 6 faces, mm) and GLB (pulp material, m) from the panel, clamshell STEP with 2 solids.');
+    console.log ('Molded Pulp output passed: STEP (1 solid, 6 faces, mm), smooth surface STEP refused with its reason for domed cans, and GLB (pulp material, m) from the panel, clamshell STEP with 2 solids.');
 } finally { await browser.close (); }

@@ -14,7 +14,10 @@ import { PullDirections } from '../orient.js';
 export function ProductSurfaceProblem (loft, { floorFilletMm = 0, rimFilletMm = 0 } = {})
 {
     for (const [name, value] of [['floor fillet', floorFilletMm], ['rim fillet', rimFilletMm]]) { if (!(value >= 0) || !Number.isFinite (value)) { return `The ${name} radius must be zero or more.`; } }
-    if (!loft.ok) { return loft.reason || 'The smooth walls are outside the tolerance.'; }
+    if (!loft.ok) {
+        const outside = (loft.walls || []).filter (w => !w.withinTolerance);
+        return outside.length ? `Smooth walls outside the ${loft.wallToleranceMm.toFixed (2)} mm tolerance: ${outside.map (w => `${w.id} (${w.maxDistanceMm.toFixed (2)} mm)`).join (', ')}.` : loft.reason || 'The smooth walls are outside the tolerance.';
+    }
     if (!loft.walls.some (w => w.kind === 'skirt')) { return 'Turn on the outer skirt wall: the plateau needs it as its outer edge.'; }
     if (rimFilletMm > 0 && !loft.walls.some (w => w.kind === 'skirt' && w.surface.closedU)) { return 'Round the skirt corners to fillet the rims: the skirt top needs one closed wall.'; }
     const raised = loft.faces.find (f => f.kind !== 'plane');
@@ -30,19 +33,22 @@ export function ProductSurfaceProblem (loft, { floorFilletMm = 0, rimFilletMm = 
     return null;
 }
 
-// Narrowest strip of plateau between the walls' top curves (pocket rims and the skirt top), in plan.
+// Narrowest strips of plateau between the walls' top curves in plan: overall, between two pockets (pocketMm) and between
+// a pocket and the skirt (skirtMm, the strip extra material widens).
 export function PlateauLand (loft, samples = 160)
 {
     const top = w => { const sf = w.surface, u0 = sf.knotsU[0], u1 = sf.knotsU.at (-1), v = sf.knotsV.at (-1); return Array.from ({ length : samples }, (_, q) => SurfacePoint (sf, u0 + (u1 - u0) * q / (samples - (sf.closedU ? 0 : 1)), v)); };
-    const rings = loft.walls.map (w => ({ id : w.id, points : top (w) }));
-    let narrowestMm = Infinity, between = '';
+    const rings = loft.walls.map (w => ({ id : w.id, kind : w.kind, points : top (w) }));
+    let narrowestMm = Infinity, between = '', pocketMm = Infinity, skirtMm = Infinity;
     for (let i = 0; i < rings.length; i++) {
         for (let j = i + 1; j < rings.length; j++) {
+            if (rings[i].kind === 'skirt' && rings[j].kind === 'skirt') { continue; }
             let best = Infinity; for (const a of rings[i].points) { for (const b of rings[j].points) { const d = Math.hypot (a[0] - b[0], a[2] - b[2]); if (d < best) { best = d; } } }
+            if (rings[i].kind === 'skirt' || rings[j].kind === 'skirt') { skirtMm = Math.min (skirtMm, best); } else { pocketMm = Math.min (pocketMm, best); }
             if (best < narrowestMm) { narrowestMm = best; between = rings[i].id + ' and ' + rings[j].id; }
         }
     }
-    return { narrowestMm, between };
+    return { narrowestMm, between, pocketMm, skirtMm };
 }
 
 function Cross (a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }

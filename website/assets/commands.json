@@ -9990,7 +9990,7 @@
       "id": "pulp.export",
       "title": "Export molded pulp output",
       "category": "Molded Pulp",
-      "description": "Download the formed sheet or tray (selected pulp object, else the current one) for tooling or review. step: a closed B-rep solid per shell (AP214, millimetres, absolute positions matching the products) built on the internal review surfaces; the clamshell hinge bead is display only. glb: the formed shape with its pulp material in metres, for customer review. A pulp object from a saved session is formed again from its definition first. Local download only; nothing is uploaded. Does not change the scene.",
+      "description": "Download the formed sheet or tray (selected pulp object, else the current one) for tooling or review. step: a closed B-rep solid per shell (AP214, millimetres, absolute positions matching the products) built on the internal review surfaces; the clamshell hinge bead is display only. glb: the formed shape with its pulp material in metres, for customer review. surface-step (trays): the smooth product-side surface (Phase 2 NURBS) as an open-shell AP214 STEP in mm with every crease rounded (floor and rim fillets of thickness + 1 mm, skirt plan corners of at least 10 mm), for thickening into the tool side; formed again in the worker at Standard detail or finer, and when the plateau at the edge is too narrow for the rim fillets the extra material is raised for this output (reported as raisedExtraMm; the scene is unchanged). A pulp object from a saved session is formed again from its definition first. Local download only; nothing is uploaded. Does not change the scene.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -9999,7 +9999,8 @@
             "type": "string",
             "enum": [
               "step",
-              "glb"
+              "glb",
+              "surface-step"
             ]
           }
         },
