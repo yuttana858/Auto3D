@@ -27,15 +27,22 @@ let progress = null;
 for (let attempt = 0; attempt < 40; attempt++) { await page.waitForTimeout (250); progress = await call ('animation.embedded.inspect', { objectId }); if (progress.state?.time > 0.1) { break; } }
 assert.ok (progress.state?.time > 0.1, JSON.stringify (progress)); const playing=await call('animation.embedded.playback',{objectId,action:'pause'});assert.ok(playing.time>0.1);
 await call('animation.embedded.configure',{objectId,clip:1,speed:1,loop:true});await call('animation.embedded.playback',{objectId,action:'seek',time:1});
+const recorded = await call ('animation.macro.record', { definition : JSON.stringify ({ version : 1, steps : [{ id : 'move', command : 'object.transform', arguments : { objectId, position : [2, 0, 0] } }, { id : 'camera', command : 'camera.fov', arguments : { fov : 50 } }] }), stepSeconds : 2 }); assert.equal (recorded.recorded, true); assert.equal ((await call ('animation.timeline.inspect')).objects[0].keyframes.length, 3); await call ('animation.timeline.seek', { time : 1 }); assert.ok (Math.abs ((await call ('scene.inspect')).objects[0].position[0] - 1) < 1e-6); await call ('history.undo'); assert.equal ((await call ('animation.timeline.inspect')).objects[0].keyframes.length, 0); await call ('object.transform', { objectId, position : [0, 0, 0] });
 await call('animation.panel',{visible:true});assert.equal(await page.getByLabel('Scene state playhead').count(),1);assert.equal(await page.getByLabel('Camera positioning playhead').count(),1);
 assert.equal(await page.locator('.animation_panel .native_timeline').count(),0);
 await call('animation.timeline.seek',{time:0});await call('animation.keyframe.scene');await call('animation.keyframe.camera');
 await call('animation.timeline.seek',{time:3});await call('object.transform',{objectId,position:[2,0,0]});await call('view.focus',{objectId});await call('animation.keyframe.scene');await call('animation.keyframe.camera');
+await call ('animation.tracks.expand', { open : true, objectId }); assert.equal ((await call ('animation.tracks.inspect')).objects[0].expanded, true); assert.equal (await page.locator ('.animation_object_track[open]').count (), 1); await call ('animation.tracks.expand', { open : false, track : 'camera' }); assert.equal ((await call ('animation.tracks.inspect')).groups.camera, false); await call ('animation.tracks.expand', { open : true, track : 'camera' });
 await call('animation.timeline.range',{start:0.5,end:4});
 const playhead=page.getByLabel('Scene state playhead');await playhead.fill('1.5');await playhead.dispatchEvent('input');assert.equal((await call('animation.timeline.inspect')).time,1.5); assert.ok (Math.abs ((await call ('scene.inspect')).objects[0].position[0] - 1) < 1e-6);
 const marker=page.getByLabel('Beginning marker on Scene state');await marker.focus();await page.keyboard.press('ArrowRight');assert.ok((await call('animation.timeline.inspect')).rangeStart>0.5);
 await page.getByLabel('End of animation',{exact:true}).fill('3.5');await page.getByLabel('End of animation',{exact:true}).dispatchEvent('change');
 await page.screenshot({path:'/tmp/auto3d-advance-animation.png'});
+// Every Advance animation control sits on one toolbar line, with Close in view.
+const toolbar=await page.evaluate(()=>{const bar=document.querySelector('#advance_animation_panel .timeline_toolbar');const close=bar.querySelector('.advance_animation_close').getBoundingClientRect();const tops=[...bar.querySelectorAll('button,input,select')].map(e=>Math.round(e.getBoundingClientRect().top+e.getBoundingClientRect().height/2));return{height:bar.getBoundingClientRect().height,rows:new Set(tops).size,closeVisible:close.right<=innerWidth&&close.width>0,names:[...bar.querySelectorAll('button')].map(b=>b.getAttribute('aria-label'))};});
+assert.ok(toolbar.height<=40,JSON.stringify(toolbar));assert.ok(toolbar.rows<=2,JSON.stringify(toolbar));assert.equal(toolbar.closeVisible,true);
+for(const name of ['Play','Reset','Keyframe scene state','Keyframe camera','Action','Camera settings','Close Advance animation'])assert.ok(toolbar.names.includes(name),name);
+for(const label of ['Timeline duration in seconds','Beginning of animation','End of animation','Keyframe interpolation','Auto-fit folding camera'])assert.equal(await page.getByLabel(label,{exact:true}).count(),1,label);
 await call('animation.timeline.playback',{action:'play'});await page.waitForTimeout(250);await call('animation.timeline.playback',{action:'pause'});
 await call('object.transform',{objectId,position:[1,0,0]});
 let checkpoint = null;

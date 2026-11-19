@@ -66,7 +66,7 @@ export class CommandRegistry
         if (!command) { throw new Error ('Unknown command: ' + id); }
         Validate (args, command.inputSchema);
         if (command.mutates && this.context.readOnly) { throw new Error ('This shared viewer is read-only.'); }
-        if (this.context.busy && id !== 'polygon.cancel' && id !== 'macro.cancel' && !['camera.current.inspect', 'object.array.playback', 'object.array.playback.inspect', 'packaging.fefco.toggle', 'packaging.fefco.playback', 'packaging.fefco.playback.inspect', 'auth.open', 'auth.inspect', 'auth.verify', 'auth.sign_out', 'render.queue.inspect', 'animation.video.inspect', 'animation.video.cancel', 'render.queue.enqueue', 'render.queue.start', 'render.queue.stop', 'render.queue.cancel', 'render.queue.clear', 'render.queue.download', 'render.queue.open', 'render.image.view', 'render.queue.delete', 'sidebar.details.collapse'].includes (id)) { throw new Error ('The viewer is busy. Retry after loading completes.'); }
+        if (this.context.busy && id !== 'polygon.cancel' && id !== 'macro.cancel' && !['camera.current.inspect', 'object.array.playback', 'object.array.playback.inspect', 'packaging.fefco.toggle', 'packaging.fefco.playback', 'packaging.fefco.playback.inspect', 'packaging.auto.sequence.inspect', 'auth.open', 'auth.inspect', 'auth.verify', 'auth.sign_out', 'render.queue.inspect', 'animation.video.inspect', 'animation.video.cancel', 'render.queue.enqueue', 'render.queue.start', 'render.queue.stop', 'render.queue.cancel', 'render.queue.clear', 'render.queue.download', 'render.queue.open', 'render.image.view', 'render.queue.delete', 'sidebar.details.collapse'].includes (id)) { throw new Error ('The viewer is busy. Retry after loading completes.'); }
         return await command.handler (args) ?? null;
     }
     Execute (id, args = {})
@@ -82,29 +82,92 @@ export class CommandRegistry
     {
         return this.Queue (() => this.InvokeMacro (macro));
     }
-    async InvokeMacro (macro)
+    // Wait until a step's playback (folding, array reveal, loading) releases the viewer.
+    async Settle (token, limitMs = MacroSettleMs)
+    {
+        const started = Date.now ();
+        while (this.context?.busy && !token.cancelled) {
+            if (Date.now () - started > limitMs) { throw new Error ('The viewer stayed busy for more than ' + Math.round (limitMs / 1000) + ' s after this step.'); }
+            await new Promise ((resolve) => setTimeout (resolve, MacroSettlePollMs));
+        }
+    }
+    async InvokeMacro (macro, observer = null)
     {
         if (this.running) { return { ok : false, error : { code : 'NESTED_MACRO', message : 'A macro is already running. Nested macros are not supported.' }, completed : [] }; }
         const completed = []; const results = Object.create (null); const token = { cancelled : false }; this.running = token;
+        this.lastRun = null; const history = this.context?.history, recorded = [], push = history?.Push, ownPush = !!history && Object.hasOwn (history, 'Push');
         try {
-            if (macro?.version !== 1 || !Array.isArray (macro.steps) || !macro.steps.length || macro.steps.length > 100) { throw new Error ('Use a version 1 macro with 1–100 steps.'); }
-            const ids = new Set ();
+            CheckMacro (macro, this.commands);
             for (const step of macro.steps) {
-                if (typeof step?.id !== 'string' || !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test (step.id) || ids.has (step.id) || !this.commands.has (step.command)) { throw new Error ('Each step needs a unique ID and an existing command.'); }
-                ids.add (step.id);
                 // Validate every static input before any step changes the scene.
-                const hasReference = JSON.stringify (step.arguments || {}).includes ('"$ref"');
-                if (!hasReference) { Validate (step.arguments || {}, this.commands.get (step.command).inputSchema); }
+                if (!JSON.stringify (step.arguments || {}).includes ('"$ref"')) { Validate (step.arguments || {}, this.commands.get (step.command).inputSchema); }
             }
+            // Record the history entries the run adds so one Undo reverses the whole macro.
+            if (push) { history.Push = function (entry) { recorded.push (entry); return push.call (this, entry); }; }
+            if (observer?.start) { await observer.start (); }
             for (const step of macro.steps) {
                 if (token.cancelled) { return { ok : false, cancelled : true, completed }; }
                 try {
                     const result = await this.Invoke (step.command, Resolve (step.arguments || {}, results));
-                    results[step.id] = result; completed.push ({ id : step.id, command : step.command, result });
+                    await this.Settle (token);
+                    results[step.id] = result; completed.push ({ id : step.id, command : step.command, result }); if (observer?.step) { await observer.step (step, result, completed.length); }
                 } catch (error) { this.context?.website?.errorLogs?.Record ('error', 'macro', step.command + ': ' + error.message); return { ok : false, failedStep : step.id, error : { code : 'STEP_FAILED', message : error.message }, completed }; }
             }
             return { ok : true, completed };
         } catch (error) { this.context?.website?.errorLogs?.Record ('error', 'macro', error.message); return { ok : false, error : { code : 'INVALID_MACRO', message : error.message }, completed }; }
-        finally { this.running = null; }
+        finally {
+            if (push) { if (ownPush) { history.Push = push; } else { delete history.Push; } this.lastRun = { history, entry : GroupHistory (history, recorded) }; }
+            this.running = null;
+        }
     }
+}
+
+export const MacroSettleMs = 5 * 60 * 1000, MacroSettlePollMs = 100;
+// Steps that move the run to another session tab; later steps would act on the wrong tab.
+export const MacroTabCommands = Object.freeze (['session.tabs.new', 'session.tabs.switch', 'session.tabs.close']);
+
+export function CheckMacro (macro, commands)
+{
+    if (macro?.version !== 1 || !Array.isArray (macro.steps) || !macro.steps.length || macro.steps.length > 100) { throw new Error ('Use a version 1 macro with 1–100 steps.'); }
+    const ids = new Set ();
+    macro.steps.forEach ((step, index) => {
+        if (typeof step?.id !== 'string' || !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test (step.id) || ids.has (step.id) || !commands.has (step.command)) { throw new Error ('Each step needs a unique ID and an existing command.'); }
+        if (MacroTabCommands.includes (step.command) && index !== macro.steps.length - 1) { throw new Error ('Step ' + step.id + ' (' + step.command + ') changes the session tab, so it can only be the last step.'); }
+        ids.add (step.id);
+    });
+    return macro;
+}
+
+// Arguments that name objects or records in one account or scene; another account cannot replay them.
+export function MacroWarnings (macro)
+{
+    const warnings = [];
+    const visit = (value, path, step) => {
+        if (Array.isArray (value)) { value.forEach ((item, i) => visit (item, path + '[' + i + ']', step)); return; }
+        if (!value || typeof value !== 'object' || Object.hasOwn (value, '$ref')) { return; }
+        for (const [key, item] of Object.entries (value)) {
+            if (typeof item === 'string' && /(^id$|Id$|Ids$)/.test (key) && !/^nominal-/.test (item)) { warnings.push ({ step : step.id, argument : path + key, message : step.id + ' uses ' + key + ' “' + item + '”, which may exist only in this account or scene. Use a $ref to an earlier step where possible.' }); }
+            else { visit (item, path + key + '.', step); }
+        }
+    };
+    for (const step of macro.steps || []) { visit (step.arguments || {}, '', step); }
+    return warnings;
+}
+
+// Replace the entries a macro added with one entry, when they are still the newest in order.
+// Returns the entry that now represents the run (null when the run's entries are no longer the newest).
+function GroupHistory (history, recorded)
+{
+    if (!recorded.length || !Array.isArray (history.undo)) { return null; }
+    const tail = history.undo.slice (-recorded.length);
+    if (tail.length !== recorded.length || tail.some ((entry, i) => entry !== recorded[i])) { return null; }
+    if (recorded.length === 1) { return recorded[0]; }
+    history.undo.splice (-recorded.length, recorded.length);
+    const entry = {
+        macro : true, steps : recorded.length,
+        undo : async () => { for (const entry of [...recorded].reverse ()) { await entry.undo (); } },
+        redo : async () => { for (const entry of recorded) { await entry.redo (); } }
+    };
+    history.undo.push (entry); history.Changed?.();
+    return entry;
 }

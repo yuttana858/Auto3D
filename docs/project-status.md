@@ -1,5 +1,17 @@
 # Auto3D development log and handoff
 
+## Private alternative-reader proof transport — Auto3D 0.91.1 (2026-11-18)
+
+Packaging 1.16.1 / Primary Products 0.15.0 / Molded Pulp 0.3.0 unchanged. Adds a short-lived operator-only read capability so a retained failed Parasolid can go directly from private R2 to an isolated Modal proof. No retries, retention or model-publication changes. Based on main 0.91.0; PR #163, CI/deployment pending. See [release-0911.md](release-0911.md).
+
+## Integration release in #155 — Auto3D 0.91.0 / Packaging 1.16.1 (2026-11-18)
+
+Primary Products 0.15.0 / Molded Pulp 0.3.0 are preserved; Packaging 1.16.1 is #156's Auto Pack change on top of #161's 1.16.0. Based on main after #161 (0.90.0); renumbered from 0.89.0 and 0.90.0. #156 (Auto Pack compact controls and fold timeline, prepared as 0.88.1) and #157 (macro animation recording and collapsible tracks) are stacked here; a macro recording is one Undo step. Based on main after #154 (0.89.0). Not deployed. Agent pairings last 24 hours, follow the window's active tab and survive reloads (these commits missed the #148 merge). Read-only Supabase tools are auto-approved in `.claude/settings.json`. Macro steps wait for playback, one Undo reverses a run, tab changes are allowed only as the last step, saved macros can be deleted and exported, and saving warns about account-specific IDs. The Advance animation controls are one minimal toolbar line. See [release-0910.md](release-0910.md). Next: store macros in the account.
+
+## Auto Pack assembly sequence, motion easing, Assign facing — Auto3D 0.90.0 / Packaging 1.16.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0 (2026-11-18)
+
+Candidate on `claude/dazzling-faraday-rhti3h`, not deployed. Auto Pack plays the real packing order (lift, erect with lid open 90°, pads, partitions, products one at a time with acceleration for large counts, top pad, close) as one Undo step; Accessories pads and partitions drop in; automatic modelling motion ramps in and out with the new Motion easing preference (Smooth default, Strong, Linear); Assign facing joins the Model spec preview buttons. New commands: `packaging.auto.sequence.inspect`, `preferences.motion_easing`, `object.facing.*` (394 commands). See docs/release-0900.md.
+
 ## Automatic CAD import — Auto3D 0.89.0 live (2026-11-18)
 
 Packaging 1.15.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0 remain unchanged. Integrates main `12dea98` / 0.88.0 and its Molded Pulp NURBS output release (#153). Parasolid open/drop detects the format and opens conversion; choosing a source (plus actual Parasolid units) starts conversion and automatically adds its GLB to the originating scene with Undo. STEP opens locally as before. The bounded watcher continues with the dialog closed and pauses on account/document/tab/read-only changes. Native Cloud 3D Studio remains 0.5.0 with the existing private processing/retention contract. PR #154; local 1,049 app/module tests, 73 MCP tests, workerd/build/audit checks and all 91 distinct browser checks passed across the full run and four unchanged isolated reruns. Initial failures remain recorded in [validation/cad-auto-0890.md](validation/cad-auto-0890.md). CI 44380198211 and production deployment 44381827086 (attempt 1) passed. Runtime commit `6bdb3c321cfcf9f97bf29739fdd521969e44cba6`; the served version/bundle, landing/login, credential boundary and live MCP checks all passed. See [release-0890.md](release-0890.md) for final validation/publication evidence and [commercial SDK research](cad-commercial-sdk.md) for future reader choices.

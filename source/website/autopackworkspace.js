@@ -6,6 +6,7 @@ import { CreateNestedPartitionPlan } from '../../modules/packaging/src/partition
 import { BoardRectangle, PadPositions } from '../../modules/packaging/src/accessories.js';
 import { AddBoardPiece } from './accessoriesworkspace.js';
 import { ValidateFefco, DefaultFefco } from '../../modules/packaging/src/fefco.js';
+import { PackSequencePlayback } from './autopacksequence.js';
 
 // World-space bounds of an object's transformed triangles in canonical mm (doubles, never display-rounded).
 // Shared by Auto Pack and Auto pallet.
@@ -151,7 +152,7 @@ export class AutoPackWorkspace
                 // Open the gaps: move whole columns and rows apart so each holds one partition.
                 for (const move of plan.partitions.moves) {
                     const object = target.objects.find (o => o.id === move.id), before = [...object.position], offset = plan.toWorld (move.offset);
-                    object.position = object.position.map ((v, i) => v + offset[i] / f); target.ApplyTransform (object); moved.push ({ object, before, after : [...object.position] });
+                    object.position = object.position.map ((v, i) => v + offset[i] / f); target.ApplyTransform (object); moved.push ({ object, before, after : [...object.position], offset });
                 }
                 const env = plan.partitions.envelope;
                 for (const layer of plan.partitions.layers) {
@@ -176,24 +177,66 @@ export class AutoPackWorkspace
             await editor.Render?.(); editor.website.packagingPanel?.Refresh?.();
         };
         const entry = { undo : () => apply (false), redo : () => apply (true) }; editor.history.Push (entry);
-        return { added, moved : moved.length, plan, rollback : async () => { await apply (false); const at = editor.history.undo.indexOf (entry); if (at >= 0) { editor.history.undo.splice (at, 1); } } };
+        return { added, moved : moved.length, movedOffsets : moved.map (({ object, offset }) => ({ id : object.id, offset })), plan, rollback : async () => { await apply (false); const at = editor.history.undo.indexOf (entry); if (at >= 0) { editor.history.undo.splice (at, 1); } } };
     }
-    async Generate ({ duration = 8, ...contentOptions } = {})
+    // The assembly sequence for the packed result: products (at their packed, possibly spread positions), the pads and
+    // partitions Auto Pack added, and the carton height. Offsets are planned in world millimetres.
+    PackSequence (products, contents)
+    {
+        const f = products.factor, document = products.document, items = new Map (), bounds = object => { const b = MeasureWorldBoundsMm (document, object, f, 'product'); return { id : object.id, min : b.min, max : b.max }; };
+        const productBoxes = products.objects.map (object => { items.set (object.id, object); return bounds (object); });
+        const pads = [], partitions = [];
+        for (const piece of contents?.added || []) {
+            const data = JSON.parse (piece.userData._auto3dAccessory); items.set (piece.id, piece);
+            if (data.kind === 'pad') { pads.push ({ ...bounds (piece), position : data.position }); } else { partitions.push ({ ...bounds (piece), layer : data.layer || 1 }); }
+        }
+        const spreads = (contents?.movedOffsets || []).map (move => ({ id : move.id, offset : move.offset }));
+        const all = [...productBoxes, ...pads, ...partitions], top = Math.max (...all.map (b => b.max[1]));
+        // Upright top flaps reach about the carton's shorter side above its walls (a full-overlap 0203 flap is that long).
+        const reach = Math.min (products.plan.parameters.width, products.plan.parameters.length);
+        return new PackSequencePlayback (this.editor, { products : productBoxes, pads, partitions, spreads, packedTopMm : top, flapReachMm : reach, closeLid : true, easing : this.editor.website.preferences?.motionEasing || 'smooth' }, items, f);
+    }
+    // Rebuild the assembly sequence of a packed carton from what it saved: its products and the pads and partitions tagged
+    // with its id. Products are already in their packed places, so they rise and drop straight back in. Null if anything is missing.
+    ReplaySequence (carton)
+    {
+        const saved = AutoPackDefinition (carton); if (!saved) { return null; }
+        const document = this.editor.document, factor = PackagingUnitMM[document.model.GetUnit ()]; if (!factor) { return null; }
+        const tagged = item => { try { return JSON.parse (item.userData?._auto3dAccessory || 'null')?.cartonId === carton.id; } catch { return false; } };
+        const pieces = document.objects.filter (tagged), pieceIds = new Set (pieces.map (item => item.id));
+        // The carton was fitted around products and contents together, so its saved ids include the pieces; keep only products.
+        const ids = (saved.productIds?.length ? saved.productIds : [saved.productId]).filter (id => !pieceIds.has (id)), objects = ids.map (id => document.objects.find (item => item.id === id));
+        if (!objects.length || objects.some (item => !item || item.visible === false)) { return null; }
+        return this.PackSequence ({ objects, factor, document, plan : { parameters : JSON.parse (carton.userData._auto3dFefco) } }, { added : pieces });
+    }
+    async Generate ({ duration = 14, ...contentOptions } = {})
     {
         this.packaging.Editable ();
         if (!Number.isFinite (duration) || duration < 1 || duration > 30) { throw new Error ('Animation duration must be 1–30 seconds.'); }
-        const options = this.ContentsOptions (contentOptions); let contents = null;
+        const options = this.ContentsOptions (contentOptions); let contents = null, sequence = null;
         const editor = this.editor, products = this.Measure ();
         if (!products.plan) { throw new Error (products.reason); }
+        const historyStart = editor.history.undo.length;
         if (options.partitions || options.pads.length) { contents = await this.PrepareContents (products, options); }
         let result;
-        try { result = await this.Fit (duration, contents); }
-        catch (error) { if (contents) { await contents.rollback (); } throw error; }
+        try {
+            // Plan the assembly before the carton exists and hold its first frame (products in place, pieces hidden)
+            // through every rebuild, so nothing appears packed before the animation starts.
+            sequence = this.PackSequence ({ ...products, objects : products.objects }, contents); sequence.Frame (0);
+            editor.motionOverride = () => sequence.Frame ();
+            result = await this.Fit (duration, contents, sequence);
+        }
+        catch (error) { editor.motionOverride = null; sequence?.Reset (); if (contents) { await contents.rollback (); } throw error; }
+        // One Undo step for the whole pack (contents, carton and fold) once the sequence completes.
+        const operation = this.packaging.foldOperation;
+        const finish = () => { if (editor.motionOverride) { editor.motionOverride = null; } sequence.Reset (); if (this.packaging.lastFold?.state === 'completed') { editor.history.Group (historyStart); } editor.RefreshButtons?.(); };
+        if (operation?.completion) { operation.completion.then (finish, finish); } else { finish (); }
+        this.sequence = sequence;
         // The packed contents belong to the new carton (the Accessories tab sees them as its accessories).
         for (const piece of contents?.added || []) { piece.userData._auto3dAccessory = JSON.stringify ({ ...JSON.parse (piece.userData._auto3dAccessory), cartonId : result.objectId }); }
         return result;
     }
-    async Fit (duration, contents)
+    async Fit (duration, contents, sequence = null)
     {
         const editor = this.editor, m = this.Measure (contents?.added), target = m.document, previous = m.object, owner = editor.website.auth.user.id;
         if (!m.plan) { throw new Error (m.reason); }
@@ -223,7 +266,7 @@ export class AutoPackWorkspace
             if (object) { target.Remove (object); target.packaging = before; if (editor.document === target) { editor.selected = previous; await editor.Render (); } }
             throw error;
         } finally { if (this.packaging.foldOperation === preparing) { this.packaging.foldOperation = null; } editor.busy = false; editor.RefreshButtons?.(); editor.website.packagingPanel?.Refresh (); }
-        const result = await this.packaging.AnimateFold (object.id, duration);
+        const result = await this.packaging.AnimateFold (object.id, duration, { sequence });
         const pieces = contents?.added.length || 0, packed = products.length - pieces;
         const extra = contents ? ' with ' + [contents.plan.partitions && contents.plan.partitions.strips + ' partition strips', contents.plan.pads.length && contents.plan.pads.length + ' pads'].filter (Boolean).join (' and ') + (contents.moved ? '; ' + contents.moved + ' products moved apart to make room' : '') : '';
         return { ...result, productId : previous.id, productIds : products.map (item => item.id), contents : contents ? { pieces : contents.added.map (o => o.id), moved : contents.moved, board : contents.plan.material.name, thicknessMm : contents.plan.thickness, layout : contents.plan.partitions?.layout || null, growthMm : contents.plan.partitions?.growthMm || null } : null, clearanceMm : .0254, units : 'mm',

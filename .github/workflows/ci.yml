@@ -54,6 +54,7 @@ jobs:
       - run: npm run test_mcp
       - run: node test/modal-worker.mjs
       - run: node test/cad-conversion-worker.mjs
+      - run: node test/cad-conversion-proof.mjs
       - name: Committed MCP command catalog matches the registry
         run: git diff --exit-code mcp/command-catalog.js website/assets/commands.json
       - name: Verify audience-sharing database permissions and throttling
