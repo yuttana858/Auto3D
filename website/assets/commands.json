@@ -3658,7 +3658,7 @@
       "id": "packaging.accessories.collar",
       "title": "Add can collar",
       "category": "Packaging",
-      "description": "Same as Add can collar in the Accessories tab: add a paperboard collar over the selected group or array of upright cans (1–24, one size, e.g. a 3 × 2 array for a six-pack). Each can gets a round hole split into tabs by relief slits; tab tips reach tuckMm (default 1.5) inside the rim and the collar top meets the rim underside, so the tabs tuck under it; reliefs end reliefMm past the rim (default 3) but keep a 1.5 mm web between holes. Corners are rounded (default follows the corner cans). A CAD board profile grouped with the cans; it lowers onto them. One Undo step.",
+      "description": "Same as Add can collar in the Accessories tab: add a paperboard collar over the selected group or array of upright cans (1–24, one size, e.g. a 3 × 2 array for a six-pack). Each can gets a round hole split into tabs by relief slits; omit tuckMm for automatic tuck up to 1.5 mm inside the rim; explicit tuck must clear the can neck through the full board thickness. The flat collar keeps 0.0254 mm clearance from the neck and below the rim; tab bending during application is not simulated; reliefs end reliefMm past the rim (default 3) but keep a 1.5 mm web between holes. Corners are rounded (default follows the corner cans). A CAD board profile grouped with the cans; it lowers onto them. One Undo step.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -3708,8 +3708,7 @@
         "additionalProperties": false
       },
       "example": {
-        "boardId": "cuk-24pt",
-        "tuckMm": 1.5
+        "boardId": "cuk-24pt"
       }
     },
     {

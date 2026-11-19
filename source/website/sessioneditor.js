@@ -589,6 +589,7 @@ export class SessionEditor
             }
             this.document.objects.forEach ((object) => { object.threeObject.visible = object.visible; });
             await PreparePackagingPresentations (this.document.objects, this.document.model.materials, this.document.model.GetUnit ());
+            this.timeline.ApplyVisibility ();
             if (beforeDisplay) { beforeDisplay (); }
             this.motionOverride?.(); // A running sequence (Auto Pack) keeps its in-flight placement across rebuilds.
             this.website.navigator.Clear ();
@@ -601,7 +602,7 @@ export class SessionEditor
             this.website.sidebar.detailsPanel.modelFormat = 'SESSION';
             this.website.UpdateMeshesVisibility ();
             this.website.sceneEffects?.ApplyObjectSettings (this.document.objects);
-            await this.packaging.presentation?.PrepareAll (); this.timeline.ApplyEmbeddedClips (); this.timeline.ApplyVisibility (); this.packaging.presentation?.Apply (this.timeline.time, false);
+            await this.packaging.presentation?.PrepareAll (); this.timeline.ApplyEmbeddedClips (); this.packaging.presentation?.Apply (this.timeline.time, false);
             this.RefreshUI (); this.Select (this.selected); this.website.sceneEffects?.Refresh (); this.website.viewModes?.Refresh (); this.website.viewer.Render ();
         } finally { this.busy = false; this.RefreshButtons (); this.website.materialPanel?.Update (); }
     }
@@ -645,6 +646,14 @@ export class SessionEditor
         this.website.viewer?.RequestRender?.();
     }
     SelectedObjects () { return this.document.objects.filter ((object) => this.selectedIds?.has (object.id)); }
+    UpdateTransformControls ()
+    {
+        this.controls.detach ();
+        if (this.mode === 'select' || this.readOnly) { return; }
+        const selection = this.SelectedObjects ().filter (item => item.threeObject?.visible);
+        if (selection.length > 1) { const bounds = new THREE.Box3 (); selection.forEach (item => bounds.union (new THREE.Box3 ().setFromObject (item.threeObject))); this.selectionPivot.position.copy (bounds.getCenter (new THREE.Vector3 ())); this.selectionPivot.rotation.set (0, 0, 0); this.selectionPivot.scale.set (1, 1, 1); this.selectionPivot.updateMatrix (); this.controls.setMode (this.mode); this.controls.attach (this.selectionPivot); }
+        else if (selection.length === 1 || this.selected?.threeObject?.visible) { this.controls.setMode (this.mode); this.controls.attach ((selection[0] || this.selected).threeObject); }
+    }
     Select (object, fromNavigator = false, additive = false, single = false)
     {
         if (this.facing?.active && this.facing.object !== object) { this.facing.Stop (); }
@@ -652,10 +661,7 @@ export class SessionEditor
         if (!this.selectedIds) { this.selectedIds = new Set (); }
         if (!additive) { this.selectedIds.clear (); }
         if (this.selected) { const group = !single && this.selected.userData?._auto3dGroup; this.document.objects.filter ((item) => item === this.selected || (group && item.userData?._auto3dGroup === group)).forEach ((item) => this.selectedIds.add (item.id)); }
-        this.controls.detach ();
-        const selection = this.SelectedObjects ();
-        if (selection.length > 1 && this.mode !== 'select' && !this.readOnly) { const bounds = new THREE.Box3 (); selection.forEach ((item) => { if (item.threeObject) { bounds.union (new THREE.Box3 ().setFromObject (item.threeObject)); } }); this.selectionPivot.position.copy (bounds.getCenter (new THREE.Vector3 ())); this.selectionPivot.rotation.set (0, 0, 0); this.selectionPivot.scale.set (1, 1, 1); this.selectionPivot.updateMatrix (); this.controls.setMode (this.mode); this.controls.attach (this.selectionPivot); }
-        else if (this.selected?.threeObject && this.selected.visible && this.mode !== 'select') { this.controls.setMode (this.mode); this.controls.attach (this.selected.threeObject); }
+        this.UpdateTransformControls ();
         this.transformPanel.hidden = !this.selected || this.mode === 'select'; this.transformFloat?.Apply ();
         if (!fromNavigator && this.selected) {
             let first = null; this.document.model.EnumerateMeshInstances ((instance) => { if (!first && this.document.Owner (instance) === this.selected) { first = instance.id; } });
@@ -695,7 +701,7 @@ export class SessionEditor
 
     UpdateSelectionBox ()
     {
-        if (this.packaging?.foldOperation || this.packaging?.presentation?.HasVisiblePreview () || this.arrayOperation || !this.selected?.threeObject || !this.selected.visible) {
+        if (this.packaging?.foldOperation || this.packaging?.presentation?.HasVisiblePreview () || this.arrayOperation || !this.selected?.threeObject?.visible) {
             this.selectionBox.visible = false;
             return;
         }
@@ -1468,25 +1474,27 @@ export class SessionEditor
         const target = this.document; const owner = this.website.auth?.user?.id; const previous = this.selected; const selection = new Set (this.selectedIds || []);
         if (!saved.document.objects.length) { throw new Error ('The saved Library item has no models to add.'); }
         if (target.objects.length + saved.document.objects.length > 1000) { throw new Error ('Adding this save would exceed 1,000 scene objects.'); }
-        const added = []; const firstIndex = target.objects.length; const meshes = target.model.meshes.length; const materials = target.model.materials.length; const unit = target.model.GetUnit (); const groups = new Map (); const objectIds = new Map (); const previousActions = this.timeline?.actions || []; let importedActions = [];
+        const added = []; const firstIndex = target.objects.length; const meshes = target.model.meshes.length; const materials = target.model.materials.length; const unit = target.model.GetUnit (); const groups = new Map (); const objectIds = new Map (); const timeline = this.timeline, previousTimeline = timeline?.Serialize (); let importedTimeline;
+        const applyTimeline = forward => { if (!timeline) { return; } timeline.Load (forward ? importedTimeline : previousTimeline); if (forward && previousTimeline.rangeEnd === previousTimeline.duration) { timeline.rangeEnd = timeline.duration; } };
         try {
             for (const source of saved.document.objects) {
                 const model = saved.document.CompactModel ([source], true); model.root = model.root.GetChildNode (0);
                 const object = target.AddImported (model, source.name, Direction.Y, false); added.push (object); objectIds.set (source.id, object.id);
-                Object.assign (object, TransformState (source), { source : source.source, packagingProfile : source.packagingProfile, visible : source.visible, hiddenParts : [...source.hiddenParts], unit : source.unit, userData : { ...source.userData }, castShadow : source.castShadow !== false, receiveShadow : source.receiveShadow !== false, keyframes : source.keyframes.map (frame => ({ ...frame, id : crypto.randomUUID (), position : [...frame.position], rotation : [...frame.rotation], scale : [...frame.scale] })), animationAsset : source.animationAsset, playback : source.playback ? { ...source.playback, playing : false } : undefined });
+                Object.assign (object, TransformState (source), { source : source.source, packagingProfile : source.packagingProfile, visible : source.visible, hiddenParts : [...source.hiddenParts], unit : source.unit, userData : { ...source.userData }, castShadow : source.castShadow !== false, receiveShadow : source.receiveShadow !== false, keyframes : source.keyframes.map (frame => ({ ...frame, id : crypto.randomUUID (), position : [...frame.position], rotation : [...frame.rotation], scale : [...frame.scale] })), visibilityKeys : (source.visibilityKeys || []).map (key => ({ ...key, id : crypto.randomUUID () })), animationAsset : source.animationAsset, playback : source.playback ? { ...source.playback, playing : false } : undefined });
                 const group = object.userData._auto3dGroup; if (group) { if (!groups.has (group)) { groups.set (group, crypto.randomUUID ()); } object.userData._auto3dGroup = groups.get (group); }
                 target.ApplyTransform (object);
             }
-            importedActions = (saved.view?.timeline?.actions || []).filter (action => objectIds.has (action.objectId)).map (action => ({ ...action, id : crypto.randomUUID (), objectId : objectIds.get (action.objectId) }));
-            if (this.timeline) { this.timeline.actions = [...previousActions, ...importedActions]; this.timeline.ExtendDurationForKeys (); }
+            const remap = actions => (actions || []).filter (action => objectIds.has (action.objectId)).map (action => ({ ...action, id : crypto.randomUUID (), objectId : objectIds.get (action.objectId) }));
+            importedTimeline = { ...previousTimeline, actions : [...(previousTimeline?.actions || []), ...remap (saved.view?.timeline?.actions)], embeddedClips : [...(previousTimeline?.embeddedClips || []), ...remap (saved.view?.timeline?.embeddedClips)] }; applyTimeline (true);
             this.selected = added[0]; this.selectedIds = new Set ([added[0].id]); await this.Render (true);
             if (this.document !== target || this.website.auth?.user?.id !== owner || this.website.accountReady === false || this.readOnly) { throw new Error ('Account or workspace changed while adding the saved model.'); }
             if (place) { place (this, added); }
-            this.history.Push ({ undo : async () => { added.forEach (object => target.Remove (object)); if (this.timeline) { this.timeline.actions = previousActions; } this.selected = previous; this.selectedIds = new Set (selection); await this.Render (); }, redo : async () => { added.forEach ((object, index) => target.Restore (object, firstIndex + index)); if (this.timeline) { this.timeline.actions = [...previousActions, ...importedActions]; } this.selected = added[0]; this.selectedIds = new Set ([added[0].id]); await this.Render (); } });
+            const checkTarget = () => { if (this.document !== target || this.website.auth?.user?.id !== owner) { throw new Error ('This imported animation belongs to another session.'); } };
+            this.history.Push ({ undo : async () => { checkTarget (); added.forEach (object => target.Remove (object)); applyTimeline (false); this.selected = previous; this.selectedIds = new Set (selection); await this.Render (); }, redo : async () => { checkTarget (); added.forEach ((object, index) => target.Restore (object, firstIndex + index)); applyTimeline (true); this.selected = added[0]; this.selectedIds = new Set ([added[0].id]); await this.Render (); } });
             this.Status ('Added ' + added.length + ' model(s) from ' + saved.document.name + ' · selected ' + added[0].name);
             return { objectIds : added.map (object => object.id), objectCount : added.length };
         } catch (error) {
-            added.forEach (object => target.Remove (object)); if (this.timeline) { this.timeline.actions = previousActions; } target.model.meshes.length = meshes; target.model.materials.length = materials; target.model.SetUnit (unit);
+            added.forEach (object => target.Remove (object)); if (this.document === target) { applyTimeline (false); } target.model.meshes.length = meshes; target.model.materials.length = materials; target.model.SetUnit (unit);
             if (this.document === target) { this.selected = previous; this.selectedIds = selection; try { await this.Render (); } catch { /* Keep the original import error. */ } } throw error;
         }
     }

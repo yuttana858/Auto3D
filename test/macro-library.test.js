@@ -52,6 +52,11 @@ describe ('Shared macro library', () => {
             { version : 1, steps : [{ id : 'a', command : 'view.fit', arguments : [] }] }, { version : 1, steps : [{ id : 'a', command : 'view.fit', arguments : { text : 'x'.repeat (70000) } }] }]) { assert.throws (() => ValidateMacroShape (bad)); }
         assert.equal (OwnerLabel ({ name : ' Sam ', email : 'sam@example.com' }), 'Sam'); assert.equal (OwnerLabel ({ email : 'sam.lee@example.com' }), 'sam.lee'); assert.equal (OwnerLabel ({}), 'Auto3D user');
     });
+    it ('accepts bounded animation timing and rejects malformed timing before saving', () => {
+        const macro = animation => ({ version : 1, steps : [{ ...fit.steps[0], animation }] });
+        for (const timing of [{}, { duration : 0.1, pauseAfter : 0 }, { duration : 30, pauseAfter : 30 }]) { assert.deepEqual (ValidateMacroShape (macro (timing)), macro (timing)); }
+        for (const timing of [null, [], 2, { duration : null }, { duration : '2' }, { duration : 0 }, { duration : 31 }, { pauseAfter : -1 }, { pauseAfter : Infinity }, { pauseAfter : 31 }, { overlap : 1 }]) { assert.throws (() => ValidateMacroShape (macro (timing)), /timing|duration/); }
+    });
     it ('API lists every macro, passes only the verified user to the database and maps refusals', async () => {
         const original = global.fetch, calls = []; let next = null;
         global.fetch = async (url, options) => {
@@ -70,9 +75,14 @@ describe ('Shared macro library', () => {
             assert.equal (listed.isAdmin, false); assert.deepEqual (listed.macros.map (m => [m.name, m.savedBy, m.mine, m.canEdit]), [['demo1', 'Sam', true, true], ['other', 'Lee', false, false]]);
             assert.equal (JSON.stringify (listed).includes ('owner-b'), false, 'owner IDs stay on the server');
             // The actor comes from the verified session, never the body; extra fields are refused.
-            const saved = await onRequest (context ('PUT', { name : 'demo2', macro : fit }));
+            const timed = { version : 1, steps : [{ ...fit.steps[0], animation : { duration : 1.5, pauseAfter : 2 } }] };
+            const saved = await onRequest (context ('PUT', { name : 'demo2', macro : timed }));
             assert.equal (saved.status, 200); const rpc = calls.find (call => call.path.endsWith ('/auto3d_macro_save')).body;
             assert.equal (rpc.p_actor, 'owner-a'); assert.equal (rpc.p_label, 'sam'); assert.equal (rpc.p_revision, null);
+            assert.deepEqual (rpc.p_definition, timed);
+            const requests = calls.length;
+            assert.equal ((await onRequest (context ('PUT', { name : 'bad timing', macro : { version : 1, steps : [{ ...fit.steps[0], animation : { duration : -1 } }] } }))).status, 400);
+            assert.equal (calls.length, requests, 'invalid timing never reaches the database');
             assert.equal ((await onRequest (context ('PUT', { name : 'demo2', macro : fit, owner : 'owner-b' }))).status, 400);
             assert.equal ((await onRequest (context ('PUT', { name : 'demo2', macro : fit, revision : 'stale' }))).status, 400);
             assert.equal ((await onRequest (context ('PUT', { name : 'demo2', macro : { version : 1, steps : [] } }))).status, 400);

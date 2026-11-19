@@ -1,3 +1,5 @@
+import { ValidateMacroAnimation } from './macroshape.js';
+
 // Deliberately narrow: commands that create, delete or alter materials cannot yet be
 // represented by native transform/camera tracks and are rejected before execution.
 const SupportedSteps = new Set (['object.transform', 'object.visibility', 'selection.transform', 'view.fit', 'view.focus', 'camera.activate', 'camera.fov', 'object.select', 'scene.inspect', 'camera.current.inspect']);
@@ -8,10 +10,8 @@ export async function RecordMacroAnimation (editor, registry, macro, stepSeconds
     if (!Number.isFinite (stepSeconds) || stepSeconds < 0.1 || stepSeconds > 30) { throw new Error ('Use 0.1–30 seconds per step.'); }
     let total = 0;
     const timings = macro.steps.map (step => {
-        const animation = step?.animation ?? {};
-        if (!animation || typeof animation !== 'object' || Array.isArray (animation) || Object.keys (animation).some (key => !['duration', 'pauseAfter'].includes (key))) { throw new Error ('Animation timing supports duration and pauseAfter only.'); }
+        const animation = ValidateMacroAnimation (step?.animation === undefined ? {} : step.animation);
         const duration = animation.duration ?? stepSeconds, pauseAfter = animation.pauseAfter ?? 0;
-        if (!Number.isFinite (duration) || duration < 0.1 || duration > 30 || !Number.isFinite (pauseAfter) || pauseAfter < 0 || pauseAfter > 30) { throw new Error ('Use 0.1–30 seconds for duration and 0–30 seconds for pause.'); }
         const timing = { id : step.id, start : total, end : total + duration, pauseAfter }; total = timing.end + pauseAfter; return timing;
     });
     if (total > 3600) { throw new Error ('Macro animation cannot exceed one hour.'); }

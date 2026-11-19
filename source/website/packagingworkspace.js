@@ -477,7 +477,33 @@ export class PackagingWorkspace
         for (const id of chosen) {
             const path = design.paths.find (item => item.id === id); if (!path) { throw new Error ('Choose an existing path.'); }
             if (!path.closed) { throw new Error ('Round corners works on closed outlines. Close the path first.'); }
-            const result = FilletPolygon (path.points, r, { corners }); path.points = result.points; rounded += result.rounded;
+            const oldPoints = path.points, result = FilletPolygon (oldPoints, r, { corners }); path.points = result.points; rounded += result.rounded;
+            if (!result.rounded || !design.engineering) { continue; }
+            let rebuildAuto = false;
+            const dimensions = design.engineering.dimensions.map (dimension => {
+                if (dimension.pathId !== id) { return dimension; }
+                const a = oldPoints[dimension.start], b = oldPoints[dimension.end];
+                const at = p => result.points.findIndex (q => Math.hypot (p[0] - q[0], p[1] - q[1]) < 1e-7);
+                let start = at (a), end = at (b);
+                if (start < 0 || end < 0) {
+                    if (dimension.mode !== 'auto') { throw new Error ('Rounding removes a constrained measurement endpoint. Switch that measurement to Auto before rounding.'); }
+                    const adjacent = (dimension.start + 1) % oldPoints.length === dimension.end || (dimension.end + 1) % oldPoints.length === dimension.start;
+                    if (adjacent) {
+                        const dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot (dx, dy);
+                        const candidates = result.points.map ((p, i) => ({ i, along : ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / length, off : Math.abs ((p[0] - a[0]) * dy - (p[1] - a[1]) * dx) / length })).filter (p => p.off < 1e-7 && p.along >= -1e-7 && p.along <= length + 1e-7).sort ((p, q) => p.along - q.along);
+                        start = candidates[0]?.i ?? -1; end = candidates.at (-1)?.i ?? -1;
+                    }
+                    if (start < 0 || end < 0 || start === end) { rebuildAuto = true; return null; }
+                }
+                return { ...dimension, start, end };
+            }).filter (Boolean);
+            // A removed custom Auto reference has no unambiguous successor. Rebuild that path's
+            // Auto layer from its new boundary, retaining valid constraints and all other paths.
+            if (rebuildAuto) {
+                const keep = dimensions.filter (d => d.pathId !== id || d.mode !== 'auto');
+                const generated = DefaultEngineering ({ ...design, paths : [path] }).dimensions.slice (0, 100 - keep.length).map (d => ({ ...d, id : 'rounded-' + crypto.randomUUID () }));
+                design.engineering.dimensions = [...keep, ...generated];
+            } else { design.engineering.dimensions = dimensions; }
         }
         if (!rounded) { throw new Error ('No corners to round: every corner is already smooth.'); }
         const design2 = this.Change (design); this.Message ('Rounded ' + rounded + (rounded === 1 ? ' corner' : ' corners')); return { pathIds : chosen, rounded, radiusMm : r, design : design2 };

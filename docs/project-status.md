@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Integrated animation and can-collar release — Auto3D 0.94.0 candidate
+
+Packaging 1.17.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0. Consolidates #158 visibility/lifetime tracks, #159 embedded clip scheduling, #160 array timeline reveals, #162 macro step timing, and #166 can collars/CAD shape tools into #162, preserving main through #164 (`cfd03f6`) and its shared account macro library. Resolves code, version and release-note conflicts without dropping either workstream. See [release-0940.md](release-0940.md). Combined validation and merge status are recorded in PR #162.
+
 ## Can collar and CAD shape tools — Auto3D 0.93.0 / Packaging 1.17.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0 (2026-11-19)
 
 Candidate on `claude/dazzling-faraday-rhti3h`, not deployed. The Accessories tab adds a Can collar for a selected group or array of upright cans (for example a 3 × 2 six-pack). The rim is sensed from the geometry, each can gets a tabbed relief hole tucked under its rim, the corners are rounded, and the collar is a grouped CAD board profile added in one Undo step. The CAD designer adds Shape tools (round corners, circle, relief hole). New commands: `packaging.accessories.collar(.inspect)` and `packaging.path.round_corners/circle/relief_hole`. See docs/release-0930.md.

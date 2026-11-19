@@ -13,8 +13,8 @@ The Accessories tab has a new **Can collar** section. It adds a paperboard carri
 
   A can whose top is not wider than its neck is refused ("No rim to tuck under"). So are cans of different rim sizes and cans standing at different heights.
 - **Holes and tabs.** Each can gets a round hole split into tabs by radial V relief slits.
-  - The tab tips reach **Tuck under rim** inside the rim (default 1.5 mm).
-  - The collar's top face meets the rim underside, so the tabs tuck under the rim.
+  - **Tuck under rim** defaults to automatic fit, up to 1.5 mm. The effective tuck is shown in the panel; explicitly entered tuck that intersects the neck is refused.
+  - The can's triangle surfaces are measured through the full board slab, including sloped faces between mesh vertices. The polygonal tab tips keep at least 0.0254 mm radial neck clearance, and the collar top sits 0.0254 mm below the lowest rim underside. Boards with insufficient under-rim space are refused.
   - The slits end **Reliefs past rim** beyond the rim (default 3 mm), so the tabs can flex over it. They always leave at least 1.5 mm of board between neighbouring holes.
   - Tabs per can are automatic (about one every 11 mm, 8–24), or 4–48 by choice.
 - **Outline.** A rounded rectangle, **Edge margin** beyond the relief rings (default 5 mm). By default the corners follow the corner cans; a corner radius can be set instead.
@@ -23,7 +23,7 @@ The Accessories tab has a new **Can collar** section. It adds a paperboard carri
   - Its measurement layer shows the overall length and width, the tab-tip diameter and the relief diameter.
   - It opens in the CAD designer and exports as SVG, EPS or DXF.
   - A second collar for the same cans is refused.
-- **Display.** The collar is shown flat. In real use the tabs bend up as it is pressed on; the board does not show that bend yet.
+- **Display.** The collar is shown flat with a checked neck fit. In real use the tabs bend up as it is pressed on; application bending and retention strength are not simulated.
 
 The planner is pure: `modules/packaging/src/cancollar.js` (`SenseCanRim`, `CreateCanCollarPlan`, `CollarBoards`). The host part is `source/website/cancollarworkspace.js` (`CanCollarWorkspace`, at `packaging.canCollar`).
 

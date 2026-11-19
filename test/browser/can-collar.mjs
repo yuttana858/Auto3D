@@ -31,6 +31,7 @@ try {
     assert.ok (inspect.rim.undercutMm > 0.2 && inspect.rim.radiusMm < 33, JSON.stringify (inspect.rim));
     assert.ok (inspect.rim.bottomMm > 118 && inspect.rim.bottomMm < 122, JSON.stringify (inspect.rim));
     assert.equal (inspect.collar.cans, 6); assert.ok (Math.abs (inspect.collar.holeRadiusMm - (inspect.rim.radiusMm - 1.5)) < 1e-6);
+    assert.equal (inspect.collar.automaticTuck, true); assert.ok (inspect.collar.neckClearanceMm >= .0254 - 1e-7);
     assert.ok (inspect.collar.reliefRadiusMm > inspect.rim.radiusMm && inspect.collar.webMm >= 1.5 - 1e-6);
     await fails ('packaging.accessories.collar', { boardId : 'tissue' });
     await fails ('packaging.accessories.collar', { tuckMm : 40 });
@@ -38,6 +39,7 @@ try {
     // The Accessories tab shows the collar for the selected cans and adds it.
     await call ('packaging.tab', { tab : 'accessories' });
     const panel = page.getByRole ('region', { name : 'Can collar', exact : true }); await panel.waitFor ();
+    assert.equal (await panel.getByLabel ('Tuck under rim (mm, blank fits neck)', { exact : true }).inputValue (), '');
     await page.waitForFunction (() => /6 cans · rim Ø/.test (document.querySelector ('[aria-label="Can collar"]')?.textContent || ''));
     await panel.getByLabel ('Collar board', { exact : true }).selectOption ('sbs-24pt');
     const before = (await call ('scene.inspect')).objects.length;
@@ -46,7 +48,7 @@ try {
     const scene = await call ('scene.inspect'); assert.equal (scene.objects.length, before + 1);
     const collar = scene.objects.find (o => o.userData?._auto3dAccessory && JSON.parse (o.userData._auto3dAccessory).kind === 'collar');
     const data = JSON.parse (collar.userData._auto3dAccessory); assert.equal (data.canIds.length, 6); assert.equal (data.boardId, 'sbs-24pt'); assert.equal (data.thicknessMm, 0.61);
-    // Grouped with the cans; the collar top meets the rim underside.
+    // Grouped with the cans; the collar top sits just below the rim underside.
     const cans = scene.objects.filter (o => data.canIds.includes (o.id)); assert.ok (cans.every (o => o.userData._auto3dGroup === collar.userData._auto3dGroup));
     const bounds = await call ('object.bounds', { objectId : collar.id }).catch (() => null);
     if (bounds?.max) { assert.ok (Math.abs (bounds.max[1] * 1 - inspect.rim.bottomMm / 1) < 1, JSON.stringify (bounds)); }

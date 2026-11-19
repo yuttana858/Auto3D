@@ -1,6 +1,7 @@
 import { ValidateTimelineActions } from './timelineactions.js';
 import { ValidateTimelineClips, TimelineClipSample } from './timelineclips.js';
 import { ValidateVisibilityKeys, VisibilityAt } from './visibilitytrack.js';
+import { EaseMotion, MotionEasings } from '../../modules/packaging/src/easing.js';
 import * as THREE from 'three';
 
 function Clamp (value, min, max)
@@ -79,6 +80,7 @@ function NormalizeObjectKeyframe (item)
         id : String (item.id || crypto.randomUUID ()),
         time : item.time,
         interpolation : NormalizeInterpolation (item.interpolation),
+        ...(MotionEasings.includes (item.motionEasing) ? { motionEasing : item.motionEasing } : {}),
         position : [...item.position],
         rotation : [...item.rotation],
         scale : [...item.scale]
@@ -110,9 +112,10 @@ function NormalizeCameraKeyframe (item)
     return result;
 }
 
-function InterpolationFactor (mode, value)
+function InterpolationFactor (mode, value, motionEasing)
 {
     if (mode === 'step') { return 0; }
+    if (mode === 'smooth' && MotionEasings.includes (motionEasing)) { return EaseMotion (value, motionEasing); }
     return mode === 'smooth' ? SmoothStep (value) : Clamp (value, 0, 1);
 }
 
@@ -126,7 +129,7 @@ function NeighborPair (items, time)
         const a = items[index]; const b = items[index + 1];
         if (time >= a.time && time <= b.time) {
             const span = Math.max (b.time - a.time, 1e-9);
-            return [a, b, InterpolationFactor (a.interpolation, (time - a.time) / span)];
+            return [a, b, InterpolationFactor (a.interpolation, (time - a.time) / span, a.motionEasing)];
         }
     }
     return [last, last, 0];
@@ -207,7 +210,9 @@ export class SessionTimeline
     VisibilityAt (object, time = this.time) { return VisibilityAt (object, time); }
     ApplyVisibility ()
     {
-        for (const object of this.editor.document.objects) { if (object.threeObject) { object.threeObject.visible = VisibilityAt (object, this.time); } }
+        let changed = false;
+        for (const object of this.editor.document.objects) { if (object.threeObject) { const visible = VisibilityAt (object, this.time); changed ||= object.threeObject.visible !== visible; object.threeObject.visible = visible; } }
+        if (changed) { this.editor.UpdateTransformControls?.(); }
     }
     SetVisibilityKeys (object, keys)
     {
@@ -246,7 +251,7 @@ export class SessionTimeline
         if (!player || !Number.isInteger (clip) || !player.clips[clip] || player.state.playing) { throw new Error ('Select an object with a paused embedded clip.'); }
         const before = this.embeddedClips, first = before.find (item => item.objectId === objectId), action = { id : crypto.randomUUID (), objectId, clip, time, duration, speed, loop, baseClip : first?.baseClip ?? player.state.clip, baseTime : first?.baseTime ?? player.state.time };
         const next = ValidateTimelineClips ([...before, action]); const oldDuration = this.duration, oldEnd = this.rangeEnd;
-        const apply = (items, forward) => { this.embeddedClips = items; this.duration = oldDuration; this.rangeEnd = oldEnd; this.ExtendDurationForKeys (); if (forward && oldEnd === oldDuration) { this.rangeEnd = this.duration; } if (!items.some (item => item.objectId === objectId)) { player.Choose (action.baseClip, action.baseTime, false); } this.Seek (this.time); editor.MarkDirty (); editor.AnimationUI (); };
+        const apply = (items, forward) => { this.embeddedClips = items; this.duration = oldDuration; this.rangeEnd = oldEnd; this.ExtendDurationForKeys (); if (forward && oldEnd === oldDuration) { this.rangeEnd = this.duration; } if (!items.some (item => item.objectId === objectId)) { editor.document.objects.find (item => item.id === objectId)?.player?.Choose (action.baseClip, action.baseTime, false); } this.Seek (this.time); editor.MarkDirty (); editor.AnimationUI (); };
         apply (next, true); editor.history.Push ({ undo : () => apply (before, false), redo : () => apply (next, true) }); return { action : { ...action } };
     }
     DeleteEmbeddedClip (id)

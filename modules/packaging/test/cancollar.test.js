@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { FilletPolygon, RoundedRectangle, CircleOutline, ReliefHoleOutline } from '../src/cadshapes.js';
-import { SenseCanRim, CreateCanCollarPlan, CollarBoards } from '../src/cancollar.js';
+import { SenseCanRim, CanRadiusInSlab, CreateCanCollarPlan, CollarBoards, CollarNeckClearanceMm } from '../src/cancollar.js';
 import { PackagingContours } from '../src/profile.js';
 
 const area = points => points.reduce ((sum, p, i) => { const q = points[(i + 1) % points.length]; return sum + p[0] * q[1] - q[0] * p[1]; }, 0) / 2;
@@ -46,6 +46,20 @@ describe ('CAD shape tools', () => {
 });
 
 describe ('Can collar', () => {
+    it ('checks sloped faces through the board slab and limits automatic tuck to a clear flat fit', () => {
+        assert.equal (CanRadiusInSlab ([10, 0, 0, 30, 10, 0, 0, 0, 10], [0, 0], 4, 6), 22);
+        const ringPoints = Can (0, 0), triangles = [], segments = 48;
+        for (let row = 0; row < ringPoints.length / (segments * 3) - 1; row++) { for (let s = 0; s < segments; s++) { const at = (r, k) => Array.from (ringPoints.slice ((r * segments + k % segments) * 3, (r * segments + k % segments) * 3 + 3)); const a = at (row, s), b = at (row, s + 1), c = at (row + 1, s), d = at (row + 1, s + 1); triangles.push (...a, ...b, ...c, ...b, ...d, ...c); } }
+        const rim = SenseCanRim (ringPoints), top = rim.rimBottomMm - CollarNeckClearanceMm;
+        const neck = CanRadiusInSlab (triangles, rim.center, top - .61, top);
+        assert.ok (Math.abs (neck - 28.4) < 1e-7);
+        const args = { cans : [[0, 0]], rimRadiusMm : rim.rimRadiusMm, neckRadiusMm : neck, thickness : .61 };
+        const plan = CreateCanCollarPlan (args);
+        assert.equal (plan.automaticTuck, true); assert.ok (plan.tuckMm >= .3 && plan.tuckMm < .5);
+        assert.ok (plan.neckClearanceMm >= CollarNeckClearanceMm - 1e-7);
+        assert.throws (() => CreateCanCollarPlan ({ ...args, tuckMm : 1.5 }), /intersects the can neck/);
+        assert.throws (() => CreateCanCollarPlan ({ ...args, neckRadiusMm : 28.8 }), /too little room/);
+    });
     it ('senses the rim, its underside and the neck under it from surface points', () => {
         const rim = SenseCanRim (Can (100, -50));
         assert.deepEqual (rim.center.map (v => Number (v.toFixed (6))), [100, -50]);

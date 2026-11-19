@@ -48,7 +48,7 @@ export class AccessoriesPanel
         const fields = Element ('div', collar, undefined, 'packaging_accessory_options');
         this.collarBoard = this.Select (fields, 'Collar board');
         const number = (title, value, min, max, step = 'any') => { const label = Element ('label', fields, title); const input = Element ('input', label); input.type = 'number'; input.min = String (min); input.max = String (max); input.step = step; input.value = value; input.setAttribute ('aria-label', title); input.addEventListener ('change', () => this.Refresh ()); return input; };
-        this.collarTuck = number ('Tuck under rim (mm)', '1.5', 0.3, 10, '0.1');
+        this.collarTuck = number ('Tuck under rim (mm, blank fits neck)', '', 0.3, 10, '0.1'); this.collarTuck.placeholder = 'Auto · up to 1.5';
         this.collarRelief = number ('Reliefs past rim (mm)', '3', 0.5, 20, '0.5');
         this.collarMargin = number ('Edge margin (mm)', '5', 1, 50, '0.5');
         this.collarCorner = number ('Corner radius (mm, blank follows cans)', '', 0, 500, '0.5');
@@ -73,7 +73,7 @@ export class AccessoriesPanel
         if (data.boards) { this.Fill (this.collarBoard, data.boards.map (b => ({ value : b.id, label : b.name + ' · ' + b.caliperMm + ' mm' })), data.defaults?.boardId || data.boards[0]?.id || ''); }
         this.collarState = data;
         const mm = v => Number (v.toFixed (1)) + ' mm', c = data.collar;
-        this.collarSize.textContent = c ? data.cans + ' cans · rim Ø ' + mm (2 * data.rim.radiusMm) + ' · collar ' + mm (c.sizeMm.length) + ' × ' + mm (c.sizeMm.width) + ' · ' + c.tabs + ' tabs per can, tips Ø ' + mm (2 * c.holeRadiusMm) + ', reliefs to Ø ' + mm (2 * c.reliefRadiusMm) + ' · corners ' + mm (c.cornerRadiusMm) : data.reason || '';
+        this.collarSize.textContent = c ? data.cans + ' cans · rim Ø ' + mm (2 * data.rim.radiusMm) + ' · collar ' + mm (c.sizeMm.length) + ' × ' + mm (c.sizeMm.width) + ' · ' + c.tabs + ' tabs per can, tips Ø ' + mm (2 * c.holeRadiusMm) + ', reliefs to Ø ' + mm (2 * c.reliefRadiusMm) + ' · corners ' + mm (c.cornerRadiusMm) + ' · effective tuck ' + Number (c.tuckMm.toFixed (3)) + ' mm' + (c.automaticTuck ? ' (auto fit)' : '') : data.reason || '';
         this.addCollar.disabled = this.pending || this.host.blocked () || !data.available || !this.host.addCollar;
     }
     async CreateCollar ()
