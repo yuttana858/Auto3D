@@ -48,7 +48,7 @@ try {
     const pallet = after.objects.find (item => item.userData?._auto3dPallet); assert.ok (pallet); assert.match (pallet.name, /Black/);
     assert.equal (JSON.parse (pallet.userData._auto3dPallet).total, 160);
     assert.ok (after.objects.every (item => item.userData?._auto3dGroup === pallet.userData._auto3dGroup));
-    await call ('view.fit'); await page.screenshot ({ path : 'work/auto-pallet-review/black-pallet-160.png' });
+    await call ('view.fit'); await page.screenshot ({ path : 'work/auto-pallet-review/black-pallet-160.png', timeout : 120000 });
     await call ('history.undo'); const undone = await call ('scene.inspect'); assert.equal (undone.objects.length, 1); assert.deepEqual (undone.objects[0].position, before.objects[0].position);
     assert.deepEqual (errors, []);
     console.log ('Auto pallet section, live plan and units, height input, colour choice, 160-box column-stacked build, mobile layout and Undo passed.');

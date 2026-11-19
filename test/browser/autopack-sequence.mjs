@@ -25,20 +25,43 @@ try {
     await call ('object.array', { width : 3, length : 2, height : 1, animate : false, autoGroup : true });
     const before = await call ('scene.inspect'); await call ('object.select', { objectId : before.objects[0].id });
     const undoBefore = (await call ('scene.inspect')).objects.length;
-    await call ('packaging.auto.generate', { duration : 20, pads : ['bottom', 'top', 'front', 'back'], partitions : true });
-
-    // Sample the running sequence: stages appear in order and the lid holds open (0.76) between erect and close.
-    const seen = []; let lidOpen = false;
-    for (let i = 0; i < 2000; i++) {
-        const playback = await call ('packaging.fefco.playback.inspect'), s = await call ('packaging.auto.sequence.inspect');
-        if (s && seen.at (-1) !== s.stage) { seen.push (s.stage); }
-        if (s && ['bottom', 'sides', 'partitions', 'products', 'top'].includes (s.stage)) { assert.ok (Math.abs (s.fold - 0.76) < 1e-9, 'lid open while packing: ' + s.fold); lidOpen = true; }
-        if (!['playing', 'paused'].includes (playback.state)) { break; } await page.waitForTimeout (50);
-    }
-    const order = ['lift', 'erect', 'bottom', 'sides', 'partitions', 'products', 'top', 'close'];
-    assert.ok (seen.every ((stage, i) => !i || order.indexOf (stage) > order.indexOf (seen[i - 1])), 'stages in order: ' + seen.join (' → ')); assert.ok (seen.includes ('products') && seen.includes ('partitions'), seen.join (','));
-    assert.ok (lidOpen); for (let i = 0; i < 100 && (await call ('packaging.fefco.playback.inspect')).state === 'finishing'; i++) { await page.waitForTimeout (100); }
-    const sequence = await call ('packaging.auto.sequence.inspect'); assert.equal (sequence.order.length, 6); assert.deepEqual (sequence.stages.map (s => s.name), order);
+    // Drive the playback's monotonic clock explicitly. Real requestAnimationFrame callbacks still
+    // render each sampled state, but a slow software-rendered frame cannot skip a short stage.
+    await page.evaluate (() => {
+        const descriptor = Object.getOwnPropertyDescriptor (performance, 'now'), start = performance.now ();
+        window.autoPackTestClock = { elapsed : 0, restore : () => { if (descriptor) { Object.defineProperty (performance, 'now', descriptor); } else { delete performance.now; } } };
+        Object.defineProperty (performance, 'now', { configurable : true, value : () => start + window.autoPackTestClock.elapsed });
+    });
+    const order = ['lift', 'erect', 'bottom', 'sides', 'partitions', 'products', 'top', 'close'], seen = [];
+    let sequence;
+    try {
+        await call ('packaging.auto.generate', { duration : 20, pads : ['bottom', 'top', 'front', 'back'], partitions : true });
+        sequence = await call ('packaging.auto.sequence.inspect'); assert.deepEqual (sequence.stages.map (stage => stage.name), order); assert.equal (sequence.order.length, 6);
+        const contents = (await call ('scene.inspect')).objects.map (object => ({ id : object.id, data : JSON.parse (object.userData?._auto3dAccessory || 'null') })).filter (item => item.data);
+        const partitions = contents.filter (item => item.data.kind === 'partition'), tops = contents.filter (item => item.data.position === 'top');
+        assert.ok (partitions.length > 0); assert.equal (tops.length, 1);
+        for (const stage of sequence.stages) {
+            const progress = (stage.start + stage.end) / 2;
+            await page.evaluate (elapsed => { window.autoPackTestClock.elapsed = elapsed; }, progress * 20000);
+            await page.waitForFunction (async expected => {
+                const result = await Auto3D.execute ('packaging.auto.sequence.inspect');
+                return result.ok && Math.abs (result.result.progress - expected) < 1e-8;
+            }, progress);
+            const sampled = await call ('packaging.auto.sequence.inspect'); assert.equal (sampled.stage, stage.name); seen.push (sampled.stage);
+            if (['bottom', 'sides', 'partitions', 'products', 'top'].includes (stage.name)) { assert.ok (Math.abs (sampled.fold - .76) < 1e-9, 'lid must remain open during ' + stage.name); }
+            if (stage.name === 'partitions') {
+                for (const piece of partitions) { assert.equal ((await call ('animation.visibility.inspect', { objectId : piece.id })).renderedVisible, true, 'partition is rendered while lowering'); }
+                assert.equal ((await call ('animation.visibility.inspect', { objectId : tops[0].id })).renderedVisible, false, 'top pad must wait until products are placed');
+            }
+        }
+        assert.deepEqual (seen, order);
+        await page.evaluate (() => { window.autoPackTestClock.elapsed = 20001; });
+        await page.waitForFunction (async () => {
+            const result = await Auto3D.execute ('packaging.fefco.playback.inspect');
+            return result.ok && ['completed', 'failed'].includes (result.result.state);
+        });
+        const playback = await call ('packaging.fefco.playback.inspect'); assert.equal (playback.state, 'completed', playback.error);
+    } finally { await page.evaluate (() => { window.autoPackTestClock.restore (); delete window.autoPackTestClock; }); }
     const packed = await call ('scene.inspect'); assert.ok (packed.objects.length > undoBefore); const carton = packed.objects.find (o => o.userData?._auto3dAutoPack);
     assert.equal (carton.userData._auto3dPackagingState, 'folded');
     // One Undo removes the carton and contents and restores the products.
