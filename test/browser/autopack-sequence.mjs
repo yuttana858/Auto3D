@@ -12,6 +12,15 @@ try {
     await page.route ('**/api/accounts/**', route => route.fulfill ({ json : { isAdmin : false } }));
     await page.goto ('http://127.0.0.1:8080/website/index.html'); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
     const call = async (id, args = {}) => { const r = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (r.ok, true, id + ' ' + JSON.stringify (r)); return r.result; };
+    // waitForFunction does not repoll a false result from an async predicate; await each command explicitly.
+    const until = async (id, ready) => {
+        const deadline = Date.now () + 120000;
+        for (;;) {
+            const result = await call (id); if (ready (result)) { return result; }
+            assert.ok (Date.now () < deadline, 'Timed out waiting for ' + id + ': ' + JSON.stringify (result));
+            await page.waitForTimeout (50);
+        }
+    };
     const fails = async (id, args = {}) => assert.equal ((await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args })).ok, false, id);
 
     // Motion easing preference.
@@ -55,21 +64,15 @@ try {
         for (const stage of sequence.stages) {
             const progress = (stage.start + stage.end) / 2;
             await page.evaluate (elapsed => { window.autoPackTestClock.elapsed = elapsed; }, progress * 20000);
-            await page.waitForFunction (async expected => {
-                const result = await Auto3D.execute ('packaging.auto.sequence.inspect');
-                return result.ok && Math.abs (result.result.progress - expected) < 1e-8;
-            }, progress);
-            const sampled = await call ('packaging.auto.sequence.inspect'); assert.equal (sampled.stage, stage.name); seen.push (sampled.stage);
+            const sampled = await until ('packaging.auto.sequence.inspect', result => Math.abs (result.progress - progress) < 1e-8);
+            assert.equal (sampled.stage, stage.name); seen.push (sampled.stage);
             if (['bottom', 'sides', 'partitions', 'products', 'top'].includes (stage.name)) { assert.ok (Math.abs (sampled.fold - .76) < 1e-9, 'lid must remain open during ' + stage.name); }
             if (stage.name === 'partitions') { duringPartitions = await page.evaluate (() => window.autoPackTestClock.snapshot ()); }
         }
         assert.deepEqual (seen, order);
         await page.evaluate (() => { window.autoPackTestClock.elapsed = 20001; });
-        await page.waitForFunction (async () => {
-            const result = await Auto3D.execute ('packaging.fefco.playback.inspect');
-            return result.ok && ['completed', 'failed'].includes (result.result.state);
-        });
-        const playback = await call ('packaging.fefco.playback.inspect'); assert.equal (playback.state, 'completed', playback.error);
+        const playback = await until ('packaging.fefco.playback.inspect', result => ['completed', 'failed'].includes (result.state));
+        assert.equal (playback.state, 'completed', playback.error);
         completedGeometry = await page.evaluate (() => window.autoPackTestClock.snapshot ());
     } finally { await page.evaluate (() => { window.autoPackTestClock.restore (); delete window.autoPackTestClock; }); }
     const packed = await call ('scene.inspect'); assert.ok (packed.objects.length > undoBefore); const carton = packed.objects.find (o => o.userData?._auto3dAutoPack);
