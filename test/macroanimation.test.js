@@ -18,7 +18,8 @@ describe ('Macro animation recording', () => {
         registry.Register ({ id : 'object.transform', inputSchema : schema ({ x : { type : 'number' } }), mutates : true }, ({ x }) => { object.position = [x, 0, 0]; return { id : object.id }; });
         registry.Register ({ id : 'camera.fov', inputSchema : schema ({ fov : { type : 'number' } }), mutates : true }, ({ fov }) => { camera.fov = fov; return {}; });
         registry.Register ({ id : 'object.visibility', inputSchema : schema ({ visible : { type : 'boolean' } }), mutates : true }, ({ visible }) => { object.visible = visible; return {}; });
-        registry.Register ({ id : 'object.delete', inputSchema : schema ({}), mutates : true }, () => { throw new Error ('Must not run'); });
+        registry.Register ({ id : 'object.delete', inputSchema : schema ({ objectId : { type : 'string' } }), mutates : true }, () => { throw new Error ('Must not permanently delete'); });
+        registry.Register ({ id : 'material.change', inputSchema : schema ({}), mutates : true }, () => { throw new Error ('Must not run'); });
         return { editor, registry, object, camera };
     }
     it ('records sequential object and camera states as interpolated keyframes', async () => {
@@ -90,8 +91,38 @@ describe ('Macro animation recording', () => {
         object.visible = false; const failed = await RecordMacroAnimation (editor, registry, macro); assert.equal (failed.recorded, false); assert.match (failed.error.message, /visible/); assert.equal (editor.document.objects.length, 1);
         object.visible = true; const result = await RecordMacroAnimation (editor, registry, macro); assert.equal (result.recorded, true); assert.deepEqual (editor.document.objects[1].visibilityKeys.map (key => [key.time, key.visible]), [[0, false], [2, true]]);
     });
+    it ('records a duplicate and later removal as reversible object lifetime keys', async () => {
+        const { editor, registry, object } = fixture (); object.visible = true; editor.selected = object; editor.Select = item => { editor.selected = item; }; editor.timeline.Seek = time => { editor.timeline.time = time; };
+        const schema = { type : 'object', properties : { objectId : { type : 'string' } }, required : [], additionalProperties : false };
+        registry.Register ({ id : 'object.duplicate', inputSchema : schema, mutates : true }, () => { const copy = { id : 'copy', position : [1, 0, 0], rotation : [0, 0, 0], scale : [1, 1, 1], visible : true, keyframes : [] }; editor.document.objects.push (copy); editor.selected = copy; return { id : copy.id }; });
+        const macro = { version : 1, steps : [{ id : 'copy', command : 'object.duplicate', arguments : {} }, { id : 'remove', command : 'object.delete', arguments : { objectId : { $ref : 'copy.id' } } }] };
+        const result = await RecordMacroAnimation (editor, registry, macro); assert.equal (result.recorded, true); assert.deepEqual (result.completed.map (step => step.objectIds), [['copy'], ['copy']]);
+        const copy = editor.document.objects[1]; assert.deepEqual (copy.visibilityKeys.map (key => [key.time, key.visible]), [[0, false], [2, true], [4, false]]); assert.equal (editor.timeline.VisibilityAt (copy, 1), false); assert.equal (editor.timeline.VisibilityAt (copy, 3), true); assert.equal (editor.timeline.VisibilityAt (copy, 4), false); assert.equal (copy.visible, true);
+        await editor.undo.undo (); assert.equal (copy.visibilityKeys.length, 0); await editor.undo.redo (); assert.equal (copy.visibilityKeys.length, 3);
+    });
+    it ('rejects steps targeting an object after its recorded removal', async () => {
+        const { editor, registry, object } = fixture (); object.visible = true; editor.selected = object; editor.Select = item => { editor.selected = item; };
+        const schema = { type : 'object', properties : { objectId : { type : 'string' } }, required : [], additionalProperties : false };
+        registry.Register ({ id : 'object.select', inputSchema : schema, mutates : false }, () => { throw new Error ('Must not reselect'); });
+        const result = await RecordMacroAnimation (editor, registry, { version : 1, steps : [{ id : 'remove', command : 'object.delete', arguments : { objectId : 'box' } }, { id : 'select', command : 'object.select', arguments : { objectId : 'box' } }] });
+        assert.equal (result.recorded, false); assert.equal (result.failedStep, 'select'); assert.match (result.error.message, /removed earlier/); assert.equal (editor.document.objects.length, 1); assert.equal (object.visibilityKeys.length, 0);
+    });
+    it ('marks retained deleted objects in inspection during recording', async () => {
+        const { editor, registry, object } = fixture (); object.visible = true; editor.selected = object; editor.Select = item => { editor.selected = item; };
+        registry.Register ({ id : 'scene.inspect', inputSchema : { type : 'object', properties : {}, required : [], additionalProperties : false }, mutates : false }, () => ({ objects : [{ id : object.id, visible : true }] }));
+        let observed; registry.commands.get ('object.visibility').handler = ({ visible }) => { observed = visible; };
+        const macro = { version : 1, steps : [{ id : 'remove', command : 'object.delete', arguments : { objectId : 'box' } }, { id : 'inspect', command : 'scene.inspect', arguments : {} }, { id : 'check', command : 'object.visibility', arguments : { visible : { $ref : 'inspect.objects.0.retainedForTimeline' } } }] };
+        const result = await RecordMacroAnimation (editor, registry, macro); assert.equal (result.recorded, true); assert.equal (observed, true);
+    });
+    it ('hides every member of a removed group and restores them with undo', async () => {
+        const { editor, registry, object } = fixture (); object.visible = true; object.userData = { _auto3dGroup : 'group' }; editor.selected = object; editor.Select = item => { editor.selected = item; }; editor.timeline.Seek = time => { editor.timeline.time = time; };
+        const second = { id : 'second', position : [1, 0, 0], rotation : [0, 0, 0], scale : [1, 1, 1], visible : true, userData : { _auto3dGroup : 'group' }, keyframes : [] }; editor.document.objects.push (second);
+        const result = await RecordMacroAnimation (editor, registry, { version : 1, steps : [{ id : 'remove', command : 'object.delete', arguments : { objectId : 'box' } }] });
+        assert.equal (result.recorded, true); assert.deepEqual (result.completed[0].objectIds, ['box', 'second']); assert.equal (editor.timeline.VisibilityAt (object, 1), true); assert.equal (editor.timeline.VisibilityAt (second, 2), false);
+        await editor.undo.undo (); assert.equal (object.visibilityKeys.length, 0); assert.equal (second.visibilityKeys.length, 0); assert.equal (editor.document.objects.length, 2);
+    });
     it ('rejects unsupported operations before executing any step', async () => {
-        const { editor, registry, object } = fixture (); await assert.rejects (RecordMacroAnimation (editor, registry, { version : 1, steps : [{ id : 'move', command : 'object.transform', arguments : { x : 4 } }, { id : 'remove', command : 'object.delete', arguments : {} }] }), /Cannot record/); assert.equal (object.position[0], 0); assert.equal (object.keyframes.length, 0);
+        const { editor, registry, object } = fixture (); await assert.rejects (RecordMacroAnimation (editor, registry, { version : 1, steps : [{ id : 'move', command : 'object.transform', arguments : { x : 4 } }, { id : 'material', command : 'material.change', arguments : {} }] }), /Cannot record/); assert.equal (object.position[0], 0); assert.equal (object.keyframes.length, 0);
     });
     it ('rejects an active embedded clip before running a macro', async () => {
         const { editor, registry, object } = fixture (); object.player = { state : { playing : true } }; await assert.rejects (RecordMacroAnimation (editor, registry, { version : 1, steps : [{ id : 'move', command : 'object.transform', arguments : { x : 4 } }] }), /Pause embedded animation/); assert.equal (object.position[0], 0);
