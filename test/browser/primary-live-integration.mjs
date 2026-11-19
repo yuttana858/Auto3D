@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright-core';
+import { PNG } from 'pngjs';
 import { OpenSessionArchive } from '../../source/website/sessionarchive.js';
 import { MockMacroApi } from './macro-api-mock.mjs';
 
@@ -216,6 +217,41 @@ try {
     await call ('selection.clear');
     await page.screenshot ({ path : 'work/primary-live-integration/clear-glass-studio.png', timeout : 120000 });
     await page.locator ('#main_viewer').screenshot ({ path : 'work/primary-live-integration/clear-glass-studio-viewport.png', timeout : 120000 });
+    // Actual image evidence: guides behind clear glass must reach its transmission buffer.
+    // Remove the opaque front label temporarily so the sampled interior contains only glass.
+    await call ('object.select', { objectId }); await call ('primary.artwork.remove', { zone : 'front' }); await call ('selection.clear');
+    const samplePoints = await page.evaluate (() => {
+        let body; primaryLiveProbe.root.traverse (mesh => { if (mesh.isMesh && mesh.name === 'body') { body = mesh; } });
+        return [50, 110].map (y => body.localToWorld (body.position.clone ().set (0, y, 0)).project (primaryLiveProbe.viewer.camera).toArray ());
+    });
+    const gridImage = async (name, visible) => {
+        await call ('view.guides', { grid : visible });
+        const bytes = await canvas.screenshot ({ path : 'work/primary-live-integration/' + name + '.png', timeout : 120000 });
+        return PNG.sync.read (bytes);
+    };
+    const gridOn = await gridImage ('glass-grid-on', true), gridOff = await gridImage ('glass-grid-off', false);
+    const sampleX = (samplePoints[0][0] + 1) * gridOn.width / 2;
+    const sampleY = samplePoints.map (point => (1 - point[1]) * gridOn.height / 2);
+    const roi = { left : Math.round (sampleX - 20), right : Math.round (sampleX + 20), top : Math.ceil (Math.min (...sampleY)), bottom : Math.floor (Math.max (...sampleY)) };
+    assert.ok (roi.left >= 0 && roi.right < gridOn.width && roi.top >= 0 && roi.bottom < gridOn.height && roi.bottom - roi.top > 30, 'glass pixel sample is inside the fitted model');
+    const pixelDifference = (a, b) => {
+        assert.equal (a.width, b.width); assert.equal (a.height, b.height); let changed = 0, maximum = 0;
+        for (let y = roi.top; y < roi.bottom; y++) { for (let x = roi.left; x < roi.right; x++) {
+            const i = (y * a.width + x) * 4, delta = Math.max (...[0, 1, 2].map (channel => Math.abs (a.data[i + channel] - b.data[i + channel])));
+            if (delta > 2) { changed++; } maximum = Math.max (maximum, delta);
+        } }
+        return { changed, maximum };
+    };
+    // The same region must not respond to the grid when an actual public optics edit makes the bottle opaque.
+    await call ('object.select', { objectId }); await call ('primary.glass.set', { objectId, optics : { color : '#f2fff6', opacity : 1, ior : 1.52, tintDistanceMm : 100 } }); await call ('selection.clear');
+    assert.equal ((await rendered ()).meshes.find (mesh => mesh.name === 'body').materials[0].transmission, 0);
+    const opaqueOn = await gridImage ('opaque-grid-on', true), opaqueOff = await gridImage ('opaque-grid-off', false);
+    const pixelChecks = { roi, glass : pixelDifference (gridOn, gridOff), opaque : pixelDifference (opaqueOn, opaqueOff) };
+    await writeFile ('work/primary-live-integration/glass-grid-pixels.json', JSON.stringify (pixelChecks, null, 2));
+    assert.ok (pixelChecks.glass.changed > 20 && pixelChecks.glass.maximum > 4, 'grid lines are visibly transmitted through clear glass: ' + JSON.stringify (pixelChecks));
+    assert.equal (pixelChecks.opaque.changed, 0, 'opaque bottle blocks the same grid region, excluding a background-only false positive');
+    await call ('history.undo'); await call ('history.undo'); await call ('view.guides', { grid : true }); await call ('selection.clear');
+    console.log ('Actual pixels transmit the grid through clear glass and block it in the opaque control:', JSON.stringify (pixelChecks));
     assert.deepEqual (errors, []); console.log ('Actual-app Primary Products live editing, glass/caps, camera fit, vector CAD labels, archive round trip and clear-glass studio review passed.');
 } catch (error) {
     if (page && !page.isClosed ()) {
