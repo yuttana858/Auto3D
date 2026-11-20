@@ -724,3 +724,6 @@ div.main_viewer
 .animation_object_track .advance_animation_track { min-height: 88px; }
 
 .animation_clip_span { position: absolute; top: 60px; height: 7px; background: #8dbf88; border-radius: 4px; pointer-events: none; }
+
+.rectangle_selection_overlay { position: fixed; pointer-events: none; z-index: 1000; box-sizing: border-box; border: 1px solid #63d7ea; background: rgba(43, 180, 204, .13); box-shadow: 0 0 0 1px rgba(0, 0, 0, .65), inset 0 0 0 1px rgba(255, 255, 255, .2); }
+.rectangle_selection_overlay[data-mode="subtract"] { border-style: dashed; }

@@ -4094,6 +4094,138 @@
       "example": {}
     },
     {
+      "id": "selection.set",
+      "title": "Select scene objects",
+      "category": "Objects",
+      "description": "Replace, add to or subtract from the object selection. Groups are selected together by default; expandGroups=false targets individual members. Does not change geometry.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectIds": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 1000,
+            "items": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "replace",
+              "add",
+              "subtract"
+            ]
+          },
+          "expandGroups": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "objectIds"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "objectIds": [],
+        "mode": "replace"
+      }
+    },
+    {
+      "id": "selection.rectangle.mode",
+      "title": "Activate rectangle selection",
+      "category": "Objects",
+      "description": "Enable or close the rectangular selection tool, also available with B. Drag with the left button; Shift/Ctrl adds, Alt subtracts, and Escape cancels. Right-drag orbit remains available.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "active"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "active": true
+      }
+    },
+    {
+      "id": "selection.rectangle.inspect",
+      "title": "Inspect rectangle selection",
+      "category": "Objects",
+      "description": "Read whether rectangle selection is active and its current drag state.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "selection.rectangle",
+      "title": "Select objects in a rectangle",
+      "category": "Objects",
+      "description": "Select objects whose projected visible bounds intersect a viewport rectangle. Coordinates are normalized 0–1 from the viewport top-left. Occluded objects are included; hidden objects are excluded. Groups expand by default. Does not require the interactive tool to be active.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "x1": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "y1": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "x2": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "y2": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "replace",
+              "add",
+              "subtract"
+            ]
+          },
+          "expandGroups": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "x1",
+          "y1",
+          "x2",
+          "y2"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "x1": 0.1,
+        "y1": 0.1,
+        "x2": 0.8,
+        "y2": 0.8
+      }
+    },
+    {
       "id": "object.tool",
       "title": "Activate model tool",
       "category": "Objects",
@@ -4549,14 +4681,15 @@
       "id": "object.group",
       "title": "Group selected objects",
       "category": "Objects",
-      "description": "Group the selected objects for selection and transform controls. Group membership is saved in portable sessions. Undo supported.",
+      "description": "Group the selection for shared selection and transforms. Existing groups are included in full. Saves membership in portable sessions; preserves every object and its placement. Undo supported.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
         "properties": {
           "name": {
             "type": "string",
-            "maxLength": 4096
+            "minLength": 1,
+            "maxLength": 100
           }
         },
         "required": [],
@@ -4570,7 +4703,21 @@
       "id": "object.ungroup",
       "title": "Ungroup selected objects",
       "category": "Objects",
-      "description": "Remove group membership while preserving placement. Undo supported.",
+      "description": "Remove all group metadata from every member of the selected groups or arrays, preserving each object, placement and animation tracks. Undo restores membership and selection.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "object.array.ungroup",
+      "title": "Ungroup array",
+      "category": "Objects",
+      "description": "Dissolve selected array groups into independently selectable objects. Keeps every copy, transform, material, label and animation track. Ordinary groups are unchanged. Undo restores the array grouping.",
       "mutates": true,
       "inputSchema": {
         "type": "object",

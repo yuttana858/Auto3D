@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Rectangle selection and grouping tools — Auto3D 0.98.0 candidate
+
+Primary Products 0.17.0 / Packaging 1.18.0 / Molded Pulp 0.3.0 unchanged. Based on main `42be7df` (merged #172). Adds rectangular selection (B, Shift/Ctrl add, Alt subtract), Group/Ungroup toolbar actions and shortcuts, and explicit Ungroup Array. Shared grouping transactions preserve objects, placement, materials, labels, animation and Undo; whole-group operations avoid partial membership. New shared selection and array-ungroup commands are exposed to agents. See [release-0980.md](release-0980.md). One development batch; not deployed. Final validation is recorded when complete.
+
 ## Live manual scaling and separated product generation — Auto3D 0.97.0 candidate
 
 Packaging 1.18.0 / Primary Products 0.17.0 / Molded Pulp 0.3.0. Draft [PR #172](https://github.com/yuttana858/Auto3D/pull/172), based on main `5c74f93` (merged #168). Primary Products manual fields update the matching selected object; uniform scale now follows the same live interaction with a stable percentage baseline, coalesced edits and no Apply scale button. Pending inputs are tied to the selection, account and document. Newly generated products are placed beyond existing world bounds with unit-correct spacing, while updates and anchored assemblies keep their placement. See [release-0970.md](release-0970.md). One development batch; not deployed. Validation on `ea53dd4`: 1,179 app/module tests, 73 MCP tests, app/MCP lint, license checks, both builds and two focused browser checks passed. Full browser release gate remains pending; see [validation](validation/primary-live-placement-0970.md).
