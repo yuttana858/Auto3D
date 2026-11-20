@@ -10750,7 +10750,7 @@
       "id": "primary.artwork.mapping",
       "title": "Set physical label size",
       "category": "Primary Products",
-      "description": "Set label size, position and paper/film/foil finish; validates physical fit before mutation. Applies immediately to the loaded selected product; without a selection it remains a draft.",
+      "description": "Set label size, position, bleed and paper/film/foil finish; validates physical fit before mutation. bleedMm: artwork designed on a label dieline includes that bleed on every side; it is cropped so the trim fills the label. Applies immediately to the loaded selected product; without a selection it remains a draft.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -10784,6 +10784,11 @@
             "minimum": -500,
             "maximum": 500
           },
+          "bleedMm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 20
+          },
           "finish": {
             "type": "string",
             "enum": [
@@ -10805,6 +10810,87 @@
         "zone": "front",
         "widthMm": 40,
         "heightMm": 60
+      }
+    },
+    {
+      "id": "primary.export.step",
+      "title": "Download product CAD with label regions",
+      "category": "Primary Products",
+      "description": "Download the current product draft (cans: two-piece beverage, three-piece food, tins) as an exact STEP solid in mm (AP214): a solid of revolution of planes, cylinders and cones from its real construction, with each label zone (default: the zones with applied artwork; or the given zones: front, back, wrap) split out as faces named \"Label <zone>\" in a label colour, and the body in the product colour. Other families are refused. Local download only; nothing is uploaded and the scene is unchanged.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zones": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "front",
+                "back",
+                "wrap"
+              ]
+            },
+            "maxItems": 3
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "zones": [
+          "wrap"
+        ]
+      }
+    },
+    {
+      "id": "primary.label.dieline",
+      "title": "Download label dieline",
+      "category": "Primary Products",
+      "description": "The label print template of the current product draft (zone: front, back, wrap or cap-top; default the active zone) at physical scale in mm, from the same zones as the 3D label: trim (cut), bleed, safe area, a wrap's glue overlap (default 6 mm on paper/film wraps, none on direct-printed beverage cans) and centre/seam guides, with where it sits on the product. format svg (layers BLEED, TRIM, SAFE, OVERLAP, GUIDES, NOTES) or dxf (same layers, mm) downloads it locally; json returns it. Design to the bleed box and import the art with primary.artwork.mapping bleedMm. Nothing is uploaded; the scene is unchanged.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zone": {
+            "type": "string",
+            "enum": [
+              "front",
+              "back",
+              "wrap",
+              "cap-top"
+            ]
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "svg",
+              "dxf",
+              "json"
+            ]
+          },
+          "bleedMm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 20
+          },
+          "safeMm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "overlapMm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 50
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "zone": "wrap",
+        "format": "svg"
       }
     },
     {

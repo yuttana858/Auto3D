@@ -37,7 +37,7 @@ try {
     const art = page.getByRole ('region', { name : 'Product label artwork', exact : true }); await art.waitFor ();
     const chooser = page.waitForEvent ('filechooser'); await art.getByRole ('button', { name : 'Import label image', exact : true }).click (); await (await chooser).setFiles ('test/testfiles/obj/texture.png');
     await poll (async () => (await call ('primary.inspect')).artwork.length === 1);
-    await call ('primary.artwork.mapping', { zone : 'front', widthMm : 30, heightMm : 35, offsetXmm : 2, offsetYmm : 2, finish : 'glossFilm' });
+    await call ('primary.artwork.mapping', { zone : 'front', widthMm : 30, heightMm : 35, offsetXmm : 2, offsetYmm : 2, bleedMm : 2, finish : 'glossFilm' }); assert.equal ((await call ('primary.inspect')).artwork[0].bleedMm, 2);
     let materials = await materialProbe.read (call, bottle.objectId); assert.ok (materials.some (m => m.transmission === .94 && m.maps.bumpMap)); assert.ok (materials.some (m => m.name.startsWith ('Primary label') && m.clearcoat === 1));
     await page.locator ('#material_drawer_close').click ();
     const scale = await call ('primary.scale', { factor : 1.15, scaleArtwork : true }); assert.equal (scale.objectId, bottle.objectId);
@@ -52,7 +52,20 @@ try {
     for (const [id, material] of [['standard-beverage', 'aluminum'], ['flat-bottom-coffee', 'kraftFilm'], ['food-deli', 'petClear'], ['rect-cleaner', 'naturalHDPE']]) {
         await call ('object.visibility', { objectId : previous, visible : false }); await call ('primary.designs.select', { id }); await call ('primary.configure', { material });
         const result = await call ('primary.generate'); previous = result.objectId; await call ('primary.callouts.set', { visible : false }); await call ('view.focus', { objectId : result.objectId });
-        if (id === 'standard-beverage') { assert.ok (result.components.includes ('pull-tab')); }
+        if (id === 'standard-beverage') {
+            assert.ok (result.components.includes ('pull-tab'));
+            // Label dieline of the printed wrap: the circumference, no glue overlap, downloaded as SVG and DXF.
+            // Exact product CAD: one solid with the wrap label as named, coloured faces.
+            const [stepFile, stepResult] = await Promise.all ([page.waitForEvent ('download'), page.evaluate (() => Auto3D.execute ('primary.export.step', { zones : ['wrap'] }))]);
+            assert.equal (stepResult.ok, true, JSON.stringify (stepResult)); assert.deepEqual (stepResult.result.labels, ['wrap']);
+            const stepText = (await readFile (await stepFile.path ())).toString (); assert.match (stepText, /MANIFOLD_SOLID_BREP/); assert.match (stepText, /STYLED_ITEM\('Label wrap'/);
+            const dieline = await call ('primary.label.dieline', { zone : 'wrap', format : 'json' }); assert.ok (Math.abs (dieline.trim.widthMm - Math.PI * 66.2) < 1e-6); assert.equal (dieline.overlapMm, 0);
+            for (const format of ['svg', 'dxf']) {
+                const [file] = await Promise.all ([page.waitForEvent ('download'), page.evaluate (format => Auto3D.execute ('primary.label.dieline', { zone : 'wrap', format }), format)]);
+                assert.match (file.suggestedFilename (), new RegExp ('wrap label dieline\\.' + format + '$')); const text = (await readFile (await file.path ())).toString ();
+                assert.match (text, format === 'svg' ? /<g id="TRIM"/ : /\r\nTRIM\r\n/);
+            }
+        }
         if (id === 'food-deli') { assert.ok (result.components.includes ('hinge')); }
         materials = await materialProbe.read (call, result.objectId); assert.ok (materials.some (m => m.maps.roughnessMap && m.maps.bumpMap));
         await page.waitForTimeout (400); await page.screenshot ({ path : 'work/primary-realism-review/' + id + '.png' });

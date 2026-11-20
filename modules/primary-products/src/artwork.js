@@ -10,10 +10,12 @@ export function ValidateProductArtwork (draft, entries = [])
     if (!Array.isArray (entries) || entries.length > 3) { throw new Error ('Use front/back labels or one wrap, plus a bottle cap label.'); }
     const seen = new Set (), zones = GetArtworkZones (draft);
     const result = entries.map (a => {
-        if (!a || typeof a !== 'object' || Object.keys (a).some (k => !['resourceId', 'name', 'mime', 'zone', 'widthMm', 'heightMm', 'finish', 'offsetXmm', 'offsetYmm', 'source', 'cad'].includes (k)) || !/^[a-f0-9]{64}$/.test (a.resourceId) || typeof a.name !== 'string' || a.name.length > 80 || !['image/png', 'image/jpeg', 'image/webp'].includes (a.mime)) { throw new Error ('Invalid label artwork.'); }
+        if (!a || typeof a !== 'object' || Object.keys (a).some (k => !['resourceId', 'name', 'mime', 'zone', 'widthMm', 'heightMm', 'finish', 'offsetXmm', 'offsetYmm', 'bleedMm', 'source', 'cad'].includes (k)) || !/^[a-f0-9]{64}$/.test (a.resourceId) || typeof a.name !== 'string' || a.name.length > 80 || !['image/png', 'image/jpeg', 'image/webp'].includes (a.mime)) { throw new Error ('Invalid label artwork.'); }
         const z = zones.find (zone => zone.id === a.zone);
         if (!z || seen.has (a.zone) || !Number.isFinite (a.widthMm) || !Number.isFinite (a.heightMm) || a.widthMm < 1 || a.heightMm < 1 || a.widthMm > z.widthMm || a.heightMm > z.heightMm) { throw new Error ('Label must fit its physical zone. Resize or remove artwork before changing the product.'); }
         if (a.finish !== undefined && !Object.hasOwn (LabelFinishes, a.finish)) { throw new Error ('Choose a supported label finish.'); }
+        // Artwork designed on a dieline includes its bleed: that margin is cropped so the trim fills the label.
+        if (a.bleedMm !== undefined && (!Number.isFinite (a.bleedMm) || a.bleedMm < 0 || a.bleedMm > 20)) { throw new Error ('Artwork bleed must be 0–20 mm.'); }
         const x = a.offsetXmm ?? 0, y = a.offsetYmm ?? 0;
         if (!Number.isFinite (x) || !Number.isFinite (y) || a.widthMm + 2*Math.abs (x) > z.widthMm + 1e-7 || a.heightMm + 2*Math.abs (y) > z.heightMm + 1e-7) { throw new Error ('Label position must remain within its physical zone.'); }
         if (z.surface === 'disc' && Math.hypot (x, y) + Math.max (a.widthMm, a.heightMm) / 2 > z.radiusMm + 1e-7) { throw new Error ('Keep the cap label within the circular cap top.'); }
@@ -26,8 +28,19 @@ export function ValidateProductArtwork (draft, entries = [])
     return result;
 }
 
-// Surface-conforming label patch: separate dielectric material avoids metallic ink.
+// Surface-conforming label patch: separate dielectric material avoids metallic ink. Artwork with a bleed (designed on a
+// dieline) maps only its trim area onto the label: the texture coordinates are inset by the bleed on every side.
 export function CreateLabelMesh (draft, art)
+{
+    const mesh = LabelMesh (draft, art), b = art.bleedMm || 0;
+    if (b > 0) {
+        const su = art.widthMm / (art.widthMm + 2 * b), sv = art.heightMm / (art.heightMm + 2 * b);
+        for (let i = 0; i < mesh.uvs.length; i += 2) { mesh.uvs[i] = (1 - su) / 2 + mesh.uvs[i] * su; mesh.uvs[i + 1] = (1 - sv) / 2 + mesh.uvs[i + 1] * sv; }
+    }
+    return mesh;
+}
+
+function LabelMesh (draft, art)
 {
     const offsetX = art.offsetXmm || 0, offsetY = art.offsetYmm || 0;
     if (art.zone === 'cap-top') {
@@ -50,7 +63,8 @@ export function CreateLabelMesh (draft, art)
             const at = SectionAt (section, zone.perimeterMm * (art.zone === 'back' ? .75 : .25) + (0.5 - u) * art.widthMm - offsetX);
             normal = [at.nx, 0, at.nz]; p = [at.x + at.nx * 0.15, y, at.z + at.nz * 0.15];
         } else {
-            const radius = draft.diameterMm / 2, center = art.zone === 'back' ? -Math.PI / 2 : Math.PI / 2;
+            // The zone's radius: the printed body (inside a three-piece can's seams), else the overall radius.
+            const radius = zone.radiusMm ?? draft.diameterMm / 2, center = art.zone === 'back' ? -Math.PI / 2 : Math.PI / 2;
             const angle = center + ((0.5 - u) * art.widthMm - offsetX) / radius;
             normal = [Math.cos (angle), 0, Math.sin (angle)]; p = [normal[0] * (radius + 0.15), y, normal[2] * (radius + 0.15)];
         }

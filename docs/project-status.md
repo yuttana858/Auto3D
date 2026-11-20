@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Label dielines and product CAD with label regions — Auto3D 0.99.0 candidate
+
+Packaging 1.18.0 / Primary Products 0.19.0 / Molded Pulp 0.4.0, stacked on #174 (0.98.0). Label dielines (SVG/DXF print templates with trim, bleed, safe area, glue overlap), artwork bleed cropping, and exact can STEP solids with label zones as named, coloured faces (`primary.export.step`). Round bottles are the next product family for exact CAD. See [release-0990.md](release-0990.md).
+
 ## Smooth molded pulp (NURBS Phase 2) and real-world cans — Auto3D 0.98.0 candidate
 
 Packaging 1.18.0 / Primary Products 0.18.0 / Molded Pulp 0.4.0, based on main `42be7df` (0.97.0). Formed trays are displayed and exported from a smooth NURBS product surface (lofted walls, rounded skirt, fitted domed/recessed floors, tangent fillets) with live edge/corner radius settings (default 0.25 in) and knowledge-base radius checks; flat sheets have rounded corners and an exact STEP solid. Primary Products cans follow real two- and three-piece construction. Companion Cloud 3D Studio 0.6.0 (#25, draft) thickens the surface locally; the owned cloud thicken job is outstanding. See [release-0980.md](release-0980.md) and [molded-pulp-nurbs.md](molded-pulp-nurbs.md).

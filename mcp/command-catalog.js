@@ -367,6 +367,8 @@ export const CommandIds = Object.freeze ([
     'primary.artwork.apply',
     'primary.artwork.open',
     'primary.artwork.mapping',
+    'primary.export.step',
+    'primary.label.dieline',
     'primary.artwork.remove',
     'primary.reset',
     'ui.molded_pulp',
