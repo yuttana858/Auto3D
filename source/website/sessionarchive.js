@@ -3,6 +3,7 @@ import { ValidateVisibilityKeys } from './visibilitytrack.js';
 import { MotionEasings } from '../../modules/packaging/src/easing.js';
 import { ValidateDimensions } from './dimensioncore.js';
 import { ValidateProductDefinition } from '../../modules/primary-products/src/definition.js';
+import { ValidateStudioDefinition } from '../../modules/3dstudio/src/definition.js';
 import { ValidatePulpDefinition } from '../../modules/molded-pulp/src/definition.js';
 import { ValidateTimelineActions } from './timelineactions.js';
 import { ValidateCameraViews } from './sessioncameras.js';
@@ -48,9 +49,27 @@ function PackMaterial (material)
     const result = {};
     for (const key of Object.keys (material)) {
         const value = material[key];
-        result[key] = value instanceof TextureMap ? { ...value, buffer : value.buffer ? EncodeBuffer (value.buffer) : null } : value;
+        result[key] = value instanceof TextureMap || key.endsWith ('Map') && value && typeof value === 'object' ? { ...value, buffer : value.buffer ? EncodeBuffer (value.buffer) : null } : value;
     }
     return result;
+}
+
+function StudioPaletteEntries (palette, authoring)
+{
+    if (!palette || typeof palette !== 'object' || Array.isArray (palette) || ![Object.prototype, null].includes (Object.getPrototypeOf (palette)) || Object.keys (palette).length > 64 || typeof authoring !== 'string') { throw new Error ('Invalid 3Dstudio material palette.'); }
+    const definition = ValidateStudioDefinition (JSON.parse (authoring));
+    const leaves = new Set (definition.nodes.filter (node => node.kind === 'primitive').map (node => node.id));
+    const entries = Object.entries (palette);
+    if (entries.some (([id, material]) => !leaves.has (id) || !material || typeof material !== 'object' || Array.isArray (material))) { throw new Error ('Invalid 3Dstudio material palette role.'); }
+    return entries;
+}
+
+// Hidden history roles reuse the same bounded engine material and texture
+// format as visible surfaces, including structured-cloned recovery snapshots.
+export function PackStudioMaterials (palette, authoring)
+{
+    if (palette === undefined) { return undefined; }
+    return Object.fromEntries (StudioPaletteEntries (palette, authoring).map (([id, material]) => [id, PackMaterial (material)]));
 }
 
 function ReadMaterial (data)
@@ -197,7 +216,7 @@ export function PackSession (document, view = {}, objects = document.objects, ki
     return {
         dimensions : ValidateDimensions (document.dimensions || []).filter (d => objects.some (o => o.id === d.objectId)), dimensionsVisible : document.dimensionsVisible !== false,
         format : 'SW Auto3D', version : SessionVersion, metadata : { savedAt : new Date ().toISOString () }, kind, name : document.name, view, packaging : kind === 'session' && document.packaging ? ValidatePackaging (document.packaging) : null,
-        objects : objects.map ((object) => ({ id : object.id, packagingProfile : object.packagingProfile ? ValidatePackaging (object.packagingProfile) : null, name : object.name, source : object.source, unit : object.unit, visible : object.visible, hiddenParts : object.hiddenParts || [], position : object.position, rotation : object.rotation, scale : object.scale, userData : object.userData || {}, castShadow : object.castShadow !== false, receiveShadow : object.receiveShadow !== false, keyframes : Array.isArray (object.keyframes) ? object.keyframes : [], visibilityKeys : ValidateVisibilityKeys (object.visibilityKeys || []), playback : object.playback, animationAsset : object.animationAsset ? { main : object.animationAsset.main, files : object.animationAsset.files.map ((file) => ({ name : file.name, buffer : EncodeBuffer (file.buffer) })) } : null })),
+        objects : objects.map ((object) => ({ id : object.id, packagingProfile : object.packagingProfile ? ValidatePackaging (object.packagingProfile) : null, name : object.name, source : object.source, unit : object.unit, visible : object.visible, hiddenParts : object.hiddenParts || [], position : object.position, rotation : object.rotation, scale : object.scale, userData : object.userData || {}, studioMaterials : PackStudioMaterials (object.studioMaterials, object.userData?._auto3dStudio), castShadow : object.castShadow !== false, receiveShadow : object.receiveShadow !== false, keyframes : Array.isArray (object.keyframes) ? object.keyframes : [], visibilityKeys : ValidateVisibilityKeys (object.visibilityKeys || []), playback : object.playback, animationAsset : object.animationAsset ? { main : object.animationAsset.main, files : object.animationAsset.files.map ((file) => ({ name : file.name, buffer : EncodeBuffer (file.buffer) })) } : null })),
         model : { unit : model.unit, properties : model.propertyGroups, materials : model.materials.map (PackMaterial), meshes : model.meshes.map (PackMesh), nodes : model.root.childNodes.map (PackNode) }
     };
 }
@@ -258,12 +277,15 @@ export function ReadSession (data)
         if (data.userData && typeof data.userData === 'object' && !Array.isArray (data.userData)) {
             for (const [key, value] of Object.entries (data.userData).slice (0, 100)) {
                 const name = String (key).trim ().slice (0, 100);
-                const limit = name === '_auto3dPrimaryProduct' ? 262144 : 2000;
-                if (name === '_auto3dPrimaryProduct' && String (value).length > limit) { throw new Error ('Primary Products definition is too large.'); }
+                const authoring = ['_auto3dPrimaryProduct', '_auto3dStudio'].includes (name);
+                const limit = authoring ? 262144 : 2000;
+                if (authoring && new TextEncoder ().encode (String (value)).byteLength > limit) { throw new Error ('Model authoring definition is too large.'); }
                 const text = String (value).slice (0, limit);
                 if (name && !['__proto__', 'prototype', 'constructor'].includes (name)) { object.userData[name] = text; }
             }
         }
+        if (object.userData._auto3dStudio !== undefined) { object.userData._auto3dStudio = JSON.stringify (ValidateStudioDefinition (JSON.parse (object.userData._auto3dStudio))); }
+        if (data.studioMaterials !== undefined) { object.studioMaterials = Object.fromEntries (StudioPaletteEntries (data.studioMaterials, object.userData._auto3dStudio).map (([id, material]) => [id, ReadMaterial (material)])); }
         if (object.userData._auto3dMoldedPulp !== undefined) { object.userData._auto3dMoldedPulp = JSON.stringify (ValidatePulpDefinition (JSON.parse (object.userData._auto3dMoldedPulp))); }
         if (object.userData._auto3dPrimaryProduct !== undefined) { object.userData._auto3dPrimaryProduct = JSON.stringify (ValidateProductDefinition (JSON.parse (object.userData._auto3dPrimaryProduct))); }
         if (object.userData._auto3dFoldPreview !== undefined && (!object.userData._auto3dFefco || !object.userData._auto3dFoldPreview.trim () || !Number.isFinite (Number (object.userData._auto3dFoldPreview)) || Number (object.userData._auto3dFoldPreview) < 0 || Number (object.userData._auto3dFoldPreview) > 1)) { throw new Error ('Invalid visual fold position.'); }

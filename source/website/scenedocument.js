@@ -6,6 +6,11 @@ import { Matrix } from '../engine/geometry/matrix.js';
 import { Transformation } from '../engine/geometry/transformation.js';
 import { Direction } from '../engine/geometry/geometry.js';
 
+export function CloneMaterialPalette (palette)
+{
+    return palette ? Object.fromEntries (Object.entries (palette).map (([id, material]) => [id, CloneSurface (material)])) : undefined;
+}
+
 export function CloneSurface (material)
 {
     const copy = new material.constructor ();
@@ -153,7 +158,7 @@ export class SceneDocument
         const meshMap = new Map (); object.node.EnumerateMeshIndices ((index) => meshMap.set (index, index));
         const node = CopyNodeTree (object.node, this.model.root, meshMap);
         const copy = { ...object, id : crypto.randomUUID (), node, name : object.name + ' copy', threeObject : null, position : [...object.position], rotation : [...object.rotation], scale : [...object.scale], userData : { ...(object.userData || {}) }, hiddenParts : [...(object.hiddenParts || [])], keyframes : [], visibilityKeys : [] };
-        delete copy.player; this.objects.push (copy); this.ApplyTransform (copy); return copy;
+        if (object.studioMaterials) { copy.studioMaterials = CloneMaterialPalette (object.studioMaterials); } delete copy.player; this.objects.push (copy); this.ApplyTransform (copy); return copy;
     }
 
     Duplicate (object)
@@ -163,6 +168,7 @@ export class SceneDocument
         asset.root = asset.root.GetChildNode (0);
         const copy = this.AddImported (asset, object.name + ' copy', Direction.Y, false);
         copy.packagingProfile = object.packagingProfile ? JSON.parse (JSON.stringify (object.packagingProfile)) : undefined; copy.unit = object.unit; copy.hiddenParts = [...(object.hiddenParts || [])]; copy.userData = { ...(object.userData || {}) }; copy.castShadow = object.castShadow !== false; copy.receiveShadow = object.receiveShadow !== false;
+        if (object.studioMaterials) { copy.studioMaterials = CloneMaterialPalette (object.studioMaterials); }
         if (object.animationAsset) { copy.animationAsset = object.animationAsset; copy.playback = { ...object.playback, playing : false }; }
         copy.position = [...object.position]; copy.rotation = [...object.rotation]; copy.scale = [...object.scale];
         let minX = Infinity; let maxX = -Infinity;

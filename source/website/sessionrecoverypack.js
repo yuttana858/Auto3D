@@ -1,4 +1,4 @@
-import { CreateSessionArchive, EncodeBuffer, SessionVersion } from './sessionarchive.js';
+import { CreateSessionArchive, EncodeBuffer, PackStudioMaterials, SessionVersion } from './sessionarchive.js';
 
 const TriangleKeys = ['v0', 'v1', 'v2', 'c0', 'c1', 'c2', 'n0', 'n1', 'n2', 'u0', 'u1', 'u2', 'mat', 'curve'];
 
@@ -36,7 +36,7 @@ export function PackRecoverySnapshot (snapshot)
         format : 'SW Auto3D', version : SessionVersion, metadata : { savedAt : new Date ().toISOString () }, kind : snapshot.kind || 'session', name : snapshot.name, view : snapshot.view, packaging : snapshot.packaging || null,
         objects : snapshot.objects.map ((object) => {
             const { node, ...data } = object;
-            return { ...data, animationAsset : object.animationAsset ? { main : object.animationAsset.main, files : object.animationAsset.files.map ((file) => ({ name : file.name, buffer : EncodeBuffer (file.buffer) })) } : null };
+            return { ...data, studioMaterials : PackStudioMaterials (object.studioMaterials, object.userData?._auto3dStudio), animationAsset : object.animationAsset ? { main : object.animationAsset.main, files : object.animationAsset.files.map ((file) => ({ name : file.name, buffer : EncodeBuffer (file.buffer) })) } : null };
         }),
         model : { unit : snapshot.unit, properties : snapshot.properties, materials, meshes, nodes }
     };

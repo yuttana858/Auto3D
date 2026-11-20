@@ -18,6 +18,8 @@ describe ('Packaging adapter and unfolding', () => {
         const result = await build ({ entryPoints : ['source/website/index.js'], bundle : true, write : false, outdir : 'work/boundary', metafile : true, define : { 'import.meta.url' : 'document.currentScript.src' }, loader : { '.ttf' : 'file', '.woff' : 'file', '.svg' : 'file' } });
         const names = Object.keys (result.metafile.inputs); for (const file of ['geometry.js', 'mesh.js', 'material.js', 'panel.js', 'index.js', 'folding.js', 'foldplayback.js']) { assert.equal (names.includes ('modules/packaging/src/' + file), false, file + ' must be loaded separately'); }
         assert.equal (names.includes ('source/website/packagingadapter.js'), true); assert.equal (names.includes ('modules/packaging/src/profile.js'), true);
+        assert.deepEqual (names.filter (name => name.startsWith ('modules/3dstudio/')), ['modules/3dstudio/src/definition.js'], 'Only archive-safe 3Dstudio authoring data belongs in the startup bundle');
+        assert.equal (names.some (name => name.includes ('node_modules/manifold-3d/')), false, 'The solid kernel loads only inside its worker');
     });
     it ('Unfolds to a watertight physical sheet and preserves the current edited liner and edge material', async () => {
         const editor = Editor (); await editor.packaging.GenerateFefco ({ code : '0201' }); const original = editor.selected;

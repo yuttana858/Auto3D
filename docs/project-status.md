@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## 3Dstudio primitive modeling — Auto3D 0.99.0 candidate
+
+New 3Dstudio 0.1.0 / Primary Products 0.17.0 / Packaging 1.18.0 / Molded Pulp 0.3.0. Stacked into draft [PR #173](https://github.com/yuttana858/Auto3D/pull/173), preserving its selection/grouping increment. Adds seven editable primitives, live dimensions/local transforms/PBR, union/subtract/intersect, retained editable history with rollback/resume, ordinary Undo/Redo, portable recipe persistence and nine shared agent commands. Geometry stays in an independently built module and lazy local WASM worker. Existing product/CAD/packaging models keep their editing systems. See [release-0990.md](release-0990.md). Development validation is in progress; not deployed.
+
 ## Rectangle selection and grouping tools — Auto3D 0.98.0 candidate
 
 Primary Products 0.17.0 / Packaging 1.18.0 / Molded Pulp 0.3.0 unchanged. Draft [PR #173](https://github.com/yuttana858/Auto3D/pull/173), based on main `42be7df` (merged #172). Adds rectangular selection (B, Shift/Ctrl add, Alt subtract), Group/Ungroup toolbar actions and shortcuts, and explicit Ungroup Array. Shared grouping transactions preserve objects, placement, materials, labels, animation and Undo; whole-group operations avoid partial membership. New shared selection and array-ungroup commands are exposed to agents. See [release-0980.md](release-0980.md). One development batch; not deployed. Validation on `edf33a2`: 1,205 app/module tests, 73 MCP tests, app/MCP lint, license checks, both builds and all three focused browser checks passed. Full browser release gate remains pending; see [validation](validation/selection-tools-0980.md).

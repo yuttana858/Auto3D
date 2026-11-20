@@ -22,7 +22,7 @@ import * as THREE from 'three';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { clone as CloneRig } from 'three/addons/utils/SkeletonUtils.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
-import { SceneDocument, SceneHistory } from './scenedocument.js';
+import { SceneDocument, SceneHistory, CloneMaterialPalette } from './scenedocument.js';
 import { PackSession, CreateSessionArchive, OpenSessionArchive } from './sessionarchive.js';
 import { ModelLibrary, WorkspaceDialog, RecoveryArchiveBuffer } from './modellibrary.js';
 import { Selection, SelectionType } from './navigator.js';
@@ -59,6 +59,7 @@ export function DropToFloorDelta (box, upVector)
 }
 
 const Icons = {
+    '3dstudio' : '<path d="m4 6 8-4 8 4v10l-8 4-8-4ZM4 6l8 4 8-4M12 10v10"/><circle cx="20" cy="18" r="4"/>',
     'primary-products' : '<path d="M6 2h5v4l2 4v12H4V10l2-4ZM4 14h9M17 7q4-2 7 0v14q-4 2-7 0ZM17 9q4 2 7 0"/>',
     'molded-pulp' : '<path d="M2 16h4l2-6h3l2 6h2l2-6h3l2 6h2M2 19h22"/>',
     animation : '<rect x="2" y="5" width="16" height="14" rx="2"/><path d="m18 10 6-3v10l-6-3M7 9.5v5l4.5-2.5Z"/>',
@@ -247,7 +248,7 @@ export class SessionEditor
     ModelTools ()
     {
         const toggle = (id, open) => () => this.website.modulePanels ? this.website.modulePanels.Toggle (id, open) : open ();
-        return [['ai', 'AI Generative', toggle ('ai', () => this.website.aiWorkspace?.Open ())], ['packaging', 'Packaging design', toggle ('packaging', () => this.website.packagingPanel?.Open ())], ['primary-products', 'Primary Products', toggle ('primary-products', () => this.website.primaryProductsPanel?.Open ())], ['molded-pulp', 'Molded Pulp', toggle ('molded-pulp', () => this.website.moldedPulpPanel?.Open ())], ['animation', 'Animation and video', toggle ('animation', () => this.website.animationPanel?.Open ())], ['select', 'Select (V)', () => this.SetMode ('select')], ['box-select', 'Rectangle select (B)', () => this.rectangleSelection.SetActive (!this.rectangleSelection.active)], ['move', 'Move (W)', () => this.SetMode ('translate')], ['rotate', 'Rotate (E)', () => this.SetMode ('rotate')], ['scale', 'Scale (R)', () => this.SetMode ('scale')], ['dimension', 'Dimensions · drag an edge', () => this.website.dimensions.SetActive (!this.website.dimensions.active)], ['duplicate', 'Duplicate object (Ctrl+D)', () => this.Duplicate ()], ['group', 'Group (Ctrl+G)', () => this.GroupObjects ()], ['ungroup', 'Ungroup (Ctrl+Shift+G)', () => this.UngroupObjects ()], ['array', 'Array selected object', () => this.ArrayDialog ()], ['ungroup-array', 'Ungroup array', () => this.UngroupArray ()], ['floor', 'Drop selected object to floor', () => this.DropToFloor ()], ['visible', 'Hide or show object (H)', () => this.ToggleVisibility ()], ['remove', 'Delete object', () => this.Delete ()], ['focus', 'Focus object (F)', () => this.Focus ()], ['fit', 'Fit all objects to screen', () => this.FitScene ()], ['update', 'Update selected model', () => this.UpdateModel ()], ['undo', 'Undo object edit (Ctrl+Z)', () => this.Undo ()], ['redo', 'Redo object edit (Ctrl+Shift+Z)', () => this.Redo ()], ['add', 'Add model', () => this.AddModel ()], ['save', 'Save or open session (Ctrl+S)', () => this.library.SaveDialog (true)], ['export', 'Export', () => this.Export ()], ['library', 'Model library', () => this.library.Open ()], ['commands', 'Command bar', () => this.commandBar.SetVisible (!this.commandBar.visible)]];
+        return [['ai', 'AI Generative', toggle ('ai', () => this.website.aiWorkspace?.Open ())], ['packaging', 'Packaging design', toggle ('packaging', () => this.website.packagingPanel?.Open ())], ['primary-products', 'Primary Products', toggle ('primary-products', () => this.website.primaryProductsPanel?.Open ())], ['molded-pulp', 'Molded Pulp', toggle ('molded-pulp', () => this.website.moldedPulpPanel?.Open ())], ['3dstudio', '3Dstudio · primitive modeling', toggle ('3dstudio', () => this.website.studioPanel?.Open ())], ['animation', 'Animation and video', toggle ('animation', () => this.website.animationPanel?.Open ())], ['select', 'Select (V)', () => this.SetMode ('select')], ['box-select', 'Rectangle select (B)', () => this.rectangleSelection.SetActive (!this.rectangleSelection.active)], ['move', 'Move (W)', () => this.SetMode ('translate')], ['rotate', 'Rotate (E)', () => this.SetMode ('rotate')], ['scale', 'Scale (R)', () => this.SetMode ('scale')], ['dimension', 'Dimensions · drag an edge', () => this.website.dimensions.SetActive (!this.website.dimensions.active)], ['duplicate', 'Duplicate object (Ctrl+D)', () => this.Duplicate ()], ['group', 'Group (Ctrl+G)', () => this.GroupObjects ()], ['ungroup', 'Ungroup (Ctrl+Shift+G)', () => this.UngroupObjects ()], ['array', 'Array selected object', () => this.ArrayDialog ()], ['ungroup-array', 'Ungroup array', () => this.UngroupArray ()], ['floor', 'Drop selected object to floor', () => this.DropToFloor ()], ['visible', 'Hide or show object (H)', () => this.ToggleVisibility ()], ['remove', 'Delete object', () => this.Delete ()], ['focus', 'Focus object (F)', () => this.Focus ()], ['fit', 'Fit all objects to screen', () => this.FitScene ()], ['update', 'Update selected model', () => this.UpdateModel ()], ['undo', 'Undo object edit (Ctrl+Z)', () => this.Undo ()], ['redo', 'Redo object edit (Ctrl+Shift+Z)', () => this.Redo ()], ['add', 'Add model', () => this.AddModel ()], ['save', 'Save or open session (Ctrl+S)', () => this.library.SaveDialog (true)], ['export', 'Export', () => this.Export ()], ['library', 'Model library', () => this.library.Open ()], ['commands', 'Command bar', () => this.commandBar.SetVisible (!this.commandBar.visible)]];
     }
 
     ToolDisabled (key)
@@ -272,7 +273,7 @@ export class SessionEditor
         const historyTools = Element ('div', 'session_history_tools', undefined, document.getElementById ('toolbar')); historyTools.setAttribute ('role', 'group'); historyTools.setAttribute ('aria-label', 'Edit history'); document.getElementById ('toolbar').prepend (historyTools);
         const tools = this.ModelTools ().filter (([key]) => !stripHidden.has (key));
         for (const [key, label, action] of tools) {
-            const button = Element ('button', 'scene_tool', undefined, ['ai', 'packaging', 'primary-products', 'molded-pulp', 'animation'].includes (key) ? moduleTools : ['undo', 'redo'].includes (key) ? historyTools : this.strip); button.title = label; button.setAttribute ('aria-label', label); button.innerHTML = '<svg viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">' + Icons[key] + '</svg>';
+            const button = Element ('button', 'scene_tool', undefined, ['ai', 'packaging', 'primary-products', 'molded-pulp', '3dstudio', 'animation'].includes (key) ? moduleTools : ['undo', 'redo'].includes (key) ? historyTools : this.strip); button.title = label; button.setAttribute ('aria-label', label); button.innerHTML = '<svg viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">' + Icons[key] + '</svg>';
             button.addEventListener ('click', async () => { if (['undo', 'redo'].includes (key)) { button.setAttribute ('aria-busy', 'true'); button.disabled = true; try { await this.Run (action); } finally { button.removeAttribute ('aria-busy'); this.RefreshButtons (); } } else { await this.Run (action); } }); this.buttons.set (key, button);
         }
         this.transformPanel = Element ('div', 'scene_transform_panel', undefined, this.website.parameters.viewerDiv); this.transformPanel.hidden = true;
@@ -767,7 +768,7 @@ export class SessionEditor
             else if (this.busy && this.rectangleSelection.drag) { this.rectangleSelection.Cancel (); }
         }
         this.website?.dimensions?.Draw (this.website.viewer.camera);
-        this.website?.primaryProductsPanel?.RefreshAvailability (); this.website?.moldedPulpPanel?.RefreshAvailability (); this.website?.animationPanel?.Refresh ();
+        this.website?.primaryProductsPanel?.RefreshAvailability (); this.website?.moldedPulpPanel?.RefreshAvailability (); this.website?.studioPanel?.RefreshAvailability (); this.website?.animationPanel?.Refresh ();
         this.processing?.Sync (this.busy && !this.packaging?.foldOperation && !this.packaging?.dimensionUpdating && this.arrayOperation?.stage !== 'revealing' && !this.website?.rendering?.running); this.commandBar?.SetBusy (this.busy);
         this.website?.packagingPanel?.fefcoPanel?.SetDisabled ();
         { const workspace = this.website?.packagingPanel?.workspace, tab = workspace?.InspectTab ().tab; if (tab === 'auto') { workspace.autoPanel.Refresh (); } else if (tab === 'accessories') { workspace.accessoriesPanel.Refresh (); } }
@@ -1497,7 +1498,7 @@ export class SessionEditor
         try {
             for (const source of saved.document.objects) {
                 const model = saved.document.CompactModel ([source], true); model.root = model.root.GetChildNode (0);
-                const object = target.AddImported (model, source.name, Direction.Y, false); added.push (object); objectIds.set (source.id, object.id);
+                const object = target.AddImported (model, source.name, Direction.Y, false); added.push (object); objectIds.set (source.id, object.id); if (source.studioMaterials) { object.studioMaterials = CloneMaterialPalette (source.studioMaterials); }
                 Object.assign (object, TransformState (source), { source : source.source, packagingProfile : source.packagingProfile, visible : source.visible, hiddenParts : [...source.hiddenParts], unit : source.unit, userData : { ...source.userData }, castShadow : source.castShadow !== false, receiveShadow : source.receiveShadow !== false, keyframes : source.keyframes.map (frame => ({ ...frame, id : crypto.randomUUID (), position : [...frame.position], rotation : [...frame.rotation], scale : [...frame.scale] })), visibilityKeys : (source.visibilityKeys || []).map (key => ({ ...key, id : crypto.randomUUID () })), animationAsset : source.animationAsset, playback : source.playback ? { ...source.playback, playing : false } : undefined });
                 const group = object.userData._auto3dGroup; if (group) { if (!groups.has (group)) { groups.set (group, crypto.randomUUID ()); } object.userData._auto3dGroup = groups.get (group); }
                 target.ApplyTransform (object);
