@@ -3,7 +3,7 @@
 // review figures put Type 1 at 5–10 mm, Type 2 at 3–5 mm (1.5–3 mm common in practice), wet-pressed Type 3 at
 // 0.7–1.2 mm and dry-pressed Type 3 at 1.5–3.0 mm. Drafts of 1–7° are published; 3–5° is the common default.
 // Densities are indicative presentation values for mass estimates, not certified material data.
-export const MoldedPulpVersion = '0.3.0';
+export const MoldedPulpVersion = '0.4.0';
 export const PulpTypes = Object.freeze ({
     type1 : Object.freeze ({ name : 'Type 1 · Thick-wall', short : 'Type 1', thicknessMm : 6, rangeMm : [5, 10], draftDeg : 5, minDraftDeg : 3, toleranceMm : 2, densityGcm3 : 0.3, color : '#9a8f7e', roughness : 0.97, surface : 'One smooth side, one rough side', use : 'Dunnage, end caps and heavy industrial supports; oven dried in a single open mold.' }),
     type2 : Object.freeze ({ name : 'Type 2 · Transfer-molded', short : 'Type 2', thicknessMm : 3, rangeMm : [1.5, 5], draftDeg : 4, minDraftDeg : 3, toleranceMm : 1.25, densityGcm3 : 0.45, color : '#a79c89', roughness : 0.92, surface : 'Both sides moderately smooth', use : 'Egg cartons, trays, cup carriers and protective inserts; formed, transferred and oven dried.' }),
