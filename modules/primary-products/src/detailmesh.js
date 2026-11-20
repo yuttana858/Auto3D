@@ -80,8 +80,10 @@ export function CanProfile (d)
     const r = d.diameterMm / 2, h = d.heightMm, style = d.details?.canStyle || (d.material === 'aluminum' ? 'beverage' : 'food');
     if (style === 'beverage') {
         const standRadius = r * .757, domeDepth = Math.min (r * .31, h * .09), taperTop = Math.min (r * .29, h * .09), neckStart = h - Math.min (r * .5, h * .14);
-        const neckRadius = r * .818, seamHeight = Math.min (3, h * .025), countersink = Math.min (6.4, h * .052);
-        return { style, r, h, bodyRadius : r, standRadius, domeDepth, taperTop, neckStart, neckRadius, seamRadius : neckRadius * 1.04, seamHeight, countersink, labelBottomMm : taperTop + Math.min (1, h * .01), labelHeightMm : neckStart - taperTop - 2 * Math.min (1, h * .01) };
+        // A 202 end on a 211 body: neck about Ø 52.6 mm under a double seam about Ø 56.6 mm (0.795 and 0.855 of the body
+        // radius), so the seam overhangs the neck by about 2 mm (what a can collar tucks under).
+        const neckRadius = r * .795, seamHeight = Math.min (3, h * .025), countersink = Math.min (6.4, h * .052);
+        return { style, r, h, bodyRadius : r, standRadius, domeDepth, taperTop, neckStart, neckRadius, seamRadius : r * .855, seamHeight, countersink, labelBottomMm : taperTop + Math.min (1, h * .01), labelHeightMm : neckStart - taperTop - 2 * Math.min (1, h * .01) };
     }
     if (style === 'food') {
         const seamHeight = Math.min (3.2, h * .03), bodyRadius = r - Math.min (1.4, r * .03), countersink = Math.min (3.2, h * .03), clear = seamHeight + Math.min (1.5, h * .015);
