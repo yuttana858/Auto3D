@@ -134,7 +134,7 @@ export class VideoExport
                 const time = times[index];
                 // Fold framing on, viewer refresh off: the same poses and automatic camera framing playback shows.
                 timeline.Seek (time, false, true);
-                players.forEach (([player]) => SeekPlayer (player, time - start));
+                players.forEach (([player]) => { if (!timeline.embeddedClips.some (action => action.objectId === player.object.id)) { SeekPlayer (player, time - start); } });
                 const cameraState = CaptureCameraState (viewer), camera = RenderCamera (cameraState, width, height, viewer.camera.near, viewer.camera.far);
                 hidden = HideRenderHelpers (viewer, false);
                 if (dome) { dome.position.copy (camera.position); dome.scale.setScalar (Math.max (10, camera.far * 0.8)); dome.updateMatrixWorld (true); }

@@ -35,9 +35,9 @@ describe ('Primary Products neutral geometry', function () {
         for (const family of ['bottle', 'can']) {
             const draft = DefaultProductDraft (family); const original = structuredClone (draft);
             const zones = GetArtworkZones (draft);
-            assert.deepEqual (zones.map (z => z.id), ['front', 'back', 'wrap']);
+            assert.deepEqual (zones.map (z => z.id), family === 'bottle' ? ['front', 'back', 'wrap', 'cap-top'] : ['front', 'back', 'wrap']);
             assert.equal (zones[2].widthMm, Math.PI * draft.diameterMm);
-            assert.ok (zones.every (z => z.bottomMm + z.heightMm <= draft.heightMm * (family === 'bottle' ? 0.65 : 0.975)));
+            assert.ok (zones.filter (z => z.componentId === 'body').every (z => z.bottomMm + z.heightMm <= draft.heightMm * (family === 'bottle' ? 0.65 : 0.975)));
             const result = CreatePrimaryProduct (draft); result.definition.heightMm = 999;
             assert.deepEqual (draft, original); assert.equal (CreatePrimaryProduct (draft).definition.heightMm, original.heightMm);
         }
@@ -47,7 +47,7 @@ describe ('Primary Products neutral geometry', function () {
         const body = product.components[0], cap = product.components[1]; assert.ok (body.positions.some ((v,i) => i%3===1 && Math.abs(v-120)<1e-8));
         assert.equal (Math.min (...cap.positions.filter ((v,i) => i%3===1)),170); assert.equal (Math.max (...cap.positions.filter ((v,i) => i%3===1)),190);
         for (const mesh of product.components) { const edges = new Map (), key = id => mesh.positions.slice (id*3,id*3+3).map (v => Math.round(v*1e7)).join(','); for(let i=0;i<mesh.indices.length;i+=3){const ids=mesh.indices.slice(i,i+3);for(let j=0;j<3;j++){const edge=[key(ids[j]),key(ids[(j+1)%3])].sort().join('/');edges.set(edge,(edges.get(edge)||0)+1);}} assert.ok ([...edges.values ()].every (v => v===2)); }
-        assert.ok (product.artworkZones.every (z => z.bottomMm+z.heightMm<=120));
+        assert.ok (product.artworkZones.filter (z => z.componentId === 'body').every (z => z.bottomMm+z.heightMm<=120));
         const shorter = GetArtworkZones ({ ...draft,bottleShape : { ...draft.bottleShape,shoulderHeightMm : 105 } }); assert.ok (shorter[0].heightMm<product.artworkZones[0].heightMm);
     });
     it ('rejects malformed definitions and unbounded tessellation', function () {

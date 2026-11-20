@@ -3,15 +3,16 @@
 export function BottleFill (body, contents, wall)
 {
     if (!contents || contents.fillPercent <= 0) { return null; }
-    const half = body.positions.length / 6, faceStart = body.indices.length / 2, gap = Math.min (.1, wall * .1);
+    const cavity = body.cavity; if (cavity) { body = cavity; }
+    const half = cavity ? 0 : body.positions.length / 6, faceStart = cavity ? 0 : body.indices.length / 2, gap = Math.min (.1, wall * .1);
     const points = [], normals = [], averages = new Map ();
     const key = p => p.map (v => Math.round (v * 1e7)).join (',');
     for (let i = half; i < body.positions.length / 3; i++) {
-        const k = key (body.positions.slice (i * 3, i * 3 + 3)), n = body.normals.slice (i * 3, i * 3 + 3), sum = averages.get (k) || [0, 0, 0];
+        const k = key (body.positions.slice (i * 3, i * 3 + 3)), n = body.normals.slice (i * 3, i * 3 + 3).map (v => cavity ? -v : v), sum = averages.get (k) || [0, 0, 0];
         n.forEach ((v, axis) => { sum[axis] += v; }); averages.set (k, sum);
     }
     for (let i = half; i < body.positions.length / 3; i++) {
-        const n = body.normals.slice (i * 3, i * 3 + 3), p = body.positions.slice (i * 3, i * 3 + 3);
+        const n = body.normals.slice (i * 3, i * 3 + 3).map (v => cavity ? -v : v), p = body.positions.slice (i * 3, i * 3 + 3);
         const sum = averages.get (key (p)), length = Math.hypot (...sum) || 1;
         points.push (p.map ((v, axis) => v + sum[axis] / length * gap)); normals.push (n.map (v => -v));
     }
@@ -21,7 +22,7 @@ export function BottleFill (body, contents, wall)
     const add = (p, n) => { mesh.positions.push (...p); mesh.normals.push (...n); mesh.uvs.push (0, 0); return mesh.positions.length / 3 - 1; };
     const rimPoint = p => { rim.set (p.map (v => Math.round (v * 1e7)).join (','), p); };
     for (let i = faceStart; i < body.indices.length; i += 3) {
-        const ids = [body.indices[i], body.indices[i + 2], body.indices[i + 1]].map (id => id - half), triangle = ids.map (id => ({ p : points[id], n : normals[id] })), clipped = [];
+        const ids = (cavity ? body.indices.slice (i, i + 3) : [body.indices[i], body.indices[i + 2], body.indices[i + 1]]).map (id => id - half), triangle = ids.map (id => ({ p : points[id], n : normals[id] })), clipped = [];
         for (let j = 0; j < 3; j++) {
             const a = triangle[j], b = triangle[(j + 1) % 3], ai = a.p[1] <= level, bi = b.p[1] <= level;
             if (ai) { clipped.push (a); }

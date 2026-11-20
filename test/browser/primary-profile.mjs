@@ -39,9 +39,10 @@ try {
     assert.ok (right.x >= left.x + left.width - 1); assert.ok (right.width > 450); await page.screenshot ({ path : 'work/primary-profile-review/open.png' });
     assert.equal (await profile.getByRole ('button', { name : /Apply|Generate/ }).count (), 0);
     const shoulder = profile.getByRole ('spinbutton', { name : 'Profile shoulder height', exact : true });
-    await shoulder.fill ('42'); assert.notEqual ((await call ('primary.profile.inspect')).draft.bottleShape?.shoulderHeightMm, 42);
-    await shoulder.press ('Enter'); await poll (async () => (await call ('primary.profile.inspect')).draft.bottleShape?.shoulderHeightMm === 42);
+    await shoulder.fill ('42'); await poll (async () => (await call ('primary.profile.inspect')).draft.bottleShape?.shoulderHeightMm === 42);
     await poll (async () => await shoulder.isEnabled ());
+    const committed = (await call ('scene.inspect')).objects.find (object => object.id === objectId);
+    assert.equal (JSON.parse (committed.userData._auto3dPrimaryProduct).draft.bottleShape.shoulderHeightMm, 42, 'typing commits the profile edit without Enter');
     await call ('history.undo'); assert.notEqual (await shoulder.inputValue (), '42'); await call ('history.redo'); assert.equal (await shoulder.inputValue (), '42');
     const height = profile.getByRole ('spinbutton', { name : 'Profile overall height', exact : true });
     await height.fill ('2'); await height.press ('Enter'); await poll (async () => await height.getAttribute ('aria-invalid') === 'true'); assert.equal ((await call ('primary.profile.inspect')).draft.heightMm, initial.draft.heightMm);
@@ -66,5 +67,5 @@ try {
     await call ('primary.profile.open'); assert.equal (await profile.locator ('select[aria-label="Profile cross-section"]').count (), 1); assert.equal (await profile.locator ('select[aria-label="Profile cross-section"]').isVisible (), false);
     await call ('object.select', { objectId }); await poll (async () => await shoulder.isVisible ());
     await call ('object.select', { objectId : can.objectId }); await call ('object.delete', { objectId : can.objectId }); await profile.waitFor ({ state : 'detached' });
-    assert.deepEqual (errors, []); console.log ('Live profile: create-on-open, same canvas, Enter updates, Undo/Redo, validation, inches, orbit/zoom, mobile, close and selection passed.');
+    assert.deepEqual (errors, []); console.log ('Live profile: create-on-open, same canvas, automatic updates, Undo/Redo, validation, inches, orbit/zoom, mobile, close and selection passed.');
 } finally { await browser.close (); }

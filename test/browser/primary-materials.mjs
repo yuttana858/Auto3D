@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
 import { readFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
+import { ObserveCurrentMaterials } from './fixtures/primary-material-probe.mjs';
 const root = path.resolve ('build/pages');
 const types = { '.html' : 'text/html', '.js' : 'text/javascript', '.css' : 'text/css', '.json' : 'application/json', '.svg' : 'image/svg+xml', '.png' : 'image/png', '.woff' : 'font/woff', '.ttf' : 'font/ttf', '.wasm' : 'application/wasm' };
 const browser = await chromium.launch ({ executablePath : process.env.BROWSER_EXECUTABLE || '/usr/bin/chromium', args : ['--no-sandbox', '--enable-unsafe-swiftshader'] });
+let materialProbe;
 try {
     const page = await browser.newPage ({ viewport : { width : 1500, height : 1000 } }); const errors = [], requests = []; page.on ('pageerror', error => errors.push (error.message)); page.on ('request', request => requests.push (request.url ()));
     await page.route ('https://auto3d.test/**', async route => {
@@ -17,7 +19,15 @@ try {
         catch { return route.fulfill ({ status : 404, body : 'Missing fixture asset' }); }
     });
     await page.goto ('https://auto3d.test/'); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
-    const call = async (id, args = {}) => { if (process.env.PRIMARY_TEST_PROGRESS) { console.log (id); } const response = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (response.ok, true, JSON.stringify (response)); return response.result; };
+    const call = async (id, args = {}) => { if (process.env.PRIMARY_TEST_PROGRESS) { console.log (id); } const response = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); if (!response.ok && response.error?.code === 'COMMAND_FAILED' && response.error.message === 'The viewer is busy. Retry after loading completes.') { throw Object.assign (new Error (response.error.message), { code : 'VIEWER_BUSY' }); } assert.equal (response.ok, true, JSON.stringify (response)); return response.result; };
+    const poll = async predicate => {
+        const deadline = Date.now () + 120000;
+        for (;;) {
+            try { if (await predicate ()) { return; } } catch (error) { if (error.code !== 'VIEWER_BUSY') { throw error; } }
+            assert.ok (Date.now () < deadline, 'Timed out waiting for automatic product update.'); await page.waitForTimeout (100);
+        }
+    };
+    materialProbe = await ObserveCurrentMaterials (page);
     await mkdir ('work/primary-products-review', { recursive : true });
     await call ('ui.primary_products');
     const panel = page.getByRole ('region', { name : 'Primary Products', exact : true });
@@ -38,8 +48,8 @@ try {
     assert.equal (await editor.getByRole ('spinbutton', { name : 'IRO', exact : true }).inputValue (), '1.575');
     const roughness = editor.getByRole ('slider', { name : 'Roughness', exact : true }); await roughness.fill ('0.22'); await roughness.dispatchEvent ('change');
     const chooser = page.waitForEvent ('filechooser'); await art.getByRole ('button', { name : 'Import label image', exact : true }).click (); await (await chooser).setFiles ('test/testfiles/obj/texture.png');
-    let imported = false; for (let i = 0; i < 100; i++) { if ((await call ('primary.inspect')).artwork.length === 1) { imported = true; break; } await page.waitForTimeout (100); } assert.equal (imported, true);
-    await call ('primary.artwork.apply'); const surfaces = await call ('material.list'); assert.ok (surfaces.some (m => m.transmission === 1 && m.roughness === .22)); assert.ok (surfaces.some (m => m.name.startsWith ('Primary label') && m.transmission === 0));
+    await poll (async () => (await call ('primary.inspect')).artwork.length === 1);
+    const surfaces = await materialProbe.read (call, shell.objectId); assert.ok (surfaces.some (m => m.transmission === 1 && m.roughness === .22)); assert.ok (surfaces.some (m => m.name.startsWith ('Primary label') && m.transmission === 0));
     await page.screenshot ({ path : 'work/primary-products-review/advanced-label-art-final.png' });
     await page.setViewportSize ({ width : 390, height : 844 }); assert.equal (await page.evaluate (() => document.documentElement.scrollWidth > innerWidth), false);
     await page.screenshot ({ path : 'work/primary-products-review/advanced-label-mobile.png' }); await page.setViewportSize ({ width : 1500, height : 1000 });
@@ -49,4 +59,4 @@ try {
     await call ('primary.callouts.set', { visible : false }); await page.waitForTimeout (500);
     await page.screenshot ({ path : 'work/primary-products-review/clear-glass-model-final.png' });
     assert.deepEqual (errors, []); console.log ('Unified cyan clamshell catalog, advanced label editor, material preservation, clear PET/glass rendering and mobile layout passed.');
-} finally { await browser.close (); }
+} finally { await materialProbe?.dispose (); await browser.close (); }

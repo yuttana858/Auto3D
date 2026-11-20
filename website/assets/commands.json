@@ -2185,7 +2185,8 @@
             "type": "string",
             "enum": [
               "cut",
-              "score"
+              "score",
+              "artwork"
             ]
           }
         },
@@ -2196,6 +2197,36 @@
       },
       "example": {
         "type": "score"
+      }
+    },
+    {
+      "id": "packaging.artwork.style",
+      "title": "Style selected CAD artwork",
+      "category": "Packaging",
+      "description": "Set solid fill, stroke and stroke width in millimeters for selected artwork-layer paths. One Undo step; cut and crease paths remain unchanged.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fill": {
+            "type": "string",
+            "pattern": "^(none|#[a-fA-F0-9]{6})$"
+          },
+          "stroke": {
+            "type": "string",
+            "pattern": "^(none|#[a-fA-F0-9]{6})$"
+          },
+          "strokeWidth": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "fill": "#123740"
       }
     },
     {
@@ -2435,7 +2466,8 @@
             "type": "string",
             "enum": [
               "cut",
-              "score"
+              "score",
+              "artwork"
             ]
           }
         },
@@ -2561,7 +2593,8 @@
             "type": "string",
             "enum": [
               "cut",
-              "score"
+              "score",
+              "artwork"
             ]
           },
           "closed": {
@@ -2661,7 +2694,8 @@
             "type": "string",
             "enum": [
               "cut",
-              "score"
+              "score",
+              "artwork"
             ]
           },
           "closed": {
@@ -2738,7 +2772,8 @@
             "type": "string",
             "enum": [
               "cut",
-              "score"
+              "score",
+              "artwork"
             ]
           },
           "closed": {
@@ -2783,6 +2818,179 @@
       },
       "example": {
         "id": "path-id"
+      }
+    },
+    {
+      "id": "packaging.path.round_corners",
+      "title": "Round CAD corners",
+      "category": "Packaging",
+      "description": "Same as Round selected corners in the CAD Shape tools: replace the corners of closed outlines with tangent arcs of the given radius (display units unless units=mm). ids defaults to the selected paths; corners optionally limits one path to the given point indices. A radius too big for a corner shrinks to half its shorter edge. One Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "radius": {
+            "type": "number",
+            "minimum": 0.0001,
+            "maximum": 100000
+          },
+          "ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          },
+          "corners": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2000,
+            "uniqueItems": true,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1999
+            }
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "display",
+              "mm"
+            ]
+          }
+        },
+        "required": [
+          "radius"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "radius": 10,
+        "units": "mm"
+      }
+    },
+    {
+      "id": "packaging.path.circle",
+      "title": "Draw CAD circle",
+      "category": "Packaging",
+      "description": "Same as Add circle in the CAD Shape tools: add a closed circular cut (or score) path at center with radius (display units unless units=mm). One Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "center": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            }
+          },
+          "radius": {
+            "type": "number",
+            "minimum": 0.0001,
+            "maximum": 100000
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "cut",
+              "score",
+              "artwork"
+            ]
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "display",
+              "mm"
+            ]
+          }
+        },
+        "required": [
+          "center",
+          "radius"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "center": [
+          50,
+          50
+        ],
+        "radius": 20,
+        "units": "mm"
+      }
+    },
+    {
+      "id": "packaging.path.relief_hole",
+      "title": "Draw CAD relief hole",
+      "category": "Packaging",
+      "description": "Same as Add relief hole in the CAD Shape tools: add a round cut hole whose edge is split into tabs by radial V relief slits. holeRadius is the tab tip radius, reliefRadius where the slits end (the tab hinge), tabs 4–48, notchWidth the slit width at the hole edge (default 1.2 mm). Display units unless units=mm. One Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "center": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            }
+          },
+          "holeRadius": {
+            "type": "number",
+            "minimum": 0.0001,
+            "maximum": 100000
+          },
+          "reliefRadius": {
+            "type": "number",
+            "minimum": 0.0001,
+            "maximum": 100000
+          },
+          "tabs": {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 48
+          },
+          "notchWidth": {
+            "type": "number",
+            "minimum": 0.0001,
+            "maximum": 100000
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "display",
+              "mm"
+            ]
+          }
+        },
+        "required": [
+          "center",
+          "holeRadius",
+          "reliefRadius"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "center": [
+          40,
+          40
+        ],
+        "holeRadius": 27.4,
+        "reliefRadius": 31.9,
+        "tabs": 16,
+        "units": "mm"
       }
     },
     {
@@ -3426,10 +3634,124 @@
       }
     },
     {
+      "id": "packaging.accessories.collar.inspect",
+      "title": "Inspect can collar",
+      "category": "Packaging",
+      "description": "Sense the top rims of the selected group or array of upright cans (rim radius, its underside, the neck under it) and plan the can collar for the options, without changing the scene. Same as the Can collar section of the Accessories tab. Returns boards, the sensed rim and the collar size, hole and relief radii and tabs, or why it is unavailable.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "enum": [
+              "sbs-24pt",
+              "cuk-24pt",
+              "cuk-28pt",
+              "kraft-32pt",
+              "molded-fiber"
+            ]
+          },
+          "tuckMm": {
+            "type": "number",
+            "minimum": 0.3,
+            "maximum": 10
+          },
+          "reliefMm": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 20
+          },
+          "marginMm": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "cornerRadiusMm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 500
+          },
+          "tabs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 48
+          },
+          "notchWidthMm": {
+            "type": "number",
+            "minimum": 0.3,
+            "maximum": 5
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "boardId": "cuk-24pt"
+      }
+    },
+    {
+      "id": "packaging.accessories.collar",
+      "title": "Add can collar",
+      "category": "Packaging",
+      "description": "Same as Add can collar in the Accessories tab: add a paperboard collar over the selected group or array of upright cans (1–24, one size, e.g. a 3 × 2 array for a six-pack). Each can gets a round hole split into tabs by relief slits; omit tuckMm for automatic tuck up to 1.5 mm inside the rim; explicit tuck must clear the can neck through the full board thickness. The flat collar keeps 0.0254 mm clearance from the neck and below the rim; tab bending during application is not simulated; reliefs end reliefMm past the rim (default 3) but keep a 1.5 mm web between holes. Corners are rounded (default follows the corner cans). A CAD board profile grouped with the cans; it lowers onto them. One Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "enum": [
+              "sbs-24pt",
+              "cuk-24pt",
+              "cuk-28pt",
+              "kraft-32pt",
+              "molded-fiber"
+            ]
+          },
+          "tuckMm": {
+            "type": "number",
+            "minimum": 0.3,
+            "maximum": 10
+          },
+          "reliefMm": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 20
+          },
+          "marginMm": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "cornerRadiusMm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 500
+          },
+          "tabs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 48
+          },
+          "notchWidthMm": {
+            "type": "number",
+            "minimum": 0.3,
+            "maximum": 5
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "boardId": "cuk-24pt"
+      }
+    },
+    {
       "id": "packaging.tab",
       "title": "Select Packaging tab",
       "category": "Packaging",
-      "description": "Open Packaging, its Auto tab (Auto Pack and Auto pallet) or its Accessories tab (pads and partitions) without generating geometry.",
+      "description": "Open Packaging, its Auto tab (Auto Pack and Auto pallet) or its Accessories tab (pads, partitions and can collars) without generating geometry.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -6592,6 +6914,255 @@
       }
     },
     {
+      "id": "animation.visibility.inspect",
+      "title": "Inspect object visibility track",
+      "category": "Animation",
+      "description": "Read an existing object’s discrete visibility keys, editor visibility and effective visibility at the timeline playhead.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "objectId"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "objectId": "object-1"
+      }
+    },
+    {
+      "id": "animation.visibility.keyframe",
+      "title": "Set object visibility keyframe",
+      "category": "Animation",
+      "description": "Show or hide an existing object at a specific timeline time. Visibility changes are discrete; the saved editor visibility is unchanged. Replaces a visibility keyframe at the same time and supports Undo.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "time": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3600
+          },
+          "visible": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "objectId",
+          "visible"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "objectId": "object-1",
+        "time": 2,
+        "visible": true
+      }
+    },
+    {
+      "id": "animation.visibility.lifetime",
+      "title": "Set object lifetime",
+      "category": "Animation",
+      "description": "Show an existing object from start time and hide it at optional end time. Replaces its visibility track with an undoable lifetime; it does not create or delete the model.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "start": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3600
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 3600
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "objectId",
+          "start"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "objectId": "object-1",
+        "start": 1,
+        "end": 5
+      }
+    },
+    {
+      "id": "animation.visibility.clear",
+      "title": "Clear object visibility track",
+      "category": "Animation",
+      "description": "Remove all visibility keyframes for an object and restore its editor visibility. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "objectId"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "objectId": "object-1"
+      }
+    },
+    {
+      "id": "animation.array.schedule",
+      "title": "Schedule array reveal",
+      "category": "Animation",
+      "description": "Create staggered drop and visibility tracks for existing visible objects with no existing motion, visibility or fold tracks. Does not create objects. Ordered objectIds determine reveal order; dropHeight uses model units. Undo supported. First create an array with animate false, then pass its objectIds.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 999,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          },
+          "time": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3600
+          },
+          "duration": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 15
+          },
+          "dropHeight": {
+            "type": "number",
+            "minimum": 0.000001,
+            "maximum": 1000000
+          }
+        },
+        "required": [
+          "objectIds"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "objectIds": [
+          "object-1",
+          "object-2"
+        ],
+        "time": 0,
+        "duration": 4,
+        "dropHeight": 1
+      }
+    },
+    {
+      "id": "animation.clip.add",
+      "title": "Add embedded clip to timeline",
+      "category": "Animation",
+      "description": "Schedule a paused embedded clip for an existing model on the shared timeline. Start and duration are seconds; speed and loop control clip sampling. Overlaps on the same object are rejected. Preview and video export follow this same timeline. Undo supported.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "clip": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "time": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3600
+          },
+          "duration": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 3600
+          },
+          "speed": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 10
+          },
+          "loop": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "objectId",
+          "clip",
+          "duration"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "objectId": "object-1",
+        "clip": 0,
+        "time": 1,
+        "duration": 3,
+        "speed": 1,
+        "loop": false
+      }
+    },
+    {
+      "id": "animation.clip.delete",
+      "title": "Remove embedded clip from timeline",
+      "category": "Animation",
+      "description": "Remove one embedded clip timeline action by ID. Undo restores it.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "id": "clip-action-id"
+      }
+    },
+    {
       "id": "animation.action.open",
       "title": "Open Action keyframe options",
       "category": "Animation",
@@ -7237,7 +7808,7 @@
       "id": "animation.macro.record",
       "title": "Run macro and record animation",
       "category": "Animation",
-      "description": "Run a saved or supplied macro and record object transforms and camera views as sequential keyframes. Requires an empty stopped timeline and 1–100 existing objects. Unsupported commands, including creation, deletion, materials and procedural animation, are rejected before execution. Completed macro steps remain if a later step fails. Object/camera changes are interpolated over stepSeconds; the recorded timeline is one undo step.",
+      "description": "Run a saved or supplied macro and record object transforms, visibility and camera views as sequential keyframes. Set step.animation.duration and pauseAfter in seconds, or use stepSeconds as the default duration. Requires an empty stopped timeline and 1–100 existing objects. Unsupported commands, including creation, deletion, materials and procedural animation, are rejected before execution. Completed macro steps remain if a later step fails. The recorded timeline is one undo step.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -7327,7 +7898,21 @@
       "id": "macro.list",
       "title": "List saved macros",
       "category": "Macros",
-      "description": "Return macros stored in this browser.",
+      "description": "Return the shared macro library: every macro saved by any account, with savedBy, mine, canEdit (owner or administrator), revision and location \"shared\". Macros saved earlier only in this browser are included with location \"browser\" until moved with macro.library.upload_browser.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "macro.library.inspect",
+      "title": "Inspect shared macro library",
+      "category": "Macros",
+      "description": "Return whether the shared library is reachable, whether this account is an administrator, and how many shared and browser-only macros exist.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -7341,7 +7926,7 @@
       "id": "macro.save",
       "title": "Save macro",
       "category": "Macros",
-      "description": "Save a named version 1 macro locally. Definition is a JSON string; matching names are replaced. The macro is checked before saving (unique step IDs, known commands, session tab changes only as the last step). warnings list arguments that name account- or scene-specific records another account cannot replay.",
+      "description": "Save a named version 1 macro to the shared library, where every account can see and run it. Definition is a JSON string. A matching name (case-insensitive) is replaced only if this account saved it or is an administrator; pass the listed revision to refuse replacing a newer save. The macro is checked first (unique step IDs, known commands, session tab changes only as the last step). warnings list arguments that name account- or scene-specific records another account cannot replay. Never falls back to browser storage.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -7353,6 +7938,10 @@
           "definition": {
             "type": "string",
             "maxLength": 262144
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F-]{36}$"
           }
         },
         "required": [
@@ -7370,7 +7959,7 @@
       "id": "macro.delete",
       "title": "Delete saved macro",
       "category": "Macros",
-      "description": "Delete a macro saved in this browser by name (case-insensitive).",
+      "description": "Delete a macro by name (case-insensitive). A shared macro can be deleted only by the account that saved it or an administrator; a browser-only macro is removed from this browser.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -7393,7 +7982,7 @@
       "id": "macro.export",
       "title": "Export saved macro",
       "category": "Macros",
-      "description": "Return a saved macro as a portable JSON definition (for macro.save in another browser), with replay warnings.",
+      "description": "Return a saved macro (shared or browser-only) as a portable JSON definition for macro.save, with replay warnings.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -7411,6 +8000,20 @@
       "example": {
         "name": "Fit and inspect"
       }
+    },
+    {
+      "id": "macro.library.upload_browser",
+      "title": "Move browser macros to the shared library",
+      "category": "Macros",
+      "description": "Explicit user action: copy macros saved earlier only in this browser to the shared library, where every account can see them. Names already in the library are skipped, never overwritten; uploaded macros are removed from browser storage.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
     },
     {
       "id": "ui.materials",
@@ -8564,7 +9167,7 @@
       "id": "primary.inspect",
       "title": "Inspect product draft",
       "category": "Primary Products",
-      "description": "Read canonical-mm draft dimensions and whether opaque generation is available. Includes imported local label descriptors; Generate or Apply renders them.",
+      "description": "Read canonical-mm product controls, selected live target, update status and local label descriptors.",
       "mutates": false,
       "inputSchema": {
         "type": "object",
@@ -8667,7 +9270,7 @@
       "id": "primary.designs.generate",
       "title": "Generate product design",
       "category": "Primary Products",
-      "description": "Select a catalog design and generate it as one undoable session object, the same action as clicking its design card. Opaque materials only.",
+      "description": "Select a catalog design and generate it as one undoable session object, the same action as clicking its design card. Bottles default to glass. New products are spaced beside existing model bounds.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -8946,7 +9549,8 @@
             "enum": [
               "front",
               "wrap",
-              "back"
+              "back",
+              "cap-top"
             ]
           }
         },
@@ -8968,6 +9572,38 @@
       "inputSchema": {
         "type": "object",
         "properties": {
+          "glassPreset": {
+            "type": "string",
+            "enum": [
+              "lightweight",
+              "standard",
+              "heavy",
+              "custom"
+            ]
+          },
+          "baseMm": {
+            "type": "number",
+            "minimum": 0.001,
+            "maximum": 25
+          },
+          "capWallMm": {
+            "type": "number",
+            "minimum": 0.05,
+            "maximum": 5
+          },
+          "capMaterial": {
+            "type": "string",
+            "enum": [
+              "pp",
+              "hdpe",
+              "aluminum",
+              "steel"
+            ]
+          },
+          "capColor": {
+            "type": "string",
+            "pattern": "^#[a-fA-F0-9]{6}$"
+          },
           "wallMm": {
             "type": "number",
             "minimum": 0.001,
@@ -9029,7 +9665,7 @@
       "id": "primary.scale",
       "title": "Scale product and artwork",
       "category": "Primary Products",
-      "description": "Resize the product parametrically by a factor, optionally scaling labels and offsets. Rebuilds a matching selected product with one Undo step and preserves edited surfaces. Validates product, wall, spout and artwork bounds before changing the model.",
+      "description": "Resize the product parametrically by a factor, optionally scaling labels and offsets. Rebuilds a matching selected product with one Undo step and preserves edited surfaces. Validates product, wall, spout and artwork bounds before changing the model. Optional objectId refuses a changed selection.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -9041,6 +9677,10 @@
           },
           "scaleArtwork": {
             "type": "boolean"
+          },
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -9234,6 +9874,46 @@
       "inputSchema": {
         "type": "object",
         "properties": {
+          "glassPreset": {
+            "type": "string",
+            "enum": [
+              "lightweight",
+              "standard",
+              "heavy",
+              "custom"
+            ]
+          },
+          "baseMm": {
+            "type": "number",
+            "minimum": 0.001,
+            "maximum": 25
+          },
+          "capWallMm": {
+            "type": "number",
+            "minimum": 0.05,
+            "maximum": 5
+          },
+          "capMaterial": {
+            "type": "string",
+            "enum": [
+              "pp",
+              "hdpe",
+              "aluminum",
+              "steel"
+            ]
+          },
+          "capColor": {
+            "type": "string",
+            "pattern": "^#[a-fA-F0-9]{6}$"
+          },
+          "closure": {
+            "type": "string",
+            "enum": [
+              "ribbed",
+              "smooth",
+              "fliptop"
+            ]
+          },
           "objectId": {
             "type": "string",
             "maxLength": 4096
@@ -9416,10 +10096,465 @@
       }
     },
     {
+      "id": "primary.live.configure",
+      "title": "Update selected product from its panel",
+      "category": "Primary Products",
+      "description": "Validate and apply product controls live to a matching selected generated product, preserving identity, placement, edited surfaces, labels and camera. Rapid edits are serialized and coalesced with Undo. Without a matching selection, changes remain a draft. Optional objectId refuses stale selection.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "family": {
+            "type": "string",
+            "enum": [
+              "bottle",
+              "can",
+              "pouch",
+              "clamshell"
+            ]
+          },
+          "bottleSection": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "shape": {
+                "type": "string",
+                "enum": [
+                  "round",
+                  "oval",
+                  "rectangle"
+                ]
+              },
+              "depthMm": {
+                "type": "number",
+                "minimum": 10,
+                "maximum": 500
+              },
+              "cornerRadiusMm": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 250
+              }
+            },
+            "required": [
+              "shape"
+            ]
+          },
+          "pouchShape": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "style": {
+                    "type": "string",
+                    "enum": [
+                      "pillow",
+                      "standup",
+                      "flatbottom"
+                    ]
+                  },
+                  "gussetMm": {
+                    "type": "number",
+                    "minimum": 3,
+                    "maximum": 200
+                  },
+                  "zipper": {
+                    "type": "boolean"
+                  },
+                  "spout": {
+                    "anyOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "position": {
+                            "type": "string",
+                            "enum": [
+                              "center",
+                              "corner"
+                            ]
+                          },
+                          "diameterMm": {
+                            "type": "number",
+                            "minimum": 5,
+                            "maximum": 40
+                          }
+                        },
+                        "required": [
+                          "position"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "style"
+                ]
+              }
+            ]
+          },
+          "bottleShape": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "neckDiameterMm": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 1000
+              },
+              "shoulderHeightMm": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 1000
+              },
+              "neckHeightMm": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 1000
+              },
+              "capHeightMm": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 1000
+              }
+            },
+            "required": [
+              "neckDiameterMm",
+              "shoulderHeightMm",
+              "neckHeightMm",
+              "capHeightMm"
+            ]
+          },
+          "heightMm": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 1000
+          },
+          "diameterMm": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 500
+          },
+          "widthMm": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 500
+          },
+          "depthMm": {
+            "type": "number",
+            "minimum": 2,
+            "maximum": 200
+          },
+          "material": {
+            "type": "string",
+            "enum": [
+              "frostedGlass",
+              "amberGlass",
+              "naturalHDPE",
+              "frostedPP",
+              "pearlPlastic",
+              "clearFilm",
+              "paperboard",
+              "moldedFiber",
+              "kraftFilm",
+              "satinFilm",
+              "lacquer",
+              "softTouch",
+              "plastic",
+              "hdpe",
+              "pp",
+              "petOpaque",
+              "glass",
+              "petClear",
+              "aluminum",
+              "steel",
+              "coatedMetal",
+              "brushedMetal",
+              "matteFilm",
+              "glossFilm",
+              "foil"
+            ]
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[a-fA-F0-9]{6}$"
+          },
+          "roughness": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "labelZone": {
+            "type": "string",
+            "enum": [
+              "front",
+              "wrap",
+              "back",
+              "cap-top"
+            ]
+          },
+          "details": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "glassPreset": {
+                    "type": "string",
+                    "enum": [
+                      "lightweight",
+                      "standard",
+                      "heavy",
+                      "custom"
+                    ]
+                  },
+                  "baseMm": {
+                    "type": "number",
+                    "minimum": 0.001,
+                    "maximum": 25
+                  },
+                  "capWallMm": {
+                    "type": "number",
+                    "minimum": 0.05,
+                    "maximum": 5
+                  },
+                  "capMaterial": {
+                    "type": "string",
+                    "enum": [
+                      "pp",
+                      "hdpe",
+                      "aluminum",
+                      "steel"
+                    ]
+                  },
+                  "capColor": {
+                    "type": "string",
+                    "pattern": "^#[a-fA-F0-9]{6}$"
+                  },
+                  "wallMm": {
+                    "type": "number",
+                    "minimum": 0.001,
+                    "maximum": 10
+                  },
+                  "textureStrength": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "textureScaleMm": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
+                  "shoulder": {
+                    "type": "string",
+                    "enum": [
+                      "rounded",
+                      "sloped"
+                    ]
+                  },
+                  "closure": {
+                    "type": "string",
+                    "enum": [
+                      "ribbed",
+                      "smooth",
+                      "fliptop"
+                    ]
+                  },
+                  "canStyle": {
+                    "type": "string",
+                    "enum": [
+                      "beverage",
+                      "food",
+                      "tin"
+                    ]
+                  },
+                  "shellStyle": {
+                    "type": "string",
+                    "enum": [
+                      "retail",
+                      "food"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "optics": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "color": {
+                    "type": "string",
+                    "pattern": "^#[a-fA-F0-9]{6}$"
+                  },
+                  "opacity": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "ior": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 2.5
+                  },
+                  "tintDistanceMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 1000
+                  }
+                }
+              }
+            ]
+          },
+          "contents": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "liquid",
+                      "oil",
+                      "syrup",
+                      "lotion"
+                    ]
+                  },
+                  "fillPercent": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "color": {
+                    "type": "string",
+                    "pattern": "^#[a-fA-F0-9]{6}$"
+                  },
+                  "opacity": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "viscosity": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 1000000
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              }
+            ]
+          },
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "heightMm": 230,
+        "details": {
+          "capMaterial": "aluminum",
+          "capColor": "#d2b477"
+        }
+      }
+    },
+    {
+      "id": "primary.fit",
+      "title": "Fit selected product in viewer",
+      "category": "Primary Products",
+      "description": "Fit the selected generated product to the actual full or split viewport while retaining the viewing direction. Completes camera movement before returning.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "primary.label.cad.open",
+      "title": "Design product label in CAD",
+      "category": "Primary Products",
+      "description": "Open the existing CAD editor for the active or requested label zone. Existing SVG paths become editable vectors; text and raster sources use a disclosed bounded color trace. The model stays unchanged until Apply. New bottle cap-top labels have a circular cut outline.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zone": {
+            "type": "string",
+            "enum": [
+              "front",
+              "back",
+              "wrap",
+              "cap-top"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "zone": "cap-top"
+      }
+    },
+    {
+      "id": "primary.label.cad.inspect",
+      "title": "Inspect linked label CAD",
+      "category": "Primary Products",
+      "description": "Read the active product label CAD paths, canonical-mm sheet, target and conversion detail.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "primary.label.cad.apply",
+      "title": "Apply CAD label to product",
+      "category": "Primary Products",
+      "description": "Render and apply the edited vector cut/artwork layers to their product surface with Undo. Preserves physical placement and label finish; refuses stale product, account or session.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
       "id": "primary.generate",
       "title": "Generate product",
       "category": "Primary Products",
-      "description": "Generate the current product draft as one undoable session object, including clear glass/PET. Imported local labels render on the generated model.",
+      "description": "Generate the current product draft as one undoable session object, including clear glass/PET and imported labels. New products are spaced along world X beyond existing model bounds; the first keeps its original position. Updating a selected product preserves its placement.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -9503,7 +10638,7 @@
       "id": "primary.artwork.text",
       "title": "Create editable text label",
       "category": "Primary Products",
-      "description": "Create or replace the active label zone with editable text and a portable PNG preview. Retains text authoring in the product definition. Applies immediately in the profile editor; otherwise use primary.artwork.apply. Does not touch CAD layers.",
+      "description": "Create or replace the active label zone with editable text and a portable PNG preview. Retains text authoring in the product definition. Applies immediately to the loaded selected product. Open primary.label.cad.open to convert it into editable CAD artwork paths.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -9558,7 +10693,7 @@
       "id": "primary.artwork.svg",
       "title": "Import vector label source",
       "category": "Primary Products",
-      "description": "Import self-contained SVG paths/text with a viewBox, retaining sanitized vector source and a PNG material preview. Rejects scripts, external resources and unsupported styling. Applies immediately in the profile editor; otherwise use primary.artwork.apply. CAD integration remains separate.",
+      "description": "Import self-contained SVG paths/text with a viewBox, retaining sanitized vector source and a PNG material preview. Rejects scripts, external resources and unsupported styling. Applies immediately to the loaded selected product. Open primary.label.cad.open to edit compatible paths in CAD.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -9601,7 +10736,7 @@
       "id": "primary.artwork.open",
       "title": "Import label image",
       "category": "Primary Products",
-      "description": "Open an interactive local PNG/JPEG/WebP/SVG picker. In the profile editor imports apply immediately. Returns opened, not imported; source bytes stay local until an explicit save.",
+      "description": "Open an interactive local PNG/JPEG/WebP/SVG picker. Imports apply immediately to the loaded selected product. Returns opened, not imported; source bytes stay local until an explicit save.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -9615,7 +10750,7 @@
       "id": "primary.artwork.mapping",
       "title": "Set physical label size",
       "category": "Primary Products",
-      "description": "Set label size, position and paper/film/foil finish; validates physical fit before mutation. Applies immediately in the profile editor; otherwise Generate or Apply commits the draft.",
+      "description": "Set label size, position and paper/film/foil finish; validates physical fit before mutation. Applies immediately to the loaded selected product; without a selection it remains a draft.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -9625,7 +10760,8 @@
             "enum": [
               "front",
               "back",
-              "wrap"
+              "wrap",
+              "cap-top"
             ]
           },
           "widthMm": {
@@ -9675,7 +10811,7 @@
       "id": "primary.artwork.remove",
       "title": "Remove label image",
       "category": "Primary Products",
-      "description": "Remove a draft label and its unused local source. Applies immediately in the profile editor; otherwise Generate or Apply commits the draft.",
+      "description": "Remove a draft label and its unused local source. Applies immediately to the loaded selected product; without a selection it remains a draft.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -9685,7 +10821,8 @@
             "enum": [
               "front",
               "back",
-              "wrap"
+              "wrap",
+              "cap-top"
             ]
           }
         },

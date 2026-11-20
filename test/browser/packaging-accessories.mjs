@@ -44,13 +44,13 @@ try {
     await tab.getByLabel ('Do not affect box ID', { exact : true }).check (); assert.match (await tab.textContent (), /box size unchanged/);
     await tab.getByLabel ('Do not affect box ID', { exact : true }).uncheck ();
     await tab.getByRole ('button', { name : 'Add pads', exact : true }).click ();
-    await page.waitForFunction (() => document.querySelector ('.packaging_accessories [aria-live=polite]')?.textContent.includes ('Added 2 pads'), null, { timeout : 60000 });
+    await page.waitForFunction (() => document.querySelector ('.packaging_accessories > [role=status][aria-live=polite]')?.textContent.includes ('Added 2 pads'), null, { timeout : 60000 });
     // The carton grew through the dimension tools so the space between the pads is the original 150 mm.
     const grown = await call ('packaging.dimensions.inspect'); assert.ok (Math.abs (grown.inside.height - 153) < 1e-6, String (grown.inside.height));
     await tab.getByLabel ('Cells along length', { exact : true }).fill ('4'); await tab.getByLabel ('Cells along length', { exact : true }).press ('Enter');
     assert.match (await tab.textContent (), /8 cells/);
     await tab.getByRole ('button', { name : 'Add partitions', exact : true }).click ();
-    await page.waitForFunction (() => document.querySelector ('.packaging_accessories [aria-live=polite]')?.textContent.includes ('8-cell partitions'), null, { timeout : 60000 });
+    await page.waitForFunction (() => document.querySelector ('.packaging_accessories > [role=status][aria-live=polite]')?.textContent.includes ('8-cell partitions'), null, { timeout : 60000 });
     const scene = await call ('scene.inspect'); assert.equal (scene.objects.length, 1 + 2 + 4);
     assert.ok (scene.objects.every (item => item.userData._auto3dGroup === scene.objects[0].userData._auto3dGroup));
     assert.equal (await tab.getByRole ('button', { name : 'Add pads', exact : true }).isDisabled (), true);

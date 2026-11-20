@@ -1,3 +1,6 @@
+import { ValidateTimelineClips } from './timelineclips.js';
+import { ValidateVisibilityKeys } from './visibilitytrack.js';
+import { MotionEasings } from '../../modules/packaging/src/easing.js';
 import { ValidateDimensions } from './dimensioncore.js';
 import { ValidateProductDefinition } from '../../modules/primary-products/src/definition.js';
 import { ValidatePulpDefinition } from '../../modules/molded-pulp/src/definition.js';
@@ -184,11 +187,17 @@ export function MigrateSessionData (data)
 export function PackSession (document, view = {}, objects = document.objects, kind = 'session')
 {
     const model = document.CompactModel (objects);
-    if (view.timeline?.actions) { view = { ...view, timeline : { ...view.timeline, actions : ValidateTimelineActions (view.timeline.actions).filter (action => objects.some (object => object.id === action.objectId)) } }; }
+    if (view.timeline) {
+        const timeline = { ...view.timeline };
+        for (const [key, validate] of [['actions', ValidateTimelineActions], ['embeddedClips', ValidateTimelineClips]]) {
+            if (timeline[key] !== undefined) { timeline[key] = validate (timeline[key] || []).filter (action => objects.some (object => object.id === action.objectId)); }
+        }
+        view = { ...view, timeline };
+    }
     return {
         dimensions : ValidateDimensions (document.dimensions || []).filter (d => objects.some (o => o.id === d.objectId)), dimensionsVisible : document.dimensionsVisible !== false,
         format : 'SW Auto3D', version : SessionVersion, metadata : { savedAt : new Date ().toISOString () }, kind, name : document.name, view, packaging : kind === 'session' && document.packaging ? ValidatePackaging (document.packaging) : null,
-        objects : objects.map ((object) => ({ id : object.id, packagingProfile : object.packagingProfile ? ValidatePackaging (object.packagingProfile) : null, name : object.name, source : object.source, unit : object.unit, visible : object.visible, hiddenParts : object.hiddenParts || [], position : object.position, rotation : object.rotation, scale : object.scale, userData : object.userData || {}, castShadow : object.castShadow !== false, receiveShadow : object.receiveShadow !== false, keyframes : Array.isArray (object.keyframes) ? object.keyframes : [], playback : object.playback, animationAsset : object.animationAsset ? { main : object.animationAsset.main, files : object.animationAsset.files.map ((file) => ({ name : file.name, buffer : EncodeBuffer (file.buffer) })) } : null })),
+        objects : objects.map ((object) => ({ id : object.id, packagingProfile : object.packagingProfile ? ValidatePackaging (object.packagingProfile) : null, name : object.name, source : object.source, unit : object.unit, visible : object.visible, hiddenParts : object.hiddenParts || [], position : object.position, rotation : object.rotation, scale : object.scale, userData : object.userData || {}, castShadow : object.castShadow !== false, receiveShadow : object.receiveShadow !== false, keyframes : Array.isArray (object.keyframes) ? object.keyframes : [], visibilityKeys : ValidateVisibilityKeys (object.visibilityKeys || []), playback : object.playback, animationAsset : object.animationAsset ? { main : object.animationAsset.main, files : object.animationAsset.files.map ((file) => ({ name : file.name, buffer : EncodeBuffer (file.buffer) })) } : null })),
         model : { unit : model.unit, properties : model.propertyGroups, materials : model.materials.map (PackMaterial), meshes : model.meshes.map (PackMesh), nodes : model.root.childNodes.map (PackNode) }
     };
 }
@@ -240,10 +249,12 @@ export function ReadSession (data)
             id : String (item.id || ''),
             time : item.time,
             interpolation : ['linear', 'smooth', 'step'].includes (item.interpolation) ? item.interpolation : 'smooth',
+            ...(MotionEasings.includes (item.motionEasing) ? { motionEasing : item.motionEasing } : {}),
             position : [...item.position],
             rotation : [...item.rotation],
             scale : item.scale.map ((value) => Math.abs (value) < 1e-6 ? 1e-6 : value)
         })).sort ((a, b) => a.time - b.time) : [];
+        object.visibilityKeys = ValidateVisibilityKeys (data.visibilityKeys || []);
         if (data.userData && typeof data.userData === 'object' && !Array.isArray (data.userData)) {
             for (const [key, value] of Object.entries (data.userData).slice (0, 100)) {
                 const name = String (key).trim ().slice (0, 100);
@@ -265,6 +276,7 @@ export function ReadSession (data)
         return object;
     });
     if (data.view?.timeline?.actions) { const actions = ValidateTimelineActions (data.view.timeline.actions); if (actions.some (action => !document.objects.some (object => object.id === action.objectId && object.userData._auto3dFefco))) { throw new Error ('Invalid action keyframe target.'); } }
+    if (data.view?.timeline?.embeddedClips) { const clips = ValidateTimelineClips (data.view.timeline.embeddedClips); if (clips.some (clip => !document.objects.some (object => object.id === clip.objectId && object.animationAsset))) { throw new Error ('Invalid embedded clip target.'); } }
     return { document, view : data.view || {}, kind : data.kind === 'model' ? 'model' : 'session' };
 }
 

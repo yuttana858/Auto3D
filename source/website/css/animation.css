@@ -17,3 +17,8 @@
 .animation_field input, .animation_field select { min-width: 0; padding: 5px 6px; border: 1px solid var(--ov_border_color); border-radius: 4px; color: inherit; background: var(--ov_background_color); font: inherit; }
 .animation_check { display: flex; align-items: center; gap: 4px; font-size: var(--workspace-meta-font-size, 12px); }
 @media (max-width: 520px) { .animation_grid { grid-template-columns: 1fr; } }
+
+.animation_visibility, .animation_clip_section, .animation_array_section { margin-top: 8px; }
+.animation_visibility > summary, .animation_clip_section > summary, .animation_array_section > summary { cursor: pointer; font-size: var(--workspace-menu-font-size, 13px); font-weight: 600; }
+.animation_visibility > summary:focus-visible, .animation_clip_section > summary:focus-visible, .animation_array_section > summary:focus-visible { outline: 2px solid var(--ov_hover_color, #5aa9e6); outline-offset: 2px; }
+.animation_visibility > p:first-of-type, .animation_clip_section > p:first-of-type, .animation_array_section > p:first-of-type { margin-top: 8px; }

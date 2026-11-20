@@ -1,4 +1,5 @@
 import { VideoExport, VideoSizes, VideoFrameRates, VideoFrameTimes } from './videoexport.js';
+import { ScheduleArrayReveal } from './timelinearray.js';
 
 function Element (tag, className, text, parent)
 {
@@ -37,8 +38,8 @@ export class AnimationPanel
     Field (parent, label, input) { const row = Element ('label', 'animation_field', undefined, parent); Element ('span', null, label, row); row.appendChild (input); input.setAttribute ('aria-label', label); return input; }
     Number (parent, label, min, max, step) { const input = document.createElement ('input'); input.type = 'number'; input.min = String (min); input.max = String (max); input.step = String (step); return this.Field (parent, label, input); }
     Select (parent, label, items) { const select = document.createElement ('select'); items.forEach (([value, text]) => select.add (new Option (text, String (value)))); return this.Field (parent, label, select); }
-    Button (parent, text, onClick, className = null) { const button = Element ('button', className, text, parent); button.type = 'button'; button.addEventListener ('click', () => this.Guard (onClick)); return button; }
-    async Guard (action) { try { this.status.textContent = ''; await action (); } catch (error) { this.status.textContent = error.message; } this.Refresh (); }
+    Button (parent, text, onClick, className = null, status = null) { const button = Element ('button', className, text, parent); button.type = 'button'; button.addEventListener ('click', () => this.Guard (onClick, status)); return button; }
+    async Guard (action, status = null) { const target = status || this.status; try { target.textContent = ''; await action (); } catch (error) { target.textContent = error.message; } this.Refresh (); }
     // Timeline edits are saved with the session like the Advance panel's (MarkDirty), and both panels redraw.
     Changed () { this.editor.MarkDirty (); this.editor.AnimationUI (); }
 
@@ -73,6 +74,37 @@ export class AnimationPanel
         this.keyAction = this.Button (keyButtons, 'Fold action', () => this.editor.Run (() => this.editor.packaging.OpenTimelineAction ()));
         this.keySummary = Element ('p', 'animation_summary', '', keys);
         this.Button (keys, 'Open timeline editor', () => this.editor.ShowAdvanceAnimation (true), 'animation_secondary');
+        const visibility = Element ('details', 'animation_visibility', undefined, keys); Element ('summary', null, 'Object visibility', visibility);
+        this.visibilityTarget = Element ('p', 'animation_summary', '', visibility);
+        Element ('p', 'animation_help', 'Add a show or hide key at the playhead, or set a lifetime. Setting a lifetime replaces this object’s visibility keys; the model stays in the session.', visibility);
+        this.visibilityStatus = Element ('p', 'animation_summary', '', visibility); this.visibilityStatus.setAttribute ('role', 'status');
+        const visibilityButtons = Element ('div', 'animation_buttons', undefined, visibility);
+        this.keyShow = this.Button (visibilityButtons, 'Show at playhead', () => { this.timeline.SetVisibilityKey (this.editor.selected, this.timeline.time, true); this.visibilityStatus.textContent = 'Show key added.'; }, null, this.visibilityStatus);
+        this.keyHide = this.Button (visibilityButtons, 'Hide at playhead', () => { this.timeline.SetVisibilityKey (this.editor.selected, this.timeline.time, false); this.visibilityStatus.textContent = 'Hide key added.'; }, null, this.visibilityStatus);
+        const lifetime = Element ('div', 'animation_grid', undefined, visibility);
+        this.lifeStart = this.Number (lifetime, 'Show from (s)', 0, 3600, .01); this.lifeStart.value = '0';
+        this.lifeEnd = this.Number (lifetime, 'Hide at (s, optional)', 0, 3600, .01); this.lifeEnd.placeholder = 'No end';
+        const lifetimeButtons = Element ('div', 'animation_buttons', undefined, visibility);
+        this.setLifetime = this.Button (lifetimeButtons, 'Set lifetime', () => { if (!this.lifeStart.value.trim ()) { throw new Error ('Enter a start time.'); } this.timeline.SetLifetime (this.editor.selected, Number (this.lifeStart.value), this.lifeEnd.value.trim () ? Number (this.lifeEnd.value) : null); this.visibilityStatus.textContent = 'Lifetime set.'; }, null, this.visibilityStatus);
+        this.clearVisibility = this.Button (lifetimeButtons, 'Clear visibility keys', () => { this.timeline.SetVisibilityKeys (this.editor.selected, []); this.visibilityStatus.textContent = 'Visibility keys cleared.'; }, null, this.visibilityStatus);
+
+
+        const embedded = Element ('details', 'animation_clip_section', undefined, keys); Element ('summary', null, 'Embedded clip', embedded);
+        this.clipTarget = Element ('p', 'animation_summary', '', embedded); Element ('p', 'animation_help', 'Pause the clip, then add it at the playhead. Speed changes playback; a non-looping clip holds its last frame.', embedded);
+        this.clipStatus = Element ('p', 'animation_summary', '', embedded); this.clipStatus.setAttribute ('role', 'status');
+        const clipGrid = Element ('div', 'animation_grid', undefined, embedded);
+        this.clipChoice = this.Select (clipGrid, 'Embedded clip', []); this.clipDuration = this.Number (clipGrid, 'Timeline duration (s)', .01, 3600, .01); this.clipSpeed = this.Number (clipGrid, 'Clip speed', .01, 10, .1); this.clipSpeed.value = '1';
+        const clipLoopLabel = Element ('label', 'animation_check', undefined, embedded); this.clipLoop = Element ('input', null, undefined, clipLoopLabel); this.clipLoop.type = 'checkbox'; clipLoopLabel.appendChild (document.createTextNode (' Loop clip'));
+        this.clipChoice.addEventListener ('change', () => { const clip = this.editor.selected?.player?.clips[Number (this.clipChoice.value)]; if (clip) { this.clipDuration.value = String (Number (clip.duration.toFixed (3))); } });
+        const clipButtons = Element ('div', 'animation_buttons', undefined, embedded);
+        this.clipAdd = this.Button (clipButtons, 'Add clip at playhead', () => { const object = this.editor.selected; if (!object?.player || !this.clipDuration.value.trim () || !this.clipSpeed.value.trim ()) { throw new Error ('Choose a paused clip, duration and speed.'); } this.timeline.AddEmbeddedClip ({ objectId : object.id, clip : Number (this.clipChoice.value), time : this.timeline.time, duration : Number (this.clipDuration.value), speed : Number (this.clipSpeed.value), loop : this.clipLoop.checked }); this.clipStatus.textContent = 'Clip added to timeline.'; }, null, this.clipStatus);
+
+        const array = Element ('details', 'animation_array_section', undefined, keys); Element ('summary', null, 'Array reveal', array);
+        this.arrayTarget = Element ('p', 'animation_summary', '', array); Element ('p', 'animation_help', 'Scheduled objects are hidden from the start until their reveal. They appear in scene-list order. No models are created.', array);
+        this.arrayStatus = Element ('p', 'animation_summary', '', array); this.arrayStatus.setAttribute ('role', 'status');
+        const keepLabel = Element ('label', 'animation_check', undefined, array); this.arrayKeepActive = Element ('input', null, undefined, keepLabel); this.arrayKeepActive.type = 'checkbox'; this.arrayKeepActive.checked = true; keepLabel.appendChild (document.createTextNode (' Keep active object in place')); this.arrayKeepActive.addEventListener ('change', () => this.Refresh ());
+        const arrayGrid = Element ('div', 'animation_grid', undefined, array); this.arrayDuration = this.Number (arrayGrid, 'Reveal duration (s)', 1, 15, .1); this.arrayDuration.value = '4'; this.arrayHeight = this.Number (arrayGrid, 'Drop distance (model units)', .000001, 1000000, .1); this.arrayHeight.value = '1';
+        const arrayButtons = Element ('div', 'animation_buttons', undefined, array); this.arraySchedule = this.Button (arrayButtons, 'Schedule reveal', () => { const selected = this.ArrayTargets (); if (!this.arrayDuration.value.trim () || !this.arrayHeight.value.trim ()) { throw new Error ('Enter a duration and drop distance.'); } ScheduleArrayReveal (this.editor, { objectIds : selected.map (item => item.id), time : this.timeline.time, duration : Number (this.arrayDuration.value), dropHeight : Number (this.arrayHeight.value) }); this.arrayStatus.textContent = 'Array reveal scheduled.'; }, null, this.arrayStatus);
 
         const video = this.Section ('Export video', 'Records the range frame by frame, so no frame is dropped. The video stays in this browser until you download it.');
         const videoGrid = Element ('div', 'animation_grid', undefined, video);
@@ -92,6 +124,8 @@ export class AnimationPanel
         this.timeline.Subscribe ((type) => { if (!this.Visible ()) { return; } if (type === 'time') { this.RefreshTime (); } else { this.Refresh (); } });
     }
 
+    ArrayTargets () { const objects = this.editor.SelectedObjects?.() || []; return this.arrayKeepActive.checked ? objects.filter (item => item !== this.editor.selected) : objects; }
+
     async ExportVideo () { const result = await this.video.Export ({ ...this.options }); this.status.textContent = ''; return result; }
 
     RefreshTime ()
@@ -103,14 +137,22 @@ export class AnimationPanel
     {
         if (!this.Visible ()) { return; }
         const t = this.timeline, editor = this.editor, locked = this.Locked (), hasObjects = editor.document.objects.length > 0;
+        if (this.visibilityObjectId !== (editor.selected?.id || null)) { this.visibilityObjectId = editor.selected?.id || null; this.lifeStart.value = '0'; this.lifeEnd.value = ''; this.visibilityStatus.textContent = ''; }
+        const clipPlayer = editor.selected?.player, clipId = editor.selected?.id || null;
+        if (clipId !== this.clipObjectId || clipPlayer !== this.clipPlayer) { this.clipObjectId = clipId; this.clipPlayer = clipPlayer; this.clipChoice.replaceChildren (); clipPlayer?.clips.forEach ((clip, index) => this.clipChoice.add (new Option (clip.name || 'Clip ' + (index + 1), String (index)))); if (clipPlayer) { this.clipChoice.value = String (clipPlayer.state.clip); this.clipDuration.value = String (Number (clipPlayer.clips[clipPlayer.state.clip].duration.toFixed (3))); } else { this.clipDuration.value = ''; } this.clipSpeed.value = '1'; this.clipLoop.checked = false; this.clipStatus.textContent = ''; }
+        this.clipTarget.textContent = !clipPlayer ? 'Select a model with an embedded clip.' : locked ? 'Selected: ' + editor.selected.name + ' · Editing unavailable.' : editor.busy ? 'Selected: ' + editor.selected.name + ' · Wait for the current operation.' : t.playing ? 'Selected: ' + editor.selected.name + ' · Pause the timeline to add a clip.' : clipPlayer.state.playing ? 'Selected: ' + editor.selected.name + ' · Pause the embedded clip first.' : 'Selected: ' + editor.selected.name; [this.clipChoice, this.clipDuration, this.clipSpeed, this.clipLoop, this.clipAdd].forEach (control => { control.disabled = locked || editor.busy || t.playing || !clipPlayer || clipPlayer.state.playing; });
+        const targets = this.ArrayTargets (), selectedCount = targets.length; const invalid = targets.some (item => !item.threeObject || item.visible === false || item.keyframes?.length || item.visibilityKeys?.length || item.userData?._auto3dFoldPreview !== undefined || editor.packaging?.presentation?.records?.get (item.id)?.preview?.visible || t.actions.some (action => action.objectId === item.id));
+        this.arrayTarget.textContent = locked ? 'Editing is unavailable.' : editor.busy ? 'Wait for the current operation.' : t.playing ? 'Pause the timeline first.' : !selectedCount ? (this.arrayKeepActive.checked && editor.selected ? 'Keeping ' + editor.selected.name + ' in place. Select more objects or include the active object.' : 'Select objects to reveal.') : invalid ? 'Use visible objects without motion, visibility or active fold previews.' : (this.arrayKeepActive.checked && editor.selected ? 'Keeping ' + editor.selected.name + ' in place. ' : '') + selectedCount + ' object' + (selectedCount === 1 ? '' : 's') + ' will be scheduled.';
+        [this.arrayKeepActive, this.arrayDuration, this.arrayHeight, this.arraySchedule].forEach (control => { control.disabled = locked || editor.busy || t.playing; }); this.arraySchedule.disabled ||= !selectedCount || invalid;
         this.RefreshTime (); this.play.textContent = t.playing ? 'Pause' : 'Play';
         for (const [input, value] of [[this.duration, t.duration], [this.rangeStart, t.rangeStart], [this.rangeEnd, t.rangeEnd]]) { if (document.activeElement !== input) { input.value = String (Number (value.toFixed (3))); } }
         this.tween.value = t.interpolation; this.loop.checked = t.loop;
         [this.duration, this.rangeStart, this.rangeEnd, this.tween, this.loop, this.keyScene, this.keyCamera].forEach (control => { control.disabled = locked; });
-        this.keyScene.disabled ||= !hasObjects; this.keyObject.disabled = locked || !editor.selected; this.keyAction.disabled = locked || editor.busy || !editor.selected?.userData?._auto3dFefco;
+        this.keyScene.disabled ||= !hasObjects; this.keyObject.disabled = locked || !editor.selected; [this.keyShow, this.keyHide, this.lifeStart, this.lifeEnd, this.setLifetime].forEach (control => { control.disabled = locked || editor.busy || !editor.selected; }); this.clearVisibility.disabled = locked || editor.busy || !editor.selected?.visibilityKeys?.length; this.visibilityTarget.textContent = editor.selected ? 'Selected: ' + editor.selected.name : 'Select an object to set its visibility.'; this.keyAction.disabled = locked || editor.busy || !editor.selected?.userData?._auto3dFefco;
         this.play.disabled = this.reset.disabled = this.scrub.disabled = this.video.running;
+        const visibilityKeys = editor.document.objects.reduce ((sum, item) => sum + (item.visibilityKeys?.length || 0), 0);
         const objectKeys = editor.document.objects.reduce ((sum, item) => sum + (item.keyframes?.length || 0), 0), animated = editor.document.objects.filter (item => item.keyframes?.length).length;
-        this.keySummary.textContent = t.cameraKeyframes.length + ' camera keyframe' + (t.cameraKeyframes.length === 1 ? '' : 's') + ' · ' + objectKeys + ' object keyframe' + (objectKeys === 1 ? '' : 's') + (animated ? ' on ' + animated + ' object' + (animated === 1 ? '' : 's') : '') + ' · ' + (t.actions?.length || 0) + ' fold action' + ((t.actions?.length || 0) === 1 ? '' : 's');
+        this.keySummary.textContent = t.cameraKeyframes.length + ' camera keyframe' + (t.cameraKeyframes.length === 1 ? '' : 's') + ' · ' + objectKeys + ' object keyframe' + (objectKeys === 1 ? '' : 's') + (animated ? ' on ' + animated + ' object' + (animated === 1 ? '' : 's') : '') + ' · ' + visibilityKeys + ' visibility keyframe' + (visibilityKeys === 1 ? '' : 's') + ' · ' + (t.embeddedClips?.length || 0) + ' clip action' + ((t.embeddedClips?.length || 0) === 1 ? '' : 's') + ' · ' + (t.actions?.length || 0) + ' fold action' + ((t.actions?.length || 0) === 1 ? '' : 's');
         this.size.value = this.options.size; this.fps.value = String (this.options.fps); this.format.value = this.options.format;
         this.RefreshVideo ();
     }

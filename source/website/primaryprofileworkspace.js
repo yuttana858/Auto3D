@@ -1,6 +1,11 @@
 export class PrimaryProfileWorkspace
 {
     constructor (panel) { this.panel = panel; this.website = panel.website; this.open = false; this.committing = false; }
+    InputsBlocked ()
+    {
+        const editor = this.website.sessionEditor;
+        return !this.website.auth?.user || this.website.accountReady === false || editor.readOnly || (editor.busy || this.panel.products.active) && !this.committing && !this.panel.liveUpdates?.active;
+    }
     Inspect ()
     {
         let selected; try { selected = this.panel.products.Selected (); } catch { return { open : this.open, available : false }; }
@@ -28,7 +33,7 @@ export class PrimaryProfileWorkspace
         await panels.Set ('upload', 'minimal');
         const viewer = this.website.parameters.viewerDiv; this.wrapper = globalThis.document.createElement ('div'); this.wrapper.className = 'pp_viewport_split'; viewer.parentNode.insertBefore (this.wrapper, viewer);
         this.root = globalThis.document.createElement ('section'); this.wrapper.append (this.root, viewer);
-        this.ui = new this.panel.module.ProductProfileEditor ({ inspect : () => this.Inspect (), blocked : () => this.panel.Blocked (), update : (changes, objectId) => this.panel.UpdateProfile (changes, objectId), close : () => this.Close (), refreshLabels : () => this.panel.workspace.SetDisabled () }, this.root);
+        this.ui = new this.panel.module.ProductProfileEditor ({ inspect : () => this.Inspect (), blocked : () => this.InputsBlocked (), update : (changes, objectId) => this.panel.UpdateProfile (changes, objectId), close : () => this.Close (), fitSelected : () => this.panel.FitSelected (), refreshLabels : () => this.panel.workspace.SetDisabled () }, this.root);
         this.ui.labelsRoot.appendChild (this.panel.workspace.artworkRoot);
         this.open = true; globalThis.document.body.classList.add ('primary_profile_open'); this.website.layouter.primaryProfile = this; this.Sync (); this.website.layouter.Resize (); editor.Focus ();
         this.website.viewer.navigation.FinishCameraMovement ();
@@ -47,20 +52,23 @@ export class PrimaryProfileWorkspace
     {
         if (!this.open) { return; }
         if (this.document !== this.website.sessionEditor.document || this.owner !== this.website.auth?.user?.id) { this.Close (false); return; }
-        if (this.committing || this.website.sessionEditor.busy || this.panel.products.active) { this.ui.SetDisabled (true); return; }
+        if (this.committing || this.website.sessionEditor.busy || this.panel.products.active) { this.ui.SetDisabled (this.InputsBlocked ()); return; }
         const state = this.Inspect ();
         if (!state.available) { this.Close (false); return; }
+        const changedSelection = this.currentObjectId && this.currentObjectId !== state.objectId;
+        this.currentObjectId = state.objectId;
         const definitionKey = state.objectId + JSON.stringify (this.panel.products.Selected ().definition);
         if (this.labelKey !== definitionKey && !this.panel.Blocked ()) {
             this.labelKey = definitionKey; this.panel.artworkTarget = state.objectId;
             this.panel.products.LoadSelected ();
         }
         this.ui.Refresh (state);
+        if (changedSelection) { this.panel.FitSelected (); }
     }
     async Close (restore = true)
     {
         if (!this.open) { return { open : false }; }
-        this.open = false; globalThis.document.body.classList.remove ('primary_profile_open'); globalThis.document.body.style.removeProperty ('--primary-drawer-left'); this.labelKey = null; this.website.layouter.primaryProfile = null;
+        this.open = false; this.ui?.Dispose?.(); this.currentObjectId = null; globalThis.document.body.classList.remove ('primary_profile_open'); globalThis.document.body.style.removeProperty ('--primary-drawer-left'); this.labelKey = null; this.website.layouter.primaryProfile = null;
         if (this.root.contains (this.panel.workspace.artworkRoot)) { this.panel.workspace.artworkRoot.remove (); }
         const viewer = this.website.parameters.viewerDiv; this.wrapper.before (viewer); this.wrapper.remove (); this.ui = null; this.website.layouter.Resize ();
         if (restore && this.owner === this.website.auth?.user?.id && this.document === this.website.sessionEditor.document) {

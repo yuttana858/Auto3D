@@ -2,7 +2,7 @@
 
 ## Development and release process
 
-1. Keep the active integration PR in **Draft**. Add related commits to that branch, or keep dependent PRs draft and consolidate them before release. PR #116 is the current integration batch; #110 reached main through #109. Draft pushes allocate no CI runner jobs; small skipped workflow records may still appear.
+1. Keep the active integration PR in **Draft**. Add related commits to that branch, or keep dependent PRs draft and consolidate them before release. PR #162 is the current integration batch, combining #158, #159, #160 and #166. Draft pushes allocate no CI runner jobs; small skipped workflow records may still appear.
 2. Run relevant checks locally after each change. For a release batch, run the full local validation below and record the commit, commands, results and any unexecuted checks in the PR. Do not rerun unchanged checks without a reason.
 3. When the batch is stable, mark the integration PR **Ready for review** once. A ready PR runs validation and the **browser smoke suite** (`test/browser/smoke-suite.txt`, one job, about 10 tests). A later push to a ready PR reruns that gate; return it to draft before iterative work. Converting to draft cancels an in-flight CI run through the existing concurrency group.
    - **Full browser suite, on request only.** Right before merging a release batch, add the `full-ci` label to the PR, or run **Actions → CI → Run workflow** (suite `full`). That runs every test in `test/browser/ci-suite.txt` across three shards. Unrelated labels neither start nor cancel CI.

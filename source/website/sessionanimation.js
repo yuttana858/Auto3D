@@ -17,10 +17,10 @@ export class AnimationPlayer
         object.playback = this.state;
         this.Choose (this.state.clip, this.state.time); if (this.state.playing) { this.Schedule (); }
     }
-    Choose (index, time = 0)
+    Choose (index, time = 0, render = true)
     {
         if (!Number.isInteger (index) || !this.clips[index]) { throw new Error ('Animation clip is unavailable.'); }
-        this.mixer.stopAllAction (); this.state.clip = index; this.action = this.mixer.clipAction (this.clips[index]); this.ApplyLoopMode (); this.action.reset ().play (); this.Seek (time);
+        this.mixer.stopAllAction (); this.state.clip = index; this.action = this.mixer.clipAction (this.clips[index]); this.ApplyLoopMode (); this.action.reset ().play (); this.Seek (time, render);
     }
     ApplyLoopMode ()
     {
@@ -33,10 +33,10 @@ export class AnimationPlayer
         this.state.loop = loop !== false;
         this.ApplyLoopMode ();
     }
-    Seek (time)
+    Seek (time, render = true)
     {
         this.action.paused = false; this.action.enabled = true; this.action.play ();
-        this.action.time = Math.min (this.clips[this.state.clip].duration, Math.max (0, Number.isFinite (time) ? time : 0)); this.mixer.update (0); this.state.time = this.action.time; this.render ();
+        this.action.time = Math.min (this.clips[this.state.clip].duration, Math.max (0, Number.isFinite (time) ? time : 0)); this.mixer.update (0); this.state.time = this.action.time; if (render) { this.render (); }
     }
     Toggle () { this.SetPlaying (!this.state.playing); }
     SetPlaying (playing)

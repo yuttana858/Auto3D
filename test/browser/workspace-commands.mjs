@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { MockMacroApi } from './macro-api-mock.mjs';
 import { chromium } from 'playwright-core';
 import { mkdir } from 'node:fs/promises';
 await mkdir ('work', { recursive : true });
@@ -7,6 +8,7 @@ try {
     const page = await browser.newPage ({ viewport : { width : 1440, height : 950 } }); const errors = []; page.on ('pageerror', error => errors.push (error.message));
     await page.route ('**/api/auth/**', route => route.fulfill ({ json : { user : { id : 'workspace-test', email : 'test@example.com' } } }));
     await page.route ('**/api/preferences', route => route.fulfill ({ json : { preferences : { theme : 1 }, folders : [] } }));
+    const sharedMacros = await MockMacroApi (page, { user : 'workspace-test' });
     for (const path of ['accounts/**', 'personal/items', 'environments']) { await page.route ('**/api/' + path, route => route.fulfill ({ json : path.startsWith ('accounts') ? { isAdmin : false } : [] })); }
     await page.goto (process.env.AUTO3D_TEST_URL || 'http://127.0.0.1:8080/website/index.html');
     await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
@@ -43,6 +45,7 @@ try {
     assert.equal ((await call ('scene.inspect')).objects.length, 1);
     await input.fill ('array model 99x4x6'); await input.press ('Enter'); await page.waitForFunction (() => /Array counts/.test (document.querySelector ('.scene_status')?.textContent || '')); assert.equal ((await call ('scene.inspect')).objects.length, 1);
     await call ('macro.save', { name : 'Frame model', definition : JSON.stringify ({ version : 1, steps : [{ id : 'fit', command : 'view.fit' }] }) });
+    if (!sharedMacros.some (row => row.name === 'Frame model')) { throw new Error ('macro.save did not reach the shared library'); }
     await input.fill ('run macro Frame model'); await input.press ('Enter'); await page.waitForFunction (() => document.querySelector ('.scene_status')?.textContent === 'Completed · 1 command');
     await call ('ui.ai'); assert.equal (await page.locator ('#ai_module_panel').isVisible (), true);
     await page.locator ('.ai_connection_badge').evaluate (node => { node.textContent = 'Meshy through Auto3D with a long connection description'; });

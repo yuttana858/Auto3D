@@ -7,6 +7,9 @@
 .packaging_controls button:hover, .packaging_drawing button:hover { border-color: var(--ov_button_color); }
 .packaging_actions { display: flex; gap: 6px; }
 .packaging_actions button { flex: 1; }
+.packaging_artwork_paint { align-items: center; margin: 6px 0; }
+.packaging_controls .packaging_artwork_paint input[type="color"] { flex: 0 0 48px; width: 48px; min-width: 48px; max-width: 48px; height: 34px; box-sizing: border-box; padding: 3px; cursor: pointer; }
+.packaging_artwork_paint button { min-width: 120px; min-height: 34px; white-space: nowrap; }
 .packaging_drawing { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
 .packaging_drawing_header { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; }
 .packaging_canvas { width: 100%; flex: 1; min-height: 200px; background: var(--ov_background_color); border: 1px solid var(--ov_border_color); cursor: crosshair; touch-action: none; }
@@ -14,7 +17,7 @@
 .packaging_vertices { max-height: 220px; overflow: auto; margin-top: 8px; }
 .packaging_vertex { display: grid; grid-template-columns: 18px 1fr 1fr; align-items: center; gap: 4px; margin-bottom: 4px; font-size: 12px; }
 @media (max-width: 700px) { .packaging_body { grid-template-columns: 185px minmax(0, 1fr); gap: 8px; padding: 8px; } .packaging_drawing_header { flex-direction: column; align-items: start; } }
-.packaging_controls > [hidden] { display: none !important; }
+.packaging_dialog [hidden] { display: none !important; }
 .packaging_controls button[aria-pressed=true] { border-color: #bd76ed; color: #bd76ed; }
 
 @media (max-width: 700px) { .packaging_body { display: flex; flex-direction: column; overflow:auto; } .packaging_controls { flex: 0 0 auto; max-height: 45vh; } .packaging_drawing { min-height: 40vh; } .packaging_canvas { min-height: 250px; } }

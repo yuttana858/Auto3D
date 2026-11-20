@@ -7,6 +7,7 @@ ai-extended
 ai-image-dropzone
 ai-progress
 animation
+animation-array
 animation-video
 array-spacing
 assign-facing
@@ -20,6 +21,7 @@ board-panel-visibility
 board-toggle-stability
 cad-apply
 cad-conversion
+can-collar
 capture
 command-bar
 command-design
@@ -71,6 +73,11 @@ popup-fonts
 preferences-recovery
 preview-context-lifecycle
 primary-contents
+primary-label-cad
+primary-label-cad-ui
+primary-label-vectors
+primary-live-integration
+primary-live-panel
 primary-materials
 primary-products
 primary-profile
@@ -91,3 +98,4 @@ viewport-quality
 workspace-commands
 workspace-editing
 workspace-optimization
+primary-live-placement
