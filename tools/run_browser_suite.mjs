@@ -13,8 +13,8 @@ import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path';
 
 const Suites = { smoke : 'test/browser/smoke-suite.txt', full : 'test/browser/ci-suite.txt' };
-// The complete product flow includes many physical-material rebuilds under SwiftShader.
-const LongTests = { 'primary-products' : 1200 };
+// The complete product and pulp flows include many physical-material and refined-shell rebuilds under SwiftShader.
+const LongTests = { 'primary-products' : 1200, 'molded-pulp' : 1200 };
 const DefaultLimit = 600;
 
 export function ParseArgs (argv)

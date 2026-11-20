@@ -1,3 +1,4 @@
+import { ScaleLabelCAD } from '../../modules/primary-products/src/labelcad.js';
 import { RenderLabelSVG } from './primarylabelrenderer.js';
 import { ValidateLabelSource, TextLabelSVG } from '../../modules/primary-products/src/labelsource.js';
 import { ArtworkImageInfo, MaxArtworkBytes } from '../../modules/primary-products/src/imageinfo.js';
@@ -48,7 +49,7 @@ export class PrimaryProductsArtwork
         if (this.panel.Blocked ()) { throw new Error ('Open an editable, idle session.'); }
         if (Object.keys (changes).some (key => !['widthMm', 'heightMm', 'finish', 'offsetXmm', 'offsetYmm', 'bleedMm'].includes (key))) { throw new Error ('Invalid label placement or finish.'); }
         if (!this.entries.some (a => a.zone === zone)) { throw new Error ('Import artwork for this zone first.'); }
-        this.entries = ValidateProductArtwork (this.panel.draft, this.entries.map (a => a.zone === zone ? { ...a, ...changes } : a)); this.panel.Refresh (); return this.Inspect ();
+        this.entries = ValidateProductArtwork (this.panel.draft, this.entries.map (a => a.zone === zone ? { ...a, ...changes, ...(a.cad && (changes.widthMm !== undefined || changes.heightMm !== undefined) ? { cad : ScaleLabelCAD (a.cad, changes.widthMm ?? a.widthMm, changes.heightMm ?? a.heightMm) } : {}) } : a)); this.panel.Refresh (); return this.Inspect ();
     }
     Remove ({ zone })
     {

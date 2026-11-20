@@ -34,6 +34,11 @@ export class MoldedPulpPanel
         this.Field (row, 'thicknessMm', 'Pulp thickness', PulpLimits.thicknessMm, 0.1);
         this.Field (row, 'extraLengthMm', 'Additional length', PulpLimits.extraMm, 1);
         this.Field (row, 'extraWidthMm', 'Additional width', PulpLimits.extraMm, 1);
+        // Edge and corner rounding (molded fibre always forms with some); live like the other sheet fields.
+        const radiusRow = Element ('div', 'mp_row', undefined, sheet);
+        this.Field (radiusRow, 'edgeRadiusMm', 'Edge radius', PulpLimits.radiusMm, 0.1);
+        this.Field (radiusRow, 'cornerRadiusMm', 'Corner radius', PulpLimits.radiusMm, 0.1);
+        Element ('p', 'mp_help', 'Edge radius rounds pocket floors, rims and the skirt top; corner radius rounds the sheet and skirt corners. 0.25 in (6.35 mm) is a safe start; the knowledge base asks for 3 mm or more on edges and 6 mm or more on corners deeper than 30 mm.', sheet);
         this.thicknessHint = Element ('p', 'mp_help', '', sheet);
         this.sheetText = Element ('p', 'mp_readout', '', sheet);
         this.sheetButton = this.Button (sheet, 'Generate sheet', () => this.host.generateSheet (), 'mp_primary');

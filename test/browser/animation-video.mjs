@@ -26,6 +26,8 @@ try {
     await page.locator ('#open_file').setInputFiles ('test/testfiles/stl/cube_meshlab_binary.stl');
     let objects = []; for (let i = 0; i < 150 && !objects.length; i++) { const r = await raw ('scene.inspect'); objects = r.ok ? r.result.objects : []; if (!objects.length) { await page.waitForTimeout (100); } }
     const cube = objects[0]; await call ('object.select', { objectId : cube.id });
+    await call ('lighting.effects', { ambientIntensity : 0.7, ambientColor : '#b6c8e0', environmentIntensity : 0.8, shadows : true, shadowIntensity : 0.45 });
+    const lighting = await call ('lighting.inspect');
 
     // The module icon opens the Animation panel.
     await page.getByRole ('button', { name : 'Animation and video', exact : true }).click ();
@@ -53,6 +55,7 @@ try {
     // Playhead, object pose and the viewer are restored after export.
     const after = await call ('animation.timeline.inspect'); assert.equal (after.time, 0.5);
     const placed = (await call ('scene.inspect')).objects.find (o => o.id === cube.id); assert.deepEqual (placed.position, before, 'pose at 0.5 s is restored');
+    assert.deepEqual (await call ('lighting.inspect'), lighting, 'export preserves configured lighting');
     assert.equal (await panel.getByRole ('button', { name : 'Export video', exact : true }).isEnabled (), true);
 
     // Download: a real container file.
@@ -80,6 +83,7 @@ try {
     const cancel = await call ('animation.video.cancel'); assert.equal (cancel.cancelling, true, JSON.stringify (await call ('animation.video.inspect')));
     const cancelled = await running; assert.equal (cancelled.ok, false); assert.match (cancelled.error.message, /cancelled/);
     assert.equal ((await call ('animation.video.inspect')).status, 'cancelled'); assert.equal ((await call ('animation.timeline.inspect')).time, 0.5);
+    assert.deepEqual (await call ('lighting.inspect'), lighting, 'cancelled export preserves configured lighting');
     assert.equal ((await raw ('animation.video.export', { fps : 15 })).ok, false, 'invalid frame rates are rejected');
 
     await mkdir ('work/animation-review', { recursive : true }); await page.screenshot ({ path : 'work/animation-review/panel.png' });

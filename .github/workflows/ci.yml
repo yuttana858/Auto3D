@@ -72,6 +72,14 @@ jobs:
           for script in test/security/messenger-bootstrap.sql supabase/migrations/20261115133848_messenger_conversations.sql test/security/messenger-access.sql; do
             docker exec -i '${{ job.services.postgres.id }}' psql -U postgres -d messenger_test -v ON_ERROR_STOP=1 < "$script"
           done
+      - name: Verify the shared macro library owner and administrator rules
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker exec '${{ job.services.postgres.id }}' createdb -U postgres macros_test
+          for script in test/security/macros-bootstrap.sql supabase/migrations/20261119120000_shared_macro_library.sql test/security/macros-access.sql; do
+            docker exec -i '${{ job.services.postgres.id }}' psql -U postgres -d macros_test -v ON_ERROR_STOP=1 < "$script"
+          done
       - name: Verify owned CAD jobs and worker leases
         shell: bash
         run: |

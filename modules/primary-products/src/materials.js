@@ -15,7 +15,7 @@ export const ProductMaterials = Object.freeze ({
     hdpe : { name : 'HDPE · matte', families : ['bottle'], metalness : 0, roughness : 0.62 },
     pp : { name : 'Polypropylene · satin', families : ['bottle', 'clamshell'], metalness : 0, roughness : 0.32 },
     petOpaque : { name : 'PET · opaque gloss', families : ['bottle', 'clamshell'], metalness : 0, roughness : 0.12 },
-    glass : { name : 'Clear glass', color : '#ffffff', families : ['bottle'], metalness : 0, roughness : .08, transmission : 1, ior : 1.5, wallMm : 1.2 },
+    glass : { name : 'Clear glass', color : '#ffffff', families : ['bottle'], metalness : 0, roughness : .08, transmission : 1, ior : 1.5, wallMm : 2 },
     petClear : { name : 'PET · clear', color : '#ffffff', families : ['bottle', 'clamshell'], metalness : 0, roughness : .06, transmission : 1, ior : 1.575, wallMm : .6 },
     aluminum : { name : 'Aluminum', families : ['can'], metalness : 1, roughness : 0.3 },
     steel : { name : 'Steel', families : ['can'], metalness : 1, roughness : 0.38 },

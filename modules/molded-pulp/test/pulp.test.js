@@ -97,7 +97,7 @@ describe ('Molded Pulp surface sensing and sheet', () => {
         assert.ok (Math.abs (grown.rect.lengthMm - plan.rect.lengthMm - 40) < 1e-6); assert.ok (Math.abs (grown.rect.widthMm - plan.rect.widthMm - 24) < 1e-6);
         assert.equal (grown.origin[1], 0); assert.ok (Math.abs (grown.origin[0] - (plan.bounds.min[0] + plan.bounds.max[0]) / 2) < 1e-6);
         const ys = grown.components[0].positions.filter ((v, i) => i % 3 === 1); assert.equal (Math.max (...ys), 0); assert.equal (Math.min (...ys), -draft.thicknessMm);
-        const check = MeshChecks (grown.components[0]); assert.equal (check.open, 0); assert.ok (Math.abs (check.volume - grown.rect.lengthMm * grown.rect.widthMm * draft.thicknessMm) < 1);
+        const check = MeshChecks (grown.components[0]); assert.equal (check.open, 0); assert.ok (Math.abs (check.volume - (grown.rect.lengthMm * grown.rect.widthMm - (4 - Math.PI) * grown.metrics.cornerRadiusMm ** 2) * draft.thicknessMm) < 1);
     });
     it ('rasterizes the lowest product surface, including a curved underside', () => {
         const triangles = Dome (), bounds = SenseBounds (triangles), rect = SheetRect (bounds, { extraLengthMm : 20, extraWidthMm : 20 });
@@ -248,5 +248,50 @@ describe ('Molded Pulp clamshells, detail and worker', function () {
         const legacy = { pulpType : 'type2', thicknessMm : 3, extraLengthMm : 20, extraWidthMm : 20, formDepthMm : 30, clearanceMm : 1, draftDeg : 4, resolutionMm : null, color : '#a79c89' };
         const definition = ValidatePulpDefinition ({ schemaVersion : 1, module : 'molded-pulp', moduleVersion : '0.1.0', stage : 'tray', productIds : ['a'], draft : legacy });
         assert.equal (definition.draft.detail, 'standard'); assert.equal (definition.draft.clamshell, 'none'); assert.equal (definition.moduleVersion, '0.1.0');
+    });
+});
+
+describe ('Molded Pulp edge and corner radii', () => {
+    it ('defaults both radii to 0.25 in, validates them and checks them against the knowledge base', async () => {
+        const { DefaultPulpDraft, UpdatePulpDraft, DefaultRadiusMm } = await import ('../src/state.js');
+        const { PulpChecks, SmoothSurfaceRadii } = await import ('../src/plan.js');
+        const draft = DefaultPulpDraft ('type2');
+        assert.equal (DefaultRadiusMm, 6.35); assert.equal (draft.edgeRadiusMm, 6.35); assert.equal (draft.cornerRadiusMm, 6.35);
+        assert.equal (UpdatePulpDraft (draft, { edgeRadiusMm : 12.7, cornerRadiusMm : 10 }).edgeRadiusMm, 12.7);
+        assert.throws (() => UpdatePulpDraft (draft, { edgeRadiusMm : 0.2 }), /Edge radius must be 0.5–50 mm/);
+        assert.throws (() => UpdatePulpDraft (draft, { cornerRadiusMm : 60 }), /Corner radius must be 0.5–50 mm/);
+        // Drafts saved before the radii existed take the defaults.
+        const { edgeRadiusMm, cornerRadiusMm, ...legacy } = draft; void edgeRadiusMm; void cornerRadiusMm;
+        assert.equal (UpdatePulpDraft (legacy, {}).cornerRadiusMm, 6.35);
+        const bounds = { size : [200, 100, 120] }, rect = {}, ids = d => PulpChecks (d, bounds, rect).map (c => c.id);
+        assert.ok (!ids ({ ...draft, formDepthMm : 35 }).some (id => /^MP-RD/.test (id)), 'the defaults pass');
+        assert.ok (ids ({ ...draft, edgeRadiusMm : 2 }).includes ('MP-RD1'), 'edges below 3 mm');
+        assert.ok (ids ({ ...draft, pulpType : 'type1', thicknessMm : 6, edgeRadiusMm : 5 }).includes ('MP-RD1'), 'Type 1 edges below the wall');
+        assert.ok (ids ({ ...draft, formDepthMm : 35, cornerRadiusMm : 4 }).includes ('MP-RD2') && !ids ({ ...draft, formDepthMm : 25, cornerRadiusMm : 4 }).includes ('MP-RD2'), 'corners below 6 mm only past 30 mm deep');
+        assert.ok (ids ({ ...draft, edgeRadiusMm : 3 }).includes ('MP-RD3'), 'tool-side edges sharp when the radius is not above the wall');
+        assert.deepEqual (SmoothSurfaceRadii ({ ...draft, edgeRadiusMm : 8, cornerRadiusMm : 12 }), { floorFilletMm : 8, rimFilletMm : 8, skirtCornerMm : 12 });
+    });
+});
+
+describe ('Molded Pulp rounded sheet corners', () => {
+    it ('rounds the flat sheet by the corner radius in the display mesh and as an exact STEP solid', async () => {
+        const { WriteSolidStep } = await import ('../src/nurbs/step.js');
+        const box = [], add = (x, y, z) => box.push (x, y, z);
+        for (const [x, z] of [[0, 0], [100, 0], [100, 60], [0, 60]]) { add (x, 0, z); add (x, 40, z); add (x, 40, z); }
+        const triangles = Float32Array.from (box), draft = { ...DefaultPulpDraft ('type2'), cornerRadiusMm : 10 }, plan = PlanSheet (triangles, draft);
+        assert.equal (plan.metrics.cornerRadiusMm, 10); assert.equal (plan.nurbs.solids.length, 1);
+        const solid = plan.nurbs.solids[0]; assert.equal (solid.faces.length, 10); assert.equal (solid.faces.filter (f => f.name === 'Sheet corner').length, 4);
+        // Every edge used once in each direction: a closed solid.
+        const uses = solid.edges.map (() => [0, 0]); for (const f of solid.faces) { for (const b of f.bounds) { for (const [e, fw] of b.loop) { uses[e][fw ? 0 : 1]++; } } }
+        assert.ok (uses.every (([f, r]) => f === 1 && r === 1));
+        const L = plan.metrics.lengthMm, W = plan.metrics.widthMm, area = L * W - (4 - Math.PI) * 100;
+        assert.ok (Math.abs (plan.metrics.volumeCm3 - area * 3 / 1000) < 0.06);
+        const mesh = plan.components[0]; let volume = 0;
+        for (let t = 0; t < mesh.indices.length; t += 3) { const [a, b, c] = [0, 1, 2].map (k => [0, 1, 2].map (x => mesh.positions[mesh.indices[t + k] * 3 + x])); volume += (a[0] * (b[1] * c[2] - c[1] * b[2]) - b[0] * (a[1] * c[2] - c[1] * a[2]) + c[0] * (a[1] * b[2] - b[1] * a[2])) / 6; }
+        assert.ok (Math.abs (volume - area * 3) < 0.002 * area * 3, volume + ' vs ' + area * 3);
+        const text = WriteSolidStep (plan.nurbs.solids, { name : 'Sheet', timestamp : '2026-11-20T00:00:00' });
+        assert.match (text, /MANIFOLD_SOLID_BREP\('Sheet',#\d+\)/); assert.match (text, /CLOSED_SHELL/); assert.equal ((text.match (/ADVANCED_FACE\(/g) || []).length, 10);
+        // A very small sheet clamps the radius below half its shorter side.
+        assert.ok (PlanSheet (triangles, { ...draft, cornerRadiusMm : 50, extraLengthMm : 0, extraWidthMm : 0 }).metrics.cornerRadiusMm < 30);
     });
 });

@@ -100,7 +100,7 @@ export function WriteStep (shells, { name = 'Molded pulp', timestamp = new Date 
 
 const Direction = (w, v) => { const l = Math.hypot (...v); return w.Add ('DIRECTION(\'\',(' + v.map (x => StepReal (x / l)).join (',') + '))'); };
 
-function WriteSurface (w, surface)
+function WriteSurface (w, surface, closed = false)
 {
     const flat = points => points.map (p => w.Point (p));
     const vertex = surface.vertices.map (v => w.Add ('VERTEX_POINT(\'\',' + w.Point (v.point) + ')'));
@@ -125,7 +125,7 @@ function WriteSurface (w, surface)
         });
         return w.Add ('ADVANCED_FACE(' + Text (face.name) + ',(' + bounds.join (',') + '),' + geometry + ',' + (face.sameSense ? '.T.' : '.F.') + ')');
     });
-    return w.Add ('OPEN_SHELL(' + Text (surface.id) + ',(' + faces.join (',') + '))');
+    return w.Add ((closed ? 'CLOSED_SHELL(' : 'OPEN_SHELL(') + Text (surface.id) + ',(' + faces.join (',') + '))');
 }
 
 // surfaces: ProductSurface results (world mm): the smooth product side of each shell as an open shell, for thickening
@@ -134,4 +134,11 @@ export function WriteSurfaceStep (surfaces, { name = 'Molded pulp product side',
 {
     if (!surfaces.length) { throw new Error ('Form a tray before exporting its smooth surface.'); }
     return StepFile (name, timestamp, w => ({ type : 'MANIFOLD_SURFACE_SHAPE_REPRESENTATION', refs : [w.Add ('SHELL_BASED_SURFACE_MODEL(\'\',(' + surfaces.map (s => WriteSurface (w, s)).join (',') + '))')] }), 'Auto3D molded pulp product-side surface');
+}
+
+// solids: closed B-rep data in the same neutral form (RoundedSheetSurface): each a MANIFOLD_SOLID_BREP, AP214 in mm.
+export function WriteSolidStep (solids, { name = 'Molded pulp', timestamp = new Date ().toISOString ().slice (0, 19) } = {})
+{
+    if (!solids.length) { throw new Error ('Form a sheet or tray before exporting STEP.'); }
+    return StepFile (name, timestamp, w => ({ type : 'ADVANCED_BREP_SHAPE_REPRESENTATION', refs : solids.map (s => w.Add ('MANIFOLD_SOLID_BREP(' + Text (s.id) + ',' + WriteSurface (w, s, true) + ')')) }), 'Auto3D molded pulp B-rep');
 }

@@ -91,7 +91,7 @@ describe ('Primary Products realistic construction and surfaces', function () {
         assert.equal ((await registry.Execute ('primary.details.set', { canStyle : 'food' })).ok, false); assert.equal (JSON.stringify (panel.draft), before);
     });
     it ('exports clearcoat and packed roughness maps into standard glTF material extensions', async function () {
-        const d = module.ProductDesign ('cosmo-inspired'), model = PrimaryProductModel (module.CreatePrimaryProduct (d), Unit.Millimeter);
+        const d = module.UpdateProductDraft (module.ProductDesign ('cosmo-inspired'), { material : 'petOpaque' }), model = PrimaryProductModel (module.CreatePrimaryProduct (d), Unit.Millimeter);
         const files = await new Promise (resolve => new ExporterGltf ().Export (new ExporterModel (model), FileFormat.Binary, resolve)), buffer = files[0].GetBufferContent (), json = JSON.parse (new TextDecoder ().decode (new Uint8Array (buffer, 20, new DataView (buffer).getUint32 (12, true))).trim ());
         assert.equal (json.materials[0].extensions.KHR_materials_clearcoat.clearcoatFactor, .8); assert.ok (json.materials[0].pbrMetallicRoughness.metallicRoughnessTexture); assert.ok (json.images.length >= 2);
     });

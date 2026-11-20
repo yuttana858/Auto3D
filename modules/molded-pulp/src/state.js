@@ -3,14 +3,14 @@
 // review figures put Type 1 at 5–10 mm, Type 2 at 3–5 mm (1.5–3 mm common in practice), wet-pressed Type 3 at
 // 0.7–1.2 mm and dry-pressed Type 3 at 1.5–3.0 mm. Drafts of 1–7° are published; 3–5° is the common default.
 // Densities are indicative presentation values for mass estimates, not certified material data.
-export const MoldedPulpVersion = '0.3.0';
+export const MoldedPulpVersion = '0.4.0';
 export const PulpTypes = Object.freeze ({
     type1 : Object.freeze ({ name : 'Type 1 · Thick-wall', short : 'Type 1', thicknessMm : 6, rangeMm : [5, 10], draftDeg : 5, minDraftDeg : 3, toleranceMm : 2, densityGcm3 : 0.3, color : '#9a8f7e', roughness : 0.97, surface : 'One smooth side, one rough side', use : 'Dunnage, end caps and heavy industrial supports; oven dried in a single open mold.' }),
     type2 : Object.freeze ({ name : 'Type 2 · Transfer-molded', short : 'Type 2', thicknessMm : 3, rangeMm : [1.5, 5], draftDeg : 4, minDraftDeg : 3, toleranceMm : 1.25, densityGcm3 : 0.45, color : '#a79c89', roughness : 0.92, surface : 'Both sides moderately smooth', use : 'Egg cartons, trays, cup carriers and protective inserts; formed, transferred and oven dried.' }),
     type3wet : Object.freeze ({ name : 'Type 3 · Thermoformed (wet-pressed)', short : 'Type 3 wet', thicknessMm : 1, rangeMm : [0.7, 1.2], draftDeg : 3, minDraftDeg : 1, toleranceMm : 0.5, densityGcm3 : 0.9, color : '#e7e1d3', roughness : 0.78, surface : 'Smooth on both sides', use : 'Premium electronics and cosmetics inserts, food-service ware; cured in heated matched tools.' }),
     type3dry : Object.freeze ({ name : 'Type 3 · Dry-pressed', short : 'Type 3 dry', thicknessMm : 2, rangeMm : [1.5, 3], draftDeg : 3, minDraftDeg : 2, toleranceMm : 0.5, densityGcm3 : 0.8, color : '#d8cfbd', roughness : 0.85, surface : 'Smooth top, rougher bottom', use : 'Formed, oven dried, then hot-pressed; rigid inserts with good surface.' })
 });
-export const PulpLimits = Object.freeze ({ thicknessMm : [0.5, 12], extraMm : [0, 1000], formDepthMm : [1, 300], clearanceMm : [0, 20], draftDeg : [0, 15], resolutionMm : [0.1, 10], ribDepthMm : [1, 30], ribWidthMm : [2, 60], lugStandoffMm : [0.5, 5], partingFraction : [0.1, 0.9] });
+export const PulpLimits = Object.freeze ({ radiusMm : [0.5, 50], thicknessMm : [0.5, 12], extraMm : [0, 1000], formDepthMm : [1, 300], clearanceMm : [0, 20], draftDeg : [0, 15], resolutionMm : [0.1, 10], ribDepthMm : [1, 30], ribWidthMm : [2, 60], lugStandoffMm : [0.5, 5], partingFraction : [0.1, 0.9] });
 // Detail tiers: target sensing cell (mm), largest square grid (2^k + 1 nodes per side) and the adaptive-mesh tolerance (mm).
 // Heavier tiers are computed off the main thread and shown progressively (draft first, then the requested tier).
 export const PulpDetail = Object.freeze ({
@@ -22,13 +22,21 @@ export const PulpDetail = Object.freeze ({
 // Clamshell modes: none (single tray), top-bottom (base formed from below, lid from above) or side-to-side halves split
 // across the X or Z axis. Each shell is formed toward a parting plane at partingFraction of the product extent.
 export const PulpClamshellModes = Object.freeze ({ none : 'Single tray', 'top-bottom' : 'Clamshell · top and bottom', 'side-x' : 'Clamshell · side to side (X)', 'side-z' : 'Clamshell · side to side (Z)' });
-const fields = ['pulpType', 'thicknessMm', 'extraLengthMm', 'extraWidthMm', 'formDepthMm', 'clearanceMm', 'draftDeg', 'resolutionMm', 'color', 'detail', 'ribs', 'lugs', 'ribDepthMm', 'ribWidthMm', 'lugStandoffMm', 'clamshell', 'partingFraction', 'hinge', 'skirtWall'];
+const fields = ['pulpType', 'thicknessMm', 'extraLengthMm', 'extraWidthMm', 'formDepthMm', 'clearanceMm', 'draftDeg', 'resolutionMm', 'color', 'detail', 'ribs', 'lugs', 'ribDepthMm', 'ribWidthMm', 'lugStandoffMm', 'clamshell', 'partingFraction', 'hinge', 'skirtWall', 'edgeRadiusMm', 'cornerRadiusMm'];
+
+// Edge and corner radii. Molded fibre always forms with some rounding (tooling and the fibre mat); the knowledge base
+// (mp-des-dfm-rules-by-process-type, mp-des-dfm-checklist-and-rule-tables G-04/G-05) puts every edge at 3 mm or more and
+// plan-view corners of pockets deeper than 30 mm at 6 mm or more (6–12 mm preferred). The default starts at 0.25 in.
+//   edgeRadiusMm: pocket floors and rims and the skirt top (the formed tray's edges).
+//   cornerRadiusMm: plan-view corners of the sheet and of the tray's skirt.
+export const DefaultRadiusMm = 6.35;
+export const PulpRadiusRules = Object.freeze ({ edgeMinMm : 3, cornerMinMm : 6, cornerDepthMm : 30 });
 
 export function DefaultPulpDraft (pulpType = 'type2')
 {
     if (!Object.hasOwn (PulpTypes, pulpType)) { throw new Error ('Choose Type 1, Type 2, Type 3 wet-pressed or Type 3 dry-pressed pulp.'); }
     const preset = PulpTypes[pulpType];
-    return { pulpType, thicknessMm : preset.thicknessMm, extraLengthMm : 20, extraWidthMm : 20, formDepthMm : 30, clearanceMm : 1, draftDeg : preset.draftDeg, resolutionMm : null, color : preset.color, detail : 'standard', ribs : 'auto', lugs : 'auto', ribDepthMm : null, ribWidthMm : null, lugStandoffMm : 1.5, clamshell : 'none', partingFraction : 0.5, hinge : true, skirtWall : false };
+    return { pulpType, thicknessMm : preset.thicknessMm, extraLengthMm : 20, extraWidthMm : 20, formDepthMm : 30, clearanceMm : 1, draftDeg : preset.draftDeg, resolutionMm : null, color : preset.color, detail : 'standard', ribs : 'auto', lugs : 'auto', ribDepthMm : null, ribWidthMm : null, lugStandoffMm : 1.5, clamshell : 'none', partingFraction : 0.5, hinge : true, skirtWall : false, edgeRadiusMm : DefaultRadiusMm, cornerRadiusMm : DefaultRadiusMm };
 }
 
 function Range (value, [min, max], message)
@@ -65,6 +73,8 @@ export function UpdatePulpDraft (current, changes)
     if (typeof next.hinge !== 'boolean') { throw new Error ('Hinge must be true or false.'); }
     // Experimental: include the outer skirt wall in the smooth (lofted) wall check.
     if (typeof next.skirtWall !== 'boolean') { throw new Error ('Outer skirt wall must be true or false.'); }
+    next.edgeRadiusMm = Range (next.edgeRadiusMm, PulpLimits.radiusMm, 'Edge radius must be 0.5–50 mm.');
+    next.cornerRadiusMm = Range (next.cornerRadiusMm, PulpLimits.radiusMm, 'Corner radius must be 0.5–50 mm.');
     return next;
 }
 

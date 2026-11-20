@@ -1,8 +1,8 @@
 import { ValidateContents, ValidateOptics } from './contents.js';
 import { ValidateProductDetails } from './details.js';
 import { ProductMaterials } from './materials.js';
-export const PrimaryProductsVersion = '0.15.0';
-export const PrimaryFamilies = Object.freeze ({ clamshell : { name : 'Closed clamshell', material : 'pp', heightMm : 60, widthMm : 180, depthMm : 130, color : '#eee9dd', roughness : .35, labelZone : 'front' }, bottle : { name : 'Round bottle', material : 'plastic', heightMm : 190, diameterMm : 65, color : '#e8eceb', roughness : 0.45, labelZone : 'front' }, can : { name : 'Standard can', material : 'aluminum', heightMm : 122, diameterMm : 66, color : '#c9d2d4', roughness : 0.3, labelZone : 'wrap' }, pouch : { name : 'Pillow pouch', material : 'plastic', heightMm : 200, widthMm : 140, depthMm : 40, color : '#e8eceb', roughness : 0.5, labelZone : 'front' } });
+export const PrimaryProductsVersion = '0.18.0';
+export const PrimaryFamilies = Object.freeze ({ clamshell : { name : 'Closed clamshell', material : 'pp', heightMm : 60, widthMm : 180, depthMm : 130, color : '#eee9dd', roughness : .35, labelZone : 'front' }, bottle : { name : 'Round bottle', material : 'glass', heightMm : 190, diameterMm : 65, color : '#ffffff', roughness : 0.08, labelZone : 'front' }, can : { name : 'Standard can', material : 'aluminum', heightMm : 122, diameterMm : 66, color : '#c9d2d4', roughness : 0.3, labelZone : 'wrap' }, pouch : { name : 'Pillow pouch', material : 'plastic', heightMm : 200, widthMm : 140, depthMm : 40, color : '#e8eceb', roughness : 0.5, labelZone : 'front' } });
 const fields = ['family', 'heightMm', 'diameterMm', 'widthMm', 'depthMm', 'material', 'color', 'roughness', 'labelZone', 'bottleShape', 'bottleSection', 'pouchShape', 'details', 'contents', 'optics'];
 export function DefaultProductDraft (family = 'bottle')
 {
@@ -21,7 +21,7 @@ export function UpdateProductDraft (current, changes)
     if (!Object.hasOwn (ProductMaterials, next.material) || !ProductMaterials[next.material].families.includes (next.family)) { throw new Error ('Choose a surface available for this product.'); }
     if (changes.material && changes.material !== current.material && changes.roughness === undefined) { next.roughness = ProductMaterials[changes.material].roughness; }
     if (changes.material && changes.color === undefined && ProductMaterials[changes.material].color) { next.color = ProductMaterials[changes.material].color; }
-    if (typeof next.color !== 'string' || !/^#[a-fA-F0-9]{6}$/.test (next.color) || !Number.isFinite (next.roughness) || next.roughness < 0 || next.roughness > 1 || !(['pouch', 'clamshell'].includes (next.family) ? ['front', 'back'] : ['front', 'wrap', 'back']).includes (next.labelZone)) { throw new Error ('Invalid surface or label settings.'); }
+    if (typeof next.color !== 'string' || !/^#[a-fA-F0-9]{6}$/.test (next.color) || !Number.isFinite (next.roughness) || next.roughness < 0 || next.roughness > 1 || !(['pouch', 'clamshell'].includes (next.family) ? ['front', 'back'] : next.family === 'bottle' ? ['front', 'wrap', 'back', 'cap-top'] : ['front', 'wrap', 'back']).includes (next.labelZone)) { throw new Error ('Invalid surface or label settings.'); }
     if (next.bottleSection !== undefined) {
         if (next.family !== 'bottle') { throw new Error ('Cross-section controls apply only to bottles.'); }
         next.bottleSection = ValidateBottleSection (next, next.bottleSection);

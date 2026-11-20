@@ -15,5 +15,7 @@ export { ProfileChanges } from './profilechanges.js';
 
 export { ContentPresets, ValidateContents, ValidateOptics } from './contents.js';
 export { ValidateLabelSource, TextLabelSVG } from './labelsource.js';
+export { GlassThicknessPresets, CapMaterials, GlassBottle, BottleWall, BottleCap, BottleBaseLimit, BottleCapWallLimit } from './bottleconstruction.js';
+export { ValidateLabelCAD, NewLabelCAD, ScaleLabelCAD, LabelCADSVG } from './labelcad.js';
 export { LabelDieline, DielineSvg, DielineDxf, DefaultOverlapMm, DielineLimits } from './dieline.js';
 export { CanProfile } from './detailmesh.js';

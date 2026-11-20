@@ -1,3 +1,4 @@
+import { ValidateLabelCAD } from './labelcad.js';
 import { ValidateLabelSource } from './labelsource.js';
 import { LabelFinishes } from './surfaces.js';
 import { SmoothMesh } from './detailmesh.js';
@@ -6,10 +7,10 @@ import { GetArtworkZones } from './zones.js';
 import { BottleSectionOf, SectionAt } from './section.js';
 export function ValidateProductArtwork (draft, entries = [])
 {
-    if (!Array.isArray (entries) || entries.length > 2) { throw new Error ('Use up to two front/back labels or one wrap.'); }
+    if (!Array.isArray (entries) || entries.length > 3) { throw new Error ('Use front/back labels or one wrap, plus a bottle cap label.'); }
     const seen = new Set (), zones = GetArtworkZones (draft);
     const result = entries.map (a => {
-        if (!a || typeof a !== 'object' || Object.keys (a).some (k => !['resourceId', 'name', 'mime', 'zone', 'widthMm', 'heightMm', 'finish', 'offsetXmm', 'offsetYmm', 'bleedMm', 'source'].includes (k)) || !/^[a-f0-9]{64}$/.test (a.resourceId) || typeof a.name !== 'string' || a.name.length > 80 || !['image/png', 'image/jpeg', 'image/webp'].includes (a.mime)) { throw new Error ('Invalid label artwork.'); }
+        if (!a || typeof a !== 'object' || Object.keys (a).some (k => !['resourceId', 'name', 'mime', 'zone', 'widthMm', 'heightMm', 'finish', 'offsetXmm', 'offsetYmm', 'bleedMm', 'source', 'cad'].includes (k)) || !/^[a-f0-9]{64}$/.test (a.resourceId) || typeof a.name !== 'string' || a.name.length > 80 || !['image/png', 'image/jpeg', 'image/webp'].includes (a.mime)) { throw new Error ('Invalid label artwork.'); }
         const z = zones.find (zone => zone.id === a.zone);
         if (!z || seen.has (a.zone) || !Number.isFinite (a.widthMm) || !Number.isFinite (a.heightMm) || a.widthMm < 1 || a.heightMm < 1 || a.widthMm > z.widthMm || a.heightMm > z.heightMm) { throw new Error ('Label must fit its physical zone. Resize or remove artwork before changing the product.'); }
         if (a.finish !== undefined && !Object.hasOwn (LabelFinishes, a.finish)) { throw new Error ('Choose a supported label finish.'); }
@@ -17,9 +18,13 @@ export function ValidateProductArtwork (draft, entries = [])
         if (a.bleedMm !== undefined && (!Number.isFinite (a.bleedMm) || a.bleedMm < 0 || a.bleedMm > 20)) { throw new Error ('Artwork bleed must be 0–20 mm.'); }
         const x = a.offsetXmm ?? 0, y = a.offsetYmm ?? 0;
         if (!Number.isFinite (x) || !Number.isFinite (y) || a.widthMm + 2*Math.abs (x) > z.widthMm + 1e-7 || a.heightMm + 2*Math.abs (y) > z.heightMm + 1e-7) { throw new Error ('Label position must remain within its physical zone.'); }
-        seen.add (a.zone); return { ...a, ...(a.source !== undefined ? { source : ValidateLabelSource (a.source) } : {}) };
+        if (z.surface === 'disc' && Math.hypot (x, y) + Math.max (a.widthMm, a.heightMm) / 2 > z.radiusMm + 1e-7) { throw new Error ('Keep the cap label within the circular cap top.'); }
+        const cad = a.cad === undefined ? null : ValidateLabelCAD (a.cad);
+        if (cad && (Math.abs (cad.widthMm - a.widthMm) > 1e-7 || Math.abs (cad.heightMm - a.heightMm) > 1e-7)) { throw new Error ('Label CAD sheet must match its physical artwork size.'); }
+        seen.add (a.zone); return { ...a, ...(cad ? { cad } : {}), ...(a.source !== undefined ? { source : ValidateLabelSource (a.source) } : {}) };
     });
-    if (seen.has ('wrap') && seen.size > 1) { throw new Error ('Remove front/back labels before assigning a wrap label.'); }
+    if (seen.has ('wrap') && (seen.has ('front') || seen.has ('back'))) { throw new Error ('Remove front/back labels before assigning a wrap label.'); }
+    if (JSON.stringify (result).length > 240000) { throw new Error ('Simplify label CAD or SVG artwork to fit the portable product metadata limit.'); }
     return result;
 }
 
@@ -38,6 +43,12 @@ export function CreateLabelMesh (draft, art)
 function LabelMesh (draft, art)
 {
     const offsetX = art.offsetXmm || 0, offsetY = art.offsetYmm || 0;
+    if (art.zone === 'cap-top') {
+        const zone = GetArtworkZones (draft).find (item => item.id === art.zone);
+        const mesh = { id : 'label-cap-top', materialRole : 'label', artwork : art, positions : [offsetX, zone.topMm + .08, -offsetY], normals : [0, 1, 0], uvs : [.5, .5], indices : [] };
+        for (let i = 0; i < 64; i++) { const a = i * Math.PI / 32, x = Math.cos (a), z = Math.sin (a); mesh.positions.push (offsetX + x * art.widthMm / 2, zone.topMm + .08, -offsetY - z * art.heightMm / 2); mesh.normals.push (0, 1, 0); mesh.uvs.push (.5 + x / 2, .5 + z / 2); mesh.indices.push (0, i + 1, (i + 1) % 64 + 1); }
+        return mesh;
+    }
     if (draft.family === 'clamshell') { const top = art.zone === 'front', x = offsetX * (top ? 1 : -1), w = art.widthMm/2, d = art.heightMm/2, y = top ? draft.heightMm+.15 : -.15; return { id : 'label-'+art.zone, materialRole : 'label', artwork : art, positions : [-w+x, y, d-offsetY, w+x, y, d-offsetY, w+x, y, -d-offsetY, -w+x, y, -d-offsetY], normals : [0, top?1:-1, 0, 0, top?1:-1, 0, 0, top?1:-1, 0, 0, top?1:-1, 0], uvs : top ? [0, 0, 1, 0, 1, 1, 0, 1] : [1, 0, 0, 0, 0, 1, 1, 1], indices : top ? [0, 1, 2, 0, 2, 3] : [0, 2, 1, 0, 3, 2] }; }
     if (draft.family === 'pouch') { return PouchLabel (draft, art); }
     const zone = GetArtworkZones (draft).find (z => z.id === art.zone);

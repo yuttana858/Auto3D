@@ -1,8 +1,50 @@
 # Auto3D development log and handoff
 
-## Private alternative-reader proof transport — Auto3D 0.91.1 (2026-11-18)
+## Smooth molded pulp (NURBS Phase 2) and real-world cans — Auto3D 0.98.0 candidate
 
-Packaging 1.16.1 / Primary Products 0.15.0 / Molded Pulp 0.3.0 unchanged. Adds a short-lived operator-only read capability so a retained failed Parasolid can go directly from private R2 to an isolated Modal proof. No retries, retention or model-publication changes. Based on main 0.91.0; PR #163, CI/deployment pending. See [release-0911.md](release-0911.md).
+Packaging 1.18.0 / Primary Products 0.18.0 / Molded Pulp 0.4.0, based on main `42be7df` (0.97.0). Formed trays are displayed and exported from a smooth NURBS product surface (lofted walls, rounded skirt, fitted domed/recessed floors, tangent fillets) with live edge/corner radius settings (default 0.25 in) and knowledge-base radius checks; flat sheets have rounded corners and an exact STEP solid. Primary Products cans follow real two- and three-piece construction. Companion Cloud 3D Studio 0.6.0 (#25, draft) thickens the surface locally; the owned cloud thicken job is outstanding. See [release-0980.md](release-0980.md) and [molded-pulp-nurbs.md](molded-pulp-nurbs.md).
+
+## Live manual scaling and separated product generation — Auto3D 0.97.0 candidate
+
+Packaging 1.18.0 / Primary Products 0.17.0 / Molded Pulp 0.3.0. Draft [PR #172](https://github.com/yuttana858/Auto3D/pull/172), based on main `5c74f93` (merged #168). Primary Products manual fields update the matching selected object; uniform scale now follows the same live interaction with a stable percentage baseline, coalesced edits and no Apply scale button. Pending inputs are tied to the selection, account and document. Newly generated products are placed beyond existing world bounds with unit-correct spacing, while updates and anchored assemblies keep their placement. See [release-0970.md](release-0970.md). One development batch; not deployed. Validation on `ea53dd4`: 1,179 app/module tests, 73 MCP tests, app/MCP lint, license checks, both builds and two focused browser checks passed. Full browser release gate remains pending; see [validation](validation/primary-live-placement-0970.md).
+
+## Live primary products and CAD labels — Auto3D 0.96.0 candidate
+
+Packaging 1.18.0 / Primary Products 0.16.0 / Molded Pulp 0.3.0. Draft PR #168, based on deployed main 6632010; the separate animation PR #167 reserves 0.95.0. Selected products update from the right panel without generating another object. New bottles default to glass with hollow wall/base presets, independent cap geometry/material/color controls and front/back/wrap/cap-top labels in the shared CAD editor. Viewer fit uses projected selected bounds and live updates preserve navigation. See [release-0960.md](release-0960.md) for behavior, limits and agent commands. One draft batch; not deployed. Final validation: 1,158 app/module tests, 73 MCP tests and 13 focused browser checks passed, including a pixel comparison proving clear glass refracts the grid while opaque material blocks it. The full 100-check browser release gate remains pending; see [validation](validation/primary-live-0960.md).
+
+## Integrated animation and can-collar release — Auto3D 0.94.0 candidate
+
+Packaging 1.17.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0. Consolidates #158 visibility/lifetime tracks, #159 embedded clip scheduling, #160 array timeline reveals, #162 macro step timing, and #166 can collars/CAD shape tools into #162, preserving main through #164 (`cfd03f6`) and its shared account macro library. Resolves code, version and release-note conflicts without dropping either workstream. See [release-0940.md](release-0940.md). Combined validation and merge status are recorded in PR #162.
+
+## Can collar and CAD shape tools — Auto3D 0.93.0 / Packaging 1.17.0 / Primary Products 0.15.0 / Molded Pulp 0.3.0 (2026-11-19)
+
+Candidate on `claude/dazzling-faraday-rhti3h`, not deployed. The Accessories tab adds a Can collar for a selected group or array of upright cans (for example a 3 × 2 six-pack). The rim is sensed from the geometry, each can gets a tabbed relief hole tucked under its rim, the corners are rounded, and the collar is a grouped CAD board profile added in one Undo step. The CAD designer adds Shape tools (round corners, circle, relief hole). New commands: `packaging.accessories.collar(.inspect)` and `packaging.path.round_corners/circle/relief_hole`. See docs/release-0930.md.
+
+## Macro step timing — Auto3D 0.93.0 candidate
+
+Stacked on PR #160. Recorded macros support per-step durations and pauses; timing is editable in the macro builder and available to agents. Lighting remains under the app’s existing lighting settings. Overlapping steps, automatic creation/deletion, and procedural recording remain open; see release-macro-timing.md. Not deployed.
+
+## Array reveal on the shared timeline — Auto3D 0.92.0 candidate
+
+Stacked on PR #159. Existing selected objects can receive staggered reveal motion and visibility tracks; standard macros can create an array and pass copy IDs to the scheduler. The active object can remain in place. UX review clarified selection, timing and hidden-before-reveal behavior. Existing tracks are protected. See release-animation-array.md. Not deployed.
+
+## Embedded clips on the shared timeline — Auto3D 0.91.0 candidate
+
+Stacked on PR #158. Schedules paused embedded clips on the shared timeline with start, duration, speed and looping; seeking, playback and video export sample the same timeline. Adds an Animation panel control, object-track clip spans, agent commands and archive persistence. Unmanaged clips retain their existing independent behavior. Array recording and macro-generated procedural actions remain future work. See release-animation-clips.md. Not deployed.
+
+## Object visibility and lifetime timeline — Auto3D 0.90.0 candidate
+
+Stacked on PR #157. Adds discrete, undoable visibility keyframes and lifetime ranges for existing scene objects, a compact Animation panel editor, macro visibility capture, session persistence and agent controls. UI/UX review was performed independently; selected-object context, local feedback, reset on selection change, and marker legends are included. This does not record object creation or permanent deletion. See release-animation-visibility.md. Not deployed.
+
+## Shared macro library — Auto3D 0.92.0 (2026-11-19)
+
+Packaging 1.16.1 / Primary Products 0.15.0 / Molded Pulp 0.3.0 unchanged. Based on main after #163 (0.91.1). Macros are saved to one shared library in the account database: every signed-in account sees and runs every macro; only the account that saved it or an administrator can replace or delete it. Browser-only macros stay listed until moved with `macro.library.upload_browser`; saves never fall back to browser storage. Requires migration `20261119120000_shared_macro_library` before deploy. See [release-0920.md](release-0920.md).
+
+## Private alternative-reader proof transport — Auto3D 0.91.1 live (2026-11-18)
+
+Packaging 1.16.1 / Primary Products 0.15.0 / Molded Pulp 0.3.0 unchanged. PR #163; runtime `4a769df484ad7b2b74bbc97057b1a8b00aacd0f6`. CI 44427952565 and deployment 44429356940 passed, including source-capability workerd tests, normal validation and browser smoke, served version/bundle and authentication boundaries. The read-only bridge lets an operator evaluate a retained failed Parasolid directly inside Modal without changing retries, expiry or publication.
+
+The private CadConvert proof passed the public reference and source-transfer integrity, but failed individual face tessellation on the retained private source. Production fallback remains disabled; no annual SDK was added. The experimental proof is manual-only after its two bounded server evaluations. See [release-0911.md](release-0911.md), [validation](validation/cadconvert-proof-0911.md) and the [native proof record](https://github.com/yuttana858/Cloud-3D-Studio/blob/main/docs/cadconvert-proof.md).
 
 ## Integration release in #155 — Auto3D 0.91.0 / Packaging 1.16.1 (2026-11-18)
 

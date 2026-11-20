@@ -14,7 +14,7 @@ export class PulpJobs
     constructor (url) { this.url = url; this.worker = null; this.pending = null; this.seq = 0; }
     Run (module, message, onProgress)
     {
-        if (typeof Worker !== 'function' || !this.url) { return Promise.resolve (message.smoothSurface ? module.PlanSmoothSurface (message.triangles, message.draft, { detail : message.detail, onProgress }) : module.PlanPulp (message.stage, message.triangles, message.draft, { detail : message.detail, loftCheck : message.loftCheck === true, onProgress })); }
+        if (typeof Worker !== 'function' || !this.url) { return Promise.resolve (message.smoothSurface ? module.PlanSmoothSurface (message.triangles, message.draft, { detail : message.detail, onProgress }) : module.PlanPulp (message.stage, message.triangles, message.draft, { detail : message.detail, loftCheck : message.loftCheck === true, smoothDisplay : message.smoothDisplay === true, onProgress })); }
         this.Cancel (); const id = ++this.seq, worker = this.worker ||= new Worker (this.url ());
         return new Promise ((resolve, reject) => {
             this.pending = { id, reject };
@@ -145,7 +145,8 @@ export class MoldedPulpWorkspace
         this.refining = { detail, progress : 0, phase : 'starting' }; panel.Refresh ();
         try {
             const module = await this.load (), triangles = SessionTrianglesMm (target, this.Products (ids));
-            const plan = await this.jobs.Run (module, { stage, triangles, draft, detail }, (phase, progress) => { if (token === this.token) { this.refining = { detail, phase, progress }; panel.Refresh (); } });
+            // The refined tray is shown from its smooth NURBS surface (the review mesh stays when one cannot be built).
+            const plan = await this.jobs.Run (module, { stage, triangles, draft, detail, smoothDisplay : stage === 'tray' }, (phase, progress) => { if (token === this.token) { this.refining = { detail, phase, progress }; panel.Refresh (); } });
             const preview = commit.record.after;
             if (token !== this.token || this.active || editor.document !== target || !target.objects.includes (preview) || editor.history.undo.at (-1) !== commit.entry) { return null; }
             this.active = true;
@@ -259,8 +260,8 @@ export class MoldedPulpWorkspace
         const text = module.WriteSurfaceStep (surfaces, { name : base + ' product side' }), filename = base + ' product side.step';
         editor.Download (text, filename, 'model/step');
         const radii = plan.smooth[0].radii, raised = plan.raisedExtraMm, faces = surfaces.reduce ((n, s) => n + s.faces.length, 0);
-        const message = `Smooth surface STEP downloaded: ${faces} faces in mm, ${radii.floorFilletMm} mm floor and rim fillets, ${radii.skirtCornerMm} mm skirt corners.` + (raised > 0 ? ` Extra material raised by ${raised} mm (to ${plan.smoothDraft.extraLengthMm} × ${plan.smoothDraft.extraWidthMm} mm) so the rim fillets fit; form the tray again with it to match.` : '');
-        return { format : 'surface-step', filename, bytes : text.length, units : 'mm', shells : surfaces.length, faces, radii, raisedExtraMm : raised, extraLengthMm : plan.smoothDraft.extraLengthMm, extraWidthMm : plan.smoothDraft.extraWidthMm, maxDistanceMm : Math.max (...plan.smooth.map (s => s.maxDistanceMm)), message };
+        const message = `Smooth surface STEP downloaded: ${faces} faces in mm, ${radii.floorFilletMm} mm edge radius${radii.rimFilletMm !== radii.floorFilletMm ? ` (${radii.rimFilletMm} mm on the rims, as wide as the plateau between pockets allows)` : ''}, ${radii.skirtCornerMm} mm corner radius.` + (raised > 0 ? ` Extra material raised by ${raised} mm (to ${plan.smoothDraft.extraLengthMm} × ${plan.smoothDraft.extraWidthMm} mm) so the rim fillets fit; form the tray again with it to match.` : '');
+        return { format : 'surface-step', filename, bytes : text.length, units : 'mm', shells : surfaces.length, faces, radii, ...(plan.limitedRimMm ? { limitedRimMm : plan.limitedRimMm } : {}), raisedExtraMm : raised, extraLengthMm : plan.smoothDraft.extraLengthMm, extraWidthMm : plan.smoothDraft.extraWidthMm, maxDistanceMm : Math.max (...plan.smooth.map (s => s.maxDistanceMm)), message };
     }
     async Export (format)
     {
@@ -275,15 +276,18 @@ export class MoldedPulpWorkspace
             const definition = ValidatePulpDefinition (JSON.parse (object.userData[MoldedPulpDataKey]));
             if (!definition.productIds.length) { throw new Error ('This pulp object was formed over more than ' + MaxStoredProducts + ' products. Select them and form again to export.'); }
             const triangles = SessionTrianglesMm (editor.document, this.Products (definition.productIds)), draft = definition.draft;
-            const plan = definition.stage === 'sheet' ? module.PlanSheet (triangles, draft) : await this.jobs.Run (module, { stage : 'tray', triangles, draft, detail : draft.detail });
+            const plan = definition.stage === 'sheet' ? module.PlanSheet (triangles, draft) : await this.jobs.Run (module, { stage : 'tray', triangles, draft, detail : draft.detail, smoothDisplay : true });
             output = { object, plan, stage : definition.stage, draft };
         }
         if (this.refining) { throw new Error ('Wait for the detailed shape to finish refining before exporting.'); }
         const plan = output.plan, base = (object.name || 'Molded pulp').replace (/[^\w .-]+/g, ' ').replace (/\s+/g, ' ').trim () || 'Molded pulp';
         if (format === 'step') {
-            const text = module.WriteStep (plan.nurbs.shells, { name : base }), filename = base + '.step';
+            // A flat sheet with rounded corners is written from its exact rounded solid; trays (and square sheets) from the
+            // review-node B-rep.
+            const solids = plan.nurbs.solids, text = solids ? module.WriteSolidStep (solids, { name : base }) : module.WriteStep (plan.nurbs.shells, { name : base }), filename = base + '.step';
             editor.Download (text, filename, 'model/step');
-            return { format, filename, bytes : text.length, units : 'mm', solids : plan.nurbs.shells.length, faces : 6 * plan.nurbs.shells.length, nodes : plan.nurbs.shells.map (s => [...s.nodes]), message : 'STEP downloaded: ' + plan.nurbs.shells.length + ' closed solid' + (plan.nurbs.shells.length === 1 ? '' : 's') + ' in mm.' };
+            const count = solids ? solids.length : plan.nurbs.shells.length;
+            return { format, filename, bytes : text.length, units : 'mm', solids : count, faces : solids ? solids.reduce ((n, s) => n + s.faces.length, 0) : 6 * count, nodes : plan.nurbs.shells.map (s => [...s.nodes]), ...(solids ? { cornerRadiusMm : plan.metrics.cornerRadiusMm } : {}), message : 'STEP downloaded: ' + count + ' closed solid' + (count === 1 ? '' : 's') + ' in mm' + (solids ? `, ${plan.metrics.cornerRadiusMm} mm rounded corners.` : '.') };
         }
         const bytes = await MoldedPulpGlb (plan, PulpTypes[output.draft.pulpType].roughness), filename = base + '.glb';
         editor.Download (bytes, filename, 'model/gltf-binary');

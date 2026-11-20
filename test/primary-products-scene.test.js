@@ -12,6 +12,7 @@ import { PackRecoverySnapshot } from '../source/website/sessionrecoverypack.js';
 import { Unit } from '../source/engine/model/unit.js';
 import { CreateAgentCommands } from '../source/website/agentcommands.js';
 import { ResolveDimension, ValidateDimensions } from '../source/website/dimensioncore.js';
+import { GetBoundingBox } from '../source/engine/model/modelutils.js';
 
 function Fixture (load = async () => module)
 {
@@ -20,14 +21,32 @@ function Fixture (load = async () => module)
     panel.products = new PrimaryProductsWorkspace (panel, load); return { panel, editor, workspace : panel.products };
 }
 describe ('Primary Products scene integration', function () {
-    it ('generates opaque components through strict shared commands, with one undo/redo step', async function () {
+    it ('generates glass bottle components through strict shared commands, with one undo/redo step', async function () {
         const { panel, editor } = Fixture (); const commands = CreateAgentCommands ({ sessionEditor : editor, primaryProductsPanel : panel });
         assert.equal ((await commands.Execute ('primary.generate', { unexpected : true })).ok, false);
         const r = await commands.Execute ('primary.generate'); assert.equal (r.ok, true, JSON.stringify (r));
-        assert.deepEqual (r.result.components, ['body', 'cap']); assert.equal (editor.document.objects.length, 1); assert.equal (editor.history.undo.length, 1);
+        assert.deepEqual (r.result.components, ['body', 'cap', 'neck-ring']); assert.equal (editor.document.objects.length, 1); assert.equal (editor.history.undo.length, 1);
         const model = editor.document.model; assert.equal (model.materials[0].metalness, 0); assert.equal (model.materials[0].roughness, panel.draft.roughness);
+        assert.ok (model.materials[0].transmission > .9); assert.ok (model.materials[0].thickness > 0);
         await editor.history.Undo (); assert.equal (editor.document.objects.length, 0);
         await editor.history.Redo (); assert.equal (editor.selected.id, r.result.objectId); assert.equal (editor.document.objects.length, 1);
+    });
+    it ('places new products apart in the generation Undo step and preserves placement on selected edits and reopen', async function () {
+        const { panel, editor, workspace } = Fixture (); await workspace.Generate (); const first = editor.selected;
+        assert.deepEqual (first.position, [0, 0, 0]);
+        panel.draft = module.DefaultProductDraft ('can'); await workspace.Generate (); const second = editor.selected, position = [...second.position];
+        const bounds = object => GetBoundingBox (editor.document.CompactModel ([object]));
+        assert.ok (bounds (second).min.x - bounds (first).max.x >= 10 - 1e-8); assert.equal (editor.history.undo.length, 2); assert.equal (editor.document.dimensions.length, 6);
+        await editor.history.Undo (); assert.deepEqual (editor.document.objects, [first]); assert.equal (editor.document.dimensions.length, 3);
+        await editor.history.Redo (); assert.equal (editor.selected, second); assert.deepEqual (second.position, position); assert.equal (editor.document.dimensions.length, 6);
+        Object.assign (second, { position : [position[0] + 3, 12, 9], rotation : [13, 27, 41], scale : [1.5, 2, .7] }); editor.document.ApplyTransform (second);
+        panel.draft = module.UpdateProductDraft (panel.draft, { heightMm : 150 }); await workspace.Generate (true);
+        const updated = editor.selected;
+        for (const key of ['position', 'rotation', 'scale']) { assert.deepEqual (updated[key], second[key]); }
+        assert.equal (updated.id, second.id); assert.equal (editor.document.objects.length, 2);
+        await editor.history.Undo (); assert.equal (editor.selected, second); await editor.history.Redo (); assert.equal (editor.selected, updated);
+        const saved = OpenSessionArchive (CreateSessionArchive (PackSession (editor.document))).document;
+        assert.deepEqual (saved.objects[1].position, updated.position); assert.deepEqual (saved.objects[0].position, [0, 0, 0]);
     });
     it ('adds W × L × H callouts with the generation step and keeps them on live resizes', async function () {
         this.timeout (20000); const { panel, editor, workspace } = Fixture (); panel.draft = module.UpdateProductDraft (module.DefaultProductDraft ('pouch'), { widthMm : 150, depthMm : 30, heightMm : 210 });

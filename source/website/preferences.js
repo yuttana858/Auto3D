@@ -9,7 +9,7 @@ import { Unit } from '../engine/model/unit.js';
 import { OpenCommandPanel } from './commandpanel.js';
 import { OpenModalConnection } from './modalconnection.js';
 
-export const AppVersion = '0.91.1';
+export const AppVersion = '0.98.0';
 
 export function AppBuildInfo ()
 {
