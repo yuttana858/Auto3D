@@ -92,7 +92,7 @@ try {
     await panel.locator ('[data-node-id="' + resultNodeId + '"]').click (); await panel.getByLabel ('Enable history operation', { exact : true }).uncheck (); await changed ('suppress operation', value => value.definition.nodes.find (node => node.id === resultNodeId).enabled === false); assert.equal ((await geometry ()).at (-1).triangles, 12);
     await panel.getByLabel ('Enable history operation', { exact : true }).check (); await changed ('restore operation', value => value.definition.nodes.find (node => node.id === resultNodeId).enabled);
     console.log ('Real subtraction and editable history rollback/resume/suppression passed.');
-    await panel.locator ('[data-node-id="' + baseId + '"]').click (); await panel.getByRole ('button', { name : 'Fit model', exact : true }).click (); await panel.evaluate (node => { node.scrollTop = 0; }); await page.screenshot ({ path : 'work/3dstudio/desktop.png', timeout : 120000 });
+    await panel.locator ('[data-node-id="' + baseId + '"]').click (); await panel.getByRole ('button', { name : 'Fit model', exact : true }).click (); await call ('view.focus'); await panel.evaluate (node => { node.scrollTop = 0; }); await page.screenshot ({ path : 'work/3dstudio/desktop.png', timeout : 120000 });
     await call ('ui.module.mode', { module : '3dstudio', mode : 'extended' }); assert.equal (await page.getByRole ('dialog', { name : '3Dstudio extended workspace', exact : true }).count (), 1);
     assert.ok (await panel.evaluate (node => node.scrollWidth <= node.clientWidth + 1), 'extended module has no horizontal overflow'); await page.screenshot ({ path : 'work/3dstudio/extended.png', timeout : 120000 });
     await call ('ui.module.mode', { module : '3dstudio', mode : 'minimal' });

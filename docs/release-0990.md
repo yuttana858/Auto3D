@@ -50,5 +50,11 @@ their editing systems. Imported-mesh Booleans, fillets, sketch constraints,
 B-rep/STEP authoring and label/UV remapping are not included. Curves use bounded
 tessellation; this is not a NURBS authoring release.
 
-Validation evidence is recorded in the PR and project log after final checks.
+Validation: **1,290 app/module tests and 73 MCP tests passed**, plus three focused
+browser checks, lint, license checks and both builds. The full browser release
+gate remains pending. Evidence and resolved issues are recorded in
+[the validation record](validation/3dstudio-0990.md). See the actual app's
+[desktop](assets/3dstudio-0990/desktop.png),
+[extended](assets/3dstudio-0990/extended.png) and
+[mobile](assets/3dstudio-0990/mobile.png) review images.
 The previous selection-tool increment is documented in [release-0980.md](release-0980.md).

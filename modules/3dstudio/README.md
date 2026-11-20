@@ -99,6 +99,8 @@ Products, Packaging and CAD are not converted or baked into its history. Fillets
 sketch constraints, B-rep/STEP authoring, imported-mesh repair, persistent face IDs
 and label/UV remapping are future work. Existing session mesh exports remain
 available. Curved surfaces are tessellated; segment counts control detail.
+Circular segment counts round up to multiples of four to preserve the requested
+axis diameters at each detail level.
 
 ## Runtime distribution
 
