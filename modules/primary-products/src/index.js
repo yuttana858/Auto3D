@@ -19,3 +19,4 @@ export { GlassThicknessPresets, CapMaterials, GlassBottle, BottleWall, BottleCap
 export { ValidateLabelCAD, NewLabelCAD, ScaleLabelCAD, LabelCADSVG } from './labelcad.js';
 export { LabelDieline, DielineSvg, DielineDxf, DefaultOverlapMm, DielineLimits } from './dieline.js';
 export { CanProfile } from './detailmesh.js';
+export { ProductStep, CanOutline, LabelRegions, RevolvedSolid, WriteProductStep } from './productstep.js';

@@ -180,8 +180,9 @@ export class PrimaryProductsPanel
         Element ('p', 'pp_draft_note', 'Clear film uses the image alpha channel. Use surface masks for spot varnish or relief effects.', artwork);
         // Print template of the selected zone (bleed, trim, safe area, glue overlap) for the label designer's tools.
         const dieline = Element ('div', 'pp_zone_buttons', undefined, artwork);
+        const cad = Element ('button', '', 'Product STEP', dieline); cad.type = 'button'; cad.setAttribute ('aria-label', 'Download product CAD with label regions (STEP)'); cad.addEventListener ('click', () => this.Action (() => host.exportProductStep ()));
         for (const format of ['svg', 'dxf']) { const button = Element ('button', '', 'Dieline ' + format.toUpperCase (), dieline); button.type = 'button'; button.setAttribute ('aria-label', 'Download label dieline (' + format.toUpperCase () + ')'); button.addEventListener ('click', () => this.Action (() => host.exportDieline (format))); }
-        Element ('p', 'pp_draft_note', 'Dieline: the zone\'s print template in mm. Design to its bleed box, then import the art with that bleed.', artwork);
+        Element ('p', 'pp_draft_note', 'Product STEP: the can as an exact CAD solid with its label zones as named, coloured faces. Dieline: the zone\'s print template in mm. Design to its bleed box, then import the art with that bleed.', artwork);
         this.artRemove = Element ('button', 'pp_reset', 'Remove label image', artwork); this.artRemove.type = 'button'; this.artRemove.addEventListener ('click', () => this.Action (() => host.artworkRemove (this.host.inspect ().labelZone)));
         this.artApply = Element ('button', 'pp_art_import pp_art_apply', 'Apply label artwork', artwork); this.artApply.type = 'button'; this.artApply.addEventListener ('click', () => this.Action (() => host.applyArtwork ()));
         this.artStatus = Element ('p', 'pp_status', '', artwork); this.artStatus.setAttribute ('role', 'status');

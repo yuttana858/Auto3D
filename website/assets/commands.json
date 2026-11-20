@@ -10813,6 +10813,37 @@
       }
     },
     {
+      "id": "primary.export.step",
+      "title": "Download product CAD with label regions",
+      "category": "Primary Products",
+      "description": "Download the current product draft (cans: two-piece beverage, three-piece food, tins) as an exact STEP solid in mm (AP214): a solid of revolution of planes, cylinders and cones from its real construction, with each label zone (default: the zones with applied artwork; or the given zones: front, back, wrap) split out as faces named \"Label <zone>\" in a label colour, and the body in the product colour. Other families are refused. Local download only; nothing is uploaded and the scene is unchanged.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zones": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "front",
+                "back",
+                "wrap"
+              ]
+            },
+            "maxItems": 3
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {
+        "zones": [
+          "wrap"
+        ]
+      }
+    },
+    {
       "id": "primary.label.dieline",
       "title": "Download label dieline",
       "category": "Primary Products",

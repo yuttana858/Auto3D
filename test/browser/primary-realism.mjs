@@ -55,6 +55,10 @@ try {
         if (id === 'standard-beverage') {
             assert.ok (result.components.includes ('pull-tab'));
             // Label dieline of the printed wrap: the circumference, no glue overlap, downloaded as SVG and DXF.
+            // Exact product CAD: one solid with the wrap label as named, coloured faces.
+            const [stepFile, stepResult] = await Promise.all ([page.waitForEvent ('download'), page.evaluate (() => Auto3D.execute ('primary.export.step', { zones : ['wrap'] }))]);
+            assert.equal (stepResult.ok, true, JSON.stringify (stepResult)); assert.deepEqual (stepResult.result.labels, ['wrap']);
+            const stepText = (await readFile (await stepFile.path ())).toString (); assert.match (stepText, /MANIFOLD_SOLID_BREP/); assert.match (stepText, /STYLED_ITEM\('Label wrap'/);
             const dieline = await call ('primary.label.dieline', { zone : 'wrap', format : 'json' }); assert.ok (Math.abs (dieline.trim.widthMm - Math.PI * 66.2) < 1e-6); assert.equal (dieline.overlapMm, 0);
             for (const format of ['svg', 'dxf']) {
                 const [file] = await Promise.all ([page.waitForEvent ('download'), page.evaluate (format => Auto3D.execute ('primary.label.dieline', { zone : 'wrap', format }), format)]);
