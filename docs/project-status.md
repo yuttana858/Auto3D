@@ -1,5 +1,9 @@
 # Auto3D development log and handoff
 
+## Smooth molded pulp (NURBS Phase 2) and real-world cans — Auto3D 0.98.0 candidate
+
+Packaging 1.18.0 / Primary Products 0.18.0 / Molded Pulp 0.4.0, based on main `42be7df` (0.97.0). Formed trays are displayed and exported from a smooth NURBS product surface (lofted walls, rounded skirt, fitted domed/recessed floors, tangent fillets) with live edge/corner radius settings (default 0.25 in) and knowledge-base radius checks; flat sheets have rounded corners and an exact STEP solid. Primary Products cans follow real two- and three-piece construction. Companion Cloud 3D Studio 0.6.0 (#25, draft) thickens the surface locally; the owned cloud thicken job is outstanding. See [release-0980.md](release-0980.md) and [molded-pulp-nurbs.md](molded-pulp-nurbs.md).
+
 ## Live manual scaling and separated product generation — Auto3D 0.97.0 candidate
 
 Packaging 1.18.0 / Primary Products 0.17.0 / Molded Pulp 0.3.0. Draft [PR #172](https://github.com/yuttana858/Auto3D/pull/172), based on main `5c74f93` (merged #168). Primary Products manual fields update the matching selected object; uniform scale now follows the same live interaction with a stable percentage baseline, coalesced edits and no Apply scale button. Pending inputs are tied to the selection, account and document. Newly generated products are placed beyond existing world bounds with unit-correct spacing, while updates and anchored assemblies keep their placement. See [release-0970.md](release-0970.md). One development batch; not deployed. Validation on `ea53dd4`: 1,179 app/module tests, 73 MCP tests, app/MCP lint, license checks, both builds and two focused browser checks passed. Full browser release gate remains pending; see [validation](validation/primary-live-placement-0970.md).

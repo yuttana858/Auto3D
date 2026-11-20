@@ -34,6 +34,11 @@ export class MoldedPulpPanel
         this.Field (row, 'thicknessMm', 'Pulp thickness', PulpLimits.thicknessMm, 0.1);
         this.Field (row, 'extraLengthMm', 'Additional length', PulpLimits.extraMm, 1);
         this.Field (row, 'extraWidthMm', 'Additional width', PulpLimits.extraMm, 1);
+        // Edge and corner rounding (molded fibre always forms with some); live like the other sheet fields.
+        const radiusRow = Element ('div', 'mp_row', undefined, sheet);
+        this.Field (radiusRow, 'edgeRadiusMm', 'Edge radius', PulpLimits.radiusMm, 0.1);
+        this.Field (radiusRow, 'cornerRadiusMm', 'Corner radius', PulpLimits.radiusMm, 0.1);
+        Element ('p', 'mp_help', 'Edge radius rounds pocket floors, rims and the skirt top; corner radius rounds the sheet and skirt corners. 0.25 in (6.35 mm) is a safe start; the knowledge base asks for 3 mm or more on edges and 6 mm or more on corners deeper than 30 mm.', sheet);
         this.thicknessHint = Element ('p', 'mp_help', '', sheet);
         this.sheetText = Element ('p', 'mp_readout', '', sheet);
         this.sheetButton = this.Button (sheet, 'Generate sheet', () => this.host.generateSheet (), 'mp_primary');
@@ -82,6 +87,12 @@ export class MoldedPulpPanel
         const outputRow = Element ('div', 'mp_row', undefined, output);
         this.stepButton = this.Button (outputRow, 'Export STEP', () => this.host.exportOutput ('step'));
         this.glbButton = this.Button (outputRow, 'Export GLB', () => this.host.exportOutput ('glb'));
+        this.surfaceButton = this.Button (output, 'Export smooth surface (STEP)', () => this.host.exportOutput ('surface-step'));
+        // Phase 2 (experimental): smooth lofted walls, checked against the review surface. The outer skirt is optional.
+        const skirt = Element ('label', 'mp_check_field', undefined, output); this.skirtWall = Element ('input', null, undefined, skirt); this.skirtWall.type = 'checkbox';
+        Element ('span', null, 'Outer skirt wall (experimental)', skirt); this.skirtWall.setAttribute ('aria-label', 'Outer skirt wall (experimental)');
+        this.skirtWall.addEventListener ('change', () => this.Change ({ skirtWall : this.skirtWall.checked }));
+        this.loftButton = this.Button (output, 'Check smooth walls', () => this.host.checkLoft ());
         const footer = Element ('div', 'mp_footer', undefined, this.root);
         this.resetButton = this.Button (footer, 'Reset draft', () => this.host.reset ());
         this.status = Element ('p', 'mp_status', '', this.root); this.status.setAttribute ('role', 'status');
@@ -154,7 +165,7 @@ export class MoldedPulpPanel
             field.suffix.textContent = field.unit || u; field.input.disabled = blocked;
         }
         for (const [key, select] of Object.entries (this.selects)) { select.value = d[key]; select.disabled = blocked; }
-        this.hinge.checked = d.hinge; this.hinge.disabled = blocked || d.clamshell === 'none';
+        this.hinge.checked = d.hinge; this.hinge.disabled = blocked || d.clamshell === 'none'; this.skirtWall.checked = d.skirtWall === true; this.skirtWall.disabled = blocked;
         this.fields.partingFraction.input.disabled = blocked || d.clamshell === 'none';
         for (const key of ['ribDepthMm', 'ribWidthMm']) { this.fields[key].input.disabled = blocked || d.ribs === 'off'; }
         this.fields.lugStandoffMm.input.disabled = blocked || d.lugs === 'off';
@@ -169,7 +180,7 @@ export class MoldedPulpPanel
         this.checks.replaceChildren (...(state.result?.checks || []).map (c => { const li = Element ('li', 'mp_check mp_' + c.severity); li.textContent = c.message; li.title = c.id + ' · ' + c.basis; return li; }));
         const trace = state.result?.trace || []; this.why.hidden = !trace.length;
         this.trace.replaceChildren (...trace.map (t => { const li = Element ('li', 'mp_trace_item'); Element ('strong', null, t.rule + ' · ' + t.title, li); Element ('span', null, t.decision, li); li.title = t.basis; return li; }));
-        const acting = blocked || state.generating; this.senseButton.disabled = acting; this.sheetButton.disabled = acting || !state.sensed; this.depthButton.disabled = acting; this.trayButton.disabled = acting || !state.sensed; this.stepButton.disabled = this.glbButton.disabled = acting || Boolean (refining) || !state.pulpObjectId || !this.host.exportOutput; this.resetButton.disabled = acting;
+        const acting = blocked || state.generating; this.senseButton.disabled = acting; this.sheetButton.disabled = acting || !state.sensed; this.depthButton.disabled = acting; this.trayButton.disabled = acting || !state.sensed; this.surfaceButton.disabled = acting || Boolean (refining) || state.stage !== 'tray' || !state.pulpObjectId || !this.host.exportOutput; this.stepButton.disabled = this.glbButton.disabled = acting || Boolean (refining) || !state.pulpObjectId || !this.host.exportOutput; this.loftButton.disabled = acting || Boolean (refining) || !state.pulpObjectId || !this.host.checkLoft; this.resetButton.disabled = acting;
         if (this.busyText) { this.status.textContent = this.busyText; } else if (refining) { this.status.textContent = `Refining ${PulpDetail[refining.detail]?.name || ''} shape · ${refining.phase || 'starting'} ${Math.round ((refining.progress || 0) * 100)}%`; } else if (state.unavailableReason && !this.status.textContent) { this.status.textContent = state.unavailableReason; }
         this.Drawing (state);
     }

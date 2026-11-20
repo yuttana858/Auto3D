@@ -148,3 +148,82 @@ export function KnotSpans (knots, p = Degree)
 {
     const spans = []; for (let i = p; i < knots.length - p - 1; i++) { if (knots[i + 1] > knots[i]) { spans.push ([knots[i], knots[i + 1]]); } } return spans;
 }
+
+// Least-squares fit of several value columns along one axis: values[k * columns + c] at the axis samples (AxisBasis).
+// Returns control values, index b * columns + c.
+export function FitAxis (values, columns, basis)
+{
+    const p = basis.degree, count = basis.count, out = new Float64Array (count * columns), rhs = new Float64Array (count);
+    for (let c = 0; c < columns; c++) {
+        rhs.fill (0);
+        for (let k = 0; k < basis.spans.length; k++) { const s = basis.spans[k] - p, v = values[k * columns + c]; for (let r = 0; r <= p; r++) { rhs[s + r] += basis.values[k * (p + 1) + r] * v; } }
+        BandSolve (basis.factor, count, p, rhs); for (let b = 0; b < count; b++) { out[b * columns + c] = rhs[b]; }
+    }
+    return out;
+}
+
+// Boehm knot insertion (The NURBS Book A5.1, one knot): points is a flat array of control points of dimension dim.
+// The curve is unchanged; returns the new knots and points.
+export function InsertKnot (knots, points, dim, u, p = Degree)
+{
+    let k = p; while (k + 1 < knots.length - p - 1 && knots[k + 1] <= u) { k++; }
+    const count = points.length / dim, outKnots = new Float64Array (knots.length + 1), out = new Float64Array ((count + 1) * dim);
+    outKnots.set (knots.subarray (0, k + 1)); outKnots[k + 1] = u; outKnots.set (knots.subarray (k + 1), k + 2);
+    for (let i = 0; i <= count; i++) {
+        let a; if (i <= k - p) { a = 1; } else if (i >= k + 1) { a = 0; } else { const d = knots[i + p] - knots[i]; a = d > 0 ? (u - knots[i]) / d : 0; }
+        for (let c = 0; c < dim; c++) {
+            const here = i < count ? points[i * dim + c] : 0, before = i > 0 ? points[(i - 1) * dim + c] : 0;
+            out[i * dim + c] = i <= k - p ? here : i >= k + 1 ? before : a * here + (1 - a) * before;
+        }
+    }
+    return { knots : outKnots, points : out };
+}
+
+// A uniform periodic cubic with m controls over [0, 1) (control i + m = control i), rewritten as the same curve in clamped
+// form: m + 3 controls, knots 0 ×4, 1/m … (m − 1)/m, 1 ×4. The first and last controls are both the curve point at 0 (the
+// seam), so a closed wall's boundary curves are plain control rows. ring: flat [x, z, …] of m controls (dim per point).
+export function ClampUniformPeriodic (ring, m, dim = 2)
+{
+    let knots = Float64Array.from ({ length : m + 2 * Degree + 1 }, (_, i) => (i - Degree) / m);
+    let points = new Float64Array ((m + Degree) * dim); for (let i = 0; i < m + Degree; i++) { for (let c = 0; c < dim; c++) { points[i * dim + c] = ring[(i % m) * dim + c]; } }
+    for (const u of [0, 0, 1, 1]) { ({ knots, points } = InsertKnot (knots, points, dim, u)); }
+    // Knot 0 now has multiplicity 3 at indices 3..5 and knot 1 at m + 5..m + 7: keep controls 2..m + 4.
+    const clamped = new Float64Array (m + 3 + 4); clamped.set (knots.subarray (3, m + 8), 1); clamped[0] = 0; clamped[clamped.length - 1] = 1;
+    return { knots : clamped, points : points.slice (2 * dim, (m + 5) * dim) };
+}
+
+// Split a clamped surface at height parameter v (0 < v inside the V range) into the parts below and above, exactly: v is
+// inserted until it has multiplicity p, and the shared control row is the iso curve at v (same U knots), so the two parts
+// meet in a common boundary curve. Returns { lower, upper } surfaces with the same U structure.
+export function SplitSurfaceV (surface, v)
+{
+    const { countU, countV, knotsV, points } = surface, q = surface.degreeV;
+    let knots = knotsV, columns = [];
+    for (let a = 0; a < countU; a++) { const c = new Float64Array (countV * 3); for (let b = 0; b < countV; b++) { for (let k = 0; k < 3; k++) { c[b * 3 + k] = points[(b * countU + a) * 3 + k]; } } columns.push (c); }
+    let multiplicity = knots.filter (k => k === v).length;
+    while (multiplicity < q) {
+        let next = null;
+        columns = columns.map (c => { const r = InsertKnot (knots, c, 3, v, q); next = r.knots; return r.points; });
+        knots = next; multiplicity++;
+    }
+    const s = knots.indexOf (v), rows = columns[0].length / 3;
+    const part = (from, to, partKnots) => {
+        const n = to - from, out = new Float64Array (countU * n * 3);
+        for (let b = 0; b < n; b++) { for (let a = 0; a < countU; a++) { for (let k = 0; k < 3; k++) { out[(b * countU + a) * 3 + k] = columns[a][(from + b) * 3 + k]; } } }
+        return { ...surface, knotsV : Float64Array.from (partKnots), countV : n, points : out };
+    };
+    // Knot v at indices s … s + q − 1: the curve passes through control s − 1 there.
+    return { lower : part (0, s, [...knots.subarray (0, s + q), v]), upper : part (s - 1, rows, [v, ...knots.subarray (s)]) };
+}
+
+// The same split in the U direction (by transposing): { left, right } meet in the iso curve at u.
+export function SplitSurfaceU (surface, u)
+{
+    const transpose = sf => {
+        const points = new Float64Array (sf.points.length);
+        for (let b = 0; b < sf.countV; b++) { for (let a = 0; a < sf.countU; a++) { for (let k = 0; k < 3; k++) { points[(a * sf.countV + b) * 3 + k] = sf.points[(b * sf.countU + a) * 3 + k]; } } }
+        return { ...sf, degreeU : sf.degreeV, degreeV : sf.degreeU, knotsU : sf.knotsV, knotsV : sf.knotsU, countU : sf.countV, countV : sf.countU, points };
+    };
+    const { lower, upper } = SplitSurfaceV (transpose (surface), u);
+    return { left : transpose (lower), right : transpose (upper) };
+}

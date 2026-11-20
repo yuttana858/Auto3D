@@ -1,4 +1,4 @@
-import { PulpTypes } from './state.js';
+import { PulpTypes, DefaultRadiusMm, PulpRadiusRules } from './state.js';
 import { SenseBounds, SheetRect, BottomHeightfield } from './surface.js';
 import { FormTop, SheetSurfaces, PocketMetrics, ShellVolume, FootprintIslands } from './tray.js';
 import { DetailGrid, OffsetDown } from './field.js';
@@ -8,6 +8,10 @@ import { PlanFeatures } from './rules.js';
 import { ApplyRibs, ApplyLugs } from './features.js';
 import { ClamshellShells, ToLocal, ComponentToWorld } from './orient.js';
 import { NurbsShell } from './nurbs/shell.js';
+import { LoftPocketWalls } from './nurbs/loft.js';
+import { ProductSurface, ProductSurfaceProblem, PlateauLand } from './nurbs/surface.js';
+import { SmoothShellMesh } from './nurbs/display.js';
+import { RoundedSheetSurface, RoundedSheetMesh } from './nurbs/sheet.js';
 
 const kb = 'MP knowledge base · mp-des-dfm-rules-by-process-type';
 const r1 = v => Math.round (v * 10) / 10;
@@ -30,6 +34,12 @@ export function PulpChecks (draft, bounds, rect, metrics = null)
     const margin = Math.min (draft.extraLengthMm, draft.extraWidthMm) / 2;
     if (margin < needed) { add ('MP-M1', 'warning', `Add material: ${r1 (margin)} mm per side is less than the ${r1 (needed)} mm the drafted outer wall needs to reach full depth. Increase additional length/width to at least ${r1 (needed * 2)} mm.`); }
     if (draft.clearanceMm === 0) { add ('MP-C1', 'note', 'Zero clearance: products may bind in their pockets after drying shrinkage.'); }
+    // Radii (KB G-04, G-05; tool side from the NURBS output).
+    const edge = draft.edgeRadiusMm ?? DefaultRadiusMm, corner = draft.cornerRadiusMm ?? DefaultRadiusMm, rules = 'MP knowledge base · mp-des-dfm-checklist-and-rule-tables (G-04, G-05)';
+    const edgeMin = draft.pulpType === 'type1' ? Math.max (PulpRadiusRules.edgeMinMm, draft.thicknessMm) : PulpRadiusRules.edgeMinMm;
+    if (edge < edgeMin) { add ('MP-RD1', 'warning', `Edge radius ${r1 (edge)} mm is below the ${r1 (edgeMin)} mm minimum${draft.pulpType === 'type1' ? ' (at least the wall thickness for Type 1)' : ''}: sharp edges thin and tear the fibre mat.`, rules); }
+    if (corner < PulpRadiusRules.cornerMinMm && depth > PulpRadiusRules.cornerDepthMm) { add ('MP-RD2', 'warning', `Corner radius ${r1 (corner)} mm is below the 6 mm suggested for corners deeper than 30 mm (6–12 mm preferred).`, rules); }
+    if (edge <= draft.thicknessMm) { add ('MP-RD3', 'note', `Edge radius ${r1 (edge)} mm is not above the ${r1 (draft.thicknessMm)} mm wall: convex edges come out sharp on the tool side.`, 'Molded Pulp NURBS output (tool side = product side offset by the thickness)'); }
     if (metrics) {
         if (metrics.minRibMm !== null && metrics.minRibMm < 8) { add ('MP-R1', 'warning', `Pockets are ${r1 (metrics.minRibMm)} mm apart at the plateau; keep cavities at least 8 mm apart.`); }
         if (metrics.productIslands > metrics.pocketCount) { add ('MP-R2', 'warning', `${metrics.productIslands} separate product footprints share ${metrics.pocketCount || 'no'} enclosed pocket${metrics.pocketCount === 1 ? '' : 's'}: products are too close for a full-depth rib between them. Spread them apart or reduce depth, draft or clearance.`); }
@@ -68,11 +78,25 @@ export function FormShell (triangles, draft, options = {})
     progress ('meshing', 0.85); const surfaces = { top, bottom }, display = DisplaySurfaces (grid, surfaces), component = AdaptiveShellMesh (display.grid, display.surfaces, origin, options.id || 'pulp-tray', grid.toleranceMm, Math.max (0.5, draft.thicknessMm / 2));
     // NURBS output (STEP and future solid modeling) from the same surfaces the review mesh shows, in world mm.
     const nurbs = NurbsShell (grid, surfaces, { baseY : rect.baseY, direction : options.direction || '+y', id : options.shellName || 'Tray' });
+    // Phase 2 check (on request): smooth lofted walls built from this shell's review field, reported without geometry.
+    const loft = options.loftCheck ? LoftSummary (LoftPocketWalls (grid, top, { depthMm : achieved, wallToleranceMm : WallTolerance (draft, grid), skirtWall : draft.skirtWall === true }), options.shellName || 'Tray') : null;
+    const smooth = options.smoothSurface ? SmoothShell (grid, top, achieved, rect.baseY, draft, options) : null;
+    // Smooth display (Standard detail or finer): the tray shown from its smooth product surface instead of the review
+    // mesh, whose walls saw-tooth between grid cells. Rims fall back to sharp when the plateau is too narrow for them, and
+    // the review mesh stays when no smooth surface can be built (merged pockets, for example).
+    const smoothMesh = options.smoothDisplay && detail !== 'draft' ? SmoothDisplay (grid, top, achieved, draft, origin, options, component) : null;
     const volume = ShellVolume (surfaces, grid);
     const metrics = { lengthMm : r1 (rect.lengthMm), widthMm : r1 (rect.widthMm), thicknessMm : draft.thicknessMm, formDepthMm : r1 (depth), achievedDepthMm : r1 (achieved), overallHeightMm : r1 (achieved + draft.thicknessMm), footprintLengthMm : r1 (bounds.size[0]), footprintWidthMm : r1 (bounds.size[2]), productHeightMm : r1 (bounds.size[1]), pocketCount : pockets.pocketCount, productIslands : islands.count, narrowestProductMm : islands.narrowestMm === null ? null : r1 (islands.narrowestMm), minRibMm : pockets.minRibMm === null ? null : r1 (pockets.minRibMm), detail, cellMm : Math.round (grid.cell * 1000) / 1000, gridNodes : grid.nx * grid.nz, triangles : component.triangleCount, fullGridTriangles : component.gridTriangles, volumeCm3 : r1 (volume / 1000), estimatedMassG : r1 (volume / 1000 * PulpTypes[draft.pulpType].densityGcm3), ribCount : features.ribs.length, lugCount : features.lugs.length, nestingPitchMm : features.nesting?.pitchMm ?? null, nestingRatio : features.nesting?.ratio ?? null };
     const checks = [...PulpChecks (draft, bounds, rect, metrics), ...features.warnings.map (w => ({ id : w.id, severity : w.severity || 'warning', message : w.message, basis : 'MP knowledge base · mp-des-structural-features' }))];
     progress ('done', 1);
-    return { bounds, rect, origin, grid, metrics, checks, nurbs, features : { ribs : features.ribs, lugs : features.lugs, rib : features.rib, nesting : features.nesting, hinge : features.hinge, trace : features.trace }, component, ...(options.keepSurfaces ? { surfaces, field } : {}) };
+    if (smoothMesh?.component) {
+        metrics.display = 'smooth'; metrics.triangles = smoothMesh.component.triangleCount; metrics.radii = { ...smoothMesh.radii };
+        if (smoothMesh.limited) {
+            const want = smoothMesh.radii.floorFilletMm, add = Math.ceil (2 * want + 0.5 - smoothMesh.land.narrowestMm) * 2;
+            checks.push ({ id : 'MP-RD4', severity : 'warning', message : `Rims are rounded to ${r1 (smoothMesh.radii.rimFilletMm)} mm, not ${r1 (want)} mm: the plateau is ${r1 (smoothMesh.land.narrowestMm)} mm wide between ${smoothMesh.land.between}. Add about ${add} mm of extra material (length and width) for the full radius; the smooth STEP export does this automatically.`, basis : 'Molded Pulp NURBS output (rim fillets need two radii of plateau)' });
+        }
+    } else if (options.smoothDisplay) { metrics.display = 'review'; metrics.smoothDisplayReason = smoothMesh?.reason || 'Draft detail shows the review mesh.'; }
+    return { bounds, rect, origin, grid, metrics, checks, nurbs, loft, smooth, features : { ribs : features.ribs, lugs : features.lugs, rib : features.rib, nesting : features.nesting, hinge : features.hinge, trace : features.trace }, component : smoothMesh?.component || component, ...(options.keepSurfaces ? { surfaces, field } : {}) };
 }
 
 // Living hinge bead: a solid half-cylinder of radius ~ wall thickness along the longer flange edge (KB: hinge axis in the
@@ -111,7 +135,7 @@ export function PlanTray (triangles, draft, options = {})
     const worldRect = SheetRect (world, draft), origin = Origin (worldRect);
     if (mode === 'none') {
         const shell = FormShell (triangles, draft, options);
-        return { apiVersion : 1, units : 'mm', kind : 'tray', clamshell : 'none', draft : { ...draft }, bounds : shell.bounds, rect : shell.rect, origin : shell.origin, metrics : shell.metrics, checks : shell.checks, features : shell.features, components : [shell.component], nurbs : PlanNurbs ([shell.nurbs]) };
+        return { apiVersion : 1, units : 'mm', kind : 'tray', clamshell : 'none', draft : { ...draft }, bounds : shell.bounds, rect : shell.rect, origin : shell.origin, metrics : shell.metrics, checks : shell.checks, features : shell.features, components : [shell.component], nurbs : PlanNurbs ([shell.nurbs]), ...(shell.loft ? { loft : [shell.loft] } : {}), ...(shell.smooth ? { smooth : [shell.smooth] } : {}) };
     }
     const axis = { 'top-bottom' : 1, 'side-x' : 0, 'side-z' : 2 }[mode], parting = world.min[axis] + world.size[axis] * draft.partingFraction;
     const shells = [], components = [];
@@ -126,28 +150,104 @@ export function PlanTray (triangles, draft, options = {})
     const metrics = { ...shells[0].shell.metrics, shells : shells.map (({ direction, shell }) => ({ direction, ...shell.metrics })), partingMm : r1 (parting - world.min[axis]), hinge : Boolean (shells[0].shell.features.hinge), triangles : components.reduce ((sum, c) => sum + c.triangleCount, 0), volumeCm3 : r1 (shells.reduce ((s, x) => s + x.shell.metrics.volumeCm3, 0)), estimatedMassG : r1 (shells.reduce ((s, x) => s + x.shell.metrics.estimatedMassG, 0)), pocketCount : shells.reduce ((s, x) => s + x.shell.metrics.pocketCount, 0) };
     const checks = shells.flatMap (({ direction, shell }) => shell.checks.map (c => ({ ...c, message : `Shell ${direction}: ${c.message}` })));
     checks.push ({ id : 'MP-CL1', severity : 'note', message : 'Clamshell flanges meet at the parting plane; a friction fit typically needs 0.2–0.5 mm interference (typical industry value), set in tooling.', basis : 'MP knowledge base · mp-des-structural-features (snap, lock and click features)' });
-    return { apiVersion : 1, units : 'mm', kind : 'tray', clamshell : mode, draft : { ...draft }, bounds : world, rect : worldRect, origin, metrics, checks, features : { shells : shells.map (({ direction, shell }) => ({ direction, ...shell.features })), trace : shells[0].shell.features.trace }, components, nurbs : PlanNurbs (shells.map (({ shell }) => shell.nurbs)) };
+    return { apiVersion : 1, units : 'mm', kind : 'tray', clamshell : mode, draft : { ...draft }, bounds : world, rect : worldRect, origin, metrics, checks, features : { shells : shells.map (({ direction, shell }) => ({ direction, ...shell.features })), trace : shells[0].shell.features.trace }, components, nurbs : PlanNurbs (shells.map (({ shell }) => shell.nurbs)), ...(options.loftCheck ? { loft : shells.map (({ shell }) => shell.loft) } : {}), ...(options.smoothSurface ? { smooth : shells.map (({ shell }) => shell.smooth) } : {}) };
 }
 
 // Flat sheet(s) under the grouped products (one per shell for a clamshell), sized to the exact footprint plus the
 // additional material and placed on the products' extreme point along each pull direction.
 export function PlanSheet (triangles, draft)
 {
-    const mode = draft.clamshell || 'none', bounds = SenseBounds (triangles), worldRect = SheetRect (bounds, draft), origin = Origin (worldRect), components = [], shells = [];
+    const mode = draft.clamshell || 'none', bounds = SenseBounds (triangles), worldRect = SheetRect (bounds, draft), origin = Origin (worldRect), components = [], shells = [], solids = [];
+    // Plan-view corners rounded by the corner radius (at most just under half the shorter side).
+    const radius = Math.min (draft.cornerRadiusMm ?? DefaultRadiusMm, 0.49 * Math.min (worldRect.lengthMm, worldRect.widthMm));
     ClamshellShells[mode].forEach ((direction, index) => {
-        const local = ToLocal (triangles, direction), rect = SheetRect (SenseBounds (local), draft), localOrigin = Origin (rect);
+        const local = ToLocal (triangles, direction), rect = SheetRect (SenseBounds (local), draft), localOrigin = Origin (rect), id = index ? 'pulp-sheet-b' : 'pulp-sheet', name = index ? 'Sheet B' : 'Sheet';
         const grid = { x0 : rect.x0, z0 : rect.z0, dx : rect.lengthMm, dz : rect.widthMm, nx : 2, nz : 2, cell : Math.max (rect.lengthMm, rect.widthMm) };
         const surfaces = SheetSurfaces (grid, draft);
-        components.push (ComponentToWorld (ShellMesh (grid, surfaces, localOrigin, index ? 'pulp-sheet-b' : 'pulp-sheet'), direction, localOrigin, origin));
-        shells.push (NurbsShell (grid, surfaces, { baseY : rect.baseY, direction, id : index ? 'Sheet B' : 'Sheet' }));
+        if (radius > 0.05) {
+            components.push (ComponentToWorld (RoundedSheetMesh (rect, radius, { y0 : -draft.thicknessMm, y1 : 0, origin : localOrigin, id }), direction, localOrigin, origin));
+            solids.push (RoundedSheetSurface (rect, radius, { y0 : -draft.thicknessMm, y1 : 0, baseY : rect.baseY, direction, id : name }));
+        } else { components.push (ComponentToWorld (ShellMesh (grid, surfaces, localOrigin, id), direction, localOrigin, origin)); }
+        shells.push (NurbsShell (grid, surfaces, { baseY : rect.baseY, direction, id : name }));
     });
-    const volume = worldRect.lengthMm * worldRect.widthMm * draft.thicknessMm * components.length;
+    const volume = (worldRect.lengthMm * worldRect.widthMm - (radius > 0.05 ? (4 - Math.PI) * radius * radius : 0)) * draft.thicknessMm * components.length;
     const metrics = { lengthMm : r1 (worldRect.lengthMm), widthMm : r1 (worldRect.widthMm), thicknessMm : draft.thicknessMm, sheets : components.length, footprintLengthMm : r1 (bounds.size[0]), footprintWidthMm : r1 (bounds.size[2]), productHeightMm : r1 (bounds.size[1]), volumeCm3 : r1 (volume / 1000), estimatedMassG : r1 (volume / 1000 * PulpTypes[draft.pulpType].densityGcm3) };
-    return { apiVersion : 1, units : 'mm', kind : 'sheet', clamshell : mode, draft : { ...draft }, bounds, rect : worldRect, origin, metrics, checks : PulpChecks (draft, bounds, worldRect), components, nurbs : PlanNurbs (shells) };
+    return { apiVersion : 1, units : 'mm', kind : 'sheet', clamshell : mode, draft : { ...draft }, bounds, rect : worldRect, origin, metrics : { ...metrics, cornerRadiusMm : radius > 0.05 ? Math.round (radius * 100) / 100 : 0 }, checks : PulpChecks (draft, bounds, worldRect), components, nurbs : { ...PlanNurbs (shells), ...(solids.length ? { solids } : {}) } };
 }
 
 // NURBS output of a plan: one closed B-rep shell per formed shell or sheet (the clamshell hinge bead is display only for
 // now), in world millimetres (absolute, matching the sensed products).
+function LoftSummary (result, shell)
+{
+    return { shell, ok : result.ok, reason : result.reason, controls : result.controls ?? 0, maxDistanceMm : result.maxDistanceMm ?? null, toleranceMm : result.wallToleranceMm ?? null, merges : result.merges?.length || 0, faces : (result.faces || []).map (f => ({ id : f.id, kind : f.kind, holes : f.holes.length, ...(f.raisedMm !== undefined ? { raisedMm : f.raisedMm } : {}) })), walls : result.walls.map (w => ({ id : w.id, kind : w.kind, outlineControls : w.outlineControls, heightControls : w.heightControls, maxDistanceMm : w.maxDistanceMm, withinTolerance : w.withinTolerance })) };
+}
+// Smooth walls must stay within a quarter of the process tolerance of the review surface, but the review surface itself is
+// only good to about half a grid cell (its iso-contours carry that noise): a coarser grid gets a proportionate limit.
+export function WallTolerance (draft, grid) { return Math.max (0.25 * PulpTypes[draft.pulpType].toleranceMm, 0.55 * Math.max (grid.dx, grid.dz)); }
+
+// Smooth product-side surface (Phase 2 output) radii from the draft: the edge radius on floors, rims and the skirt top,
+// the corner radius on the skirt's plan corners (state.js: defaults and knowledge-base minima).
+export function SmoothSurfaceRadii (draft)
+{
+    const edge = draft.edgeRadiusMm ?? DefaultRadiusMm, corner = draft.cornerRadiusMm ?? DefaultRadiusMm;
+    return { floorFilletMm : edge, rimFilletMm : edge, skirtCornerMm : corner };
+}
+
+// One shell's smooth product surface: { surface } or { problem }, with the plateau strips it was checked against.
+function SmoothShell (grid, top, depthMm, baseY, draft, options)
+{
+    const radii = options.radii || SmoothSurfaceRadii (draft);
+    const loft = LoftPocketWalls (grid, top, { depthMm, wallToleranceMm : WallTolerance (draft, grid), skirtWall : true, skirtCornerMm : radii.skirtCornerMm });
+    const id = options.shellName || 'Tray', land = loft.ok && loft.walls.length ? PlateauLand (loft) : null;
+    const problem = ProductSurfaceProblem (loft, radii);
+    if (problem) { return { id, problem, land, radii }; }
+    const surface = ProductSurface (loft, { baseY, direction : options.direction || '+y', id, ...radii });
+    return { id, surface, land, radii, faces : surface.faces.length, maxDistanceMm : loft.maxDistanceMm };
+}
+
+function SmoothDisplay (grid, top, depthMm, draft, origin, options, review)
+{
+    const radii = SmoothSurfaceRadii (draft), tolerance = WallTolerance (draft, grid);
+    const loft = LoftPocketWalls (grid, top, { depthMm, wallToleranceMm : tolerance, skirtWall : true, skirtCornerMm : radii.skirtCornerMm });
+    // Rims as large as the plateau holds (up to the edge radius): a narrower strip rounds less, and the check reports it.
+    const land = loft.ok && loft.walls.some (w => w.kind === 'skirt') ? PlateauLand (loft) : null, fits = land ? Math.floor (Math.max (0, (land.narrowestMm - 0.5) / 2) * 10) / 10 : 0;
+    const rim = Math.min (radii.rimFilletMm, fits);
+    for (const attempt of [{ ...radii, rimFilletMm : rim }, { ...radii, rimFilletMm : 0 }]) {
+        if (ProductSurfaceProblem (loft, attempt)) { continue; }
+        const surface = ProductSurface (loft, { baseY : 0, direction : '+y', id : options.shellName || 'Tray', ...attempt });
+        return { component : SmoothShellMesh (surface, { thicknessMm : draft.thicknessMm, origin : [origin[0], 0, origin[2]], id : review.id }), radii : attempt, land, limited : attempt.rimFilletMm < radii.rimFilletMm };
+    }
+    return { reason : ProductSurfaceProblem (loft, radii) };
+}
+
+// Plan a tray and its smooth product surface for STEP output. When a plateau strip between a pocket and the skirt is too
+// narrow for two rim fillets, the extra material is raised by what that strip lacks (on each side) and the tray formed
+// again, up to three times. Strips between two pockets do not change with extra material: they are reported.
+export function PlanSmoothSurface (triangles, draft, options = {})
+{
+    // Strips between two pockets do not widen with extra material: rims shrink to fit them (reported as limitedRimMm).
+    // Strips between a pocket and the skirt widen with extra material: it is raised by what they lack.
+    let current = { ...draft }, radii = SmoothSurfaceRadii (draft); const start = { length : draft.extraLengthMm, width : draft.extraWidthMm };
+    for (let attempt = 0; attempt < 5; attempt++) {
+        const plan = PlanTray (triangles, current, { ...options, smoothSurface : true, radii });
+        const failing = plan.smooth.filter (s => s.problem);
+        if (!failing.length) { return { ...plan, smoothDraft : current, raisedExtraMm : current.extraLengthMm - start.length, ...(radii.rimFilletMm < SmoothSurfaceRadii (draft).rimFilletMm ? { limitedRimMm : radii.rimFilletMm } : {}) }; }
+        const need = 2 * radii.rimFilletMm + 0.5, lands = failing.map (s => s.land);
+        if (attempt === 4 || lands.some (l => !l)) { throw new Error (failing.map (s => (plan.smooth.length > 1 ? s.id + ': ' : '') + s.problem).join (' ')); }
+        const pocket = Math.min (...lands.map (l => l.pocketMm));
+        if (pocket < need) {
+            const fits = Math.floor (Math.max (0, (pocket - 0.5) / 2) * 10) / 10;
+            if (fits <= 0 || fits >= radii.rimFilletMm) { throw new Error (failing.map (s => (plan.smooth.length > 1 ? s.id + ': ' : '') + s.problem).join (' ')); }
+            radii = { ...radii, rimFilletMm : fits }; continue;
+        }
+        const short = Math.max (...lands.map (l => need - l.skirtMm));
+        if (!(short > 0)) { throw new Error (failing.map (s => (plan.smooth.length > 1 ? s.id + ': ' : '') + s.problem).join (' ')); }
+        const raise = 2 * Math.ceil (short + 0.5);
+        current = { ...current, extraLengthMm : Math.min (1000, current.extraLengthMm + raise), extraWidthMm : Math.min (1000, current.extraWidthMm + raise) };
+    }
+    throw new Error ('The smooth surface could not be built.');
+}
+
 function PlanNurbs (shells) { return { apiVersion : 1, units : 'mm', representation : 'brep', degree : 1, shells }; }
 
 export function PlanPulp (stage, triangles, draft, options = {}) { return stage === 'tray' ? PlanTray (triangles, draft, options) : PlanSheet (triangles, draft); }

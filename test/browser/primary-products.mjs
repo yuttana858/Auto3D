@@ -17,7 +17,8 @@ try {
         catch { return route.fulfill ({ status : 404, body : 'Missing fixture asset' }); }
     });
     await page.goto ('https://auto3d.test/'); await page.waitForFunction (() => window.Auto3D && !document.body.classList.contains ('auth_locked'));
-    const call = async (id, args = {}) => { if (process.env.PRIMARY_TEST_PROGRESS) { console.log (id); } const response = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); assert.equal (response.ok, true, JSON.stringify (response)); return response.result; };
+    // Live product updates (0.97.0) keep the viewer briefly busy after an edit: retry while it is.
+    const call = async (id, args = {}) => { if (process.env.PRIMARY_TEST_PROGRESS) { console.log (id); } let response; for (let i = 0; i < 300; i++) { response = await page.evaluate (({ id, args }) => Auto3D.execute (id, args), { id, args }); if (response.ok || !/busy/.test (response.error?.message || '')) { break; } await page.waitForTimeout (100); } assert.equal (response.ok, true, JSON.stringify (response)); return response.result; };
     const group = page.getByRole ('group', { name : 'Generation modules', exact : true });
     assert.deepEqual (await group.getByRole ('button').evaluateAll (nodes => nodes.map (node => node.getAttribute ('aria-label'))), ['AI Generative', 'Packaging design', 'Primary Products', 'Molded Pulp', 'Animation and video']);
     assert.notEqual (await group.evaluate (node => getComputedStyle (node).borderTopStyle), 'none');
@@ -115,9 +116,10 @@ try {
         await page.waitForTimeout (100);
     }
     assert.equal (pouchReady, true); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).family, 'pouch');
-    assert.equal (await panel.getByRole ('button', { name : 'Generate', exact : true }).isDisabled (), false);
+    // With a product selected (0.97.0, #172) the button adds another product: it reads Generate new.
+    assert.equal (await panel.getByRole ('button', { name : 'Generate new', exact : true }).isDisabled (), false);
     await panel.getByRole ('combobox', { name : 'Product material', exact : true }).selectOption ('foil');
-    await panel.locator ('input[type=color]').evaluate (node => { node.value = '#aa7733'; node.dispatchEvent (new Event ('input', { bubbles : true })); });
+    await panel.getByLabel ('Product surface color', { exact : true }).evaluate (node => { node.value = '#aa7733'; node.dispatchEvent (new Event ('input', { bubbles : true })); });
     assert.equal ((await call ('primary.inspect')).color, '#aa7733');
     await call ('primary.update'); await call ('primary.materials.open');
     const artworkEditor = page.getByRole ('region', { name : 'Product label artwork' }); await artworkEditor.waitFor ();
@@ -182,24 +184,24 @@ try {
     assert.equal (await drawer.locator ('.pp_design_card .pp_callout').count (), 0); /* thumbnails carry no dimension brackets; the caption keeps W × L × H */
     const headerBox = await drawer.locator ('.pp_drawer_header').boundingBox (), sizeBox = await drawer.locator ('.pp_drawer_size').boundingBox (), titleBox = await drawer.locator ('.pp_drawer_header h3').boundingBox ();
     assert.ok (sizeBox.x - headerBox.x < 2, 'W/L/H inputs start at the left of the drawer'); assert.ok (titleBox.x > sizeBox.x + sizeBox.width, 'category name follows the inputs'); assert.ok (headerBox.height <= 40, 'compact one-line header: ' + headerBox.height);
-    assert.match (await drawer.locator ('.pp_design_card .pp_design_size').first ().textContent (), /^66 × 66 × 122 mm$/);
+    assert.match (await drawer.locator ('.pp_design_card .pp_design_size').first ().textContent (), /^66.2 × 66.2 × 122.2 mm$/);
     const beforeCan = (await call ('scene.inspect')).objects.length; await drawer.getByRole ('button', { name : 'Generate Standard beverage can' }).click ();
     await objectCountReaches (beforeCan + 1);
-    const can = (await call ('scene.inspect')).objects.at (-1); assert.equal ((await call ('primary.selected.load')).family, 'can'); assert.equal ((await call ('primary.inspect')).heightMm, 122);
+    const can = (await call ('scene.inspect')).objects.at (-1); assert.equal ((await call ('primary.selected.load')).family, 'can'); assert.equal ((await call ('primary.inspect')).heightMm, 122.2);
     /* The generated can carries W × L × H callout brackets on the 3D model. */
     const calloutsFor = async id => { for (const end = Date.now () + 120000; ; await page.waitForTimeout (100)) { const r = await page.evaluate (() => Auto3D.execute ('dimensions.inspect')); if (r.ok) { return r.result.dimensions.filter (d => d.objectId === id); } assert.ok (/busy/.test (r.error?.message) && Date.now () < end, JSON.stringify (r)); } }; /* the viewer reports busy while a product rebuilds */
     /* A newly generated product is framed to fit the window: the camera centers on its envelope (0, H/2, 0) once the fit animation settles. */
     const halfHeight = (await calloutsFor (can.id)).find (d => d.axis === 'height').length / 2; /* in model units, which may be meters */
     for (const end = Date.now () + 120000; ; await page.waitForTimeout (100)) { const r = await page.evaluate (() => Auto3D.execute ('camera.current.inspect')); if (r.ok && Math.hypot (r.result.center[0] - can.position[0], r.result.center[1] - (can.position[1] + halfHeight), r.result.center[2] - can.position[2]) < halfHeight * .01) { break; } assert.ok (Date.now () < end, 'camera did not frame the new product: ' + JSON.stringify (r.result?.center)); }
-    assert.equal ((await calloutsFor (can.id)).length, 3); await page.waitForFunction (() => ['W · 66 mm', 'L · 66 mm', 'H · 122 mm'].every (label => [...document.querySelectorAll ('[data-dimension-id] text')].some (node => node.textContent === label)), null, { timeout : 120000 });
-    const designHeight = drawer.getByRole ('spinbutton', { name : 'Design height', exact : true }); assert.equal (await designHeight.inputValue (), '122');
+    assert.equal ((await calloutsFor (can.id)).length, 3); await page.waitForFunction (() => ['W · 66.2 mm', 'L · 66.2 mm', 'H · 122.2 mm'].every (label => [...document.querySelectorAll ('[data-dimension-id] text')].some (node => node.textContent === label)), null, { timeout : 120000 });
+    const designHeight = drawer.getByRole ('spinbutton', { name : 'Design height', exact : true }); assert.equal (await designHeight.inputValue (), '122.2');
     // Enter starts a full scene rebuild; software-GPU runners can spend more than the default 30s in its event task.
     // Use the same 120s limit for the key press as for the resulting dimensions/status checks below.
     await designHeight.fill ('150'); await designHeight.press ('Enter', { timeout : 120000 });
-    await page.waitForFunction (() => document.querySelector ('.pp_design_drawer .pp_status')?.textContent.startsWith ('Resized selected product to 66 × 66 × 150 mm'), null, { timeout : 120000 });
+    /* With live updates (0.97.0, #172) the panel may report the rebuild as Selected product updated. */ await page.waitForFunction (() => /^(Resized selected product to 66.2 × 66.2 × 150 mm|Selected product updated)/.test (document.querySelector ('.pp_design_drawer .pp_status')?.textContent || ''), null, { timeout : 120000 });
     assert.equal ((await call ('scene.inspect')).objects.at (-1).id, can.id); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 150);
     await page.waitForFunction (() => [...document.querySelectorAll ('[data-dimension-id] text')].some (node => node.textContent === 'H · 150 mm'), null, { timeout : 120000 }); /* callouts follow the live resize */
-    await call ('history.undo'); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 122); await call ('history.redo');
+    await call ('history.undo'); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 122.2); await call ('history.redo');
     const heightCallout = (await calloutsFor (can.id)).find (d => d.axis === 'height'); await call ('dimensions.value', { id : heightCallout.id, valueMm : 160 }); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 160);
     await call ('history.undo'); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 150);
     const toggle = panel.getByRole ('checkbox', { name : 'Show W × L × H on model', exact : true }); assert.equal (await toggle.isChecked (), true); await toggle.uncheck ();
@@ -207,7 +209,7 @@ try {
     assert.ok ((await call ('dimensions.inspect')).dimensions.some (d => d.objectId !== can.id));
     const restored = await call ('primary.callouts.set', { visible : true }); assert.equal (restored.changed, true); assert.equal ((await calloutsFor (can.id)).length, 3);
     const productWidth = panel.getByRole ('spinbutton', { name : 'Product width', exact : true }); await productWidth.fill ('60'); await productWidth.press ('Tab');
-    assert.equal ((await call ('primary.inspect')).diameterMm, 60); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).diameterMm, 66); /* Tab changes only the draft */
+    assert.equal ((await call ('primary.inspect')).diameterMm, 60); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).diameterMm, 60); /* live updates (0.97.0, #172): Tab also resizes the selected product */
     const resized = await call ('primary.dimensions.set', { widthMm : 58, heightMm : 140 }); assert.equal (resized.updated, true); assert.equal (resized.objectId, can.id); assert.deepEqual ([resized.widthMm, resized.lengthMm, resized.heightMm], [58, 58, 140]);
     const draftOnly = await call ('primary.dimensions.set', { heightMm : 160, apply : false }); assert.equal (draftOnly.updated, false); await call ('primary.selected.load'); assert.equal ((await call ('primary.inspect')).heightMm, 140);
     const mismatch = await page.evaluate (() => Auto3D.execute ('primary.dimensions.set', { widthMm : 58, lengthMm : 70 })); assert.equal (mismatch.ok, false); assert.match (mismatch.error.message, /one diameter/);

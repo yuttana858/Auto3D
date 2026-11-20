@@ -43,6 +43,27 @@ try {
     const json = JSON.parse (glb.bytes.subarray (20, 20 + glb.bytes.readUInt32LE (12)).toString ());
     assert.ok (json.materials.some (m => /Molded pulp/.test (m.name)), 'pulp material'); assert.ok (json.meshes.length >= 1);
     const position = json.accessors[json.meshes[0].primitives[0].attributes.POSITION]; assert.ok (Math.max (...position.max.map ((v, a) => v - position.min[a])) < 1, 'metres: the tray is under 1 m');
+    // Smooth product surface (Phase 2 NURBS): an open shell with every crease rounded; the app's cans have domed bases,
+    // which get fitted floor bands and flat caps. Formed again in the worker at Standard.
+    const surface = await download ('Export smooth surface (STEP)', 'surface-step'), surfaceText = surface.bytes.toString ('utf8');
+    assert.match (surface.name, /product side\.step$/); assert.match (surfaceText, /OPEN_SHELL\(/); assert.match (surfaceText, /SHELL_BASED_SURFACE_MODEL/); assert.match (surfaceText, /SI_UNIT\(\.MILLI\.,\.METRE\.\)/);
+    assert.equal ((surfaceText.match (/ADVANCED_FACE\(/g) || []).length, 47, 'walls, floor bands and caps, fillets, skirt and plateau');
+    assert.match (surfaceText, /floor cap/);
+    assert.match (await panel.locator ('.mp_status').textContent (), /Smooth surface STEP downloaded: 47 faces in mm, 6.35 mm edge radius/);
+    const [, viaCommand] = await Promise.all ([page.waitForEvent ('download'), raw ('pulp.export', { format : 'surface-step' })]);
+    assert.equal (viaCommand.ok, true, JSON.stringify (viaCommand)); assert.equal (viaCommand.result.radii.floorFilletMm, 6.35); assert.equal (viaCommand.result.radii.skirtCornerMm, 6.35); assert.ok (viaCommand.result.radii.rimFilletMm >= 3 && viaCommand.result.radii.rimFilletMm <= 6.35); assert.ok (viaCommand.result.raisedExtraMm >= 0);
+
+    // Phase 2 check: smooth walls with the outer skirt off (default), then on. The tray stays unchanged either way.
+    const skirt = panel.getByRole ('checkbox', { name : 'Outer skirt wall (experimental)', exact : true }); assert.equal (await skirt.isChecked (), false);
+    const objectsBefore = (await call ('scene.inspect')).objects.length;
+    await panel.getByRole ('button', { name : 'Check smooth walls', exact : true }).click ();
+    await page.waitForFunction (() => /Smooth walls/.test (document.querySelector ('.mp_status')?.textContent || ''), null, { timeout : 120000 });
+    assert.match (await panel.locator ('.mp_status').textContent (), /Smooth walls: 6 walls, \d+ control points, within [\d.]+ mm of the review surface/);
+    await skirt.check (); assert.equal ((await call ('pulp.inspect')).draft.skirtWall, true);
+    const withSkirt = await call ('pulp.loft.check'); assert.equal (withSkirt.skirtWall, true); assert.equal (withSkirt.shells[0].walls.filter (w => w.kind === 'skirt').length, 4, 'four skirt sides between the sheet corners'); assert.equal (withSkirt.ok, true, withSkirt.message);
+    assert.equal ((await call ('scene.inspect')).objects.length, objectsBefore, 'the check does not change the scene');
+    console.log ('Smooth walls (skirt off): ' + await panel.locator ('.mp_status').textContent ()); console.log ('Smooth walls (skirt on): ' + JSON.stringify (withSkirt.shells[0].walls.map (w => w.id + ' ' + w.outlineControls + 'x' + w.heightControls + ' ' + w.maxDistanceMm.toFixed (2) + (w.withinTolerance ? '' : ' (outside)'))) + ' ok=' + withSkirt.ok);
+    await skirt.uncheck (); assert.equal ((await call ('pulp.loft.check')).shells[0].walls.some (w => w.kind === 'skirt'), false);
 
     // A clamshell exports two solids; the agent command returns the same summary as the panel.
     await call ('pulp.configure', { clamshell : 'top-bottom' }); await call ('pulp.tray.form'); await until ('pulp.inspect', r => r.result?.clamshell === 'top-bottom' && !r.generating && !r.refining);
@@ -55,5 +76,5 @@ try {
     assert.equal (((await readFile (await again.path ())).toString ('utf8').match (/MANIFOLD_SOLID_BREP\(/g) || []).length, 1);
     assert.equal ((await raw ('pulp.export', { format : 'iges' })).ok, false, 'only step and glb');
     assert.deepEqual (errors, []);
-    console.log ('Molded Pulp output passed: STEP (1 solid, 6 faces, mm) and GLB (pulp material, m) from the panel, clamshell STEP with 2 solids.');
+    console.log ('Molded Pulp output passed: STEP (1 solid, 6 faces, mm), smooth surface STEP (open shell, domed can floors, rounded) and GLB (pulp material, m) from the panel, clamshell STEP with 2 solids.');
 } finally { await browser.close (); }
