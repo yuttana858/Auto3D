@@ -1,6 +1,6 @@
 # Auto3D 0.98.0 — Rectangle selection and grouping tools
 
-Primary Products **0.17.0** / Packaging **1.18.0** / Molded Pulp **0.3.0** are unchanged. Based on main `42be7df70b0537a235aa999e2c50a761ea682364` (merged PR #172). This candidate is not deployed.
+Primary Products **0.17.0** / Packaging **1.18.0** / Molded Pulp **0.3.0** are unchanged. Draft [PR #173](https://github.com/yuttana858/Auto3D/pull/173), based on main `42be7df70b0537a235aa999e2c50a761ea682364` (merged PR #172). This candidate is not deployed.
 
 ## Select multiple objects
 
@@ -24,4 +24,8 @@ Group changes have one Undo step and restore group metadata and selection on Und
 - `object.group` and `object.ungroup`: existing commands now use whole-group transactions.
 - `object.array.ungroup`: dissolve only selected array groups.
 
-UI and commands share the same selection/grouping services. Both generated command catalogs are synchronized. Validation and release-gate status are recorded in the PR and project log.
+UI and commands share the same selection/grouping services. Both generated command catalogs are synchronized. Validation and release-gate status are recorded in [the validation record](validation/selection-tools-0980.md), PR and project log.
+
+## Review image
+
+[Two selected models grouped in the main viewer](assets/selection-tools-0980/group-selection.png), captured from the real browser regression.
