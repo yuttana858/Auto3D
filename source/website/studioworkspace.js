@@ -18,7 +18,9 @@ function Select (editor, selection)
 function SelectionKey (editor) { return JSON.stringify ([editor.selected?.id || null, [...(editor.selectedIds || [])].sort ()]); }
 function ObjectKey (object)
 {
-    return JSON.stringify ([object.id, object.name, object.visible, object.position, object.rotation, object.scale, object.userData, object.hiddenParts, object.keyframes, object.visibilityKeys]);
+    // Rendering normalizes absent timeline tracks into empty arrays. Those
+    // defaults are the same authoring state, not a concurrent scene edit.
+    return JSON.stringify ([object.id, object.name, object.visible, object.position, object.rotation, object.scale, object.userData, object.hiddenParts || [], object.keyframes || [], object.visibilityKeys || []]);
 }
 function Definition (object)
 {

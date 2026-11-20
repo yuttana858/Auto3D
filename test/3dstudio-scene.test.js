@@ -5,6 +5,7 @@ import { EvaluateStudio } from '../modules/3dstudio/src/kernel.js';
 import { StudioWorkspace, StudioDataKey } from '../source/website/studioworkspace.js';
 import { StudioModel, StudioMeshPrefix } from '../source/website/studioadapter.js';
 import { SceneDocument, SceneHistory } from '../source/website/scenedocument.js';
+import { SessionTimeline } from '../source/website/sessiontimeline.js';
 import { PackSession, ReadSession, CreateSessionArchive, OpenSessionArchive } from '../source/website/sessionarchive.js';
 import { RecoverySnapshot } from '../source/website/sessionrecovery.js';
 import { PackRecoverySnapshot } from '../source/website/sessionrecoverypack.js';
@@ -33,6 +34,21 @@ function Deferred () { let resolve, reject; const promise = new Promise ((yes, n
 
 describe ('3Dstudio scene integration', function () {
     this.timeout (15000);
+
+    it ('accepts the real renderer timeline normalization while retaining post-render selection guards', async function () {
+        const { editor, workspace } = Fixture (), timeline = { objectKeyCache : new WeakMap () };
+        editor.Render = async (fit, beforeDisplay) => {
+            beforeDisplay?.();
+            // SessionEditor.Render ends in RefreshUI/AnimationUI, which runs
+            // this real normalizer even for a newly created static primitive.
+            for (const object of editor.document.objects) { SessionTimeline.prototype.NormalizeObjectKeyframes.call (timeline, object); }
+        };
+        await workspace.Create (); assert.deepEqual (editor.selected.keyframes, []); assert.equal (editor.history.undo.length, 1);
+        const first = editor.selected; await workspace.UpdateNode ({ nodeId : 'primitive-1', parameters : { widthMm : 80 } }); assert.equal (editor.selected.id, first.id); assert.equal (editor.history.undo.length, 2);
+        const updated = editor.selected; editor.Render = async (fit, beforeDisplay) => { beforeDisplay?.(); Select (editor); };
+        await assert.rejects (workspace.UpdateNode ({ nodeId : 'primitive-1', parameters : { widthMm : 90 } }), /scene changed/i);
+        assert.equal (editor.document.objects[0], updated); assert.equal (editor.history.undo.length, 2);
+    });
 
     it ('creates independent solids with separated placement, one Undo, known units and inspectable persistent history', async function () {
         const { editor, workspace } = Fixture (), initialUnit = editor.document.model.GetUnit ();

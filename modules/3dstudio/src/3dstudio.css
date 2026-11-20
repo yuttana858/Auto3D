@@ -26,7 +26,7 @@
 .studio_workspace input[type=number] { box-sizing: border-box; min-width: 0; width: 100%; padding: 8px 5px; border: 0; border-radius: 4px; color: inherit; background: transparent; font: inherit; font-variant-numeric: tabular-nums; appearance: textfield; -moz-appearance: textfield; }
 .studio_workspace input[type=number]::-webkit-inner-spin-button, .studio_workspace input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .studio_workspace input[aria-invalid=true] { outline: 1px solid #e38d78; outline-offset: 0; }
-.studio_unit { padding-right: 5px; font-size: var(--workspace-meta-font-size, 10px); opacity: .6; }
+.studio_unit { flex: 0 0 auto; white-space: nowrap; padding-right: 5px; font-size: var(--workspace-meta-font-size, 10px); opacity: .6; }
 .studio_transform_fields { display: flex; flex-direction: column; gap: 11px; }
 .studio_vector { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .studio_vector > strong { grid-column: 1 / -1; font-size: var(--workspace-help-font-size, 11px); font-weight: 500; opacity: .8; }

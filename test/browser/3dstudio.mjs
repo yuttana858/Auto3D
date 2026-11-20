@@ -32,7 +32,11 @@ try {
     };
     const near = (actual, expected, label) => assert.ok (Math.abs (actual - expected) < .001, label + ': ' + actual + ' vs ' + expected);
     const inspect = () => call ('studio.inspect');
-    const changed = (description, predicate) => until (description, async () => { const state = await inspect (); return !state.busy && predicate (state) ? state : false; });
+    const changed = (description, predicate) => until (description, async () => {
+        const state = await inspect (); if (!state.busy && predicate (state)) { return state; }
+        if (!state.busy) { const message = await page.locator ('.studio_status').innerText (); if (/^\[(conflict|command_failed|permission_required)\]/.test (message)) { throw new Error (description + ': ' + message); } }
+        return false;
+    });
     await page.evaluate (() => {
         const prototype = OV.Engine.Viewer.prototype, original = prototype.SetMainObject;
         const probe = window.studioProbe = { root : null, restore : () => { prototype.SetMainObject = original; } };
@@ -49,14 +53,14 @@ try {
         });
     });
     const geometry = () => page.evaluate (() => studioProbe.geometry ());
-    await call ('ui.3dstudio'); const panel = page.getByRole ('region', { name : '3Dstudio', exact : true });
+    await call ('ui.3dstudio'); const panel = page.getByRole ('region', { name : '3Dstudio', exact : true }); console.log ('3Dstudio module loaded.');
     assert.equal (await panel.locator ('[data-primitive]').count (), 7);
     for (const type of ['sphere', 'tube', 'cone', 'torus', 'capsule', 'box']) { await panel.locator ('[data-primitive="' + type + '"]').click (); assert.equal (await panel.locator ('[data-primitive="' + type + '"]').getAttribute ('aria-pressed'), 'true'); }
     const number = label => panel.getByRole ('spinbutton', { name : 'Studio ' + label, exact : true });
     const set = async (label, value) => { const input = number (label); await input.fill (String (value)); await input.press ('Enter'); };
     await set ('Height', 60); await set ('Width', 80); await set ('Depth', 60);
     await panel.getByRole ('button', { name : 'Generate', exact : true }).click ();
-    let state = await changed ('generated box selection', value => value.available && value.objects.length === 1); const boxId = state.objectId;
+    let state = await changed ('generated box selection', value => value.available && value.objects.length === 1); const boxId = state.objectId; console.log ('Editable box generated through the panel.');
     assert.equal (await panel.getByRole ('button', { name : 'Generate new', exact : true }).count (), 1, 'generation immediately enters selected-model editing');
     await set ('Height', 80); state = await changed ('live box height', value => value.definition.nodes[0].parameters.heightMm === 80);
     assert.equal (state.objects.length, 1); assert.equal (state.objectId, boxId); near ((await geometry ())[0].max[1], 80, 'live dimensions reach rendered geometry');
@@ -68,6 +72,7 @@ try {
     await call ('preferences.units', { units : 'standard' }); await until ('inch field display', async () => Math.abs (Number (await number ('Height').inputValue ()) - 80 / 25.4) < .000001);
     await set ('Height', 4); await changed ('inch edit converts to canonical millimeters', value => Math.abs (value.definition.nodes[0].parameters.heightMm - 101.6) < .001);
     await call ('preferences.units', { units : 'metric' }); await set ('Height', 80); await changed ('metric height restored', value => value.definition.nodes[0].parameters.heightMm === 80);
+    console.log ('Live fields, invalid-input recovery, Undo/Redo and display units passed.');
     await panel.locator ('[data-primitive="cylinder"]').click (); await set ('Height', 120); await set ('Diameter', 24);
     await panel.getByRole ('button', { name : 'Generate', exact : true }).click (); state = await changed ('generated editable rod', value => value.objects.length === 2 && value.objectId !== boxId); const toolId = state.objectId;
     let rendered = await geometry (); assert.ok (rendered[1].min[0] >= rendered[0].max[0] + 9.999, 'new solids are spaced clear of earlier models');
@@ -86,7 +91,8 @@ try {
     await panel.getByRole ('button', { name : 'Resume full model', exact : true }).click (); await changed ('resume retained full result', value => value.definition.rootId === resultNodeId); assert.ok ((await geometry ()).at (-1).triangles > 12);
     await panel.locator ('[data-node-id="' + resultNodeId + '"]').click (); await panel.getByLabel ('Enable history operation', { exact : true }).uncheck (); await changed ('suppress operation', value => value.definition.nodes.find (node => node.id === resultNodeId).enabled === false); assert.equal ((await geometry ()).at (-1).triangles, 12);
     await panel.getByLabel ('Enable history operation', { exact : true }).check (); await changed ('restore operation', value => value.definition.nodes.find (node => node.id === resultNodeId).enabled);
-    await panel.locator ('[data-node-id="' + baseId + '"]').click (); await call ('view.fit'); await panel.evaluate (node => { node.scrollTop = 0; }); await page.screenshot ({ path : 'work/3dstudio/desktop.png', timeout : 120000 });
+    console.log ('Real subtraction and editable history rollback/resume/suppression passed.');
+    await panel.locator ('[data-node-id="' + baseId + '"]').click (); await panel.getByRole ('button', { name : 'Fit model', exact : true }).click (); await panel.evaluate (node => { node.scrollTop = 0; }); await page.screenshot ({ path : 'work/3dstudio/desktop.png', timeout : 120000 });
     await call ('ui.module.mode', { module : '3dstudio', mode : 'extended' }); assert.equal (await page.getByRole ('dialog', { name : '3Dstudio extended workspace', exact : true }).count (), 1);
     assert.ok (await panel.evaluate (node => node.scrollWidth <= node.clientWidth + 1), 'extended module has no horizontal overflow'); await page.screenshot ({ path : 'work/3dstudio/extended.png', timeout : 120000 });
     await call ('ui.module.mode', { module : '3dstudio', mode : 'minimal' });
@@ -103,6 +109,7 @@ try {
     await set ('Wall thickness', 3); state = await changed ('selected tube wall thickness drives the saved inner diameter', value => value.definition.nodes[0].parameters.innerDiameterMm === 44);
     assert.equal (state.objectId, tubeId); assert.equal (state.objects.length, 4); assert.equal (state.definition.nodes[0].parameters.outerDiameterMm, 50);
     assert.equal (Number (await number ('Inner diameter').inputValue ()), 44); assert.equal (Number (await number ('Wall thickness').inputValue ()), 3);
+    console.log ('Portable authoring archive reopen and selected-tube wall editing passed.');
     await page.setViewportSize ({ width : 390, height : 844 }); await call ('ui.module.mode', { module : '3dstudio', mode : 'minimal' }); await panel.evaluate (node => { node.scrollTop = 0; });
     assert.ok (await panel.evaluate (node => node.scrollWidth <= node.clientWidth + 1), 'mobile module has no horizontal overflow'); assert.equal (await panel.locator ('[data-primitive]').count (), 7);
     await page.screenshot ({ path : 'work/3dstudio/mobile.png', timeout : 120000 }); assert.deepEqual (errors, []);
