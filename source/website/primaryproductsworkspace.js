@@ -4,6 +4,7 @@ import { ProductDefinition, ValidateProductDefinition } from '../../modules/prim
 import { PrimaryProductModel, ApplyProductOptics } from './primaryproductsadapter.js';
 import { ProductCalloutRecords, ValidateDimensions } from './dimensioncore.js';
 import { BottleCap } from '../../modules/primary-products/src/bottleconstruction.js';
+import { PlaceGeneratedObject } from './generatedplacement.js';
 
 export const PrimaryProductDataKey = '_auto3dPrimaryProduct';
 async function RenderProduct (panel, preserveView)
@@ -92,7 +93,7 @@ export class PrimaryProductsWorkspace
                 for (const key of ['position', 'rotation', 'scale']) { object[key] = [...source[key]]; }
                 object.userData = { ...source.userData }; target.ApplyTransform (object);
                 target.Remove (object); target.Remove (source); target.Restore (object, index);
-            }
+            } else { PlaceGeneratedObject (target, object); }
             object.userData[PrimaryProductDataKey] = JSON.stringify (definition); editor.selected = object;
             // New products get W × L × H callout brackets in the same Undo step; rebuilt products keep their existing callouts.
             const dimensionsBefore = target.dimensions || [], visibleBefore = target.dimensionsVisible !== false; let dimensionsAfter = dimensionsBefore;

@@ -10,8 +10,8 @@ try {
     await page.route ('https://primary-ui.test/**', async route => { const path = new URL (route.request ().url ()).pathname; if (path === '/module.js') { return route.fulfill ({ contentType : 'text/javascript', body : bundle.outputFiles[0].text }); } if (path === '/style.css') { return route.fulfill ({ contentType : 'text/css', body : await readFile (root + '/modules/primary-products/src/primary-products.css') }); } return route.fulfill ({ contentType : 'text/html', body : '<link rel="stylesheet" href="/style.css"><div id="panel"></div><div id="profile"></div>' }); });
     await page.goto ('https://primary-ui.test/');
     await page.evaluate (async () => {
-        const m = await import ('/module.js'); window.module = m; window.draft = m.UpdateProductDraft (m.DefaultProductDraft (), { details : {} }); window.target = 'a'; window.edits = []; window.cad = []; window.created = 0; window.fits = 0;
-        const host = window.host = { inspect : () => ({ ...draft, artwork : [], generationAvailable : true, catalogCategory : 'bottles', catalogOpen : false, liveObjectId : target }), units : () => 'metric', blocked : () => false, liveBlocked : () => false, liveConfigure : async changes => { edits.push ({ id : target, changes }); draft = m.UpdateProductDraft (draft, changes); panel.Refresh (); return { message : 'Updated.' }; }, setDetails : async changes => { draft = m.ProfileChanges (draft, changes); panel.Refresh (); }, configure : () => { throw new Error ('Draft-only callback used'); }, generate : () => { created++; }, fitSelected : () => { fits++; }, openLabelCAD : zone => { cad.push (zone); }, artworkPreview : () => null, catalog : () => {}, openProfile : () => {}, reset : () => {}, update : () => {}, loadSelected : () => {}, openMaterials : () => {} };
+        const m = await import ('/module.js'); window.module = m; window.draft = m.UpdateProductDraft (m.DefaultProductDraft (), { details : {} }); window.target = 'a'; window.edits = []; window.cad = []; window.scales = []; window.created = 0; window.fits = 0;
+        const host = window.host = { inspect : () => ({ ...draft, artwork : [], generationAvailable : true, catalogCategory : 'bottles', catalogOpen : false, liveObjectId : target }), units : () => 'metric', blocked : () => false, liveBlocked : () => false, liveConfigure : async changes => { edits.push ({ id : target, changes }); draft = m.UpdateProductDraft (draft, changes); panel.Refresh (); return { message : 'Updated.' }; }, setDetails : async changes => { draft = m.ProfileChanges (draft, changes); panel.Refresh (); }, scaleProduct : async args => { if (window.holdScaleUpdate) { window.holdScaleUpdate = false; await new Promise (resolve => { window.releaseScaleUpdate = resolve; }); } if (args.objectId !== target) { throw new Error ('Wrong scale target'); } scales.push (args); draft = m.UpdateProductDraft (draft, m.ScaleProductChanges (draft, args.factor, { live : true })); panel.Refresh (); return { message : 'Scaled.' }; }, configure : () => { throw new Error ('Draft-only callback used'); }, generate : () => { created++; }, fitSelected : () => { fits++; }, openLabelCAD : zone => { cad.push (zone); }, artworkPreview : () => null, catalog : () => {}, openProfile : () => {}, reset : () => {}, update : () => {}, loadSelected : () => {}, openMaterials : () => {} };
         window.panel = new m.PrimaryProductsPanel (host, document.getElementById ('panel'));
     });
     const height = page.getByRole ('spinbutton', { name : 'Product height', exact : true });
@@ -27,6 +27,19 @@ try {
     await page.getByRole ('spinbutton', { name : 'Cap thickness', exact : true }).fill ('1.4'); await page.waitForFunction (() => draft.details.capWallMm === 1.4);
     await page.getByRole ('spinbutton', { name : 'Cap height', exact : true }).fill ('18.5'); await page.waitForFunction (() => draft.bottleShape.capHeightMm === 18.5);
     await page.getByLabel ('Cap color', { exact : true }).evaluate (input => { input.value = '#bf7012'; input.dispatchEvent (new Event ('input', { bubbles : true })); }); await page.waitForFunction (() => draft.details.capColor === '#bf7012');
+    const scale = page.getByRole ('spinbutton', { name : 'Product scale percent', exact : true });
+    assert.equal (await page.getByRole ('button', { name : 'Apply scale', exact : true }).count (), 0);
+    await page.evaluate (() => { window.beforeScale = draft; window.holdScaleUpdate = true; });
+    await scale.fill ('125'); await scale.press ('Enter'); await page.waitForFunction (() => window.releaseScaleUpdate);
+    await scale.fill ('130'); await scale.press ('Enter'); await page.evaluate (() => window.releaseScaleUpdate ());
+    await page.waitForFunction (() => draft.heightMm === 292.5); await scale.press ('Tab');
+    assert.deepEqual (await page.evaluate (() => scales.map (s => s.factor)), [1.25, 1.04]); assert.equal (await scale.inputValue (), '130'); assert.equal (await page.evaluate (() => created), 0);
+    await page.evaluate (() => { draft = beforeScale; panel.Refresh (); }); assert.equal (await scale.inputValue (), '100');
+    await scale.fill ('2'); await page.waitForTimeout (280); assert.equal (await scale.getAttribute ('aria-invalid'), 'true'); assert.equal (await page.evaluate (() => draft.heightMm), 225);
+    await scale.fill ('10'); await scale.press ('Enter'); await page.waitForFunction (() => panel.status.textContent.includes ('Diameter must be'));
+    assert.equal (await scale.getAttribute ('aria-invalid'), 'true'); assert.equal (await page.evaluate (() => draft.heightMm), 225);
+    await scale.fill ('125'); await scale.press ('Enter'); await page.waitForFunction (() => draft.heightMm === 281.25);
+    await scale.press ('Tab'); await page.evaluate (() => { draft = beforeScale; panel.Refresh (); }); assert.equal (await scale.inputValue (), '100');
     assert.equal (await page.getByRole ('button', { name : 'Generate new', exact : true }).count (), 1);
     for (const name of ['front label', 'wrap label', 'back label', 'cap top']) { await page.getByRole ('button', { name : 'Design ' + name + ' in CAD', exact : true }).click (); }
     assert.deepEqual (await page.evaluate (() => cad), ['front', 'wrap', 'back', 'cap-top']);
@@ -49,5 +62,5 @@ try {
     await page.waitForFunction (() => draft.optics.ior === 1.7 && draft.optics.opacity === .25);
     await page.getByRole ('button', { name : 'Fit model', exact : true }).click (); assert.equal (await page.evaluate (() => fits), 2);
     await page.setViewportSize ({ width : 390, height : 844 }); assert.equal (await page.evaluate (() => document.documentElement.scrollWidth > innerWidth), false);
-    assert.deepEqual (errors, []); console.log ('Primary Products UI fixture: live inputs, invalid drafts, glass/cap controls, CAD entries, selection pinning, queued profile edits passed.');
+    assert.deepEqual (errors, []); console.log ('Primary Products UI fixture: live inputs/scale, invalid drafts, glass/cap controls, CAD entries, selection pinning, queued profile edits passed.');
 } finally { await browser.close (); }

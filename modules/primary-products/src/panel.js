@@ -209,7 +209,7 @@ export class PrimaryProductsPanel
     }
     ReportError (message) { this.status.textContent = message; this.artStatus.textContent = message; }
     Dispose () { for (const field of this.liveFields) { field.cancel (); } this.detailsPanel.Dispose (); }
-    Context () { const d = this.host.inspect (); return JSON.stringify ([d.liveObjectId || null, d.family, d.labelZone, this.host.units ()]); }
+    Context () { const d = this.host.inspect (); return JSON.stringify ([d.editContext, d.liveObjectId || null, d.family, d.labelZone, this.host.units ()]); }
     Blocked () { return this.host.liveBlocked ? this.host.liveBlocked () : this.host.blocked (); }
     BindNumber (input, change)
     {

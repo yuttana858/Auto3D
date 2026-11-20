@@ -9270,7 +9270,7 @@
       "id": "primary.designs.generate",
       "title": "Generate product design",
       "category": "Primary Products",
-      "description": "Select a catalog design and generate it as one undoable session object, the same action as clicking its design card. Bottles default to glass.",
+      "description": "Select a catalog design and generate it as one undoable session object, the same action as clicking its design card. Bottles default to glass. New products are spaced beside existing model bounds.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -9665,7 +9665,7 @@
       "id": "primary.scale",
       "title": "Scale product and artwork",
       "category": "Primary Products",
-      "description": "Resize the product parametrically by a factor, optionally scaling labels and offsets. Rebuilds a matching selected product with one Undo step and preserves edited surfaces. Validates product, wall, spout and artwork bounds before changing the model.",
+      "description": "Resize the product parametrically by a factor, optionally scaling labels and offsets. Rebuilds a matching selected product with one Undo step and preserves edited surfaces. Validates product, wall, spout and artwork bounds before changing the model. Optional objectId refuses a changed selection.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -9677,6 +9677,10 @@
           },
           "scaleArtwork": {
             "type": "boolean"
+          },
+          "objectId": {
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -10550,7 +10554,7 @@
       "id": "primary.generate",
       "title": "Generate product",
       "category": "Primary Products",
-      "description": "Generate the current product draft as one undoable session object, including clear glass/PET. Imported local labels render on the generated model.",
+      "description": "Generate the current product draft as one undoable session object, including clear glass/PET and imported labels. New products are spaced along world X beyond existing model bounds; the first keeps its original position. Updating a selected product preserves its placement.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
