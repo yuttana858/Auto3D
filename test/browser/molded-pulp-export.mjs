@@ -49,9 +49,9 @@ try {
     assert.match (surface.name, /product side\.step$/); assert.match (surfaceText, /OPEN_SHELL\(/); assert.match (surfaceText, /SHELL_BASED_SURFACE_MODEL/); assert.match (surfaceText, /SI_UNIT\(\.MILLI\.,\.METRE\.\)/);
     assert.equal ((surfaceText.match (/ADVANCED_FACE\(/g) || []).length, 47, 'walls, floor bands and caps, fillets, skirt and plateau');
     assert.match (surfaceText, /floor cap/);
-    assert.match (await panel.locator ('.mp_status').textContent (), /Smooth surface STEP downloaded: 47 faces in mm, 4 mm floor and rim fillets/);
+    assert.match (await panel.locator ('.mp_status').textContent (), /Smooth surface STEP downloaded: 47 faces in mm, 6.35 mm edge radius/);
     const [, viaCommand] = await Promise.all ([page.waitForEvent ('download'), raw ('pulp.export', { format : 'surface-step' })]);
-    assert.equal (viaCommand.ok, true, JSON.stringify (viaCommand)); assert.deepEqual (viaCommand.result.radii, { floorFilletMm : 4, rimFilletMm : 4, skirtCornerMm : 10 }); assert.ok (viaCommand.result.raisedExtraMm >= 0);
+    assert.equal (viaCommand.ok, true, JSON.stringify (viaCommand)); assert.equal (viaCommand.result.radii.floorFilletMm, 6.35); assert.equal (viaCommand.result.radii.skirtCornerMm, 6.35); assert.ok (viaCommand.result.radii.rimFilletMm >= 3 && viaCommand.result.radii.rimFilletMm <= 6.35); assert.ok (viaCommand.result.raisedExtraMm >= 0);
 
     // Phase 2 check: smooth walls with the outer skirt off (default), then on. The tray stays unchanged either way.
     const skirt = panel.getByRole ('checkbox', { name : 'Outer skirt wall (experimental)', exact : true }); assert.equal (await skirt.isChecked (), false);

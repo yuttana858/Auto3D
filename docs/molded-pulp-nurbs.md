@@ -255,6 +255,20 @@ Real can trays (Primary Products real-world cans, default draft, extra material 
 | 6 × 355 ml beverage cans (10.2 mm dome) | Bands within 0.26–0.29 mm, 2.5 mm caps | 47 faces; one valid solid; every sample passes; minimum 3.000 mm; volume −0.8% |
 | 6 × 300 × 407 food cans (3.2 mm recessed panel) | Bands within 0.25–0.30 mm, 23 mm caps | 47 faces; one valid solid; minimum 2.996 mm; volume −0.8% |
 
+#### Edge and corner radii (draft settings)
+
+Molded fibre always forms with some rounding (tooling, and the fibre mat). Two live draft settings, defaulting to 0.25 in (6.35 mm), set it:
+
+| Setting | Rounds | Knowledge base (mp-des-dfm-rules-by-process-type, rule tables G-04/G-05) | Check |
+| --- | --- | --- | --- |
+| `edgeRadiusMm` | Pocket floors, pocket rims, skirt top | Every edge at least 3 mm; Type 1 at least the wall thickness | MP-RD1 below it; MP-RD3 when not above the wall (the tool side would come out sharp) |
+| `cornerRadiusMm` | Plan corners of the sheet and of the tray's skirt | Corners of pockets deeper than 30 mm at least 6 mm (6–12 mm preferred) | MP-RD2 below it |
+
+- **Display.** The smooth tray uses both radii (Standard detail or finer). Rims are as large as the plateau holds, up to the edge radius; a narrower strip rounds less, and MP-RD4 says how much extra material restores the full radius.
+- **Smooth STEP export.** Rims shrink to fit strips between two pockets (reported as `limitedRimMm`), and extra material is raised for strips between a pocket and the skirt.
+- **Flat sheets.** The sheet's plan corners are rounded by `cornerRadiusMm` (at most just under half the shorter side). Its STEP is an exact closed solid (`RoundedSheetSurface`, `WriteSolidStep`): top and bottom planes bounded by lines and quarter-arcs, four flat sides and four corner faces.
+- **Wall tolerance.** Smooth walls must stay within a quarter of the process tolerance of the review surface, or 0.55 of a grid cell when that is larger: the review surface is only good to about half a cell (`WallTolerance`).
+
 Design limits:
 - A rim radius must exceed the pulp thickness, because it shrinks by the thickness on the tool side.
 - Each plateau strip must hold two rim fillets. With the default 20 mm extra material, T1 has only 3.5 mm of plateau between the corner pockets and the skirt, so 3 mm pulp with rounded rims needs more extra material.

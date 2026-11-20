@@ -88,7 +88,9 @@ describe ('Molded Pulp NURBS output and STEP', function () {
         }
         const sheet = PlanSheet (SixPack (), draft); assert.equal (sheet.nurbs.shells.length, 1);
         const box = sheet.nurbs.shells[0]; assert.deepEqual (box.nodes, [2, 2]);
-        assert.ok (Math.abs (BrepVolume (box) / 1000 - sheet.metrics.volumeCm3) < 0.05 + sheet.metrics.volumeCm3 * 1e-6);
+        // The review-node B-rep stays the square sheet; the rounded corners (exact solid in nurbs.solids) remove (4 − π) r² of area.
+        const corners = (4 - Math.PI) * sheet.metrics.cornerRadiusMm ** 2 * draft.thicknessMm / 1000;
+        assert.ok (Math.abs (BrepVolume (box) / 1000 - corners - sheet.metrics.volumeCm3) < 0.05 + sheet.metrics.volumeCm3 * 1e-6);
     });
     it ('subsamples fine review grids to at most 513 nodes per side, exactly on review nodes', () => {
         const n = 1025, grid = { nx : n, nz : n, dx : 0.25, dz : 0.25, x0 : 0, z0 : 0 }, top = new Float32Array (n * n), bottom = new Float32Array (n * n);
@@ -308,13 +310,13 @@ describe ('Molded Pulp smooth surface plan with automatic extra material', funct
     it ('raises the extra material until the rim fillets fit and builds the rounded surface', async () => {
         const { PlanSmoothSurface, SmoothSurfaceRadii } = await import ('../src/plan.js');
         const draft = { ...DefaultPulpDraft ('type2'), formDepthMm : 35, detail : 'standard', ribs : 'off', lugs : 'off' };
-        assert.deepEqual (SmoothSurfaceRadii (draft), { floorFilletMm : 4, rimFilletMm : 4, skirtCornerMm : 10 });
+        assert.deepEqual (SmoothSurfaceRadii (draft), { floorFilletMm : 6.35, rimFilletMm : 6.35, skirtCornerMm : 6.35 }); assert.deepEqual (SmoothSurfaceRadii ({ ...draft, edgeRadiusMm : 4, cornerRadiusMm : 10 }), { floorFilletMm : 4, rimFilletMm : 4, skirtCornerMm : 10 });
         const plan = PlanSmoothSurface (SixPack (86, 48), draft);
-        // Default 20 mm leaves 3.5 mm of plateau at the edge; 4 mm rims need 8.5 mm.
+        // Default 20 mm leaves about 3.5 mm of plateau at the edge; 6.35 mm rims need 13.2 mm.
         assert.ok (plan.raisedExtraMm > 0, String (plan.raisedExtraMm)); assert.equal (plan.smoothDraft.extraLengthMm, 20 + plan.raisedExtraMm); assert.equal (plan.smoothDraft.extraWidthMm, 20 + plan.raisedExtraMm);
         assert.equal (draft.extraLengthMm, 20, 'the input draft is not changed');
         const [shell] = plan.smooth; assert.equal (shell.problem, undefined); assert.equal (shell.faces, 47);
-        assert.ok (shell.land.skirtMm >= 8.5 && shell.land.pocketMm >= 8.5, JSON.stringify (shell.land));
+        assert.ok (shell.land.skirtMm >= 2 * (plan.limitedRimMm ?? 6.35) + 0.5 && shell.land.pocketMm >= 2 * (plan.limitedRimMm ?? 6.35) + 0.5, JSON.stringify (shell.land));
         assert.equal (SurfaceEdgeUses (shell.surface).filter (u => u.forward + u.reversed === 1).length, 2);
         // Pockets that join below the plateau cannot be fixed with extra material: the loft's reason is reported.
         assert.throws (() => PlanSmoothSurface (SixPack (70, 48), draft), /join below the plateau/);
