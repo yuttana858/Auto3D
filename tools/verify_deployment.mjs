@@ -45,6 +45,16 @@ export async function VerifyDeployment (origin, expectedBuild, fetchImpl = fetch
             if (createHash ('sha256').update (Buffer.from (bytes)).digest ('hex') !== module[hash]) { throw new Error ('Served Molded Pulp module does not match the release.'); }
         }
     }
+    if (release.modules?.studio3d) {
+        const module = release.modules.studio3d;
+        for (const [key, hash, filename] of [['script', 'scriptHash', '3dstudio.module.js'], ['stylesheet', 'stylesheetHash', '3dstudio.module.css'], ['worker', 'workerHash', '3dstudio.worker.js'], ['wasm', 'wasmHash', 'manifold.wasm']]) {
+            if (!new RegExp ('^/o3dv/3dstudio/' + filename.replace (/\./g, '\\.') + '\\?v=[a-f0-9]{12}$').test (module[key])) { throw new Error ('Invalid 3Dstudio module location.'); }
+            const response = await read (module[key]);
+            if (key === 'wasm' && response.headers.get ('content-type')?.split (';')[0].trim () !== 'application/wasm') { throw new Error ('The 3Dstudio WASM asset has an invalid content type.'); }
+            const bytes = await response.arrayBuffer ();
+            if (createHash ('sha256').update (Buffer.from (bytes)).digest ('hex') !== module[hash]) { throw new Error ('Served 3Dstudio module ' + key + ' does not match the release.'); }
+        }
+    }
     return { version : release.version, build : release.build, verified : true };
 }
 if (process.argv[1] && import.meta.url === pathToFileURL (process.argv[1]).href) {

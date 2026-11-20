@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'">
+  <title>3Dstudio · independent preview</title>
+  <link rel="stylesheet" href="./3dstudio.module.css">
+  <style>
+    :root { color-scheme: dark; --workspace-menu-font-size: 13px; --workspace-help-font-size: 12px; --workspace-meta-font-size: 11px; --workspace-title-font-size: 14px; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 14px system-ui, sans-serif; background: #1b2229; color: #ecf2f4; }
+    header { padding: 14px 20px; border-bottom: 1px solid #44545b; }
+    header strong { color: #63c9df; }
+    #status { margin: 6px 0 0; color: #bac9cd; font-size: 12px; min-height: 18px; }
+    main { display: grid; grid-template-columns: minmax(0, 1fr) 370px; height: calc(100dvh - 81px); }
+    #presentation { min-height: 0; display: flex; flex-direction: column; }
+    #toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px; border-bottom: 1px solid #44545b; }
+    button, select { padding: 7px 10px; font: inherit; color: inherit; background: #27343d; border: 1px solid #4c727e; border-radius: 5px; }
+    button { cursor: pointer; } button:disabled { opacity: .5; cursor: default; }
+    #viewport { min-width: 0; min-height: 0; flex: 1; } canvas { display: block; }
+    aside { overflow: auto; background: #252d33; padding: 16px; }
+    .help { margin: 0; padding: 10px 14px; color: #bac9cd; font-size: 12px; }
+    @media (max-width: 760px) { main { display: block; height: auto; } #viewport { height: 50dvh; flex: none; } }
+  </style>
+</head>
+<body>
+  <header><strong>3Dstudio · independent preview</strong><p id="status" role="status">Starting the local solid-modeling worker…</p></header>
+  <main>
+    <section id="presentation" aria-label="3D preview">
+      <div id="toolbar">
+        <label>Model <select id="objects" aria-label="Selected preview model"></select></label>
+        <label><input id="visible" type="checkbox" checked> Visible</label>
+        <button id="fit" type="button">Fit view</button>
+        <button id="example" type="button">Bored block example</button>
+      </div>
+      <div id="viewport"></div>
+      <p class="help">Drag to orbit; right-drag to pan; scroll to zoom. New primitives share the origin. Move them with Primitive placement before a Boolean. Use Editable history to revisit earlier shapes.</p>
+    </section>
+    <aside id="tools" aria-label="3Dstudio modeling tools"></aside>
+  </main>
+  <script type="module" src="./preview.js"></script>
+</body>
+</html>

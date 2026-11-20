@@ -165,6 +165,10 @@ describe ('MCP live-control reliability', () => {
         for (const family of families) { for (const item of (await service.Call (writer, 'auto3d.' + family, {})).categories) { listed.add (item.category); } }
         assert.deepEqual ([...listed].sort (), [...new Set (catalog.commands.map (tool => tool.category))].sort ());
         assert.ok ((await service.Call (writer, 'auto3d.modules', {})).categories.some (item => item.category === 'Primary Products'));
+        assert.ok ((await service.Call (writer, 'auto3d.modules', {})).categories.some (item => item.category === '3Dstudio'));
+        const studio = await service.Call (writer, 'auto3d.modules', { category : '3Dstudio' });
+        assert.ok (studio.commands.some (item => item.id === 'studio.create'));
+        assert.ok (studio.commands.some (item => item.id === 'studio.boolean'));
         assert.ok (!(await service.Call (writer, 'auto3d.settings', {})).categories.some (item => item.category === 'Primary Products'));
         const readTools = service.Tools (reader);
         assert.ok (!readTools.some (tool => tool.id === 'auto3d.commands.invoke'));

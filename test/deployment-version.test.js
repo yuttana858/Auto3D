@@ -38,4 +38,19 @@ describe ('Production release verification', () => {
         await assert.rejects (VerifyDeployment ('https://fixture.example', sha, fetcher ('stale mini')), /Mini viewer bundle/);
         await assert.rejects (VerifyDeployment ('https://fixture.example', sha, fetcher ('mini bundle', 'old')), /Mini viewer HTML/);
     });
+    it ('verifies 3Dstudio worker and WASM bytes, local URLs and the WASM MIME type', async () => {
+        const assets = { script : ['3dstudio.module.js', 'studio'], stylesheet : ['3dstudio.module.css', 'studio styles'], worker : ['3dstudio.worker.js', 'solid worker'], wasm : ['manifold.wasm', Buffer.from ([0, 97, 115, 109])] };
+        const module = Object.fromEntries (Object.entries (assets).flatMap (([key, [filename, bytes]]) => [[key, '/o3dv/3dstudio/' + filename + '?v=0123456789ab'], [key + 'Hash', createHash ('sha256').update (bytes).digest ('hex')]]));
+        const fetcher = ({ override = {}, stale = null, contentType = 'application/wasm' } = {}) => async url => {
+            if (url.pathname === '/version.json') { return Response.json ({ ...release, modules : { studio3d : { ...module, ...override } } }); }
+            for (const [key, [filename, bytes]] of Object.entries (assets)) {
+                if (url.pathname === '/o3dv/3dstudio/' + filename) { return new Response (key === stale ? 'stale asset' : bytes, { headers : { 'Content-Type' : key === 'wasm' ? contentType : 'text/plain' } }); }
+            }
+            return fixture () (url);
+        };
+        assert.equal ((await VerifyDeployment ('https://fixture.example', sha, fetcher ())).verified, true);
+        for (const key of Object.keys (assets)) { await assert.rejects (VerifyDeployment ('https://fixture.example', sha, fetcher ({ stale : key })), new RegExp ('3Dstudio module ' + key)); }
+        await assert.rejects (VerifyDeployment ('https://fixture.example', sha, fetcher ({ override : { wasm : 'https://elsewhere.example/manifold.wasm' } })), /module location/);
+        await assert.rejects (VerifyDeployment ('https://fixture.example', sha, fetcher ({ contentType : 'application/octet-stream' })), /content type/);
+    });
 });

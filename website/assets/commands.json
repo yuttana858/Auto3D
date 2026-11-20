@@ -4094,6 +4094,138 @@
       "example": {}
     },
     {
+      "id": "selection.set",
+      "title": "Select scene objects",
+      "category": "Objects",
+      "description": "Replace, add to or subtract from the object selection. Groups are selected together by default; expandGroups=false targets individual members. Does not change geometry.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectIds": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 1000,
+            "items": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "replace",
+              "add",
+              "subtract"
+            ]
+          },
+          "expandGroups": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "objectIds"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "objectIds": [],
+        "mode": "replace"
+      }
+    },
+    {
+      "id": "selection.rectangle.mode",
+      "title": "Activate rectangle selection",
+      "category": "Objects",
+      "description": "Enable or close the rectangular selection tool, also available with B. Drag with the left button; Shift/Ctrl adds, Alt subtracts, and Escape cancels. Right-drag orbit remains available.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "active"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "active": true
+      }
+    },
+    {
+      "id": "selection.rectangle.inspect",
+      "title": "Inspect rectangle selection",
+      "category": "Objects",
+      "description": "Read whether rectangle selection is active and its current drag state.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "selection.rectangle",
+      "title": "Select objects in a rectangle",
+      "category": "Objects",
+      "description": "Select objects whose projected visible bounds intersect a viewport rectangle. Coordinates are normalized 0–1 from the viewport top-left. Occluded objects are included; hidden objects are excluded. Groups expand by default. Does not require the interactive tool to be active.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "x1": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "y1": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "x2": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "y2": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "replace",
+              "add",
+              "subtract"
+            ]
+          },
+          "expandGroups": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "x1",
+          "y1",
+          "x2",
+          "y2"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "x1": 0.1,
+        "y1": 0.1,
+        "x2": 0.8,
+        "y2": 0.8
+      }
+    },
+    {
       "id": "object.tool",
       "title": "Activate model tool",
       "category": "Objects",
@@ -4549,14 +4681,15 @@
       "id": "object.group",
       "title": "Group selected objects",
       "category": "Objects",
-      "description": "Group the selected objects for selection and transform controls. Group membership is saved in portable sessions. Undo supported.",
+      "description": "Group the selection for shared selection and transforms. Existing groups are included in full. Saves membership in portable sessions; preserves every object and its placement. Undo supported.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
         "properties": {
           "name": {
             "type": "string",
-            "maxLength": 4096
+            "minLength": 1,
+            "maxLength": 100
           }
         },
         "required": [],
@@ -4570,7 +4703,21 @@
       "id": "object.ungroup",
       "title": "Ungroup selected objects",
       "category": "Objects",
-      "description": "Remove group membership while preserving placement. Undo supported.",
+      "description": "Remove all group metadata from every member of the selected groups or arrays, preserving each object, placement and animation tracks. Undo restores membership and selection.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "object.array.ungroup",
+      "title": "Ungroup array",
+      "category": "Objects",
+      "description": "Dissolve selected array groups into independently selectable objects. Keeps every copy, transform, material, label and animation track. Ordinary groups are unchanged. Undo restores the array grouping.",
       "mutates": true,
       "inputSchema": {
         "type": "object",
@@ -10841,6 +10988,734 @@
       "category": "Primary Products",
       "description": "Reset only the Primary Products draft. Does not remove or change scene objects.",
       "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "ui.3dstudio",
+      "title": "Open 3Dstudio",
+      "category": "Panels",
+      "description": "Open the independent primitive modeling module. Does not generate a model or change scene geometry.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "studio.primitives.list",
+      "title": "List editable primitives",
+      "category": "3Dstudio",
+      "description": "Read supported primitives, canonical-mm parameter defaults and limits, material controls, Boolean operations and retained-history budgets. Rod uses the cylinder type. Geometry is Y-up, base centered at Y=0.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "studio.inspect",
+      "title": "Inspect 3Dstudio solids",
+      "category": "3Dstudio",
+      "description": "Read current selection, editable solid objects, busy status and the selected or specified solid's complete authoring definition, including retained inactive history. Readable during computation; no geometry changes.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "studio.create",
+      "title": "Create an editable solid",
+      "category": "3Dstudio",
+      "description": "Generate a box, sphere, rod/cylinder, tube, cone, torus or capsule from canonical-mm dimensions. Optional local transform uses position in mm, rotation in XYZ degrees, and dimensionless scale. Creates a separately placed scene object with persistent editable history, selects it and returns its objectId and definition. Waits for geometry; one Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "box",
+              "sphere",
+              "cylinder",
+              "tube",
+              "cone",
+              "torus",
+              "capsule"
+            ]
+          },
+          "parameters": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "widthMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "heightMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "depthMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "diameterMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 128
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "diameterMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "heightMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 128
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "outerDiameterMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "innerDiameterMm": {
+                    "type": "number",
+                    "minimum": 0.01,
+                    "maximum": 10000
+                  },
+                  "heightMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 128
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "diameterMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "topDiameterMm": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "heightMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 128
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "majorDiameterMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "tubeDiameterMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 128
+                  },
+                  "tubeSegments": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 128
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "diameterMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "heightMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 128
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "material": {
+            "type": "object",
+            "properties": {
+              "color": {
+                "type": "string",
+                "pattern": "^#[a-fA-F0-9]{6}$",
+                "minLength": 7,
+                "maxLength": 7
+              },
+              "roughness": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "metalness": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "opacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "transform": {
+            "type": "object",
+            "properties": {
+              "position": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": {
+                  "type": "number",
+                  "minimum": -1000000,
+                  "maximum": 1000000
+                }
+              },
+              "rotation": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": {
+                  "type": "number",
+                  "minimum": -36000,
+                  "maximum": 36000
+                }
+              },
+              "scale": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": {
+                  "type": "number",
+                  "minimum": -1000,
+                  "maximum": 1000
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "type": "box",
+        "parameters": {
+          "widthMm": 60,
+          "heightMm": 40,
+          "depthMm": 50
+        },
+        "name": "Housing"
+      }
+    },
+    {
+      "id": "studio.node.update",
+      "title": "Edit a modeling step",
+      "category": "3Dstudio",
+      "description": "Edit a node of the selected or specified 3Dstudio solid and rebuild its active result in place. Primitive patches support name, type, partial parameters/material/transform; Boolean patches support name, operation and enabled; captured placement supports name and a column-major affine matrix. Primitive type changes reset its parameter defaults. Preserves all operands and later history. Cannot edit node IDs, kinds or references. One Undo step; canonical mm.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "nodeId": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_-]{0,63}$",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "box",
+              "sphere",
+              "cylinder",
+              "tube",
+              "cone",
+              "torus",
+              "capsule"
+            ]
+          },
+          "parameters": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "widthMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "heightMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "depthMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "diameterMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 128
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "diameterMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "heightMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 128
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "outerDiameterMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "innerDiameterMm": {
+                    "type": "number",
+                    "minimum": 0.01,
+                    "maximum": 10000
+                  },
+                  "heightMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 128
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "diameterMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "topDiameterMm": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "heightMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 128
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "majorDiameterMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "tubeDiameterMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 128
+                  },
+                  "tubeSegments": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 128
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "diameterMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "heightMm": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 128
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
+          "material": {
+            "type": "object",
+            "properties": {
+              "color": {
+                "type": "string",
+                "pattern": "^#[a-fA-F0-9]{6}$",
+                "minLength": 7,
+                "maxLength": 7
+              },
+              "roughness": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "metalness": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "opacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "transform": {
+            "type": "object",
+            "properties": {
+              "position": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": {
+                  "type": "number",
+                  "minimum": -1000000,
+                  "maximum": 1000000
+                }
+              },
+              "rotation": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": {
+                  "type": "number",
+                  "minimum": -36000,
+                  "maximum": 36000
+                }
+              },
+              "scale": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": {
+                  "type": "number",
+                  "minimum": -1000,
+                  "maximum": 1000
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "union",
+              "subtract",
+              "intersect"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "matrix": {
+            "type": "array",
+            "minItems": 16,
+            "maxItems": 16,
+            "items": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            }
+          }
+        },
+        "required": [
+          "nodeId"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "nodeId": "primitive-1",
+        "parameters": {
+          "widthMm": 75
+        }
+      }
+    },
+    {
+      "id": "studio.history.inspect",
+      "title": "Inspect reversible modeling history",
+      "category": "3Dstudio",
+      "description": "Read the selected or specified solid's complete authoring graph. definition.rootId is the visible output; definition.tipId is the retained full result. All nodes remain editable after rollback, including unused branches. No geometry changes; readable during computation.",
+      "mutates": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "example": {}
+    },
+    {
+      "id": "studio.history.set_tip",
+      "title": "Roll back or resume a solid",
+      "category": "3Dstudio",
+      "description": "Show a saved modeling node by setting nodeId, or resume the retained full result with nodeId:null. Keeps every node and parameter; editing an earlier primitive affects its later Boolean result when resumed. Rebuilds in place with one Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "nodeId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-zA-Z][a-zA-Z0-9_-]{0,63}$",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "nodeId"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "nodeId": null
+      }
+    },
+    {
+      "id": "studio.boolean",
+      "title": "Combine editable solids",
+      "category": "3Dstudio",
+      "description": "Union, subtract or intersect two 3Dstudio solids using their current scene placement. targetId is the left operand; subtract removes toolId from it. Omitted IDs use the primary selection and the one other selected solid. Creates and selects a new solid retaining both editable histories and material provenance; by default hides source objects, or keepOperands:true leaves them visible. Source objects are preserved. Arbitrary imported meshes and other modules are unsupported in this first version. Waits for geometry; one Undo step.",
+      "mutates": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "union",
+              "subtract",
+              "intersect"
+            ]
+          },
+          "targetId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "toolId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "keepOperands": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "operation"
+        ],
+        "additionalProperties": false
+      },
+      "example": {
+        "operation": "subtract",
+        "targetId": "housing-id",
+        "toolId": "cutter-id",
+        "name": "Housing with hole"
+      }
+    },
+    {
+      "id": "studio.cancel",
+      "title": "Cancel solid modeling",
+      "category": "3Dstudio",
+      "description": "Cancel an in-flight 3Dstudio generation or rebuild, including while the viewer is busy. Leaves the last committed scene and authoring history intact. Does not cancel unrelated commands or delete existing models.",
+      "mutates": false,
       "inputSchema": {
         "type": "object",
         "properties": {},

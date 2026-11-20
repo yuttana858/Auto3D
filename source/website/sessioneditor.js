@@ -4,7 +4,9 @@ import { Coord3D } from '../engine/geometry/coord3d.js';
 import { CapturePresentationBackground } from './sharedpresentation.js';
 import { Theme } from './settings.js';
 import { PreparePackagingPresentations } from './packagingadapter.js';
-import { SceneGroups } from './scenegroups.js';
+import { SceneGroups, ExpandSceneGroups, SelectedSceneGroups } from './scenegroups.js';
+import { GroupSceneObjects, UngroupSceneObjects } from './scenegroupactions.js';
+import { RectangleSelection } from './rectangleselection.js';
 import { FloatingPanel } from './floatingpanel.js';
 import { FacingTool } from './facingtool.js';
 import { CommandBar } from './commandbar.js';
@@ -20,7 +22,7 @@ import * as THREE from 'three';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { clone as CloneRig } from 'three/addons/utils/SkeletonUtils.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
-import { SceneDocument, SceneHistory } from './scenedocument.js';
+import { SceneDocument, SceneHistory, CloneMaterialPalette } from './scenedocument.js';
 import { PackSession, CreateSessionArchive, OpenSessionArchive } from './sessionarchive.js';
 import { ModelLibrary, WorkspaceDialog, RecoveryArchiveBuffer } from './modellibrary.js';
 import { Selection, SelectionType } from './navigator.js';
@@ -57,11 +59,16 @@ export function DropToFloorDelta (box, upVector)
 }
 
 const Icons = {
+    '3dstudio' : '<path d="m4 6 8-4 8 4v10l-8 4-8-4ZM4 6l8 4 8-4M12 10v10"/><circle cx="20" cy="18" r="4"/>',
     'primary-products' : '<path d="M6 2h5v4l2 4v12H4V10l2-4ZM4 14h9M17 7q4-2 7 0v14q-4 2-7 0ZM17 9q4 2 7 0"/>',
     'molded-pulp' : '<path d="M2 16h4l2-6h3l2 6h2l2-6h3l2 6h2M2 19h22"/>',
     animation : '<rect x="2" y="5" width="16" height="14" rx="2"/><path d="m18 10 6-3v10l-6-3M7 9.5v5l4.5-2.5Z"/>',
     packaging : '<path d="M3 4h18v16H3Z M8 4v16 M16 4v16 M3 10h18"/>',
     dimension : '<path d="M4 3v18M20 3v18M4 12h16M8 8l-4 4 4 4m8-8 4 4-4 4"/>',
+    'box-select' : '<rect x="3" y="3" width="18" height="18" rx="1" stroke-dasharray="3 3"/><path d="m12 10 9 7-5 1-2 4Z"/>',
+    group : '<rect x="2" y="2" width="22" height="20" rx="2" stroke-dasharray="3 2"/><rect x="6" y="6" width="8" height="8"/><rect x="12" y="10" width="8" height="8"/>',
+    ungroup : '<rect x="2" y="3" width="8" height="8"/><rect x="16" y="13" width="8" height="8"/><path d="M14 4h7v5M21 4l-6 6M11 20H4v-5M4 20l6-6"/>',
+    'ungroup-array' : '<rect x="2" y="2" width="6" height="6"/><rect x="17" y="2" width="6" height="6"/><rect x="2" y="16" width="6" height="6"/><rect x="17" y="16" width="6" height="6"/><path d="M10 10l5 4m0-4-5 4"/>',
     select : '<path d="m6 3 13 10-7 1-3 7Z"/>', move : '<path d="M12 2v20M2 12h20m-13-7 3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3m14-6 3 3-3 3"/>',
     rotate : '<path d="M20 8a9 9 0 1 0 1 8M20 3v6h-6"/>', scale : '<path d="M4 13v7h7M13 4h7v7M4 20l16-16"/>', duplicate : '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M15 8V4H4v11h4"/>',
     visible : '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>', remove : '<path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/>',
@@ -129,6 +136,7 @@ export class SessionEditor
         window.addEventListener ('blur', cancelDrag);
         window.addEventListener ('keyup', event => { if (['x', 'y', 'z'].includes (event.key?.toLowerCase ())) { this.SetRotationAxisOverride (null); } });
         window.addEventListener ('blur', () => this.SetRotationAxisOverride (null));
+        this.rectangleSelection = new RectangleSelection (this);
         this.CreateUI ();
         const headerSave = Element ('button', 'header_library_button header_save_button', undefined, document.getElementById ('header_buttons'));
         headerSave.type = 'button'; headerSave.title = 'Save current session'; headerSave.setAttribute ('aria-label', 'Save current session');
@@ -240,12 +248,15 @@ export class SessionEditor
     ModelTools ()
     {
         const toggle = (id, open) => () => this.website.modulePanels ? this.website.modulePanels.Toggle (id, open) : open ();
-        return [['ai', 'AI Generative', toggle ('ai', () => this.website.aiWorkspace?.Open ())], ['packaging', 'Packaging design', toggle ('packaging', () => this.website.packagingPanel?.Open ())], ['primary-products', 'Primary Products', toggle ('primary-products', () => this.website.primaryProductsPanel?.Open ())], ['molded-pulp', 'Molded Pulp', toggle ('molded-pulp', () => this.website.moldedPulpPanel?.Open ())], ['animation', 'Animation and video', toggle ('animation', () => this.website.animationPanel?.Open ())], ['select', 'Select (V)', () => this.SetMode ('select')], ['move', 'Move (W)', () => this.SetMode ('translate')], ['rotate', 'Rotate (E)', () => this.SetMode ('rotate')], ['scale', 'Scale (R)', () => this.SetMode ('scale')], ['dimension', 'Dimensions · drag an edge', () => this.website.dimensions.SetActive (!this.website.dimensions.active)], ['duplicate', 'Duplicate object (Ctrl+D)', () => this.Duplicate ()], ['array', 'Array selected object', () => this.ArrayDialog ()], ['floor', 'Drop selected object to floor', () => this.DropToFloor ()], ['visible', 'Hide or show object (H)', () => this.ToggleVisibility ()], ['remove', 'Delete object', () => this.Delete ()], ['focus', 'Focus object (F)', () => this.Focus ()], ['fit', 'Fit all objects to screen', () => this.FitScene ()], ['update', 'Update selected model', () => this.UpdateModel ()], ['undo', 'Undo object edit (Ctrl+Z)', () => this.Undo ()], ['redo', 'Redo object edit (Ctrl+Shift+Z)', () => this.Redo ()], ['add', 'Add model', () => this.AddModel ()], ['save', 'Save or open session (Ctrl+S)', () => this.library.SaveDialog (true)], ['export', 'Export', () => this.Export ()], ['library', 'Model library', () => this.library.Open ()], ['commands', 'Command bar', () => this.commandBar.SetVisible (!this.commandBar.visible)]];
+        return [['ai', 'AI Generative', toggle ('ai', () => this.website.aiWorkspace?.Open ())], ['packaging', 'Packaging design', toggle ('packaging', () => this.website.packagingPanel?.Open ())], ['primary-products', 'Primary Products', toggle ('primary-products', () => this.website.primaryProductsPanel?.Open ())], ['molded-pulp', 'Molded Pulp', toggle ('molded-pulp', () => this.website.moldedPulpPanel?.Open ())], ['3dstudio', '3Dstudio · primitive modeling', toggle ('3dstudio', () => this.website.studioPanel?.Open ())], ['animation', 'Animation and video', toggle ('animation', () => this.website.animationPanel?.Open ())], ['select', 'Select (V)', () => this.SetMode ('select')], ['box-select', 'Rectangle select (B)', () => this.rectangleSelection.SetActive (!this.rectangleSelection.active)], ['move', 'Move (W)', () => this.SetMode ('translate')], ['rotate', 'Rotate (E)', () => this.SetMode ('rotate')], ['scale', 'Scale (R)', () => this.SetMode ('scale')], ['dimension', 'Dimensions · drag an edge', () => this.website.dimensions.SetActive (!this.website.dimensions.active)], ['duplicate', 'Duplicate object (Ctrl+D)', () => this.Duplicate ()], ['group', 'Group (Ctrl+G)', () => this.GroupObjects ()], ['ungroup', 'Ungroup (Ctrl+Shift+G)', () => this.UngroupObjects ()], ['array', 'Array selected object', () => this.ArrayDialog ()], ['ungroup-array', 'Ungroup array', () => this.UngroupArray ()], ['floor', 'Drop selected object to floor', () => this.DropToFloor ()], ['visible', 'Hide or show object (H)', () => this.ToggleVisibility ()], ['remove', 'Delete object', () => this.Delete ()], ['focus', 'Focus object (F)', () => this.Focus ()], ['fit', 'Fit all objects to screen', () => this.FitScene ()], ['update', 'Update selected model', () => this.UpdateModel ()], ['undo', 'Undo object edit (Ctrl+Z)', () => this.Undo ()], ['redo', 'Redo object edit (Ctrl+Shift+Z)', () => this.Redo ()], ['add', 'Add model', () => this.AddModel ()], ['save', 'Save or open session (Ctrl+S)', () => this.library.SaveDialog (true)], ['export', 'Export', () => this.Export ()], ['library', 'Model library', () => this.library.Open ()], ['commands', 'Command bar', () => this.commandBar.SetVisible (!this.commandBar.visible)]];
     }
 
     ToolDisabled (key)
     {
-        return this.busy || (this.readOnly && !['select', 'focus', 'fit', 'commands'].includes (key)) || (['move', 'rotate', 'scale', 'duplicate', 'array', 'floor', 'visible', 'remove', 'focus', 'update'].includes (key) && !this.selected) || (key === 'export' && !this.document.objects.length) || (key === 'undo' && !this.history.undo.length) || (key === 'redo' && !this.history.redo.length);
+        if (this.busy || (this.readOnly && !['select', 'box-select', 'focus', 'fit', 'commands'].includes (key))) { return true; }
+        if (key === 'group') { return ExpandSceneGroups (this.document.objects, this.SelectedObjects ()).length < 2; }
+        if (key === 'ungroup' || key === 'ungroup-array') { return !SelectedSceneGroups (this.document.objects, this.SelectedObjects ()).some (group => key === 'ungroup' || group.array); }
+        return (['move', 'rotate', 'scale', 'duplicate', 'array', 'floor', 'visible', 'remove', 'focus', 'update'].includes (key) && !this.selected) || (key === 'export' && !this.document.objects.length) || (key === 'undo' && !this.history.undo.length) || (key === 'redo' && !this.history.redo.length);
     }
 
     ModelToolMenu ()
@@ -262,7 +273,7 @@ export class SessionEditor
         const historyTools = Element ('div', 'session_history_tools', undefined, document.getElementById ('toolbar')); historyTools.setAttribute ('role', 'group'); historyTools.setAttribute ('aria-label', 'Edit history'); document.getElementById ('toolbar').prepend (historyTools);
         const tools = this.ModelTools ().filter (([key]) => !stripHidden.has (key));
         for (const [key, label, action] of tools) {
-            const button = Element ('button', 'scene_tool', undefined, ['ai', 'packaging', 'primary-products', 'molded-pulp', 'animation'].includes (key) ? moduleTools : ['undo', 'redo'].includes (key) ? historyTools : this.strip); button.title = label; button.setAttribute ('aria-label', label); button.innerHTML = '<svg viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">' + Icons[key] + '</svg>';
+            const button = Element ('button', 'scene_tool', undefined, ['ai', 'packaging', 'primary-products', 'molded-pulp', '3dstudio', 'animation'].includes (key) ? moduleTools : ['undo', 'redo'].includes (key) ? historyTools : this.strip); button.title = label; button.setAttribute ('aria-label', label); button.innerHTML = '<svg viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">' + Icons[key] + '</svg>';
             button.addEventListener ('click', async () => { if (['undo', 'redo'].includes (key)) { button.setAttribute ('aria-busy', 'true'); button.disabled = true; try { await this.Run (action); } finally { button.removeAttribute ('aria-busy'); this.RefreshButtons (); } } else { await this.Run (action); } }); this.buttons.set (key, button);
         }
         this.transformPanel = Element ('div', 'scene_transform_panel', undefined, this.website.parameters.viewerDiv); this.transformPanel.hidden = true;
@@ -634,7 +645,7 @@ export class SessionEditor
         apply ('after'); this.history.Push ({ undo : () => apply ('before'), redo : () => apply ('after') }); return { objectIds : objects.map ((object) => object.id) };
     }
 
-    SetMode (mode) { if (this.website.dimensions?.active) { this.website.dimensions.SetActive (false); } if (this.readOnly && mode !== 'select') { return; } this.SetRotationAxisOverride (null); this.mode = mode; this.Select (this.selected, false, true); }
+    SetMode (mode) { if (this.website.dimensions?.active) { this.website.dimensions.SetActive (false); } if (this.rectangleSelection?.active) { this.rectangleSelection.SetActive (false); } if (this.readOnly && mode !== 'select') { return; } this.SetRotationAxisOverride (null); this.mode = mode; this.Select (this.selected, false, true); }
     SetRotationAxisOverride (axis)
     {
         if (axis !== null && !['X', 'Y', 'Z'].includes (axis)) { throw new Error ('Choose X, Y or Z.'); }
@@ -646,6 +657,19 @@ export class SessionEditor
         this.website.viewer?.RequestRender?.();
     }
     SelectedObjects () { return this.document.objects.filter ((object) => this.selectedIds?.has (object.id)); }
+    SetSelection (objects, { mode = 'replace', expandGroups = true, primary } = {})
+    {
+        if (this.busy) { throw new Error ('Wait for the current scene operation before selecting objects.'); }
+        if (!['replace', 'add', 'subtract'].includes (mode) || typeof expandGroups !== 'boolean' || !Array.isArray (objects) || objects.some (object => !this.document.objects.includes (object))) { throw new Error ('Choose current scene objects and a valid selection mode.'); }
+        const incoming = expandGroups ? ExpandSceneGroups (this.document.objects, objects) : [...new Set (objects)];
+        const selection = new Set (mode === 'replace' ? [] : this.SelectedObjects ());
+        for (const object of incoming) { if (mode === 'subtract') { selection.delete (object); } else { selection.add (object); } }
+        if (primary !== undefined && primary !== null && !selection.has (primary)) { throw new Error ('The active object must belong to the selection.'); }
+        const ordered = this.document.objects.filter (object => selection.has (object));
+        const active = primary || (selection.has (this.selected) ? this.selected : ordered[ordered.length - 1]) || null;
+        this.selectedIds = new Set (ordered.map (object => object.id)); this.Select (active, false, true, true);
+        return { selectedObjectId : this.selected?.id || null, selectedObjectIds : ordered.map (object => object.id) };
+    }
     UpdateTransformControls ()
     {
         this.controls.detach ();
@@ -739,18 +763,23 @@ export class SessionEditor
     }
     RefreshButtons ()
     {
+        if (this.rectangleSelection?.active) {
+            if (this.website.dimensions?.active || this.facing?.active || this.website.measureTool?.IsActive?.()) { this.rectangleSelection.SetActive (false); }
+            else if (this.busy && this.rectangleSelection.drag) { this.rectangleSelection.Cancel (); }
+        }
         this.website?.dimensions?.Draw (this.website.viewer.camera);
-        this.website?.primaryProductsPanel?.RefreshAvailability (); this.website?.moldedPulpPanel?.RefreshAvailability (); this.website?.animationPanel?.Refresh ();
+        this.website?.primaryProductsPanel?.RefreshAvailability (); this.website?.moldedPulpPanel?.RefreshAvailability (); this.website?.studioPanel?.RefreshAvailability (); this.website?.animationPanel?.Refresh ();
         this.processing?.Sync (this.busy && !this.packaging?.foldOperation && !this.packaging?.dimensionUpdating && this.arrayOperation?.stage !== 'revealing' && !this.website?.rendering?.running); this.commandBar?.SetBusy (this.busy);
         this.website?.packagingPanel?.fefcoPanel?.SetDisabled ();
         { const workspace = this.website?.packagingPanel?.workspace, tab = workspace?.InspectTab ().tab; if (tab === 'auto') { workspace.autoPanel.Refresh (); } else if (tab === 'accessories') { workspace.accessoriesPanel.Refresh (); } }
         for (const [key, button] of this.buttons) {
             button.disabled = this.ToolDisabled (key) || button.hasAttribute?.('aria-busy') === true;
+            if (key === 'box-select') { button.setAttribute ('aria-pressed', String (this.rectangleSelection?.active === true)); }
             if (key === 'dimension') { button.setAttribute ('aria-pressed', String (this.website.dimensions?.active === true)); }
-            if (['select', 'move', 'rotate', 'scale'].includes (key)) { button.setAttribute ('aria-pressed', String ((key === 'move' ? 'translate' : key) === this.mode)); }
+            if (['select', 'move', 'rotate', 'scale'].includes (key)) { button.setAttribute ('aria-pressed', String ((key === 'move' ? 'translate' : key) === this.mode && !(key === 'select' && this.rectangleSelection?.active))); }
         }
         const groupButtons = this.objectList?.querySelectorAll ('.selection_group_tools button');
-        if (groupButtons?.length === 2) { groupButtons[0].disabled = this.readOnly || this.busy || this.SelectedObjects ().length < 2; groupButtons[1].disabled = this.readOnly || this.busy || !this.SelectedObjects ().some ((object) => object.userData?._auto3dGroup); }
+        for (const button of groupButtons || []) { button.disabled = this.ToolDisabled (button.dataset.groupAction); }
         if (this.headerExport) { this.headerExport.disabled = this.busy || this.readOnly || !this.document.objects.length; }
     }
     RefreshUI ()
@@ -776,9 +805,10 @@ export class SessionEditor
         }
         this.website.navigator?.meshesPanel?.SetSceneGroups?.(groups, this.groupExpanded, (id, expanded) => this.SetGroupExpanded (id, expanded));
         const selectionTools = Element ('div', 'selection_group_tools', undefined, this.objectList);
-        Element ('p', 'section_hint', this.SelectedObjects ().length + ' selected · Ctrl + click adds to selection.', selectionTools);
-        const group = Element ('button', null, 'Group selection', selectionTools); group.disabled = this.readOnly || this.busy || this.SelectedObjects ().length < 2; group.onclick = () => this.Run (() => this.GroupObjects ());
-        const ungroup = Element ('button', null, 'Ungroup selection', selectionTools); ungroup.disabled = this.readOnly || this.busy || !this.SelectedObjects ().some ((object) => object.userData?._auto3dGroup); ungroup.onclick = () => this.Run (() => this.UngroupObjects ());
+        Element ('p', 'section_hint', this.SelectedObjects ().length + ' selected · Rectangle select (B) · Ctrl + click adds.', selectionTools);
+        for (const [key, title, action] of [['group', 'Group selection', () => this.GroupObjects ()], ['ungroup', 'Ungroup selection', () => this.UngroupObjects ()], ['ungroup-array', 'Ungroup array', () => this.UngroupArray ()]]) {
+            const button = Element ('button', null, title, selectionTools); button.dataset.groupAction = key; button.disabled = this.ToolDisabled (key); button.onclick = () => this.Run (action);
+        }
         this.AnimationUI ();
     }
     UpdateDetails ()
@@ -1335,20 +1365,9 @@ export class SessionEditor
         return this.ArrayInspect ();
     }
 
-    GroupObjects (objects = this.SelectedObjects (), name = 'Group')
-    {
-        if (this.readOnly || this.busy || objects.length < 2 || objects.some ((object) => !this.document.objects.includes (object))) { throw new Error ('Select at least two editable objects.'); }
-        const id = crypto.randomUUID (); const records = objects.map ((object) => ({ object, before : { ...(object.userData || {}) } }));
-        const apply = (grouped) => { records.forEach ((item) => { item.object.userData = grouped ? { ...item.before, _auto3dGroup : id, _auto3dGroupName : name.slice (0, 100), _auto3dGroupKind : 'group' } : { ...item.before }; }); this.Select (objects[0]); this.MarkDirty (); };
-        apply (true); this.history.Push ({ undo : () => apply (false), redo : () => apply (true) }); return { groupId : id, objectIds : objects.map ((object) => object.id) };
-    }
-    UngroupObjects ()
-    {
-        if (this.readOnly || this.busy) { throw new Error ('The session cannot be edited right now.'); }
-        const records = this.SelectedObjects ().map ((object) => ({ object, before : { ...(object.userData || {}) } }));
-        const apply = (restore) => { records.forEach ((item) => { item.object.userData = { ...item.before }; if (!restore) { delete item.object.userData._auto3dGroup; delete item.object.userData._auto3dGroupName; } }); this.Select (this.selected, false, true, true); this.MarkDirty (); };
-        apply (false); this.history.Push ({ undo : () => apply (true), redo : () => apply (false) }); return { ungrouped : records.length };
-    }
+    GroupObjects (objects = this.SelectedObjects (), name = 'Group') { return GroupSceneObjects (this, objects, name); }
+    UngroupObjects () { return UngroupSceneObjects (this); }
+    UngroupArray () { return UngroupSceneObjects (this, { arraysOnly : true }); }
     async Duplicate ()
     {
         if (this.readOnly || this.busy) { return; }
@@ -1479,7 +1498,7 @@ export class SessionEditor
         try {
             for (const source of saved.document.objects) {
                 const model = saved.document.CompactModel ([source], true); model.root = model.root.GetChildNode (0);
-                const object = target.AddImported (model, source.name, Direction.Y, false); added.push (object); objectIds.set (source.id, object.id);
+                const object = target.AddImported (model, source.name, Direction.Y, false); added.push (object); objectIds.set (source.id, object.id); if (source.studioMaterials) { object.studioMaterials = CloneMaterialPalette (source.studioMaterials); }
                 Object.assign (object, TransformState (source), { source : source.source, packagingProfile : source.packagingProfile, visible : source.visible, hiddenParts : [...source.hiddenParts], unit : source.unit, userData : { ...source.userData }, castShadow : source.castShadow !== false, receiveShadow : source.receiveShadow !== false, keyframes : source.keyframes.map (frame => ({ ...frame, id : crypto.randomUUID (), position : [...frame.position], rotation : [...frame.rotation], scale : [...frame.scale] })), visibilityKeys : (source.visibilityKeys || []).map (key => ({ ...key, id : crypto.randomUUID () })), animationAsset : source.animationAsset, playback : source.playback ? { ...source.playback, playing : false } : undefined });
                 const group = object.userData._auto3dGroup; if (group) { if (!groups.has (group)) { groups.set (group, crypto.randomUUID ()); } object.userData._auto3dGroup = groups.get (group); }
                 target.ApplyTransform (object);
@@ -1573,8 +1592,9 @@ export class SessionEditor
         if (target.closest?.('dialog') && !(modified && key === 'z')) { return; }
         if (!modified && !event.altKey && ['x', 'y', 'z'].includes (key) && this.mode === 'rotate') { this.SetRotationAxisOverride (key.toUpperCase ()); return; }
         let action = null;
-        if (modified && key === 's') { action = () => this.library.SaveDialog (true); } else if (modified && key === 'd') { action = () => this.Duplicate (); } else if (modified && key === 'c' && this.SelectedObjects ().length) { action = () => this.sessions.Copy (); } else if (modified && key === 'v' && this.sessions?.clipboard) { action = () => this.sessions.Paste (); } else if (modified && key === 'z') { action = () => event.shiftKey ? this.Redo () : this.Undo (); }
-        else if (!modified && !event.altKey) { action = ({ v : () => this.SetMode ('select'), w : () => this.SetMode ('translate'), e : () => this.SetMode ('rotate'), r : () => this.SetMode ('scale'), f : () => this.Focus (), h : () => this.ToggleVisibility (), delete : () => this.Delete () })[key]; }
+        if (modified && !event.altKey && key === 'g') { action = () => event.shiftKey ? this.UngroupObjects () : this.GroupObjects (); }
+        else if (modified && key === 's') { action = () => this.library.SaveDialog (true); } else if (modified && key === 'd') { action = () => this.Duplicate (); } else if (modified && key === 'c' && this.SelectedObjects ().length) { action = () => this.sessions.Copy (); } else if (modified && key === 'v' && this.sessions?.clipboard) { action = () => this.sessions.Paste (); } else if (modified && key === 'z') { action = () => event.shiftKey ? this.Redo () : this.Undo (); }
+        else if (!modified && !event.altKey) { action = ({ v : () => this.SetMode ('select'), b : () => this.rectangleSelection.SetActive (!this.rectangleSelection.active), w : () => this.SetMode ('translate'), e : () => this.SetMode ('rotate'), r : () => this.SetMode ('scale'), f : () => this.Focus (), h : () => this.ToggleVisibility (), delete : () => this.Delete () })[key]; }
         if (action) { event.preventDefault (); this.Run (action); }
     }
 }

@@ -99,3 +99,5 @@ workspace-commands
 workspace-editing
 workspace-optimization
 primary-live-placement
+selection-groups
+3dstudio

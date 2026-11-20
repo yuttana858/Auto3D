@@ -6,6 +6,7 @@ import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { ModuleRoot } from '../modules/packaging/tools/build.mjs';
 import { copyFile } from 'node:fs/promises';
+import { StudioRoot, StudioStaticAssets, StudioBuildOptions, CopyStudioAssets } from '../modules/3dstudio/tools/build.mjs';
 
 const root = process.cwd ();
 const build = await context ({ entryPoints : { 'o3dv.website.min' : 'source/website/index.js', 'o3dv.recovery' : 'source/website/sessionrecoveryworker.js', 'o3dv.optimize' : 'source/website/polygonworker.js' }, define : { 'import.meta.url' : 'document.currentScript.src' }, bundle : true, minify : true, globalName : 'OV', sourcemap : true, loader : { '.ttf' : 'file', '.woff' : 'file', '.svg' : 'file' }, outdir : 'build/website_dev', logLevel : 'info' });
@@ -19,6 +20,18 @@ const moldedPulp = await context ({ entryPoints : ['modules/molded-pulp/src/inde
 await moldedPulp.rebuild (); await moldedPulp.watch ();
 const moldedPulpWorker = await context ({ entryPoints : ['modules/molded-pulp/src/worker.js'], bundle : true, format : 'iife', minify : true, outfile : path.join (root, 'build/website_dev/molded-pulp/molded-pulp.worker.js') });
 await moldedPulpWorker.rebuild (); await moldedPulpWorker.watch ();
+const studioOutput = path.join (root, 'build/website_dev/3dstudio');
+const studioOptions = StudioBuildOptions (studioOutput, true);
+const studio = await context ({ ...studioOptions.ui, plugins : [{ name : '3dstudio-static-assets', setup : bundler => {
+    bundler.onLoad ({ filter : /index\.js$/ }, async args => {
+        if (args.path !== path.join (StudioRoot, 'src/index.js')) { return; }
+        return { contents : await readFile (args.path, 'utf8'), loader : 'js', watchFiles : StudioStaticAssets };
+    });
+    bundler.onEnd (async result => { if (result.errors.length === 0) { await CopyStudioAssets (studioOutput); } });
+} }], logLevel : 'info' });
+await studio.rebuild (); await studio.watch ();
+const studioWorker = await context ({ ...studioOptions.worker, logLevel : 'info' });
+await studioWorker.rebuild (); await studioWorker.watch ();
 const types = { '.html' : 'text/html', '.js' : 'text/javascript', '.css' : 'text/css', '.json' : 'application/json', '.svg' : 'image/svg+xml', '.png' : 'image/png', '.jpg' : 'image/jpeg', '.webp' : 'image/webp', '.woff' : 'font/woff', '.ttf' : 'font/ttf', '.wasm' : 'application/wasm', '.glb' : 'model/gltf-binary', '.gltf' : 'model/gltf+json' };
 const server = createServer (async (request, response) => {
     response.setHeader ('Cache-Control', 'no-store');
@@ -33,5 +46,5 @@ const server = createServer (async (request, response) => {
 });
 server.on ('error', async (error) => { console.error (error.message); await build.dispose (); process.exit (1); });
 server.listen (8080, '127.0.0.1', () => console.log ('Auto3D development server: http://localhost:8080/website/index.html — source watching, no browser cache. Refresh after a successful rebuild.'));
-async function stop () { server.close (); await Promise.all ([build.dispose (), packaging.dispose (), primaryProducts.dispose (), moldedPulp.dispose (), moldedPulpWorker.dispose ()]); process.exit (0); }
+async function stop () { server.close (); await Promise.all ([build.dispose (), packaging.dispose (), primaryProducts.dispose (), moldedPulp.dispose (), moldedPulpWorker.dispose (), studio.dispose (), studioWorker.dispose ()]); process.exit (0); }
 process.on ('SIGINT', stop); process.on ('SIGTERM', stop);

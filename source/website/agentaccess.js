@@ -277,12 +277,16 @@ export class AgentAccess
         // Cancellation must not wait behind the macro it cancels.
         if (message.command === 'macro.cancel') { return { ok : true, command : message.command, result : await this.website.commands.Invoke (message.command, message.arguments) }; }
         // Guard inside the registry queue, immediately before execution, and after it.
-        const result = await this.website.commands.Queue (async () => {
+        const execute = async () => {
             if (!allowed ()) { throw Coded ('session_changed', 'Session changed.'); }
             const value = await this.website.commands.Invoke (message.command, message.arguments);
             if (!allowed ()) { throw Coded ('session_changed', 'Session changed while the command ran. Inspect before retrying.'); }
             return { ok : true, command : message.command, result : value };
-        });
+        };
+        // Studio reads and worker cancellation must reach the same guarded
+        // handlers while an earlier remote modeling request owns the queue.
+        const immediate = ['studio.inspect', 'studio.history.inspect', 'studio.primitives.list', 'studio.cancel'].includes (message.command);
+        const result = immediate ? await execute () : await this.website.commands.Queue (execute);
         if (!allowed ()) { throw Coded ('session_changed', 'Session changed while the command ran. Inspect before retrying.'); }
         return result;
     }

@@ -1,0 +1,53 @@
+.studio_workspace { --studio-accent: #55bfd7; color: var(--ov_foreground_color, #e7eeee); font-family: inherit; font-size: var(--workspace-menu-font-size, 12px); line-height: 1.45; min-width: 0; container-type: inline-size; }
+.studio_workspace [hidden] { display: none !important; }
+.studio_intro { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.studio_kicker { color: var(--studio-accent); font-size: var(--workspace-meta-font-size, 10px); font-weight: 600; letter-spacing: .1em; }
+.studio_version { font-size: var(--workspace-meta-font-size, 10px); opacity: .6; }
+.studio_context { margin: 0 0 15px; font-size: var(--workspace-title-font-size, 13px); overflow-wrap: anywhere; }
+.studio_section { padding-bottom: 15px; margin: 0 0 15px; border-bottom: 1px solid var(--ov_border_color, #41484c); }
+.studio_workspace h3 { margin: 0 0 10px; font-size: var(--workspace-title-font-size, 13px); font-weight: 600; }
+.studio_help { margin: 8px 0 0; font-size: var(--workspace-help-font-size, 11px); line-height: 1.5; opacity: .68; }
+.studio_readout { margin: 5px 0 10px; font-size: var(--workspace-help-font-size, 11px); line-height: 1.5; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.studio_cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.studio_button { box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--ov_border_color, #41484c); border-radius: 6px; color: inherit; background: var(--ov_background_color, #292c30); font: inherit; line-height: 1.35; cursor: pointer; }
+.studio_button.studio_card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; min-height: 82px; padding: 9px 5px; font-size: var(--workspace-help-font-size, 11px); }
+.studio_card svg { width: 36px; height: 36px; fill: none; stroke: var(--studio-accent); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.studio_button[aria-pressed=true] { border-color: var(--studio-accent); background: #55bfd714; box-shadow: inset 0 0 0 1px #55bfd733; }
+.studio_button.studio_primary { width: 100%; border-color: var(--studio-accent); background: #55bfd722; font-weight: 600; margin: 7px 0 15px; }
+.studio_workspace button:disabled, .studio_workspace input:disabled, .studio_workspace select:disabled { opacity: .45; cursor: default; }
+.studio_workspace :is(button, select, input):focus-visible { outline: 2px solid var(--studio-accent); outline-offset: 2px; }
+.studio_fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: 9px; }
+.studio_material_fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.studio_field { display: flex; flex-direction: column; gap: 5px; min-width: 0; font-size: var(--workspace-help-font-size, 11px); overflow-wrap: anywhere; }
+.studio_field select { box-sizing: border-box; width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--ov_border_color, #41484c); border-radius: 5px; background: var(--ov_background_color, #292c30); color: inherit; font: inherit; }
+.studio_section > .studio_field { margin-bottom: 9px; }
+.studio_input { display: flex; align-items: center; min-width: 0; border: 1px solid var(--ov_border_color, #41484c); border-radius: 5px; background: var(--ov_background_color, #292c30); }
+.studio_input:focus-within { border-color: var(--studio-accent); }
+.studio_workspace input[type=number] { box-sizing: border-box; min-width: 0; width: 100%; padding: 8px 5px; border: 0; border-radius: 4px; color: inherit; background: transparent; font: inherit; font-variant-numeric: tabular-nums; appearance: textfield; -moz-appearance: textfield; }
+.studio_workspace input[type=number]::-webkit-inner-spin-button, .studio_workspace input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.studio_workspace input[aria-invalid=true] { outline: 1px solid #e38d78; outline-offset: 0; }
+.studio_unit { flex: 0 0 auto; white-space: nowrap; padding-right: 5px; font-size: var(--workspace-meta-font-size, 10px); opacity: .6; }
+.studio_transform_fields { display: flex; flex-direction: column; gap: 11px; }
+.studio_vector { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.studio_vector > strong { grid-column: 1 / -1; font-size: var(--workspace-help-font-size, 11px); font-weight: 500; opacity: .8; }
+.studio_color_field input { box-sizing: border-box; width: 100%; height: 32px; padding: 3px; border: 1px solid var(--ov_border_color, #41484c); border-radius: 5px; background: var(--ov_background_color, #292c30); cursor: pointer; }
+.studio_history { display: flex; flex-direction: column; gap: 6px; list-style: none; margin: 0 0 10px; padding: 0; max-height: 265px; overflow: auto; }
+.studio_history_item { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.studio_history_item .studio_button { flex: 1; min-width: 0; text-align: left; overflow-wrap: anywhere; }
+.studio_history_marker { flex: 0 0 auto; color: var(--studio-accent); font-size: var(--workspace-meta-font-size, 10px); }
+.studio_actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.studio_actions .studio_button { flex: 1 1 110px; font-size: var(--workspace-help-font-size, 11px); }
+.studio_check { display: flex; align-items: center; gap: 7px; margin: 9px 0; font-size: var(--workspace-help-font-size, 11px); }
+.studio_check input { accent-color: var(--studio-accent); }
+.studio_status, .studio_progress { font-size: var(--workspace-help-font-size, 11px); line-height: 1.5; overflow-wrap: anywhere; margin: 9px 0 0; }
+.studio_status { min-height: 1.5em; }
+.studio_progress { color: var(--studio-accent); }
+.studio_progress:empty { display: none; }
+@container (min-width: 500px) {
+    .studio_cards { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+    .studio_fields { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); }
+    .studio_transform_fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+}
+#studio_module_panel { flex: 1; min-height: 0; width: calc(100% - 40px); margin-left: 40px; box-sizing: border-box; padding: 10px 10px 18px; overflow: auto; }
+.module_extended_view > #studio_module_panel { width: 100%; margin: 0; padding: 20px; }
+.module_extended_view[data-module="3dstudio"] > .module_panel_header, .module_extended_view[data-module="3dstudio"] > #studio_module_panel { animation: none; }

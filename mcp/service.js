@@ -15,7 +15,7 @@ const Families = Object.freeze ({
     design : { title : 'Design', categories : ['Scene', 'Objects', 'Materials', 'Lighting', 'View', 'Camera', 'Rendering', 'Animation', 'History'] },
     commands : { title : 'Commands & Macros', categories : ['Commands', 'Macros', 'Messenger'] },
     capture : { title : 'Screen capture', categories : ['Capture'] },
-    modules : { title : 'Modules', categories : ['Packaging', 'Primary Products', 'Molded Pulp', 'AI', 'Panels', 'Knowledge'] },
+    modules : { title : 'Modules', categories : ['Packaging', 'Primary Products', 'Molded Pulp', '3Dstudio', 'AI', 'Panels', 'Knowledge'] },
     sessions : { title : 'Sessions, Library & Conversion', categories : ['Sessions', 'Library', 'Conversion'] },
     settings : { title : 'Settings & Administration', categories : ['Account', 'Administration', 'Preferences', 'Diagnostics'] }
 });

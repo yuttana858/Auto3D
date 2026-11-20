@@ -1,0 +1,22 @@
+{
+  "name": "@auto3d/3dstudio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "exports": "./src/index.js",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "test": "mocha test",
+    "preview": "node tools/preview.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "mocha": "11.8.0",
+    "manifold-3d": "3.5.5",
+    "three": "0.186.1"
+  }
+}
